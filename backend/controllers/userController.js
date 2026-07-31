@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+// 1. User Register karna
 const createUser = async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
@@ -17,13 +18,14 @@ const createUser = async (req, res) => {
     
     res.status(201).json({
       message: "User created successfully",
-      user: { id: user._id, name: user.name, username: user.username, email: user.email },
+      user: { id: user._id, name: user.name, username: user.username, email: user.email, role: user.role },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// 2. User Login karna (Role ke sath)
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -41,12 +43,18 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Wapis sirf userId token mein hai (Role hata diya)
-    const jwtLoginToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    // Token mein role add kiya
+    const jwtLoginToken = jwt.sign(
+      { userId: user._id, role: user.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: "1d" }
+    );
 
+    // Response mein role add kiya
     res.status(200).json({
       message: "Login successful",
       jwtLoginToken,
+      role: user.role,
       user: { id: user._id, name: user.name, username: user.username, email: user.email },
     });
   } catch (error) {
@@ -54,8 +62,13 @@ const loginUser = async (req, res) => {
   }
 };
 
+// 3. Profile get karna (Ye wala function missing tha, isliye error aa raha tha)
 const getProfile = async (req, res) => {
-  res.status(200).json({ message: "Profile accessed successfully", user: req.user });
+  res.status(200).json({ 
+    message: "Profile accessed successfully", 
+    user: req.user 
+  });
 };
 
+// SAB SE ZAROORI LINE: Teeno functions ko export karna
 module.exports = { createUser, loginUser, getProfile };
