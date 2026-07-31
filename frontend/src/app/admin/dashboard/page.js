@@ -1,88 +1,215 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
+import { TrendingUp, TrendingDown, Package, Tag, FolderOpen, DollarSign } from 'lucide-react';
+
+const modules = [
+  { title: 'Brands', description: 'View and manage all your brands.', href: '/admin/brands', icon: Tag, stat: '24 brands' },
+  { title: 'Categories', description: 'Organize your products by category.', href: '/admin/categories', icon: FolderOpen, stat: '12 categories' },
+  { title: 'Products', description: 'Check your inventory and prices.', href: '/admin/products', icon: Package, stat: '156 products' },
+];
+
+const revenueData = [
+  { name: 'Jan', revenue: 4000, expenses: 2400 },
+  { name: 'Feb', revenue: 3000, expenses: 1398 },
+  { name: 'Mar', revenue: 5000, expenses: 3800 },
+  { name: 'Apr', revenue: 4780, expenses: 3908 },
+  { name: 'May', revenue: 5890, expenses: 4800 },
+  { name: 'Jun', revenue: 7390, expenses: 3800 },
+];
+
+const stats = [
+  { label: 'Total Products', value: '156', icon: Package, change: '+12%', up: true },
+  { label: 'Total Brands', value: '24', icon: Tag, change: '+3%', up: true },
+  { label: 'Total Categories', value: '12', icon: FolderOpen, change: '0%', up: true },
+  { label: 'Revenue', value: '$12,450', icon: DollarSign, change: '+18%', up: true },
+];
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [token, setToken] = useState(null);
-
-  // 1. Security Check: Kya user login hai?
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) {
-      router.push('/login');
-    } else {
-      setToken(storedToken);
-    }
-  }, [router]);
-
-  // Jab tak token na aaye, loading dikhao
-  if (!token) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-gray-500 text-lg animate-pulse">Loading Dashboard...</p>
-      </div>
-    );
-  }
-
-  // 2. UI Design (Welcome Message + Modern Gradient Cards)
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      {/* Welcome Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-          Welcome to Dashboard! 👋
-        </h1>
-        <p className="text-gray-500 mt-2 text-sm">Select a module below to get started.</p>
+    <div>
+      {/* Subtitle */}
+      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+        Unified view of finance, inventory, and sales metrics.
+      </p>
+
+      {/* Stats Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {stat.label}
+                </span>
+                <Icon size={16} style={{ color: 'var(--text-muted)' }} />
+              </div>
+              <p style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                {stat.value}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                {stat.up ? (
+                  <TrendingUp size={14} style={{ color: 'var(--success)' }} />
+                ) : (
+                  <TrendingDown size={14} style={{ color: 'var(--danger)' }} />
+                )}
+                <span style={{ color: stat.up ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                  {stat.change}
+                </span>
+                <span style={{ color: 'var(--text-muted)' }}>vs last month</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Shortcut Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Brands Card */}
-        <div 
-          onClick={() => router.push('/dashboard/brands')}
-          className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 group"
-        >
-          {/* Decorative background circle */}
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          
-          <div className="relative z-10">
-            <div className="text-4xl mb-3 drop-shadow-md">🏷️</div>
-            <h2 className="text-2xl font-bold">Brands</h2>
-            <p className="mt-2 text-blue-100 text-sm">View and manage all your brands.</p>
-          </div>
+      {/* Charts Row */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        <div className="card" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>
+            Revenue vs Expenses
+          </h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis stroke="var(--text-muted)" fontSize={12} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <Bar dataKey="revenue" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expenses" fill="var(--danger)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Categories Card */}
-        <div 
-          onClick={() => router.push('/dashboard/categories')}
-          className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-green-600 text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 group"
-        >
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          
-          <div className="relative z-10">
-            <div className="text-4xl mb-3 drop-shadow-md">📂</div>
-            <h2 className="text-2xl font-bold">Categories</h2>
-            <p className="mt-2 text-green-100 text-sm">Organize your products by category.</p>
-          </div>
+        <div className="card" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>
+            Sales Trend
+          </h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis stroke="var(--text-muted)" fontSize={12} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <Line type="monotone" dataKey="revenue" stroke="var(--accent)" strokeWidth={2} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
+      </div>
 
-        {/* Products Card */}
-        <div 
-          onClick={() => router.push('/dashboard/products')}
-          className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-6 rounded-2xl shadow-lg hover:shadow-2xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 group"
-        >
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full group-hover:scale-110 transition-transform duration-300"></div>
-          
-          <div className="relative z-10">
-            <div className="text-4xl mb-3 drop-shadow-md">📦</div>
-            <h2 className="text-2xl font-bold">Products</h2>
-            <p className="mt-2 text-purple-100 text-sm">Check your inventory and prices.</p>
-          </div>
-        </div>
-
+      {/* Quick Access */}
+      <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: 'var(--text-primary)' }}>
+        Quick Access
+      </h2>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '16px',
+        }}
+      >
+        {modules.map((mod) => {
+          const Icon = mod.icon;
+          return (
+            <Link
+              key={mod.href}
+              href={mod.href}
+              className="card"
+              style={{
+                padding: '20px',
+                display: 'flex',
+                gap: '16px',
+                alignItems: 'flex-start',
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+              }}
+            >
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--accent)',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {mod.title}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                    }}
+                  >
+                    {mod.stat}
+                  </span>
+                </div>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  {mod.description}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
