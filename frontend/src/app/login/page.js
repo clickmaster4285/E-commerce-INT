@@ -18,7 +18,7 @@ export default function LoginPage() {
     onSuccess: (data) => {
       // Sirf Token save hoga, Role nahi
       localStorage.setItem('token', data.jwtLoginToken);
-      router.push('/dashboard');
+      router.push('/admin/dashboard');
     },
     onError: (error) => {
       alert(error.response?.data?.message || 'Login failed! Please check your credentials.');

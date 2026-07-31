@@ -17,10 +17,10 @@ export default function DashboardLayout({ children }) {
 
   // Navigation links
   const navLinks = [
-    { name: 'Home', href: '/dashboard', icon: '🏠' },
-    { name: 'Brands', href: '/dashboard/brands', icon: '🏷️' },
-    { name: 'Categories', href: '/dashboard/categories', icon: '📂' },
-    { name: 'Products', href: '/dashboard/products', icon: '📦' },
+    { name: 'Home', href: '/admin/dashboard', icon: '🏠' },
+    { name: 'Brands', href: '/admin/brands', icon: '🏷️' },
+    { name: 'Categories', href: '/admin/categories', icon: '📂' },
+    { name: 'Products', href: '/admin/products', icon: '📦' },
   ];
 
   return (
