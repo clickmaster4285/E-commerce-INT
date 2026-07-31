@@ -28,6 +28,13 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+
+    // --- NAYA FIELD: ROLE ---
+    role: {
+      type: String,
+      default: "user", // By default sab normal user honge
+      enum: ["user", "admin"], // Sirf 'user' ya 'admin' ho sakta hai
+    },
   },
   {
     timestamps: {

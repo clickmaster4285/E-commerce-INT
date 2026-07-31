@@ -3,7 +3,7 @@ import Providers from "./providers";
 
 export const metadata = {
   title: "Inventory App",
-  description: "Inventory Management",
+  description: "Inventory Management System",
 };
 
 export default function RootLayout({ children }) {
