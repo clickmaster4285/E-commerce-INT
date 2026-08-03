@@ -12,20 +12,20 @@ export default function BrandsPage() {
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
+  const [modalMode, setModalMode] = useState('add');
   const [currentBrand, setCurrentBrand] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({ brand_code: '', name: '', description: '' });
 
-  // 1. Security Check
+  // Security Check
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     if (!storedToken) router.push('/login');
     else setToken(storedToken);
   }, [router]);
 
-  // 2. Fetch Brands (GET)
+  // Fetch Brands
   const { data: brands, isLoading, error } = useQuery({
     queryKey: ['brands'],
     queryFn: async () => {
@@ -37,7 +37,7 @@ export default function BrandsPage() {
     enabled: !!token,
   });
 
-  // 3. Create Brand (POST)
+  // Create Brand
   const createMutation = useMutation({
     mutationFn: async (newBrand) => {
       const res = await axios.post('http://localhost:5000/api/brands', newBrand, {
@@ -52,7 +52,7 @@ export default function BrandsPage() {
     onError: (err) => alert(err.response?.data?.message || 'Failed to add brand!')
   });
 
-  // 4. Update Brand (PUT)
+  // Update Brand
   const updateMutation = useMutation({
     mutationFn: async ({ id, updatedData }) => {
       const res = await axios.put(`http://localhost:5000/api/brands/${id}`, updatedData, {
@@ -67,7 +67,7 @@ export default function BrandsPage() {
     onError: (err) => alert(err.response?.data?.message || 'Failed to update brand!')
   });
 
-  // 5. Delete Brand (DELETE)
+  // Delete Brand
   const deleteMutation = useMutation({
     mutationFn: async (id) => {
       const res = await axios.delete(`http://localhost:5000/api/brands/${id}`, {
@@ -81,7 +81,6 @@ export default function BrandsPage() {
     onError: (err) => alert(err.response?.data?.message || 'Failed to delete brand!')
   });
 
-  // Helper Functions
   const openAddModal = () => {
     setModalMode('add');
     setFormData({ brand_code: '', name: '', description: '' });
@@ -121,42 +120,42 @@ export default function BrandsPage() {
   };
 
   if (!token || isLoading) {
-    return <p className="text-center mt-10 text-gray-600 font-semibold animate-pulse">Loading brands...</p>;
+    return <p className="text-center mt-10 font-semibold animate-pulse" style={{ color: 'var(--text-muted)' }}>Loading brands...</p>;
   }
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-gray-100 relative">
+    <div className="rounded-3xl shadow-xl relative" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '32px' }}>
       
-      {/* Header with Add Button */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div className="text-center md:text-left">
-          <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+          <h2 className="text-3xl font-extrabold" style={{ color: 'var(--accent)' }}>
             All Brands
           </h2>
-          <p className="text-gray-500 text-sm mt-1">Manage your inventory brands easily</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Manage your inventory brands easily</p>
         </div>
         <button 
           onClick={openAddModal}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
+          className="btn-primary flex items-center gap-2"
         >
           <span className="text-xl">+</span> Add New Brand
         </button>
       </div>
       
       {error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-center font-semibold">
+        <div className="text-center font-semibold rounded-xl p-4" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
           ⚠️ Error fetching brands! Please check backend.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {brands && brands.map((brand) => (
-            <div key={brand._id} className="group relative bg-white border border-gray-200 p-5 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-300">
+            <div key={brand._id} className="card group relative transition-all duration-300 hover:shadow-lg" style={{ padding: '20px' }}>
               
               {/* Card Content */}
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="font-bold text-xl text-gray-800">{brand.name}</h3>
-                  <p className="text-blue-600 text-xs font-bold bg-blue-50 inline-block px-3 py-1 rounded-full mt-2 border border-blue-100">
+                  <h3 className="font-bold text-xl" style={{ color: 'var(--text-primary)' }}>{brand.name}</h3>
+                  <p className="text-xs font-bold inline-block px-3 py-1 rounded-full mt-2" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent)', border: '1px solid var(--border-color)' }}>
                     Code: {brand.brand_code}
                   </p>
                 </div>
@@ -165,7 +164,8 @@ export default function BrandsPage() {
                 <div className="flex gap-2">
                   <button 
                     onClick={() => openEditModal(brand)}
-                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition font-bold"
+                    className="p-2 rounded-lg transition font-bold"
+                    style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--accent)' }}
                     title="Edit"
                   >
                     ✏️
@@ -173,7 +173,8 @@ export default function BrandsPage() {
                   <button 
                     onClick={() => handleDelete(brand._id, brand.name)}
                     disabled={deleteMutation.isPending}
-                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition font-bold"
+                    className="p-2 rounded-lg transition font-bold"
+                    style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--danger)' }}
                     title="Delete"
                   >
                     🗑️
@@ -182,7 +183,7 @@ export default function BrandsPage() {
               </div>
               
               {brand.description && (
-                <p className="text-gray-600 text-sm mt-3 line-clamp-2 border-t border-gray-100 pt-3">
+                <p className="text-sm mt-3 line-clamp-2" style={{ color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                   {brand.description}
                 </p>
               )}
@@ -191,49 +192,49 @@ export default function BrandsPage() {
         </div>
       )}
 
-      {/* --- MODAL (Add/Edit Form) - SOLID BACKGROUND, NO BLUR --- */}
+      {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 transform transition-all">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+          <div className="card rounded-2xl shadow-2xl w-full max-w-md" style={{ padding: '24px' }}>
             
-            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-              <h3 className="text-xl font-bold text-gray-900">
+            <div className="flex justify-between items-center mb-6 pb-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+              <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
                 {modalMode === 'add' ? '✨ Add New Brand' : '✏️ Edit Brand'}
               </h3>
-              <button onClick={closeModal} className="text-gray-400 hover:text-red-500 text-3xl font-bold leading-none">&times;</button>
+              <button onClick={closeModal} className="text-3xl font-bold leading-none hover:opacity-70 transition" style={{ color: 'var(--text-muted)' }}>&times;</button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Brand Code</label>
+                <label className="block text-sm font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>Brand Code</label>
                 <input
                   type="text"
                   value={formData.brand_code}
                   onChange={(e) => setFormData({...formData, brand_code: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium placeholder-gray-400"
+                  className="input-field"
                   placeholder="e.g., BR001"
                   required
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Brand Name</label>
+                <label className="block text-sm font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>Brand Name</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium placeholder-gray-400"
+                  className="input-field"
                   placeholder="e.g., Nike, Apple"
                   required
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Description</label>
+                <label className="block text-sm font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-medium placeholder-gray-400 resize-none"
+                  className="input-field resize-none"
                   rows="3"
                   placeholder="Optional details about the brand..."
                 />
@@ -243,14 +244,15 @@ export default function BrandsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 bg-gray-50 rounded-xl hover:bg-gray-100 font-bold transition"
+                  className="flex-1 py-3 rounded-xl font-bold transition"
+                  style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="btn-primary flex-1 py-3 rounded-xl font-bold"
                 >
                   {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (modalMode === 'add' ? 'Add Brand' : 'Update Brand')}
                 </button>
