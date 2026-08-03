@@ -1,196 +1,346 @@
 @import "tailwindcss";
 
-/* ========== LIGHT MODE ========== */
+/* =========================================
+   ROOT / DARK THEME
+========================================= */
+
 :root {
-  /* Backgrounds */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --bg-sidebar: #ffffff;
-  --bg-sidebar-hover: #f8f9fa;
-  --bg-sidebar-active: #e9ecef;
-  --bg-navbar: #ffffff;
-  --bg-card: #ffffff;
-  --bg-input: #f8f9fa;
+  --bg-primary: #0b1120;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
 
-  /* Text */
-  --text-primary: #212529;
-  --text-secondary: #495057;
-  --text-muted: #868e96;
-  --text-sidebar: #212529;
-  --text-sidebar-muted: #868e96;
-  --text-navbar: #212529;
-  --text-inverse: #ffffff;
+  --bg-sidebar: #020617;
+  --bg-sidebar-hover: #0f172a;
+  --bg-sidebar-active: #1e293b;
 
-  /* Borders */
-  --border-color: #dee2e6;
-  --border-sidebar: #e9ecef;
-  --border-navbar: #dee2e6;
+  --bg-navbar: #0f172a;
+  --bg-card: #0f172a;
+  --bg-card-alt: #1e293b;
+  --bg-input: #1e293b;
 
-  /* Accent */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+
+  --text-sidebar: #e2e8f0;
+  --text-sidebar-muted: #64748b;
+  --text-navbar: #f1f5f9;
+  --text-inverse: #0b1120;
+
+  --border-color: #1e293b;
+  --border-sidebar: #1e293b;
+  --border-navbar: #1e293b;
+  --border-card: #1e293b;
+
   --accent: #10b981;
   --accent-hover: #059669;
   --accent-text: #ffffff;
+  --accent-soft: rgba(16, 185, 129, 0.1);
 
-  /* Status Colors */
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --success: #10b981;
   --warning: #f59e0b;
   --info: #3b82f6;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
 
-  /* Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  /* Dimensions */
-  --sidebar-width: 260px;
-  --sidebar-collapsed: 72px;
-  --topbar-height: 80px;
+  --sidebar-width: 240px;
+  --topbar-height: 64px;
 }
 
-/* ========== DARK MODE ========== */
-.dark {
-  /* Backgrounds */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-sidebar: #0f172a;
-  --bg-sidebar-hover: #1e293b;
-  --bg-sidebar-active: #334155;
-  --bg-navbar: #0f172a;
-  --bg-card: #1e293b;
-  --bg-input: #1e293b;
+/* =========================================
+   LIGHT THEME
+========================================= */
 
-  /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-sidebar: #f1f5f9;
-  --text-sidebar-muted: #94a3b8;
-  --text-navbar: #f1f5f9;
-  --text-inverse: #0f172a;
+html.light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
 
-  /* Borders */
-  --border-color: #334155;
-  --border-sidebar: #1e293b;
-  --border-navbar: #1e293b;
+  --bg-sidebar: #ffffff;
+  --bg-sidebar-hover: #f1f5f9;
+  --bg-sidebar-active: #e2e8f0;
 
-  /* Accent */
-  --accent: #10b981;
-  --accent-hover: #34d399;
+  --bg-navbar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f8fafc;
+  --bg-input: #f1f5f9;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  --text-sidebar: #1e293b;
+  --text-sidebar-muted: #64748b;
+  --text-navbar: #0f172a;
+  --text-inverse: #ffffff;
+
+  --border-color: #e2e8f0;
+  --border-sidebar: #e2e8f0;
+  --border-navbar: #e2e8f0;
+  --border-card: #e2e8f0;
+
+  --accent: #059669;
+  --accent-hover: #047857;
   --accent-text: #ffffff;
+  --accent-soft: rgba(5, 150, 105, 0.1);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 }
 
-/* ========== BASE ========== */
-* {
+/* =========================================
+   GLOBAL RESET
+========================================= */
+
+/*
+  Important:
+  Yahan margin aur padding ko global level par reset nahi karna,
+  warna Tailwind ki px, py, mt, mb aur gap classes override hoti hain.
+*/
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
-html,
-body {
+html {
   height: 100%;
   background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.3s ease;
 }
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* =========================================
+   DEFAULT ELEMENTS
+========================================= */
 
 a {
   color: inherit;
   text-decoration: none;
 }
 
-button {
-  font-family: inherit;
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
-/* ========== SCROLLBAR ========== */
+button {
+  cursor: pointer;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  /* Sirf default browser margin remove kar rahe hain */
+  margin: 0;
+}
+
+/* =========================================
+   SCROLLBAR
+========================================= */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--bg-secondary);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: 999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
 
-/* ========== UTILITIES ========== */
-.card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tertiary) var(--bg-secondary);
 }
 
+/* =========================================
+   MAIN CONTENT SCROLLING
+========================================= */
+
+main {
+  min-width: 0;
+}
+
+main::-webkit-scrollbar {
+  width: 8px;
+}
+
+main::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+main::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+}
+
+/* =========================================
+   SIDEBAR SCROLLBAR
+========================================= */
+
+.sidebar-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-tertiary) transparent;
+}
+
+.sidebar-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-wrapper::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+}
+
+/* =========================================
+   REUSABLE CARD
+========================================= */
+
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* =========================================
+   BUTTON
+========================================= */
+
 .btn-primary {
+  border: none;
+  border-radius: var(--radius-sm);
   background-color: var(--accent);
   color: var(--accent-text);
   padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
   font-size: 14px;
-  border: none;
-  cursor: pointer;
+  font-weight: 500;
   transition: background-color 0.15s ease;
 }
+
 .btn-primary:hover {
   background-color: var(--accent-hover);
 }
 
-.btn-danger {
-  background-color: var(--danger);
-  color: #fff;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  font-size: 14px;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-.btn-danger:hover {
-  background-color: var(--danger-hover);
-}
+/* =========================================
+   INPUT
+========================================= */
 
 .input-field {
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
   width: 100%;
   outline: none;
-  transition: border-color 0.15s ease;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 14px;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.3s ease;
 }
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
 .input-field:focus {
   border-color: var(--accent);
 }
 
-/* ========== RESPONSIVE ========== */
+/* =========================================
+   SECTION HEADER
+========================================= */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* =========================================
+   PROGRESS BAR
+========================================= */
+
+.progress-bar {
+  height: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 2px;
+  background-color: var(--bg-tertiary);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--danger);
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
 @media (max-width: 768px) {
-  :root {
-    --sidebar-width: 260px;
+:root {
+    --sidebar-width: 280px;
   }
 }

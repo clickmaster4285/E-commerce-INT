@@ -1,32 +1,6 @@
-'use client';
+import React from 'react'
 
-import Link from 'next/link';
-
-const modules = [
-  {
-    title: 'Brands',
-    description: 'View and manage all your brands.',
-    href: '/admin/brands',
-    icon: '🏷️',
-    stat: '24 brands',
-  },
-  {
-    title: 'Categories',
-    description: 'Organize your products by category.',
-    href: '/admin/categories',
-    icon: '📁',
-    stat: '12 categories',
-  },
-  {
-    title: 'Products',
-    description: 'Check your inventory and prices.',
-    href: '/admin/products',
-    icon: '',
-    stat: '156 products',
-  },
-];
-
-export default function DashboardPage() {
+const page = () => {
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
@@ -119,5 +93,7 @@ export default function DashboardPage() {
         ))}
       </div>
     </div>
-  );
+  )
 }
+
+export default page
