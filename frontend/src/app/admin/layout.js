@@ -1,114 +1,65 @@
 'use client';
-
+ 
 import { useState, useEffect } from 'react';
 import Sidebar from '../Component/Sidebar';
 import Navbar from '../Component/Navbar';
-
+ 
 export default function AdminLayout({ children }) {
-  const [theme, setTheme] = useState('light');
-  const [mobileOpen, setMobileOpen] = useState(false);
-
+  const [theme, setTheme] = useState('dark');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+ 
   useEffect(() => {
-    const saved = localStorage.getItem('theme') || 'light';
+    const saved = localStorage.getItem('theme') || 'dark';
     setTheme(saved);
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-    }
+    document.documentElement.classList.toggle('light', saved === 'light');
   }, []);
-
+ 
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    if (newTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('light', newTheme === 'light');
   };
-
+ 
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const closeSidebar = () => setSidebarOpen(false);
+ 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Mobile overlay */}
-      {mobileOpen && (
+    <div className="flex h-screen overflow-hidden">
+ 
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
         <div
-          onClick={() => setMobileOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            zIndex: 40,
-            display: 'block',
-          }}
-          className="mobile-only"
+          onClick={closeSidebar}
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          aria-hidden="true"
         />
       )}
-
+ 
       {/* Sidebar */}
       <div
-        className={`sidebar-wrapper ${mobileOpen ? 'sidebar-open' : ''}`}
-        style={{
-          position: 'relative',
-          zIndex: 50,
-        }}
+        className={`
+          sidebar-wrapper shrink-0 h-screen z-50
+          fixed md:relative top-0 left-0
+          transition-transform duration-300 ease-in-out
+          md:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
       >
-        <Sidebar />
+        <Sidebar onNavigate={closeSidebar} />
       </div>
-
-      {/* Main */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <Navbar
-          theme={theme}
-          toggleTheme={toggleTheme}
-          onMenuToggle={() => setMobileOpen(!mobileOpen)}
-        />
-
-        <main
-          style={{
-            flex: 1,
-            padding: '24px',
-            backgroundColor: 'var(--bg-secondary)',
-            overflow: 'auto',
-          }}
-        >
+ 
+      {/* Main Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+ 
+        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} />
+ 
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
           {children}
         </main>
+ 
       </div>
-
-      {/* Responsive Styles */}
-      <style jsx global>{`
-        .mobile-only {
-          display: none !important;
-        }
-        .hide-mobile {
-          display: block;
-        }
-        .sidebar-wrapper {
-          flex-shrink: 0;
-        }
-        @media (max-width: 768px) {
-          .mobile-only {
-            display: block !important;
-          }
-          .hide-mobile {
-            display: none !important;
-          }
-          .sidebar-wrapper {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            transform: translateX(-100%);
-            transition: transform 0.25s ease;
-          }
-          .sidebar-wrapper.sidebar-open {
-            transform: translateX(0);
-          }
-          main {
-            padding: 16px !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
+ 

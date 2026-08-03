@@ -6,13 +6,13 @@ const adminMiddleware = require("../middleware/adminMiddleware"); // <--- Naya i
 const router = express.Router();
 
 // Sirf ADMIN add, update, delete kar sakta hai
-router.post("/", authMiddleware, adminMiddleware, createBrand);
-router.put("/:id", authMiddleware, adminMiddleware, updateBrand);
-router.delete("/:id", authMiddleware, adminMiddleware, deleteBrand);
+router.post("/",  createBrand);
+router.put("/:id", updateBrand);
+router.delete("/:id", deleteBrand);
 
 // Sab (Admin aur User) dekh sakte hain
-router.get("/", authMiddleware, getBrands);
-router.get("/:id/details", authMiddleware, getBrandWithProducts);
-router.get("/:id", authMiddleware, getBrandById);
+router.get("/", getBrands);
+router.get("/:id/details", getBrandWithProducts);
+router.get("/:id", getBrandById);
 
 module.exports = router;

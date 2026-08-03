@@ -887,5 +887,7 @@ export default function ProductsPage() {
         </div>
       )}
     </div>
-  );
+  )
 }
+
+export default page
