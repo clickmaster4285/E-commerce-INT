@@ -1,235 +1,241 @@
-'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+
 import {
-  LayoutDashboard,
-  Tag,
   FolderOpen,
+  Tag,
   Package,
-  Users,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  Zap,
-} from 'lucide-react';
+  LayoutDashboard,
+  Menu,
+  X,
+} from "lucide-react";
 
-const navItems = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Brands', href: '/admin/brands', icon: Tag },
-  { label: 'Categories', href: '/admin/categories', icon: FolderOpen },
-  { label: 'Products', href: '/admin/products', icon: Package },
-  { label: 'Users', href: '/admin/users', icon: Users },
+const menu = [
+  {
+    name: "Dashboard",
+    icon: LayoutDashboard,
+    path: "/admin/dashboard",
+  },
+  {
+    name: "Brands",
+    icon: Tag,
+    path: "/admin/brands",
+  },
+  {
+    name: "Categories",
+    icon: FolderOpen,
+    path: "/admin/categories",
+  },
+  {
+    name: "Products",
+    icon: Package,
+    path: "/admin/products",
+  },
 ];
 
 export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-
-  const isActive = (href) => pathname === href;
+  const [open, setOpen] = useState(false);
 
   return (
-    <aside
-      style={{
-        width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)',
-        backgroundColor: 'var(--bg-sidebar)',
-        color: 'var(--text-sidebar)',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.25s ease',
-        borderRight: '1px solid var(--border-sidebar)',
-        position: 'relative',
-        minHeight: '100vh',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Logo */}
-      <div
-        style={{
-          padding: collapsed ? '16px 12px' : '16px 20px',
-          borderBottom: '1px solid var(--border-sidebar)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          minHeight: '64px',
-        }}
+    <>
+      {/* Mobile Open Button */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open sidebar"
+        className="
+          fixed left-4 top-4 z-[60]
+          rounded-lg
+          border border-[var(--border-color)]
+          bg-[var(--bg-sidebar)]
+          p-2.5
+          text-[var(--text-sidebar)]
+          shadow-md
+          transition-colors
+          hover:bg-[var(--bg-sidebar-hover)]
+          lg:hidden
+        "
       >
+        <Menu size={21} />
+      </button>
+
+      {/* Mobile Overlay */}
+      {open && (
         <div
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            backgroundColor: 'var(--accent)',
-            color: 'var(--accent-text)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '16px',
-            flexShrink: 0,
-          }}
-        >
-          C
-        </div>
-        {!collapsed && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.01em' }}>
-              ClickMaster
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-sidebar-muted)' }}>
-              v1.3
-            </span>
-          </div>
-        )}
-      </div>
+          onClick={() => setOpen(false)}
+          className="
+            fixed inset-0 z-40
+            bg-black/40
+            lg:hidden
+          "
+        />
+      )}
 
-      {/* Nav */}
-      <nav
-        style={{
-          flex: 1,
-          padding: '16px 8px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-          overflowY: 'auto',
-        }}
+      {/* Sidebar */}
+      <aside
+        className={`
+          fixed left-0 top-0 z-50
+          flex h-screen w-[260px] flex-col
+          overflow-hidden
+          border-r border-[var(--border-sidebar)]
+          bg-[var(--bg-sidebar)]
+          text-[var(--text-sidebar)]
+          shadow-xl
+          transition-transform duration-300
+          lg:sticky lg:translate-x-0 lg:shadow-none
+          ${open? "translate-x-0": "-translate-x-full"}
+        `}
       >
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: collapsed ? '12px' : '12px 16px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                backgroundColor: active ? 'var(--bg-sidebar-active)' : 'transparent',
-                borderRadius: 'var(--radius-sm)',
-                color: active ? 'var(--accent)' : 'var(--text-sidebar)',
-                fontWeight: active ? 600 : 400,
-                fontSize: '14px',
-                transition: 'all 0.15s ease',
-                borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
-              }}
-              onMouseEnter={(e) => {
-                if (!active) e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)';
-              }}
-              onMouseLeave={(e) => {
-                if (!active) e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <Icon size={18} style={{ flexShrink: 0 }} />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Footer Section - Settings, Logout & Collapse Arrow */}
-      <div
-        style={{
-          padding: collapsed ? '12px 8px' : '12px 12px',
-          borderTop: '1px solid var(--border-sidebar)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <Link
-          href=""
-          title={collapsed ? 'Settings' : undefined}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: collapsed ? '12px' : '12px 16px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            color: 'var(--text-sidebar)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '14px',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        {/* Brand Header */}
+        <div
+          className="
+            relative flex h-[78px] shrink-0
+            items-center gap-3
+            border-b border-[var(--border-sidebar)]
+            bg-[var(--bg-sidebar)]
+            px-5
+          "
         >
-          <Settings size={18} />
-          {!collapsed && <span>Settings</span>}
-        </Link>
-        
-        <Link
-          href="/login"
-          title={collapsed ? 'Logout' : undefined}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: collapsed ? '12px' : '12px 16px',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            color: 'var(--danger)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '14px',
-            fontWeight: 500,
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-        >
-        
-          <LogOut size={18} />
-          {!collapsed && <span>Logout</span>}
-        </Link>
-
-        {!collapsed && (
+          {/* CM Monogram */}
           <div
-            style={{
-              fontSize: '11px',
-              color: 'var(--text-sidebar-muted)',
-              padding: '12px 12px 8px',
-              textAlign: 'center',
-              borderTop: '1px solid var(--border-sidebar)',
-              marginTop: '8px',
-            }}
+            className="
+              relative flex h-10 w-10 shrink-0
+              items-center justify-center
+              rounded-xl
+              border border-emerald-500/40
+              bg-[#0f2a2a]
+              shadow-sm
+            "
           >
-            Powered by <strong>ClickMasters</strong> · v1.3
-          </div>
-        )}
+            <div className="absolute inset-1 rounded-lg border border-emerald-400/20" />
 
-        {/* Collapse Toggle Button - AT THE END */}
-        {/* <button
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{
-            width: '100%',
-            padding: '10px',
-            marginTop: '8px',
-            backgroundColor: 'var(--bg-sidebar-hover)',
-            border: '1px solid var(--border-sidebar)',
-            color: 'var(--text-sidebar)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 'var(--radius-sm)',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-active)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-sidebar-hover)';
-          }}
+            <span
+              className="
+                relative z-10
+                text-[15px]
+                font-extrabold
+                tracking-[-0.08em]
+                text-emerald-400
+              "
+            >
+              CM
+            </span>
+          </div>
+
+          {/* Brand Name */}
+          <div className="min-w-0">
+            <h1 className="truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
+              Click Master
+            </h1>
+
+            <p className="mt-1 truncate text-[10px] font-medium leading-tight text-[var(--text-muted)]">
+              Admin Control Panel
+            </p>
+          </div>
+
+          {/* Mobile Close Button */}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close sidebar"
+            className="
+              ml-auto shrink-0
+              rounded-md p-1
+              text-[var(--text-muted)]
+              transition-colors
+              hover:bg-[var(--bg-sidebar-hover)]
+              hover:text-[var(--text-primary)]
+              lg:hidden
+            "
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-4 py-6">
+          <div className="flex flex-col gap-1.5">
+            {menu.map((item) => {
+              const Icon = item.icon;
+
+              const active =
+                pathname === item.path ||
+                pathname.startsWith(`${item.path}/`);
+
+              return (
+                <Link
+                  key={item.name}
+                  href={item.path}
+                  onClick={() => setOpen(false)}
+                  className={`
+                    group flex h-11 w-full
+                    items-center gap-3
+                    rounded-lg
+                    border-l-2
+                    px-4
+                    text-sm font-medium
+                    transition-all duration-200
+
+                    ${
+                      active
+? `
+                          border-l-[var(--accent)]
+                          bg-[var(--bg-sidebar-active)]
+                          text-[var(--text-primary)]
+                        `
+: `
+                          border-l-transparent
+                          text-[var(--text-secondary)]
+                          hover:bg-[var(--bg-sidebar-hover)]
+                          hover:text-[var(--text-primary)]
+                        `
+                    }
+                  `}
+                >
+                  <Icon
+                    size={19}
+                    strokeWidth={active? 2.4: 2}
+                    className={`
+                      shrink-0
+                      transition-transform duration-200
+                      ${
+                        active
+? "text-[var(--accent)]"
+: "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                      }
+                    `}
+                  />
+
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div
+          className="
+            shrink-0
+            border-t border-[var(--border-sidebar)]
+            px-5 py-4
+          "
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          {!collapsed && <span style={{ marginLeft: '8px', fontSize: '13px' }}>Collapse</span>}
-        </button> */}
-      </div>
-    </aside>
+          <p className="text-[10px] font-medium text-[var(--text-muted)]">
+            Powered by{" "}
+            <span className="text-[var(--text-secondary)]">
+              ClickMasters
+            </span>{" "}
+            <span className="mx-1 text-[var(--border-color)]">·</span>
+            <span className="text-[var(--text-muted)]">v1.0</span>
+          </p>
+        </div>
+      </aside>
+    </>
   );
 }

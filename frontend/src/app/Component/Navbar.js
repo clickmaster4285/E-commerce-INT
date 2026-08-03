@@ -1,161 +1,150 @@
 'use client';
 
-import { Search, Bell, Sun, Moon, Menu } from 'lucide-react';
+import { Menu, Sun, Moon, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-export default function Navbar({ theme, toggleTheme, onMenuToggle }) {
+export default function Navbar({
+  theme,
+  toggleTheme,
+  onMenuClick,
+}) {
+  const router = useRouter();
+
+  const isDark = theme === 'dark';
+
+  const handleLogout = () => {
+    const confirmLogout = window.confirm(
+      'Are you sure you want to logout?'
+    );
+
+    if (!confirmLogout) return;
+
+    // Common authentication data clear
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('accessToken');
+
+    sessionStorage.clear();
+
+    // Login page par redirect
+    router.push('/login');
+  };
+
   return (
     <header
-      style={{
-        backgroundColor: 'var(--bg-navbar)',
-        borderBottom: '1px solid var(--border-navbar)',
-        padding: '16px 24px',
-      }}
+      className={`sticky top-0 z-40 flex h-16 items-center justify-between border-b px-4 transition-colors duration-300 sm:px-6 ${
+        isDark
+? 'border-slate-800 bg-slate-950'
+: 'border-slate-200 bg-white'
+      }`}
     >
-      {/* Top Row: Search + Actions */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '16px',
-          marginBottom: '16px',
-        }}
-      >
-        {/* Search Bar */}
-        <div
-          style={{
-            flex: 1,
-            maxWidth: '500px',
-            position: 'relative',
-          }}
+      {/* Left Section */}
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+        {/* Mobile Menu Button */}
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open menu"
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition ${
+            isDark
+? 'border-slate-700 hover:bg-slate-800'
+: 'border-slate-200 hover:bg-slate-100'
+          } md:hidden`}
         >
-          <Search
-            size={16}
-            style={{
-              position: 'absolute',
-              left: '14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-            }}
+          <Menu
+            size={20}
+            className={
+              isDark? 'text-slate-300': 'text-slate-700'
+            }
           />
-          <input
-            type="text"
-            placeholder="Search modules, records..."
-            className="input-field"
-            style={{
-              paddingLeft: '42px',
-              height: '42px',
-              backgroundColor: 'var(--bg-input)',
-              border: '1px solid var(--border-navbar)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '14px',
-              color: 'var(--text-primary)',
-            }}
-          />
-        </div>
+        </button>
 
-        {/* Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: 'var(--text-navbar)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+        {/* Page/Header Area */}
+        <div className="min-w-0">
+          <p
+            className={`truncate text-sm font-medium sm:text-base ${
+              isDark? 'text-white': 'text-slate-900'
+            }`}
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
+            Admin Dashboard
+          </p>
 
-          <button
-            aria-label="Notifications"
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: 'var(--text-navbar)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative',
-            }}
+          <p
+            className={`hidden text-xs sm:block ${
+              isDark? 'text-slate-400': 'text-slate-500'
+            }`}
           >
-            <Bell size={18} />
-            <span
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--danger)',
-              }}
-            />
-          </button>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              marginLeft: '8px',
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-navbar)' }}>
-                admin1
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                COMPANY_ADMIN
-              </span>
-            </div>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--accent)',
-                color: 'var(--accent-text)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '14px',
-                fontWeight: 600,
-              }}
-            >
-              A
-            </div>
-          </div>
+            Manage your business
+          </p>
         </div>
       </div>
 
-      {/* Bottom Row: Breadcrumb + Title */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-          <span>Dashboard</span>
-          <span>›</span>
-          <span style={{ color: 'var(--text-navbar)', fontWeight: 500 }}>Overview</span>
+      {/* Right Section */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Theme Toggle */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          title={isDark? 'Switch to light mode': 'Switch to dark mode'}
+          className={`flex h-10 w-10 items-center justify-center rounded-lg border transition ${
+            isDark
+? 'border-slate-700 hover:bg-slate-800'
+: 'border-slate-200 hover:bg-slate-100'
+          }`}
+        >
+          {isDark? (
+            <Sun size={18} className="text-yellow-400" />
+          ): (
+            <Moon size={18} className="text-slate-700" />
+          )}
+        </button>
+
+        {/* Profile */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden text-right md:block">
+            <p
+              className={`text-sm font-semibold ${
+                isDark? 'text-white': 'text-slate-900'
+              }`}
+            >
+              Admin
+            </p>
+
+            <p
+              className={`text-xs ${
+                isDark? 'text-slate-400': 'text-slate-500'
+              }`}
+            >
+              Company Admin
+            </p>
+          </div>
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600 font-semibold text-white">
+            A
+          </div>
         </div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-navbar)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
-          Business Dashboard
-        </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-          Unified view of finance, inventory, and sales metrics.
-        </p>
+
+        {/* Logout Button */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Logout"
+          className={`flex h-10 items-center gap-2 rounded-lg border px-3 transition ${
+            isDark
+? 'border-red-900/60 text-red-400 hover:bg-red-950/50'
+: 'border-red-200 text-red-600 hover:bg-red-50'
+          }`}
+        >
+          <LogOut size={17} />
+
+          <span className="hidden text-sm font-medium sm:inline">
+            Logout
+          </span>
+        </button>
       </div>
     </header>
   );
 }
+
