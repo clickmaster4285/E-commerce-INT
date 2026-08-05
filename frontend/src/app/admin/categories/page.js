@@ -1,264 +1,1125 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  FolderOpen,
+  Grid3x3,
+  List,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+
+import { toast } from "sonner";
+import { categoryApi } from "@/apis/categoryApi";
+
+const ITEMS_PER_PAGE = 20;
+
+const initialForm = {
+  category_code: "",
+  name: "",
+  description: "",
+  is_active: true,
+};
 
 export default function CategoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [token, setToken] = useState(null);
 
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
-  const [currentCategory, setCurrentCategory] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [viewMode, setViewMode] = useState("table");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Form State
-  const [formData, setFormData] = useState({ category_code: '', name: '', description: '' });
+  const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
 
-  // 1. Security Check
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) router.push('/login');
-    else setToken(storedToken);
-  }, [router]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
-  // 2. Fetch Categories (GET)
-  const { data: categories, isLoading, error } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const response = await axios.get('http://localhost:5000/api/categories', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      return response.data;
-    },
-    enabled: !!token,
+  const [formData, setFormData] = useState(initialForm);
+
+  // ==========================================
+  // GET CATEGORIES
+  // ==========================================
+
+  const {
+    data: categories = [],
+    isLoading,
+  } = useQuery({
+    queryKey: ["categories"],
+    queryFn: categoryApi.getAll,
   });
 
-  // 3. Create Category (POST)
-  const createMutation = useMutation({
-    mutationFn: async (newCategory) => {
-      const res = await axios.post('http://localhost:5000/api/categories', newCategory, {
-        headers: { 'Authorization': `Bearer ${token}` }
+  // ==========================================
+  // CREATE / UPDATE
+  // ==========================================
+
+  const categoryMutation = useMutation({
+    mutationFn: ({ id, data }) => {
+      return id
+        ? categoryApi.update(id, data)
+        : categoryApi.create(data);
+    },
+
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["categories"],
       });
-      return res.data;
+
+      toast.success(
+        variables.id
+          ? "Category updated successfully"
+          : "Category added successfully"
+      );
+
+      closeFormModal();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      closeModal();
+
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message ||
+          "Category operation failed"
+      );
     },
-    onError: (err) => alert(err.response?.data?.message || 'Failed to add category!')
   });
 
-  // 4. Update Category (PUT)
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, updatedData }) => {
-      const res = await axios.put(`http://localhost:5000/api/categories/${id}`, updatedData, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
-      closeModal();
-    },
-    onError: (err) => alert(err.response?.data?.message || 'Failed to update category!')
-  });
+  // ==========================================
+  // DELETE
+  // ==========================================
 
-  // 5. Delete Category (DELETE)
   const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await axios.delete(`http://localhost:5000/api/categories/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      return res.data;
-    },
+    mutationFn: categoryApi.delete,
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({
+        queryKey: ["categories"],
+      });
+
+      toast.success("Category deleted successfully");
+
+      setShowDeleteModal(false);
+      setCategoryToDelete(null);
     },
-    onError: (err) => alert(err.response?.data?.message || 'Failed to delete category!')
+
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message ||
+          "Category delete failed"
+      );
+    },
   });
 
-  // Helper Functions
-  const openAddModal = () => {
-    setModalMode('add');
-    setFormData({ category_code: '', name: '', description: '' });
-    setIsModalOpen(true);
+  // ==========================================
+  // FILTER
+  // ==========================================
+
+  const filteredCategories = categories.filter((category) => {
+    const keyword = search.trim().toLowerCase();
+
+    const matchSearch =
+      !keyword ||
+      category.name?.toLowerCase().includes(keyword) ||
+      category.category_code?.toLowerCase().includes(keyword);
+
+    const matchStatus =
+      filterStatus === "all" ||
+      (filterStatus === "active" && category.is_active) ||
+      (filterStatus === "inactive" && !category.is_active);
+
+    return matchSearch && matchStatus;
+  });
+
+  // ==========================================
+  // PAGINATION
+  // ==========================================
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCategories.length / ITEMS_PER_PAGE)
+  );
+
+  const paginatedCategories = filteredCategories.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // ==========================================
+  // STATS
+  // ==========================================
+
+  const totalCategories = categories.length;
+
+  const activeCategories = categories.filter(
+    (category) => category.is_active
+  ).length;
+
+  const inactiveCategories =
+    totalCategories - activeCategories;
+
+  // ==========================================
+  // DETAIL PAGE
+  // ==========================================
+
+  const openCategoryDetails = (category) => {
+    router.push(`/admin/categories/${category._id}`);
   };
 
-  const openEditModal = (category) => {
-    setModalMode('edit');
-    setCurrentCategory(category);
-    setFormData({ 
-      category_code: category.category_code, 
-      name: category.name, 
-      description: category.description || '' 
+  // ==========================================
+  // FORM
+  // ==========================================
+
+  const resetForm = () => {
+    setFormData(initialForm);
+    setEditingCategory(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setShowModal(true);
+  };
+
+  const closeFormModal = () => {
+    setShowModal(false);
+    resetForm();
+  };
+
+  const handleEdit = (category) => {
+    setEditingCategory(category);
+
+    setFormData({
+      category_code: category.category_code || "",
+      name: category.name || "",
+      description: category.description || "",
+      is_active:
+        category.is_active !== undefined
+          ? category.is_active
+          : true,
     });
-    setIsModalOpen(true);
+
+    setShowModal(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setCurrentCategory(null);
-    setFormData({ category_code: '', name: '', description: '' });
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    categoryMutation.mutate({
+      id: editingCategory?._id,
+
+      data: {
+        category_code: formData.category_code.trim(),
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        is_active: formData.is_active,
+      },
+    });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (modalMode === 'add') {
-      createMutation.mutate(formData);
-    } else {
-      updateMutation.mutate({ id: currentCategory._id, updatedData: formData });
-    }
+  // ==========================================
+  // DELETE MODAL
+  // ==========================================
+
+  const handleDeleteClick = (category) => {
+    setCategoryToDelete(category);
+    setShowDeleteModal(true);
   };
 
-  const handleDelete = (id, name) => {
-    if (window.confirm(`Kya aap waqai "${name}" ko delete karna chahte hain?`)) {
-      deleteMutation.mutate(id);
-    }
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setCategoryToDelete(null);
   };
 
-  if (!token || isLoading) {
-    return <p className="text-center mt-10 text-gray-600 font-semibold animate-pulse">Loading categories...</p>;
-  }
+  const confirmDelete = () => {
+    if (!categoryToDelete) return;
+
+    deleteMutation.mutate(categoryToDelete._id);
+  };
+
+  // ==========================================
+  // SEARCH
+  // ==========================================
+
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (event) => {
+    setFilterStatus(event.target.value);
+    setCurrentPage(1);
+  };
+
+  const isSubmitting = categoryMutation.isPending;
+  const isDeleting = deleteMutation.isPending;
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-gray-100 relative">
-      
-      {/* Header with Add Button */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <div className="text-center md:text-left">
-          <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600">
-            All Categories
-          </h2>
-          <p className="text-gray-500 text-sm mt-1">Organize and manage your product categories</p>
+    <div
+      className="min-h-screen space-y-6 p-6"
+      style={{
+        // backgroundColor: "var(--bg-primary)",
+        color: "var(--text-primary)",
+      }}
+    >
+      {/* HEADER */}
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-3xl font-bold">
+            <FolderOpen
+              className="h-8 w-8"
+              style={{ color: "var(--accent)" }}
+            />
+
+            Categories
+          </h1>
+
+          <p
+            className="mt-1 text-sm"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Organize and manage your product categories
+          </p>
         </div>
-        <button 
-          onClick={openAddModal}
-          className="bg-gradient-to-r from-emerald-600 to-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2"
-        >
-          <span className="text-xl">+</span> Add New Category
-        </button>
+
+        <div className="flex items-center gap-3">
+          <div
+            className="flex rounded-lg p-1"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              title="Table view"
+              className={`rounded-md p-2 transition ${
+                viewMode === "table"
+                  ? "bg-emerald-600 text-white"
+                  : ""
+              }`}
+              style={{
+                color:
+                  viewMode !== "table"
+                    ? "var(--text-muted)"
+                    : undefined,
+              }}
+            >
+              <List className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              title="Grid view"
+              className={`rounded-md p-2 transition ${
+                viewMode === "grid"
+                  ? "bg-emerald-600 text-white"
+                  : ""
+              }`}
+              style={{
+                color:
+                  viewMode !== "grid"
+                    ? "var(--text-muted)"
+                    : undefined,
+              }}
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:scale-105"
+            style={{
+              backgroundColor: "var(--accent)",
+              color: "var(--accent-text)",
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Category
+          </button>
+        </div>
       </div>
-      
-      {error ? (
-        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-xl text-center font-semibold">
-          ⚠️ Error fetching categories! Please check backend.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {categories && categories.map((category) => (
-            <div key={category._id} className="group relative bg-white border border-gray-200 p-5 rounded-2xl shadow-sm hover:shadow-lg hover:border-emerald-300 transition-all duration-300">
-              
-              {/* Card Content */}
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-bold text-xl text-gray-800">{category.name}</h3>
-                  <p className="text-emerald-600 text-xs font-bold bg-emerald-50 inline-block px-3 py-1 rounded-full mt-2 border border-emerald-100">
-                    Code: {category.category_code}
-                  </p>
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => openEditModal(category)}
-                    className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition font-bold"
-                    title="Edit"
-                  >
-                    ✏️
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(category._id, category.name)}
-                    disabled={deleteMutation.isPending}
-                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition font-bold"
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-              
-              {category.description && (
-                <p className="text-gray-600 text-sm mt-3 line-clamp-2 border-t border-gray-100 pt-3">
-                  {category.description}
-                </p>
-              )}
-            </div>
-          ))}
+
+      {/* STATS */}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Total Categories"
+          value={totalCategories}
+        />
+
+        <StatCard
+          title="Active"
+          value={activeCategories}
+          color="var(--success)"
+        />
+
+        <StatCard
+          title="Inactive"
+          value={inactiveCategories}
+          color="var(--danger)"
+        />
+      </div>
+
+      {/* SEARCH */}
+
+     <div
+  className="rounded-xl p-4"
+  style={{
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+  }}
+>
+  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
+    
+    {/* SEARCH - BIG */}
+    <div className="relative w-full">
+      <Search
+        className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
+        style={{ color: "var(--text-muted)" }}
+      />
+
+      <input
+        type="text"
+        value={search}
+        onChange={handleSearchChange}
+        placeholder="Search by category name or code..."
+        className="input-field w-full !pl-10"
+      />
+    </div>
+
+    {/* STATUS - SMALL */}
+    <select
+      value={filterStatus}
+      onChange={handleFilterChange}
+      className="input-field w-full"
+    >
+      <option value="all">All Status</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+
+  </div>
+</div>
+
+      {/* TABLE */}
+
+      {viewMode === "table" && (
+        <div
+          className="overflow-hidden rounded-xl"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+          }}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                }}
+              >
+                <tr>
+                  <TableHeading>Category Code</TableHeading>
+                  <TableHeading>Category Name</TableHeading>
+
+                  <TableHeading className="hidden md:table-cell">
+                    Description
+                  </TableHeading>
+
+                  <TableHeading>Status</TableHeading>
+
+                  <TableHeading right>
+                    Actions
+                  </TableHeading>
+                </tr>
+              </thead>
+
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-14 text-center"
+                    >
+                      Loading categories...
+                    </td>
+                  </tr>
+                ) : paginatedCategories.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-14 text-center"
+                      style={{
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <FolderOpen className="mx-auto mb-3 h-10 w-10 opacity-30" />
+
+                      No categories found
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedCategories.map((category) => (
+                    <tr
+                      key={category._id}
+                      onClick={() =>
+                        openCategoryDetails(category)
+                      }
+                      className="cursor-pointer transition hover:bg-black/5"
+                      style={{
+                        borderTop:
+                          "1px solid var(--border-color)",
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <code
+                          className="rounded-md px-2 py-1 text-xs font-mono"
+                          style={{
+                            backgroundColor:
+                              "var(--bg-tertiary)",
+
+                            color: "var(--accent)",
+                          }}
+                        >
+                          {category.category_code || "—"}
+                        </code>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <p
+                          className="font-semibold transition hover:underline"
+                          style={{
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {category.name}
+                        </p>
+                      </td>
+
+                      <td className="hidden max-w-xs px-6 py-4 md:table-cell">
+                        <p
+                          className="truncate text-sm"
+                          style={{
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          {category.description || "—"}
+                        </p>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <StatusBadge
+                          active={category.is_active}
+                        />
+                      </td>
+
+                      <td
+                        className="px-6 py-4"
+                        onClick={(event) =>
+                          event.stopPropagation()
+                        }
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          <IconButton
+                            title="Edit category"
+                            color="var(--info)"
+                            background="rgba(59,130,246,.10)"
+                            onClick={() =>
+                              handleEdit(category)
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </IconButton>
+
+                          <IconButton
+                            title="Delete category"
+                            color="var(--danger)"
+                            background="rgba(239,68,68,.10)"
+                            disabled={isDeleting}
+                            onClick={() =>
+                              handleDeleteClick(category)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* --- MODAL (Add/Edit Form) - SOLID BACKGROUND, NO BLUR --- */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-200 transform transition-all">
-            
-            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-              <h3 className="text-xl font-bold text-gray-900">
-                {modalMode === 'add' ? '✨ Add New Category' : '✏️ Edit Category'}
-              </h3>
-              <button onClick={closeModal} className="text-gray-400 hover:text-red-500 text-3xl font-bold leading-none">&times;</button>
+      {/* GRID */}
+
+      {viewMode === "grid" && (
+        <>
+          {paginatedCategories.length === 0 ? (
+            <div
+              className="rounded-xl py-14 text-center"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <FolderOpen className="mx-auto mb-3 h-10 w-10 opacity-30" />
+
+              No categories found
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {paginatedCategories.map((category) => (
+                <div
+                  key={category._id}
+                  onClick={() =>
+                    openCategoryDetails(category)
+                  }
+                  className="cursor-pointer space-y-4 rounded-xl p-5 transition hover:-translate-y-1"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-lg text-lg font-bold"
+                      style={{
+                        backgroundColor:
+                          "var(--bg-tertiary)",
+
+                        color: "var(--accent)",
+                      }}
+                    >
+                      {category.name
+                        ?.charAt(0)
+                        .toUpperCase()}
+                    </div>
+
+                    <StatusBadge
+                      active={category.is_active}
+                    />
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-bold">
+                      {category.name}
+                    </h3>
+
+                    <code
+                      className="mt-1 block text-xs font-mono"
+                      style={{
+                        color: "var(--accent)",
+                      }}
+                    >
+                      {category.category_code}
+                    </code>
+                  </div>
+
+                  <p
+                    className="line-clamp-2 min-h-10 text-sm"
+                    style={{
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {category.description ||
+                      "No description provided."}
+                  </p>
+
+                  <div
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
+                    className="flex justify-end gap-2 border-t pt-3"
+                    style={{
+                      borderColor: "var(--border-color)",
+                    }}
+                  >
+                    <IconButton
+                      title="Edit category"
+                      color="var(--info)"
+                      background="rgba(59,130,246,.10)"
+                      onClick={() =>
+                        handleEdit(category)
+                      }
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </IconButton>
+
+                    <IconButton
+                      title="Delete category"
+                      color="var(--danger)"
+                      background="rgba(239,68,68,.10)"
+                      onClick={() =>
+                        handleDeleteClick(category)
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* PAGINATION */}
+
+      {filteredCategories.length > ITEMS_PER_PAGE && (
+        <div
+          className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
+          style={{
+            borderColor: "var(--border-color)",
+          }}
+        >
+          <p
+            className="text-sm"
+            style={{
+              color: "var(--text-muted)",
+            }}
+          >
+            Showing{" "}
+            {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+            {Math.min(
+              currentPage * ITEMS_PER_PAGE,
+              filteredCategories.length
+            )}{" "}
+            of {filteredCategories.length} categories
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.max(1, page - 1)
+                )
+              }
+              className="rounded-lg p-2 disabled:opacity-40"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+
+            <span className="px-2 text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.min(totalPages, page + 1)
+                )
+              }
+              className="rounded-lg p-2 disabled:opacity-40"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ADD / EDIT MODAL */}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <div
+              className="sticky top-0 z-10 flex items-center justify-between px-6 py-5"
+              style={{
+                backgroundColor: "var(--bg-card)",
+
+                borderBottom:
+                  "1px solid var(--border-color)",
+              }}
+            >
+              <div>
+                <h3 className="text-xl font-bold">
+                  {editingCategory
+                    ? "Edit Category"
+                    : "Add Category"}
+                </h3>
+
+                <p
+                  className="mt-1 text-sm"
+                  style={{
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {editingCategory
+                    ? "Update category information"
+                    : "Enter category information"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={closeFormModal}
+                className="rounded-lg p-2"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Category Code</label>
-                <input
-                  type="text"
-                  value={formData.category_code}
-                  onChange={(e) => setFormData({...formData, category_code: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium placeholder-gray-400"
-                  placeholder="e.g., CAT001"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Category Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium placeholder-gray-400"
-                  placeholder="e.g., Electronics, Clothing"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full p-3 bg-white text-gray-900 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium placeholder-gray-400 resize-none"
-                  rows="3"
-                  placeholder="Optional details about the category..."
-                />
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 p-6"
+            >
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Field label="Category Code *">
+                  <input
+                    required
+                    type="text"
+                    disabled={isSubmitting}
+                    value={formData.category_code}
+                    placeholder="e.g. CAT-001"
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        category_code:
+                          event.target.value,
+                      })
+                    }
+                    className="input-field"
+                  />
+                </Field>
+
+                <Field label="Category Name *">
+                  <input
+                    required
+                    type="text"
+                    disabled={isSubmitting}
+                    value={formData.name}
+                    placeholder="e.g. Electronics"
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        name: event.target.value,
+                      })
+                    }
+                    className="input-field"
+                  />
+                </Field>
               </div>
 
-              <div className="flex gap-3 mt-6 pt-2">
+              <Field label="Description">
+                <textarea
+                  rows={4}
+                  disabled={isSubmitting}
+                  value={formData.description}
+                  placeholder="Enter category description..."
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      description:
+                        event.target.value,
+                    })
+                  }
+                  className="input-field resize-none"
+                />
+              </Field>
+
+              <label
+                className="flex cursor-pointer items-center gap-3 rounded-lg p-3"
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  disabled={isSubmitting}
+                  checked={formData.is_active}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      is_active:
+                        event.target.checked,
+                    })
+                  }
+                  className="h-5 w-5"
+                  style={{
+                    accentColor: "var(--accent)",
+                  }}
+                />
+
+                <div>
+                  <p className="text-sm font-medium">
+                    Active Category
+                  </p>
+
+                  <p
+                    className="text-xs"
+                    style={{
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Category is available for products
+                  </p>
+                </div>
+              </label>
+
+              <div
+                className="flex gap-3 border-t pt-5"
+                style={{
+                  borderColor: "var(--border-color)",
+                }}
+              >
                 <button
                   type="button"
-                  onClick={closeModal}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 bg-gray-50 rounded-xl hover:bg-gray-100 font-bold transition"
+                  disabled={isSubmitting}
+                  onClick={closeFormModal}
+                  className="flex-1 rounded-lg px-4 py-2.5"
+                  style={{
+                    backgroundColor:
+                      "var(--bg-tertiary)",
+
+                    border:
+                      "1px solid var(--border-color)",
+                  }}
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl font-bold hover:shadow-lg transition disabled:opacity-70 disabled:cursor-not-allowed"
+                  disabled={isSubmitting}
+                  className="flex-1 rounded-lg px-4 py-2.5 font-semibold disabled:opacity-50"
+                  style={{
+                    backgroundColor: "var(--accent)",
+                    color: "var(--accent-text)",
+                  }}
                 >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : (modalMode === 'add' ? 'Add Category' : 'Update Category')}
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingCategory
+                      ? "Update Category"
+                      : "Save Category"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* DELETE MODAL */}
+
+      {showDeleteModal && categoryToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-xl p-5"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/10">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+              </div>
+
+              <div>
+                <h3 className="font-semibold">
+                  Delete "{categoryToDelete.name}"?
+                </h3>
+
+                <p
+                  className="mt-1 text-sm"
+                  style={{
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  This action cannot be undone. The category
+                  will be permanently removed.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={closeDeleteModal}
+                className="rounded-lg px-4 py-2.5"
+                style={{
+                  backgroundColor:
+                    "var(--bg-tertiary)",
+
+                  border:
+                    "1px solid var(--border-color)",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDelete}
+                className="rounded-lg bg-red-500 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}   
+}
+
+
+// ==========================================
+// COMPONENTS
+// ==========================================
+
+function StatCard({ title, value, color }) {
+  return (
+    <div
+      className="rounded-xl p-5"
+      style={{
+        backgroundColor: "var(--bg-card)",
+        border: "1px solid var(--border-color)",
+      }}
+    >
+      <p
+        className="text-sm"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {title}
+      </p>
+
+      <p
+        className="mt-1 text-2xl font-bold"
+        style={{
+          color: color || "var(--text-primary)",
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label
+        className="mb-2 block text-sm font-medium"
+        style={{
+          color: "var(--text-secondary)",
+        }}
+      >
+        {label}
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+function StatusBadge({ active }) {
+  return (
+    <span
+      className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+      style={{
+        backgroundColor: active
+          ? "rgba(16,185,129,.15)"
+          : "rgba(239,68,68,.15)",
+
+        color: active
+          ? "var(--success)"
+          : "var(--danger)",
+      }}
+    >
+      {active ? "ACTIVE" : "INACTIVE"}
+    </span>
+  );
+}
+
+function IconButton({
+  children,
+  onClick,
+  title,
+  color = "var(--text-muted)",
+  background = "var(--bg-card)",
+  disabled = false,
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-lg p-2 transition hover:scale-110 disabled:opacity-50"
+      style={{
+        color,
+        backgroundColor: background,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TableHeading({
+  children,
+  right = false,
+  className = "",
+}) {
+  return (
+    <th
+      className={`px-6 py-4 text-xs font-semibold uppercase tracking-wider ${
+        right ? "text-right" : "text-left"
+      } ${className}`}
+      style={{
+        color: "var(--text-muted)",
+      }}
+    >
+      {children}
+    </th>
+  );
+}

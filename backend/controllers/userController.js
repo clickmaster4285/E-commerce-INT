@@ -47,7 +47,7 @@ const loginUser = async (req, res) => {
     const jwtLoginToken = jwt.sign(
       { userId: user._id, role: user.role }, 
       process.env.JWT_SECRET, 
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
 
     // Response mein role add kiya

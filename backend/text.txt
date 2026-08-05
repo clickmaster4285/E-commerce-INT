@@ -1,1 +1,86 @@
-Hamzaasif@1234
+
+
+
+
+
+
+add the middleware of uploads documents handlers
+middleware: validate documents like for product only image accepts with high resulation, on brand only image accept but small size if brand high resolulation image upload then compress to logo size,
+when i select the images first check the middleware on the middleware check if image available thhen run middleware other skip it
+
+
+documents save on backend: /uploads/products|brands/[product|brand: id]/[imagename]
+
+on data base save the info of uploads like 
+{
+    img_url,
+    img_size,
+    mimeType, // img/jpg
+    width,
+    hight,
+} use the multer
+
+
+
+in all the schema add {
+createdby,
+updatedby,
+deletedby,
+}
+
+
+
+
+
+
+product schema{
+product name,
+cateegry.
+brand,
+descriptiion,
+tax,
+status: active|inactive
+}
+vareint schema{
+    product_id,
+    sku,
+    title,
+    descriptiion
+    cost price,
+    selling price,
+    quantity,
+    min_qnt,
+    max_qnt,
+    attribute:{
+        color,
+        size,
+        weith,
+        weith.
+        hirht.
+        etc.....
+    }
+    images :{
+    img_url,
+    img_size,
+    mimeType, // img/jpg
+    width,
+    hight,
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
