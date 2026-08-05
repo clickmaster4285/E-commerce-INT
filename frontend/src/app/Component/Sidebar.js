@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   FolderOpen,
@@ -15,64 +14,52 @@ import {
 } from "lucide-react";
 
 const menu = [
-  {
-    name: "Dashboard",
-    icon: LayoutDashboard,
-    path: "/admin/dashboard",
-  },
-  {
-    name: "Brands",
-    icon: Tag,
-    path: "/admin/brands",
-  },
-  {
-    name: "Categories",
-    icon: FolderOpen,
-    path: "/admin/categories",
-  },
-  {
-    name: "Products",
-    icon: Package,
-    path: "/admin/products",
-  },
+  { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+  { name: "Brands", icon: Tag, path: "/admin/brands" },
+  { name: "Categories", icon: FolderOpen, path: "/admin/categories" },
+  { name: "Products", icon: Package, path: "/admin/products" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   return (
     <>
       {/* Mobile Open Button */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Open sidebar"
-        className="
-          fixed left-4 top-4 z-[60]
-          rounded-lg
-          border border-[var(--border-color)]
-          bg-[var(--bg-sidebar)]
-          p-2.5
-          text-[var(--text-sidebar)]
-          shadow-md
-          transition-colors
-          hover:bg-[var(--bg-sidebar-hover)]
-          lg:hidden
-        "
-      >
-        <Menu size={21} />
-      </button>
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open sidebar"
+          className="
+            fixed left-2.5 top-2.5 z-[60]
+            inline-flex h-8 w-8
+            items-center justify-center
+            rounded-md
+            border border-[var(--border-color)]
+            bg-[var(--bg-sidebar)]
+            text-[var(--text-secondary)]
+            shadow-sm
+            transition-colors
+            hover:text-[var(--text-primary)]
+            lg:hidden
+          "
+        >
+          <Menu size={16} />
+        </button>
+      )}
 
       {/* Mobile Overlay */}
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="
-            fixed inset-0 z-40
-            bg-black/40
-            lg:hidden
-          "
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
         />
       )}
 
@@ -80,63 +67,53 @@ export default function Sidebar() {
       <aside
         className={`
           fixed left-0 top-0 z-50
-          flex h-screen w-[260px] flex-col
+          flex h-screen w-[200px] flex-col
           overflow-hidden
           border-r border-[var(--border-sidebar)]
           bg-[var(--bg-sidebar)]
           text-[var(--text-sidebar)]
-          shadow-xl
-          transition-transform duration-300
+          shadow-sm
+          transition-transform duration-200
           lg:sticky lg:translate-x-0 lg:shadow-none
-          ${open? "translate-x-0": "-translate-x-full"}
+          ${open ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Brand Header */}
+        {/* Header / Logo — navbar ke barabar height (h-16) */}
         <div
           className="
-            relative flex h-[78px] shrink-0
-            items-center gap-3
+            flex h-16 shrink-0
+            items-center justify-between
+            gap-2
             border-b border-[var(--border-sidebar)]
-            bg-[var(--bg-sidebar)]
-            px-5
+            px-3
           "
         >
-          {/* CM Monogram */}
-          <div
-            className="
-              relative flex h-10 w-10 shrink-0
-              items-center justify-center
-              rounded-xl
-              border border-emerald-500/40
-              bg-[#0f2a2a]
-              shadow-sm
-            "
+          <Link
+            href="/admin/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex min-w-0 items-center gap-2"
           >
-            <div className="absolute inset-1 rounded-lg border border-emerald-400/20" />
+            <div
+              className="
+                flex h-8 w-8 shrink-0
+                items-center justify-center
+                rounded-lg
+                bg-emerald-500
+              "
+            >
+              <span className="text-sm font-bold text-emerald-950">C</span>
+            </div>
 
             <span
               className="
-                relative z-10
-                text-[15px]
-                font-extrabold
-                tracking-[-0.08em]
-                text-emerald-400
+                truncate text-sm font-semibold
+                tracking-tight
+                text-[var(--text-primary)]
               "
             >
-              CM
+              ClickMaster
             </span>
-          </div>
-
-          {/* Brand Name */}
-          <div className="min-w-0">
-            <h1 className="truncate text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
-              Click Master
-            </h1>
-
-            <p className="mt-1 truncate text-[10px] font-medium leading-tight text-[var(--text-muted)]">
-              Admin Control Panel
-            </p>
-          </div>
+          </Link>
 
           {/* Mobile Close Button */}
           <button
@@ -144,8 +121,7 @@ export default function Sidebar() {
             onClick={() => setOpen(false)}
             aria-label="Close sidebar"
             className="
-              ml-auto shrink-0
-              rounded-md p-1
+              shrink-0 rounded-md p-1
               text-[var(--text-muted)]
               transition-colors
               hover:bg-[var(--bg-sidebar-hover)]
@@ -153,16 +129,18 @@ export default function Sidebar() {
               lg:hidden
             "
           >
-            <X size={18} />
+            <X size={14} />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-4 py-6">
-          <div className="flex flex-col gap-1.5">
+        <nav
+          aria-label="Main navigation"
+          className="flex-1 overflow-y-auto px-2 py-2"
+        >
+          <div className="space-y-0.5">
             {menu.map((item) => {
               const Icon = item.icon;
-
               const active =
                 pathname === item.path ||
                 pathname.startsWith(`${item.path}/`);
@@ -172,67 +150,57 @@ export default function Sidebar() {
                   key={item.name}
                   href={item.path}
                   onClick={() => setOpen(false)}
+                  aria-current={active ? "page" : undefined}
                   className={`
-                    group flex h-11 w-full
-                    items-center gap-3
-                    rounded-lg
-                    border-l-2
-                    px-4
-                    text-sm font-medium
-                    transition-all duration-200
-
+                    flex h-8 items-center
+                    gap-2 rounded-md px-2.5
+                    text-xs font-medium
+                    transition-colors
                     ${
                       active
-? `
-                          border-l-[var(--accent)]
-                          bg-[var(--bg-sidebar-active)]
-                          text-[var(--text-primary)]
-                        `
-: `
-                          border-l-transparent
-                          text-[var(--text-secondary)]
-                          hover:bg-[var(--bg-sidebar-hover)]
-                          hover:text-[var(--text-primary)]
-                        `
+                        ? "bg-[var(--bg-sidebar-hover)] text-[var(--text-primary)]"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary)]"
                     }
                   `}
                 >
                   <Icon
-                    size={19}
-                    strokeWidth={active? 2.4: 2}
+                    size={16}
                     className={`
                       shrink-0
-                      transition-transform duration-200
                       ${
                         active
-? "text-[var(--accent)]"
-: "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                          ? "text-emerald-500"
+                          : "text-[var(--text-muted)]"
                       }
                     `}
                   />
 
-                  <span>{item.name}</span>
+                  <span className="truncate">{item.name}</span>
                 </Link>
               );
             })}
           </div>
         </nav>
 
-        {/* Sidebar Footer */}
+        {/* Footer */}
         <div
           className="
             shrink-0
             border-t border-[var(--border-sidebar)]
-            px-5 py-4
+            px-3 py-2
           "
         >
-          <p className="text-[10px] font-medium text-[var(--text-muted)]">
+          <p
+            className="
+              text-center text-[10px]
+              text-[var(--text-muted)]
+            "
+          >
             Powered by{" "}
-            <span className="text-[var(--text-secondary)]">
+            <span className="font-medium text-[var(--text-secondary)]">
               ClickMasters
             </span>{" "}
-            <span className="mx-1 text-[var(--border-color)]">·</span>
-            <span className="text-[var(--text-muted)]">v1.0</span>
+            · v1.0
           </p>
         </div>
       </aside>

@@ -44,6 +44,7 @@ const PORT = process.env.PORT || 5000;
 // ==========================================
 
 const checkAndCreateDefaultAdmin = async () => {
+
   try {
     const existingAdmin = await User.findOne({
       role: "admin",
@@ -56,9 +57,13 @@ const checkAndCreateDefaultAdmin = async () => {
       );
 
       await User.create({
+
         name: "admin",
+
         username: "admin123",
+
         email: "admin@gmail.com",
+
         password: hashedPassword,
         role: "admin",
       });

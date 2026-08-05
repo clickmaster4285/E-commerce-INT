@@ -27,16 +27,16 @@ export default function Navbar({
 
     sessionStorage.clear();
 
-    // Login page par redirect
+    // Login page redirect
     router.push('/login');
   };
 
   return (
     <header
-      className={`sticky top-0 z-40 flex h-16 items-center justify-between border-b px-4 transition-colors duration-300 sm:px-6 ${
+      className={`sticky top-0 z-40 flex h-16 items-center justify-between border-b px-4 transition-all duration-300 sm:px-6 backdrop-blur-md ${
         isDark
-? 'border-slate-800 bg-slate-950'
-: 'border-slate-200 bg-white'
+          ? 'border-slate-800/50 bg-slate-950/80 shadow-sm shadow-slate-900/20'
+          : 'border-slate-200/60 bg-white/80 shadow-sm shadow-slate-200/50'
       }`}
     >
       {/* Left Section */}
@@ -46,59 +46,31 @@ export default function Navbar({
           type="button"
           onClick={onMenuClick}
           aria-label="Open menu"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors duration-200 active:scale-95 ${
             isDark
-? 'border-slate-700 hover:bg-slate-800'
-: 'border-slate-200 hover:bg-slate-100'
+              ? 'border-slate-700 hover:bg-slate-800 text-slate-300'
+              : 'border-slate-200 hover:bg-slate-100 text-slate-700'
           } md:hidden`}
         >
-          <Menu
-            size={20}
-            className={
-              isDark? 'text-slate-300': 'text-slate-700'
-            }
-          />
+          <Menu size={20} />
         </button>
-
-        {/* Page/Header Area */}
-        <div className="min-w-0">
-          <p
-            className={`truncate text-sm font-medium sm:text-base ${
-              isDark? 'text-white': 'text-slate-900'
-            }`}
-          >
-            Admin Dashboard
-          </p>
-
-          <p
-            className={`hidden text-xs sm:block ${
-              isDark? 'text-slate-400': 'text-slate-500'
-            }`}
-          >
-            Manage your business
-          </p>
-        </div>
       </div>
 
       {/* Right Section */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Theme Toggle */}
+        {/* Theme Toggle — Simple, No Border */}
         <button
           type="button"
           onClick={toggleTheme}
           aria-label="Toggle theme"
-          title={isDark? 'Switch to light mode': 'Switch to dark mode'}
-          className={`flex h-10 w-10 items-center justify-center rounded-lg border transition ${
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-200 active:scale-95 ${
             isDark
-? 'border-slate-700 hover:bg-slate-800'
-: 'border-slate-200 hover:bg-slate-100'
+              ? 'hover:bg-slate-800 text-slate-300'
+              : 'hover:bg-slate-100 text-slate-600'
           }`}
         >
-          {isDark? (
-            <Sun size={18} className="text-yellow-400" />
-          ): (
-            <Moon size={18} className="text-slate-700" />
-          )}
+          {isDark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
         {/* Profile */}
@@ -106,7 +78,7 @@ export default function Navbar({
           <div className="hidden text-right md:block">
             <p
               className={`text-sm font-semibold ${
-                isDark? 'text-white': 'text-slate-900'
+                isDark ? 'text-white' : 'text-slate-900'
               }`}
             >
               Admin
@@ -114,14 +86,14 @@ export default function Navbar({
 
             <p
               className={`text-xs ${
-                isDark? 'text-slate-400': 'text-slate-500'
+                isDark ? 'text-slate-400' : 'text-slate-500'
               }`}
             >
               Company Admin
             </p>
           </div>
 
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-600 font-semibold text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-semibold text-white shadow-md shadow-violet-500/20 ring-2 ring-white/10">
             A
           </div>
         </div>
@@ -131,20 +103,15 @@ export default function Navbar({
           type="button"
           onClick={handleLogout}
           title="Logout"
-          className={`flex h-10 items-center gap-2 rounded-lg border px-3 transition ${
+          className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200 active:scale-95 ${
             isDark
-? 'border-red-900/60 text-red-400 hover:bg-red-950/50'
-: 'border-red-200 text-red-600 hover:bg-red-50'
+              ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+              : 'text-red-500 hover:bg-red-50 hover:text-red-600'
           }`}
         >
-          <LogOut size={17} />
-
-          <span className="hidden text-sm font-medium sm:inline">
-            Logout
-          </span>
+          <LogOut size={20} />
         </button>
       </div>
     </header>
   );
 }
-
