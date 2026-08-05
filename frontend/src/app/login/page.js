@@ -130,10 +130,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-gray-400 text-sm mt-6">
-            Don't have an account?{' '}
-            <a href="/register" className="text-emerald-500 font-semibold hover:text-emerald-400">Create one here</a>
-          </p>
+         
         </div>
       </div>
     </div>
