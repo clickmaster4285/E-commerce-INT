@@ -6,28 +6,17 @@ const bcrypt = require("bcryptjs");
 const path = require("path");
 
 const connectDB = require("./config/db");
-
 const User = require("./models/User");
 
 const categoryRoutes = require("./routes/categoryRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const productRoutes = require("./routes/productRoutes");
 const userRoutes = require("./routes/userRoutes");
-
+const variantRoutes = require("./routes/variantRoutes");
 
 const app = express();
 
-
-// ================================
-// MIDDLEWARE
-// ================================
-
-app.use(
-  express.json({
-    limit: "20mb",
-  })
-);
-
+app.use(express.json({ limit: "20mb" }));
 
 app.use(
   cors({
@@ -35,74 +24,37 @@ app.use(
   })
 );
 
-
-// ================================
-// UPLOADS ACCESS
-// ================================
-
+// Uploads public
 app.use(
   "/uploads",
-  express.static(
-    path.join(__dirname, "uploads")
-  )
+  express.static(path.join(__dirname, "uploads"))
 );
 
+// Routes
+app.use("/api/categories", categoryRoutes);
+app.use("/api/brands", brandRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/variants", variantRoutes);
 
-// ================================
-// ROUTES
-// ================================
+const PORT = process.env.PORT || 5000;
 
-app.use(
-  "/api/categories",
-  categoryRoutes
-);
-
-app.use(
-  "/api/brands",
-  brandRoutes
-);
-
-app.use(
-  "/api/products",
-  productRoutes
-);
-
-app.use(
-  "/api/users",
-  userRoutes
-);
-
-
-// ================================
-// PORT
-// ================================
-
-const PORT = 5000;
-
-
-
-// ================================
+// ==========================================
 // DEFAULT ADMIN
-// ================================
+// ==========================================
 
 const checkAndCreateDefaultAdmin = async () => {
 
   try {
-
     const existingAdmin = await User.findOne({
       role: "admin",
     });
 
-
     if (!existingAdmin) {
-
-
-      const hashedPassword =
-        await bcrypt.hash(
-          "12345678",
-          10
-        );
-
+      const hashedPassword = await bcrypt.hash(
+        "12345678",
+        10
+      );
 
       await User.create({
 
@@ -113,100 +65,54 @@ const checkAndCreateDefaultAdmin = async () => {
         email: "admin@gmail.com",
 
         password: hashedPassword,
-
         role: "admin",
-
       });
 
-
-      console.log(
-        "✅ Default Admin Created"
-      );
-
-
+      console.log("✅ Default Admin automatically created");
     } else {
-
-      console.log(
-        "✅ Admin already exists"
-      );
-
+      console.log("✅ Admin already exists");
     }
-
-
   } catch (error) {
-
     console.error(
-      "Admin creation error:",
+      "❌ Error checking/creating admin:",
       error.message
     );
 
     throw error;
-
   }
-
 };
 
-
-
-// ================================
+// ==========================================
 // TEST ROUTE
-// ================================
+// ==========================================
 
-app.get(
-  "/",
-  (req, res) => {
+app.get("/", (req, res) => {
+  res.send("backend server is running");
+});
 
-    res.send(
-      "backend server is running"
-    );
-
-  }
-);
-
-
-
-// ================================
-// SERVER START
-// ================================
+// ==========================================
+// START SERVER
+// ==========================================
 
 const startServer = async () => {
-
   try {
-
-
     await connectDB();
-
 
     await checkAndCreateDefaultAdmin();
 
-
-
-    app.listen(
-      PORT,
-      () => {
-
-        console.log(
-          `✅ Server running on port ${PORT}`
-        );
-
-      }
-    );
-
-
+    app.listen(PORT, () => {
+      console.log(
+        `✅ Server is running on port ${PORT}`
+      );
+    });
   } catch (error) {
-
-
     console.error(
-      "Server start failed:",
+      "❌ Server start failed:",
       error.message
     );
 
-
     process.exit(1);
-
   }
-
 };
-
 
 startServer();

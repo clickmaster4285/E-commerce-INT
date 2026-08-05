@@ -1,17 +1,54 @@
 const express = require("express");
-const { createCategory, getCategories, getCategoryById, updateCategory, deleteCategory } = require("../controllers/categoryController");
+
+const {
+  createCategory,
+  getCategories,
+  getCategoryById,
+  updateCategory,
+  deleteCategory,
+} = require("../controllers/categoryController");
+
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware"); // <--- Naya import
+const adminMiddleware = require("../middleware/adminMiddleware");
 
 const router = express.Router();
 
-// Sirf ADMIN add, update, delete kar sakta hai
-router.post("/", authMiddleware, adminMiddleware, createCategory);
-router.put("/:id", authMiddleware, adminMiddleware, updateCategory);
-router.delete("/:id", authMiddleware, adminMiddleware, deleteCategory);
+// CREATE
+router.post(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  createCategory
+);
 
-// Sab (Admin aur User) dekh sakte hain
-router.get("/", authMiddleware, getCategories);
-router.get("/:id", authMiddleware, getCategoryById);
+// UPDATE
+router.put(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  updateCategory
+);
+
+// DELETE
+router.delete(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  deleteCategory
+);
+
+// GET ALL
+router.get(
+  "/",
+  authMiddleware,
+  getCategories
+);
+
+// GET ONE
+router.get(
+  "/:id",
+  authMiddleware,
+  getCategoryById
+);
 
 module.exports = router;
