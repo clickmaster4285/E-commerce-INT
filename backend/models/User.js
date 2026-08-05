@@ -29,11 +29,39 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
     },
 
-    // --- NAYA FIELD: ROLE ---
     role: {
       type: String,
-      default: "user", // By default sab normal user honge
-      enum: ["user", "admin"], // Sirf 'user' ya 'admin' ho sakta hai
+      default: "user",
+      enum: ["user", "admin"],
+    },
+
+    // --- AUDIT FIELDS ---
+    createdby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    updatedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    deletedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    is_deleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    deleted_at: {
+      type: Date,
+      default: null,
     },
   },
   {
@@ -43,5 +71,13 @@ const userSchema = new mongoose.Schema(
     },
   }
 );
+
+// Soft delete method
+userSchema.methods.softDelete = function (userId) {
+  this.is_deleted = true;
+  this.deleted_at = new Date();
+  this.deletedby = userId;
+  return this.save();
+};
 
 module.exports = mongoose.model("User", userSchema);

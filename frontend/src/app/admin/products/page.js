@@ -890,4 +890,3 @@ export default function ProductsPage() {
   )
 }
 
-export default page
