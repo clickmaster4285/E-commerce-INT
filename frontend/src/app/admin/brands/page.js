@@ -2,15 +2,12 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
-import { brandApi } from "../../../apis/barandapi";
+import { brandApi } from "../../../apis/brandApi";
 import { Country } from "country-state-city";
+import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
+import { toast } from "sonner";
 
 /* ================= Icons ================= */
-const DownloadIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
 const PlusIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -53,7 +50,7 @@ const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
 );
 const Spinner = ({ className = "w-4 h-4" }) => (
   <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
   </svg>
 );
@@ -142,7 +139,7 @@ const Avatar = ({ brand, size = "w-8 h-8" }) => {
 
 const StatusBadge = ({ active }) => (
   <span
-    className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
+    className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap"
     style={
       active
         ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
@@ -159,11 +156,6 @@ const formatDate = (d) =>
 
 /* ================================================================
    ✅ CUSTOM COUNTRY DROPDOWN COMPONENT  — OPENS UPWARD
-   - Searchable
-   - Flag emoji
-   - Dark theme matching
-   - Click outside to close
-   - Opens ABOVE the trigger (bottom-full) so modal never scrolls
    ================================================================ */
 const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -171,7 +163,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // Get flag emoji from ISO code
   const getFlagEmoji = (isoCode) => {
     if (!isoCode || isoCode.length !== 2) return "🌍";
     return isoCode
@@ -181,7 +172,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
       .join("");
   };
 
-  // Filter countries based on search
   const filteredCountries = useMemo(() => {
     if (!searchTerm.trim()) return allCountries;
     const term = searchTerm.toLowerCase();
@@ -192,12 +182,10 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
     );
   }, [allCountries, searchTerm]);
 
-  // Selected country object
   const selectedCountry = useMemo(() => {
     return allCountries.find((c) => c.name === value) || null;
   }, [allCountries, value]);
 
-  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -209,7 +197,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Focus search input when dropdown opens
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
       setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -231,7 +218,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Trigger Button */}
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -274,7 +260,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
         </div>
       </button>
 
-      {/* ✅ Dropdown Panel — OPENS UPWARD (bottom-full mb-1) */}
       {isOpen && (
         <div
           className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl"
@@ -284,7 +269,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
             boxShadow: "0 -10px 40px rgba(0,0,0,0.5)",
           }}
         >
-          {/* Footer count — now at TOP since panel opens upward */}
           <div
             className="px-3 py-1.5 text-center"
             style={{ borderBottom: "1px solid var(--border-color)" }}
@@ -294,7 +278,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
             </p>
           </div>
 
-          {/* Country List */}
           <div className="max-h-[200px] overflow-y-auto py-1" style={{ scrollbarWidth: "thin" }}>
             {filteredCountries.length === 0 ? (
               <div className="px-3 py-4 text-center">
@@ -344,7 +327,6 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
             )}
           </div>
 
-          {/* Search Input — now at BOTTOM since panel opens upward */}
           <div className="p-2" style={{ borderTop: "1px solid var(--border-color)" }}>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
@@ -374,6 +356,9 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
 /* ================= Main Component ================= */
 export default function BrandsPage() {
+  // ✅ SOCKET SYNC HOOK - Real-time updates
+  useBrandSocketSync();
+
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -393,7 +378,6 @@ export default function BrandsPage() {
   const [autoBrandCode, setAutoBrandCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
 
-  // ✅ All countries list
   const allCountries = useMemo(() => {
     return Country.getAllCountries().map((c) => ({
       name: c.name,
@@ -462,20 +446,42 @@ export default function BrandsPage() {
     isLoading: loading,
   } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll });
 
+  /* ==========================================
+     ✅ CREATE / UPDATE — with TOAST
+     ========================================== */
   const brandMutation = useMutation({
     mutationFn: ({ data, id }) => (id ? brandApi.update(id, data) : brandApi.create(data)),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
+      toast.success(
+        variables.id
+          ? "Brand updated successfully"
+          : "Brand added successfully"
+      );
       resetForm();
       setShowModal(false);
     },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message || "Brand operation failed"
+      );
+    },
   });
 
+  /* ==========================================
+     ✅ DELETE — with TOAST
+     ========================================== */
   const deleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => brandApi.delete(id))),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
       setSelectedIds([]);
+      toast.success("Brand deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(
+        error.response?.data?.message || "Brand delete failed"
+      );
     },
   });
 
@@ -600,23 +606,6 @@ export default function BrandsPage() {
     }));
   };
 
-  const handleExport = () => {
-    if (sortedBrands.length === 0) return;
-    const headers = ["Brand Code", "Brand Name", "Description", "Country", "Status"];
-    const rows = sortedBrands.map((b) => [
-      b.brand_code, b.name, b.description, b.country, b.is_active ? "Active" : "Inactive",
-    ]);
-    const csv = [headers, ...rows]
-      .map((r) => r.map((v) => `"${(v || "").toString().replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "brands.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
@@ -695,11 +684,12 @@ export default function BrandsPage() {
     </div>
   );
 
+  // ✅ FIXED ACTION BUTTONS: Added flex-shrink-0, min-w, min-h, and increased padding
   const ActionButtons = ({ brand }) => (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1 sm:gap-2">
       <button
         onClick={(e) => { e.stopPropagation(); handleViewBrand(brand._id); }}
-        className="p-1.5 rounded-md transition hover:bg-emerald-500/10"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
         style={{ color: "#34d399" }}
         title="View Details"
       >
@@ -707,7 +697,7 @@ export default function BrandsPage() {
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); handleEdit(brand); }}
-        className="p-1.5 rounded-md transition hover:bg-white/5"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
         style={{ color: "var(--text-secondary)" }}
         title="Edit"
       >
@@ -716,7 +706,7 @@ export default function BrandsPage() {
       <button
         onClick={(e) => { e.stopPropagation(); handleDelete(brand); }}
         disabled={isDeleting}
-        className="p-1.5 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
         title="Delete"
       >
         <TrashIcon className="w-4 h-4" />
@@ -739,16 +729,6 @@ export default function BrandsPage() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <button
-              onClick={handleExport}
-              className="h-9 px-3 rounded-lg text-[13px] font-medium flex items-center gap-2 transition hover:opacity-80"
-              style={cardStyle}
-              title="Export CSV"
-            >
-              <DownloadIcon />
-              Export
-            </button>
-
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -904,7 +884,8 @@ export default function BrandsPage() {
                     </th>
                     <SortHeader label="Country" sortKey="country" />
                     <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
+                    {/* ✅ FIXED TABLE HEADER: Added whitespace-nowrap */}
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       Actions
                     </th>
                   </tr>
@@ -953,7 +934,8 @@ export default function BrandsPage() {
                         <td className="px-4 py-2.5">
                           <StatusBadge active={brand.is_active} />
                         </td>
-                        <td className="px-4 py-2.5">
+                        {/* ✅ FIXED TABLE CELL: Added whitespace-nowrap and w-1 to prevent shrinking */}
+                        <td className="px-4 py-2.5 whitespace-nowrap w-1">
                           <ActionButtons brand={brand} />
                         </td>
                       </tr>
@@ -1053,7 +1035,6 @@ export default function BrandsPage() {
       {/* ===== Add/Edit Modal ===== */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          {/* ✅ overflow-visible on outer wrapper so upward dropdown is not clipped */}
           <div className="w-full max-w-lg rounded-xl overflow-visible" style={cardStyle}>
             <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <h3 className="text-base font-semibold">{editingBrand ? "Edit Brand" : "Add New Brand"}</h3>
@@ -1067,19 +1048,20 @@ export default function BrandsPage() {
               </button>
             </div>
 
-            {/* ✅ overflow-y-auto kept on form but overflow-visible on parent allows dropdown to escape */}
             <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto overflow-x-visible" style={{ overflowClipMargin: "200px" }}>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code *</label>
                   <div className="relative">
-                    <input
+                                        <input
                       type="text"
                       value={formData.brand_code}
                       onChange={(e) => setFormData({ ...formData, brand_code: e.target.value })}
                       required
-                      disabled={isSubmitting || loadingCode}
-                      className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50"
+                      // ✅ FIX: Agar editingBrand hai to readOnly aur disabled kar do
+                      readOnly={!!editingBrand}
+                      disabled={isSubmitting || loadingCode || !!editingBrand}
+                      className={`h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 ${editingBrand ? 'cursor-not-allowed opacity-70' : ''}`}
                       style={{
                         backgroundColor: "var(--bg-tertiary)",
                         border: "1px solid var(--border-color)",
@@ -1173,7 +1155,6 @@ export default function BrandsPage() {
                 </div>
               </div>
 
-              {/* ✅ CUSTOM COUNTRY DROPDOWN — opens UPWARD */}
               <div className="grid grid-cols-2 gap-3 items-end">
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>

@@ -28,27 +28,33 @@ const createUser = async (req, res) => {
 // 2. User Login karna (Role ke sath)
 const loginUser = async (req, res) => {
   try {
+    // console.log("Login Body:", req.body);
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
     const user = await User.findOne({ email });
+    // console.log("User Found:", user);
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
+      
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Token mein role add kiya
-    const jwtLoginToken = jwt.sign(
-      { userId: user._id, role: user.role }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: "7d" }
-    );
+ const jwtLoginToken = jwt.sign(
+  {
+    userId: user._id,
+    role: user.role,
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "7d" }
+);
 
     // Response mein role add kiya
     res.status(200).json({
