@@ -32,7 +32,14 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "user",
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "staff"],
+    },
+
+    // ✅ BOSS KI REQUIREMENT: Har user ka store se link hona zaroori hai
+    storeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      default: null, // Admin seeding ke waqt set hoga
     },
 
     // --- AUDIT FIELDS ---
