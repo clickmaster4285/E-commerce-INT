@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { brandApi } from "../../../../apis/barandapi";
+import { brandApi } from "../../../../apis/brandApi";
 import { Country } from "country-state-city";
 
 /* ================= Icons ================= */

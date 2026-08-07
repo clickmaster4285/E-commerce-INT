@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const path = require("path");
+const cookieParser = require("cookie-parser"); // ✅ 1. Import kiya
 
 const connectDB = require("./config/db");
 const User = require("./models/User");
@@ -17,10 +18,12 @@ const variantRoutes = require("./routes/variantRoutes");
 const app = express();
 
 app.use(express.json({ limit: "20mb" }));
+app.use(cookieParser()); // ✅ 2. Middleware add kiya taake req.cookies kaam kare
 
 app.use(
   cors({
     origin: "http://localhost:3000",
+    credentials: true, // ✅ 3. Ye BOHAT ZAROORI hai taake browser cookies accept kare
   })
 );
 
@@ -44,7 +47,6 @@ const PORT = process.env.PORT || 5000;
 // ==========================================
 
 const checkAndCreateDefaultAdmin = async () => {
-
   try {
     const existingAdmin = await User.findOne({
       role: "admin",
@@ -57,13 +59,9 @@ const checkAndCreateDefaultAdmin = async () => {
       );
 
       await User.create({
-
         name: "admin",
-
         username: "admin123",
-
         email: "admin@gmail.com",
-
         password: hashedPassword,
         role: "admin",
       });
@@ -77,7 +75,6 @@ const checkAndCreateDefaultAdmin = async () => {
       "❌ Error checking/creating admin:",
       error.message
     );
-
     throw error;
   }
 };
@@ -97,7 +94,6 @@ app.get("/", (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
-
     await checkAndCreateDefaultAdmin();
 
     app.listen(PORT, () => {
@@ -110,7 +106,6 @@ const startServer = async () => {
       "❌ Server start failed:",
       error.message
     );
-
     process.exit(1);
   }
 };

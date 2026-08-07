@@ -1,75 +1,110 @@
-// ==========================================
-// BRANDS API
-// Is file mein sirf brands se related APIs hain
-// ==========================================
+const API_BASE_URL = process.env.NEXT_PUBLIC_SERVERURL 
 
-
-const API_BASE_URL = process.env.SERVERURL || "http://localhost:5000/api"; // Backend ka base URL
-// Token ke sath headers
+// ================================
+// TOKEN (Ab cookies use ho rahi hain)
+// ================================
 const getAuthHeaders = () => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  // Headers mein token nahi bhejna, cookies automatically bheji jayengi
+  return {};
 };
 
-// Response + error handling
-const handleResponse = async (res) => {
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error("Token required - please login again");
-    }
-    let errorMessage = "Request failed";
-    try {
-      const errorData = await res.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch {
-      // JSON parse na ho to default message
-    }
-    throw new Error(errorMessage);
+// ================================
+// RESPONSE HANDLER
+// ================================
+const handleResponse = async (response) => {
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Something went wrong");
   }
-  return res.json();
+
+  return data;
 };
 
-// ✅ Brands API functions
+// ================================
+// REQUEST (✅ credentials: 'include' add kiya)
+// ================================
+const request = async (endpoint, options = {}) => {
+  const { body, ...restOptions } = options;
+
+  const fetchOptions = {
+    ...restOptions,
+    headers: {
+      ...getAuthHeaders(),
+      ...(restOptions.headers || {}),
+    },
+    credentials: 'include', // ✅ Ye LINE BOHAT ZAROORI HAI - Cookies bhejne ke liye
+  };
+
+  if (body instanceof FormData) {
+    fetchOptions.body = body;
+  } else if (body) {
+    fetchOptions.headers["Content-Type"] = "application/json";
+    fetchOptions.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, fetchOptions);
+
+  return handleResponse(response);
+};
+
+// ================================
+// BRAND API
+// ================================
 export const brandApi = {
-  // Sari brands lana
-  getAll: async () => {
-    const data = await fetch(`${API_BASE_URL}/brands`, {
-      headers: getAuthHeaders(),
-    }).then(handleResponse);
-    return Array.isArray(data) ? data : [];
+  // GET NEXT BRAND CODE
+  getNextCode: async () => {
+    const response = await request("/brands/next-code");
+    return response.data?.nextCode || "BRD-001";
   },
 
-  // Ek brand lana
-  getById: (id) =>
-    fetch(`${API_BASE_URL}/brands/${id}`, {
-      headers: getAuthHeaders(),
-    }).then(handleResponse),
+  // GET ALL BRANDS
+  getAll: async () => {
+    const response = await request("/brands");
 
-  // Nayi brand create karna
-  create: (data) =>
-    fetch(`${API_BASE_URL}/brands`, {
+    if (response.data) {
+      return response.data;
+    }
+
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    return [];
+  },
+
+  // GET SINGLE BRAND
+  getById: async (id) => {
+    const response = await request(`/brands/${id}`);
+    return response.data || response;
+  },
+
+  // GET BRAND WITH PRODUCTS
+  getWithProducts: async (id) => {
+    const response = await request(`/brands/${id}/details`);
+    return response.data || response;
+  },
+
+  // CREATE BRAND
+  create: async (formData) => {
+    return await request("/brands", {
       method: "POST",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    }).then(handleResponse),
+      body: formData,
+    });
+  },
 
-  // Brand update karna
-  update: (id, data) =>
-    fetch(`${API_BASE_URL}/brands/${id}`, {
+  // UPDATE BRAND
+  update: async (id, formData) => {
+    return await request(`/brands/${id}`, {
       method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data),
-    }).then(handleResponse),
+      body: formData,
+    });
+  },
 
-  // Brand delete karna
-  delete: (id) =>
-    fetch(`${API_BASE_URL}/brands/${id}`, {
+  // DELETE BRAND
+  delete: async (id) => {
+    return await request(`/brands/${id}`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
-    }).then(handleResponse),
+    });
+  },
 };

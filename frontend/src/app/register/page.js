@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
+import axiosInstance from "@/apis/axiosInstance";
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -21,11 +21,15 @@ export default function RegisterPage() {
     });
   };
 
-  const registerMutation = useMutation({
-    mutationFn: async (userData) => {
-      const response = await axios.post('http://localhost:5000/api/users/register', userData);
-      return response.data;
-    },
+ const registerMutation = useMutation({
+  mutationFn: async (userData) => {
+    const response = await axiosInstance.post(
+      "/users/register",
+      userData
+    );
+
+    return response.data;
+  },
     onSuccess: (data) => {
       alert('Account successfully created! Please login.');
       router.push('/login');

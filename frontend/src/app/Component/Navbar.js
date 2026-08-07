@@ -2,6 +2,7 @@
 
 import { Menu, Sun, Moon, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import axiosInstance from "@/apis/axiosInstance"; // ✅ Axios instance import kiya
 
 export default function Navbar({
   theme,
@@ -12,23 +13,22 @@ export default function Navbar({
 
   const isDark = theme === 'dark';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     const confirmLogout = window.confirm(
       'Are you sure you want to logout?'
     );
 
     if (!confirmLogout) return;
 
-    // Common authentication data clear
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('accessToken');
-
-    sessionStorage.clear();
-
-    // Login page redirect
-    router.push('/login');
+    try {
+      // ✅ Backend ko bolo ke HttpOnly cookies clear kare
+      await axiosInstance.post("/users/logout");
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      // ✅ Login page par redirect karo (localStorage clear karne ki zaroorat nahi kyunki tokens cookies mein hain)
+      router.push('/login');
+    }
   };
 
   return (
