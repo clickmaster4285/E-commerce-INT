@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { brandApi } from "../../../apis/brandApi";
 import { Country } from "country-state-city";
+import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
 import { toast } from "sonner";
 
 /* ================= Icons ================= */
@@ -138,7 +139,7 @@ const Avatar = ({ brand, size = "w-8 h-8" }) => {
 
 const StatusBadge = ({ active }) => (
   <span
-    className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
+    className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap"
     style={
       active
         ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
@@ -355,6 +356,9 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
 /* ================= Main Component ================= */
 export default function BrandsPage() {
+  // ✅ SOCKET SYNC HOOK - Real-time updates
+  useBrandSocketSync();
+
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -680,11 +684,12 @@ export default function BrandsPage() {
     </div>
   );
 
+  // ✅ FIXED ACTION BUTTONS: Added flex-shrink-0, min-w, min-h, and increased padding
   const ActionButtons = ({ brand }) => (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1 sm:gap-2">
       <button
         onClick={(e) => { e.stopPropagation(); handleViewBrand(brand._id); }}
-        className="p-1.5 rounded-md transition hover:bg-emerald-500/10"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
         style={{ color: "#34d399" }}
         title="View Details"
       >
@@ -692,7 +697,7 @@ export default function BrandsPage() {
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); handleEdit(brand); }}
-        className="p-1.5 rounded-md transition hover:bg-white/5"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
         style={{ color: "var(--text-secondary)" }}
         title="Edit"
       >
@@ -701,7 +706,7 @@ export default function BrandsPage() {
       <button
         onClick={(e) => { e.stopPropagation(); handleDelete(brand); }}
         disabled={isDeleting}
-        className="p-1.5 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
         title="Delete"
       >
         <TrashIcon className="w-4 h-4" />
@@ -879,7 +884,8 @@ export default function BrandsPage() {
                     </th>
                     <SortHeader label="Country" sortKey="country" />
                     <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>
+                    {/* ✅ FIXED TABLE HEADER: Added whitespace-nowrap */}
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       Actions
                     </th>
                   </tr>
@@ -928,7 +934,8 @@ export default function BrandsPage() {
                         <td className="px-4 py-2.5">
                           <StatusBadge active={brand.is_active} />
                         </td>
-                        <td className="px-4 py-2.5">
+                        {/* ✅ FIXED TABLE CELL: Added whitespace-nowrap and w-1 to prevent shrinking */}
+                        <td className="px-4 py-2.5 whitespace-nowrap w-1">
                           <ActionButtons brand={brand} />
                         </td>
                       </tr>
@@ -1046,13 +1053,15 @@ export default function BrandsPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code *</label>
                   <div className="relative">
-                    <input
+                                        <input
                       type="text"
                       value={formData.brand_code}
                       onChange={(e) => setFormData({ ...formData, brand_code: e.target.value })}
                       required
-                      disabled={isSubmitting || loadingCode}
-                      className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50"
+                      // ✅ FIX: Agar editingBrand hai to readOnly aur disabled kar do
+                      readOnly={!!editingBrand}
+                      disabled={isSubmitting || loadingCode || !!editingBrand}
+                      className={`h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 ${editingBrand ? 'cursor-not-allowed opacity-70' : ''}`}
                       style={{
                         backgroundColor: "var(--bg-tertiary)",
                         border: "1px solid var(--border-color)",

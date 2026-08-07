@@ -1,11 +1,17 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_SERVERURL 
 
 // ================================
-// TOKEN (Ab cookies use ho rahi hain)
+// TOKEN
 // ================================
 const getAuthHeaders = () => {
-  // Headers mein token nahi bhejna, cookies automatically bheji jayengi
-  return {};
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  return token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : {};
 };
 
 // ================================
@@ -22,18 +28,16 @@ const handleResponse = async (response) => {
 };
 
 // ================================
-// REQUEST (✅ credentials: 'include' add kiya)
+// REQUEST
 // ================================
 const request = async (endpoint, options = {}) => {
   const { body, ...restOptions } = options;
-
   const fetchOptions = {
     ...restOptions,
     headers: {
       ...getAuthHeaders(),
       ...(restOptions.headers || {}),
     },
-    credentials: 'include', // ✅ Ye LINE BOHAT ZAROORI HAI - Cookies bhejne ke liye
   };
 
   if (body instanceof FormData) {
@@ -49,16 +53,16 @@ const request = async (endpoint, options = {}) => {
 };
 
 // ================================
-// BRAND API
+// BRAND API (✅ FULLY UPDATED)
 // ================================
 export const brandApi = {
   // GET NEXT BRAND CODE
   getNextCode: async () => {
     const response = await request("/brands/next-code");
-    return response.data?.nextCode || "BRD-001";
+    return response.data?.nextCode;
   },
 
-  // GET ALL BRANDS
+  // GET ALL BRANDS (✅ Ab products bhi aayenge)
   getAll: async () => {
     const response = await request("/brands");
 
@@ -73,13 +77,13 @@ export const brandApi = {
     return [];
   },
 
-  // GET SINGLE BRAND
+  // GET SINGLE BRAND (✅ Ab products bhi aayenge)
   getById: async (id) => {
     const response = await request(`/brands/${id}`);
     return response.data || response;
   },
 
-  // GET BRAND WITH PRODUCTS
+  // ✅ NEW: GET BRAND WITH PRODUCTS (Explicit endpoint)
   getWithProducts: async (id) => {
     const response = await request(`/brands/${id}/details`);
     return response.data || response;

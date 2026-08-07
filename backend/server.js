@@ -1,105 +1,195 @@
 require("dotenv").config();
 
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const path = require("path");
+const fs = require("fs");
 const cookieParser = require("cookie-parser"); // ✅ 1. Import kiya
 
 const connectDB = require("./config/db");
 const User = require("./models/User");
+const Store = require("./models/Store");
+const { initSocket } = require("./utils/socket");
 
 const categoryRoutes = require("./routes/categoryRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const productRoutes = require("./routes/productRoutes");
 const userRoutes = require("./routes/userRoutes");
 const variantRoutes = require("./routes/variantRoutes");
+const storeRoutes = require("./routes/storeRoutes");
 
 const app = express();
+const server = http.createServer(app);
+const io = initSocket(server);
+
+// ==========================================
+// CONSTANTS & CONFIGURATION
+// ==========================================
+const ROLES = {
+  ADMIN: "admin",
+};
+
+const PORT = process.env.PORT;
+const CLIENT_URL = process.env.CLIENT_URL;
+const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
+
+// Safety Check for Critical Env Vars
+if (!PORT || !CLIENT_URL) {
+  console.error("❌ CRITICAL: PORT or CLIENT_URL is missing in .env file!");
+  // process.exit(1); // Uncomment this to stop server if env missing
+}
 
 app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 app.use(cookieParser()); // ✅ 2. Middleware add kiya taake req.cookies kaam kare
 
 app.use(
   cors({
+    origin: CLIENT_URL,
+    credentials: true,
     origin: "http://localhost:3000",
     credentials: true, // ✅ 3. Ye BOHAT ZAROORI hai taake browser cookies accept kare
   })
 );
 
-// Uploads public
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "uploads"))
-);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes
+// ==========================================
+// ROUTES
+// ==========================================
 app.use("/api/categories", categoryRoutes);
 app.use("/api/brands", brandRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/variants", variantRoutes);
+app.use("/api/store", storeRoutes);
 
-const PORT = process.env.PORT || 5000;
+app.get("/", (req, res) => {
+  res.send(
+    `Backend server is running with Socket.io 🚀 | Client: ${CLIENT_URL}`
+  );
+});
 
 // ==========================================
-// DEFAULT ADMIN
+// 🏪 STORE + 👤 ADMIN SEEDING
 // ==========================================
-
-const checkAndCreateDefaultAdmin = async () => {
+const seedDefaultData = async () => {
   try {
-    const existingAdmin = await User.findOne({
-      role: "admin",
+    // ==============================
+    // DEFAULT STORE
+    // ==============================
+    const storeName = process.env.DEFAULT_STORE_NAME;
+
+    if (!storeName) {
+      console.warn("⚠️ DEFAULT_STORE_NAME not found in .env");
+      return;
+    }
+
+    let defaultStore = await Store.findOne({
+      store_name: storeName,
     });
 
-    if (!existingAdmin) {
-      const hashedPassword = await bcrypt.hash(
-        "12345678",
-        10
-      );
-
-      await User.create({
-        name: "admin",
-        username: "admin123",
-        email: "admin@gmail.com",
-        password: hashedPassword,
-        role: "admin",
+    if (!defaultStore) {
+      defaultStore = await Store.create({
+        store_name: storeName,
+        tagline: process.env.DEFAULT_STORE_TAGLINE,
+        email: process.env.DEFAULT_STORE_EMAIL,
+        phone: process.env.DEFAULT_STORE_PHONE,
+        support_email: process.env.DEFAULT_STORE_SUPPORT_EMAIL,
+        support_phone: process.env.DEFAULT_STORE_SUPPORT_PHONE,
+        country: process.env.DEFAULT_STORE_COUNTRY,
+        state: process.env.DEFAULT_STORE_STATE,
+        city: process.env.DEFAULT_STORE_CITY,
+        zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
+        address: process.env.DEFAULT_STORE_ADDRESS,
+        currency: process.env.DEFAULT_STORE_CURRENCY,
+        tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE) || 0,
+        weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
+        store_status: process.env.DEFAULT_STORE_STATUS,
+        primary_color: process.env.DEFAULT_STORE_PRIMARY_COLOR,
       });
+      // console.log("✅ Store Created"); // Removed for clean terminal
+    } 
+    // else { console.log("ℹ️ Store already exists"); } // Removed
 
-      console.log("✅ Default Admin automatically created");
-    } else {
-      console.log("✅ Admin already exists");
+    // ==============================
+    // DEFAULT ADMIN
+    // ==============================
+    const adminName = process.env.DEFAULT_ADMIN_NAME;
+    const adminUsername = process.env.DEFAULT_ADMIN_USERNAME;
+    const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
+    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+
+    if (!adminEmail || !adminPassword) {
+      // Only log if critical admin data is missing
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚠️ Admin credentials missing in .env");
+      }
+      return;
     }
-  } catch (error) {
-    console.error(
-      "❌ Error checking/creating admin:",
-      error.message
-    );
-    throw error;
+
+    let admin = await User.findOne({
+      $or: [{ email: adminEmail }, { username: adminUsername }],
+    });
+
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+
+      admin = await User.create({
+        name: adminName,
+        username: adminUsername,
+        email: adminEmail,
+        password: hashedPassword,
+        role: ROLES.ADMIN,
+        storeId: defaultStore._id,
+      });
+      // console.log("✅ Admin Created"); // Removed
+    } else {
+      let updated = false;
+
+      if (!admin.storeId) {
+        admin.storeId = defaultStore._id;
+        updated = true;
+      }
+
+      if (admin.role !== ROLES.ADMIN) {
+        admin.role = ROLES.ADMIN;
+        updated = true;
+      }
+
+      if (updated) {
+        await admin.save();
+        // console.log("✅ Existing Admin Updated"); // Removed
+      } 
+      // else { console.log("ℹ️ Admin already exists."); } // Removed
+    }
+  } catch (err) {
+    console.error("❌ Seed Error:", err.message); // Only log error message, not full stack in prod
+    throw err;
   }
 };
 
 // ==========================================
-// TEST ROUTE
+// 🚀 SERVER STARTUP
 // ==========================================
-
-app.get("/", (req, res) => {
-  res.send("backend server is running");
-});
-
-// ==========================================
-// START SERVER
-// ==========================================
-
 const startServer = async () => {
   try {
     await connectDB();
-    await checkAndCreateDefaultAdmin();
 
-    app.listen(PORT, () => {
-      console.log(
-        `✅ Server is running on port ${PORT}`
-      );
+    const uploadDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    await seedDefaultData();
+
+    server.listen(PORT, () => {
+      // Sirf ye 3 lines terminal mein dikhengi - Clean & Professional
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`🌐 Client URL: ${CLIENT_URL}`);
+      console.log(`🚀 Socket.io Ready`);
     });
   } catch (error) {
     console.error(

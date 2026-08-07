@@ -2,83 +2,52 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import {
   FolderOpen,
   Tag,
   Package,
   LayoutDashboard,
-  Menu,
   X,
+  Store,
 } from "lucide-react";
 
+// ✅ MENU ORDER: Store Info is at the BOTTOM (after Products)
 const menu = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
   { name: "Brands", icon: Tag, path: "/admin/brands" },
   { name: "Categories", icon: FolderOpen, path: "/admin/categories" },
   { name: "Products", icon: Package, path: "/admin/products" },
+  { name: "Store Info", icon: Store, path: "/admin/store-info" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
 
+  // ✅ Route change pe sidebar band karo (layout ke closeSidebar se)
   useEffect(() => {
-    setOpen(false);
+    if (onNavigate) onNavigate();
   }, [pathname]);
 
   return (
     <>
-      {/* Mobile Open Button */}
-      {!open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Open sidebar"
-          className="
-            fixed left-2.5 top-2.5 z-[60]
-            inline-flex h-8 w-8
-            items-center justify-center
-            rounded-md
-            border border-[var(--border-color)]
-            bg-[var(--bg-sidebar)]
-            text-[var(--text-secondary)]
-            shadow-sm
-            transition-colors
-            hover:text-[var(--text-primary)]
-            lg:hidden
-          "
-        >
-          <Menu size={16} />
-        </button>
-      )}
+      {/* ❌ Mobile Open Button — HATA DIYA (Navbar mein already hai) */}
 
-      {/* Mobile Overlay */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
-        />
-      )}
+      {/* ❌ Mobile Overlay — HATA DIYA (Layout mein already hai) */}
 
       {/* Sidebar */}
       <aside
-        className={`
-          fixed left-0 top-0 z-50
+        className="
           flex h-screen w-[200px] flex-col
           overflow-hidden
           border-r border-[var(--border-sidebar)]
           bg-[var(--bg-sidebar)]
           text-[var(--text-sidebar)]
           shadow-sm
-          transition-transform duration-200
-          lg:sticky lg:translate-x-0 lg:shadow-none
-          ${open ? "translate-x-0" : "-translate-x-full"}
-        `}
+        "
       >
-        {/* Header / Logo — navbar ke barabar height (h-16) */}
+        {/* Header / Logo */}
         <div
           className="
             flex h-16 shrink-0
@@ -90,7 +59,7 @@ export default function Sidebar() {
         >
           <Link
             href="/admin/dashboard"
-            onClick={() => setOpen(false)}
+            onClick={onNavigate}
             className="flex min-w-0 items-center gap-2"
           >
             <div
@@ -118,7 +87,7 @@ export default function Sidebar() {
           {/* Mobile Close Button */}
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={onNavigate}
             aria-label="Close sidebar"
             className="
               shrink-0 rounded-md p-1
@@ -126,7 +95,7 @@ export default function Sidebar() {
               transition-colors
               hover:bg-[var(--bg-sidebar-hover)]
               hover:text-[var(--text-primary)]
-              lg:hidden
+              md:hidden
             "
           >
             <X size={14} />
@@ -149,7 +118,7 @@ export default function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.path}
-                  onClick={() => setOpen(false)}
+                  onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
                   className={`
                     flex h-8 items-center
