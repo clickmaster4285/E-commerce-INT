@@ -1,15 +1,17 @@
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 
-const {
-  getNextSku,
-} = require("../utils/skuHelper");
+const { getNextSku } = require("../utils/skuHelper");
 
 const {
   deleteImageFile,
   deleteProductUploadFolder,
 } = require("../utils/uploadHelpers");
 
+
+// ==========================================
+// PARSE JSON
+// ==========================================
 
 const parseJSON = (value, fallback) => {
   try {
@@ -24,7 +26,10 @@ const parseJSON = (value, fallback) => {
 };
 
 
+// ==========================================
 // CREATE PRODUCT
+// ==========================================
+
 const createProduct = async (req, res) => {
   let createdProduct = null;
 
@@ -51,6 +56,7 @@ const createProduct = async (req, res) => {
       brand_id: req.body.brand_id,
       description: req.body.description || "",
       tax: Number(req.body.tax || 0),
+
       status:
         req.body.status === "inactive"
           ? "inactive"
@@ -175,14 +181,21 @@ const createProduct = async (req, res) => {
       createdVariants.push(variant);
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       message:
         "Product created successfully",
+
       product: createdProduct,
+
       variants: createdVariants,
     });
 
   } catch (error) {
+    /*
+      Product create fail ho jaye to incomplete
+      product, variants aur uploaded files remove honge.
+      Ye rollback hai, normal product delete nahi.
+    */
 
     if (createdProduct) {
       await Variant.deleteMany({
@@ -199,17 +212,24 @@ const createProduct = async (req, res) => {
       );
     }
 
-    res.status(400).json({
+    return res.status(400).json({
       message: error.message,
     });
   }
 };
 
 
+// ==========================================
 // GET ALL PRODUCTS
+// ==========================================
+
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find()
+    const products = await Product.find({
+      is_deleted: {
+        $ne: true,
+      },
+    })
       .select("-__v")
       .populate(
         "category_id",
@@ -220,45 +240,48 @@ const getProducts = async (req, res) => {
         "brand_code name"
       );
 
-    const result =
-      await Promise.all(
-        products.map(
-          async (product) => {
+    const result = await Promise.all(
+      products.map(async (product) => {
+        const variants =
+          await Variant.find({
+            product_id:
+              product._id,
+          }).select("-__v");
 
-            const variants =
-              await Variant.find({
-                product_id:
-                  product._id,
-              }).select("-__v");
+        return {
+          ...product.toObject(),
+          variants,
+        };
+      })
+    );
 
-            return {
-              ...product.toObject(),
-              variants,
-            };
-          }
-        )
-      );
-
-    res.status(200).json(result);
+    return res.status(200).json(result);
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: error.message,
     });
   }
 };
 
 
+// ==========================================
 // GET PRODUCT BY ID
+// ==========================================
+
 const getProductById = async (
   req,
   res
 ) => {
   try {
     const product =
-      await Product.findById(
-        req.params.id
-      )
+      await Product.findOne({
+        _id: req.params.id,
+
+        is_deleted: {
+          $ne: true,
+        },
+      })
         .select("-__v")
         .populate(
           "category_id",
@@ -268,8 +291,14 @@ const getProductById = async (
           "brand_id",
           "brand_code name"
         )
-         .populate("createdby", "email")  // 👈 YE LINE ADD KARO
-  .populate("updatedby", "email"); // 👈 YE LINE ADD KARO
+        .populate(
+          "createdby",
+          "email"
+        )
+        .populate(
+          "updatedby",
+          "email"
+        );
 
     if (!product) {
       return res.status(404).json({
@@ -278,36 +307,43 @@ const getProductById = async (
       });
     }
 
-
-    
     const variants =
       await Variant.find({
-        product_id: product._id,
+        product_id:
+          product._id,
       }).select("-__v");
 
-    res.status(200).json({
+    return res.status(200).json({
       ...product.toObject(),
+
       variants,
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: error.message,
     });
   }
 };
 
 
-// UPDATE PRODUCT
+// ==========================================
+// UPDATE PRODUCT AND VARIANTS
+// ==========================================
+
 const updateProduct = async (
   req,
   res
 ) => {
   try {
     const product =
-      await Product.findById(
-        req.params.id
-      );
+      await Product.findOne({
+        _id: req.params.id,
+
+        is_deleted: {
+          $ne: true,
+        },
+      });
 
     if (!product) {
       return res.status(404).json({
@@ -315,6 +351,11 @@ const updateProduct = async (
           "Product not found",
       });
     }
+
+
+    // ------------------------------------------
+    // UPDATE PRODUCT INFORMATION
+    // ------------------------------------------
 
     if (req.body.name !== undefined) {
       product.name =
@@ -345,10 +386,11 @@ const updateProduct = async (
         req.body.description;
     }
 
-    if (req.body.tax !== undefined) {
-      product.tax = Number(
-        req.body.tax
-      );
+    if (
+      req.body.tax !== undefined
+    ) {
+      product.tax =
+        Number(req.body.tax);
     }
 
     if (
@@ -363,6 +405,11 @@ const updateProduct = async (
 
     await product.save();
 
+
+    // ------------------------------------------
+    // READ INCOMING VARIANTS
+    // ------------------------------------------
+
     const incomingVariants =
       parseJSON(
         req.body.variants,
@@ -375,14 +422,27 @@ const updateProduct = async (
         []
       );
 
+    if (!incomingVariants.length) {
+      return res.status(400).json({
+        message:
+          "At least one variant is required",
+      });
+    }
+
+
+    // ------------------------------------------
+    // GROUP NEW IMAGES BY VARIANT INDEX
+    // ------------------------------------------
+
     const imagesByVariant = {};
 
     (req.savedImages || []).forEach(
       (image, fileIndex) => {
-
         const variantIndex =
           Number(
-            imageVariantIndexes[fileIndex]
+            imageVariantIndexes[
+              fileIndex
+            ]
           ) || 0;
 
         if (
@@ -401,12 +461,30 @@ const updateProduct = async (
       }
     );
 
+
+    /*
+      Ye IDs un variants ki hain jo edit form se
+      receive huye hain. Baad mein jo purana variant
+      is list mein nahi hoga woh remove hoga.
+    */
+
     const retainedVariantIds = [];
+
+    /*
+      Ek hi request ke andar duplicate SKU
+      check karne ke liye.
+    */
+
+    const requestSkus = new Set();
+
+
+    // ------------------------------------------
+    // CREATE OR UPDATE EVERY VARIANT
+    // ------------------------------------------
 
     for (
       let index = 0;
-      index <
-      incomingVariants.length;
+      index < incomingVariants.length;
       index++
     ) {
       const item =
@@ -420,6 +498,20 @@ const updateProduct = async (
         sku = await getNextSku();
       }
 
+
+      // Same form mein duplicate SKU check
+
+      if (requestSkus.has(sku)) {
+        throw new Error(
+          `Duplicate SKU: ${sku}`
+        );
+      }
+
+      requestSkus.add(sku);
+
+
+      // Existing images frontend se aa rahi hain
+
       const existingImages =
         Array.isArray(
           item.existing_images
@@ -427,24 +519,39 @@ const updateProduct = async (
           ? item.existing_images
           : [];
 
+
+      // Is variant ki newly uploaded images
+
       const newImages =
         imagesByVariant[index] || [];
+
+
+      // ========================================
+      // EXISTING VARIANT UPDATE
+      // ========================================
 
       if (item._id) {
         const variant =
           await Variant.findOne({
             _id: item._id,
+
             product_id:
               product._id,
           });
 
         if (!variant) {
-          continue;
+          throw new Error(
+            `Variant not found for SKU ${sku}`
+          );
         }
+
+
+        // Database mein kisi aur variant ka same SKU
 
         const duplicate =
           await Variant.findOne({
             sku,
+
             _id: {
               $ne: variant._id,
             },
@@ -456,15 +563,24 @@ const updateProduct = async (
           );
         }
 
+
+        /*
+          Frontend se jo existing images receive hui hain
+          woh retain hongi. Baqi removed images filesystem
+          se delete hongi.
+        */
+
         const retainedUrls =
-          existingImages.map(
-            (image) =>
-              image.img_url
-          );
+          existingImages
+            .map(
+              (image) =>
+                image?.img_url
+            )
+            .filter(Boolean);
 
         for (
           const oldImage of
-          variant.images
+          variant.images || []
         ) {
           if (
             !retainedUrls.includes(
@@ -476,6 +592,7 @@ const updateProduct = async (
             );
           }
         }
+
 
         variant.sku = sku;
 
@@ -528,9 +645,14 @@ const updateProduct = async (
         retainedVariantIds.push(
           variant._id.toString()
         );
+      }
 
-      } else {
 
+      // ========================================
+      // NEW SECOND/THIRD VARIANT CREATE
+      // ========================================
+
+      else {
         const duplicate =
           await Variant.findOne({
             sku,
@@ -580,7 +702,8 @@ const updateProduct = async (
             attributes:
               item.attributes || {},
 
-            images: newImages,
+            images:
+              newImages,
 
             createdby:
               req.user?._id || null,
@@ -595,6 +718,11 @@ const updateProduct = async (
       }
     }
 
+
+    // ------------------------------------------
+    // REMOVE VARIANTS DELETED FROM EDIT FORM
+    // ------------------------------------------
+
     const oldVariants =
       await Variant.find({
         product_id:
@@ -604,14 +732,17 @@ const updateProduct = async (
     for (
       const variant of oldVariants
     ) {
+      const variantId =
+        variant._id.toString();
+
       if (
         !retainedVariantIds.includes(
-          variant._id.toString()
+          variantId
         )
       ) {
         for (
           const image of
-          variant.images
+          variant.images || []
         ) {
           await deleteImageFile(
             image.img_url
@@ -624,38 +755,53 @@ const updateProduct = async (
       }
     }
 
+
+    // ------------------------------------------
+    // GET FINAL UPDATED VARIANTS
+    // ------------------------------------------
+
     const updatedVariants =
       await Variant.find({
         product_id:
           product._id,
-      });
+      }).select("-__v");
 
-    res.status(200).json({
+
+    return res.status(200).json({
       message:
         "Product updated successfully",
+
       product,
+
       variants:
         updatedVariants,
     });
 
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       message: error.message,
     });
   }
 };
 
 
-// DELETE PRODUCT
+// ==========================================
+// DELETE PRODUCT - SOFT DELETE
+// ==========================================
+
 const deleteProduct = async (
   req,
   res
 ) => {
   try {
     const product =
-      await Product.findById(
-        req.params.id
-      );
+      await Product.findOne({
+        _id: req.params.id,
+
+        is_deleted: {
+          $ne: true,
+        },
+      });
 
     if (!product) {
       return res.status(404).json({
@@ -664,30 +810,32 @@ const deleteProduct = async (
       });
     }
 
-    await Variant.deleteMany({
-      product_id: product._id,
-    });
+    product.is_deleted = true;
 
-    await deleteProductUploadFolder(
-      product._id
-    );
+    product.deleted_at =
+      new Date();
 
-    await Product.findByIdAndDelete(
-      product._id
-    );
+    product.deletedby =
+      req.user?._id || null;
 
-    res.status(200).json({
+    await product.save();
+
+    return res.status(200).json({
       message:
         "Product deleted successfully",
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: error.message,
     });
   }
 };
 
+
+// ==========================================
+// EXPORTS
+// ==========================================
 
 module.exports = {
   createProduct,

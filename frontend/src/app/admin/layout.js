@@ -1,33 +1,68 @@
 'use client';
- 
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '../Component/Sidebar';
 import Navbar from '../Component/Navbar';
- 
+import axiosInstance from '@/apis/axiosInstance';
+
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
- 
+  const [isAuthenticated, setIsAuthenticated] = useState(null); // null = checking
+  const router = useRouter();
+  const pathname = usePathname();
+
   useEffect(() => {
     const saved = localStorage.getItem('theme') || 'dark';
     setTheme(saved);
     document.documentElement.classList.toggle('light', saved === 'light');
   }, []);
- 
+
+  // Authentication Check
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        await axiosInstance.get('/users/profile');
+        setIsAuthenticated(true);
+      } catch (error) {
+        setIsAuthenticated(false);
+        router.push('/login');
+      }
+    };
+
+    checkAuth();
+  }, [router, pathname]);
+
+  // Loading state
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
+          <p className="text-sm">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated - redirect will happen via useEffect
+  if (!isAuthenticated) {
+    return null;
+  }
+
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('light', newTheme === 'light');
   };
- 
+
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const closeSidebar = () => setSidebarOpen(false);
- 
+
   return (
     <div className="flex h-screen overflow-hidden">
- 
-      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
           onClick={closeSidebar}
@@ -35,8 +70,7 @@ export default function AdminLayout({ children }) {
           aria-hidden="true"
         />
       )}
- 
-      {/* Sidebar */}
+      
       <div
         className={`
           sidebar-wrapper shrink-0 h-screen z-50
@@ -48,18 +82,13 @@ export default function AdminLayout({ children }) {
       >
         <Sidebar onNavigate={closeSidebar} />
       </div>
- 
-      {/* Main Area */}
+
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
- 
         <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} />
- 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
           {children}
         </main>
- 
       </div>
     </div>
   );
 }
- 

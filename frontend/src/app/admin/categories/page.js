@@ -32,15 +32,13 @@ const initialForm = {
   category_code: "",
   name: "",
   description: "",
-  is_active: true,
 };
 
 export default function CategoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  
   const [viewMode, setViewMode] = useState("table");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -130,17 +128,11 @@ export default function CategoriesPage() {
   const filteredCategories = categories.filter((category) => {
     const keyword = search.trim().toLowerCase();
 
-    const matchSearch =
+    return (
       !keyword ||
       category.name?.toLowerCase().includes(keyword) ||
-      category.category_code?.toLowerCase().includes(keyword);
-
-    const matchStatus =
-      filterStatus === "all" ||
-      (filterStatus === "active" && category.is_active) ||
-      (filterStatus === "inactive" && !category.is_active);
-
-    return matchSearch && matchStatus;
+      category.category_code?.toLowerCase().includes(keyword)
+    );
   });
 
   // ==========================================
@@ -169,13 +161,6 @@ export default function CategoriesPage() {
 
   const totalCategories = categories.length;
 
-  const activeCategories = categories.filter(
-    (category) => category.is_active
-  ).length;
-
-  const inactiveCategories =
-    totalCategories - activeCategories;
-
   // ==========================================
   // DETAIL PAGE
   // ==========================================
@@ -193,8 +178,21 @@ export default function CategoriesPage() {
     setEditingCategory(null);
   };
 
-  const openCreateModal = () => {
+  const openCreateModal = async () => {
     resetForm();
+
+    try {
+      const response = await categoryApi.getNextCode();
+      setFormData({
+        // ✅ Fix: Extract nextCode from the response object
+        category_code: response.nextCode || response,
+        name: "",
+        description: "",
+      });
+    } catch (error) {
+      toast.error("Category code generate failed");
+    }
+
     setShowModal(true);
   };
 
@@ -205,17 +203,11 @@ export default function CategoriesPage() {
 
   const handleEdit = (category) => {
     setEditingCategory(category);
-
     setFormData({
       category_code: category.category_code || "",
       name: category.name || "",
       description: category.description || "",
-      is_active:
-        category.is_active !== undefined
-          ? category.is_active
-          : true,
     });
-
     setShowModal(true);
   };
 
@@ -224,12 +216,10 @@ export default function CategoriesPage() {
 
     categoryMutation.mutate({
       id: editingCategory?._id,
-
       data: {
-        category_code: formData.category_code.trim(),
+        category_code: formData.category_code,
         name: formData.name.trim(),
         description: formData.description.trim(),
-        is_active: formData.is_active,
       },
     });
   };
@@ -263,19 +253,13 @@ export default function CategoriesPage() {
     setCurrentPage(1);
   };
 
-  const handleFilterChange = (event) => {
-    setFilterStatus(event.target.value);
-    setCurrentPage(1);
-  };
-
   const isSubmitting = categoryMutation.isPending;
   const isDeleting = deleteMutation.isPending;
 
   return (
     <div
-      className="min-h-screen space-y-6 p-6"
+      className="min-h-screen space-y-6 "
       style={{
-        // backgroundColor: "var(--bg-primary)",
         color: "var(--text-primary)",
       }}
     >
@@ -288,7 +272,6 @@ export default function CategoriesPage() {
               className="h-8 w-8"
               style={{ color: "var(--accent)" }}
             />
-
             Categories
           </h1>
 
@@ -369,60 +352,35 @@ export default function CategoriesPage() {
           title="Total Categories"
           value={totalCategories}
         />
-
-        <StatCard
-          title="Active"
-          value={activeCategories}
-          color="var(--success)"
-        />
-
-        <StatCard
-          title="Inactive"
-          value={inactiveCategories}
-          color="var(--danger)"
-        />
       </div>
 
       {/* SEARCH */}
 
-     <div
-  className="rounded-xl p-4"
-  style={{
-    backgroundColor: "var(--bg-card)",
-    border: "1px solid var(--border-color)",
-  }}
->
-  <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
-    
-    {/* SEARCH - BIG */}
-    <div className="relative w-full">
-      <Search
-        className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
-        style={{ color: "var(--text-muted)" }}
-      />
+      <div
+        className="rounded-xl p-4"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-color)",
+        }}
+      >
+        <div className="grid grid-cols-1 gap-3">
+          {/* SEARCH - BIG */}
+          <div className="relative w-full">
+            <Search
+              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
+              style={{ color: "var(--text-muted)" }}
+            />
 
-      <input
-        type="text"
-        value={search}
-        onChange={handleSearchChange}
-        placeholder="Search by category name or code..."
-        className="input-field w-full !pl-10"
-      />
-    </div>
-
-    {/* STATUS - SMALL */}
-    <select
-      value={filterStatus}
-      onChange={handleFilterChange}
-      className="input-field w-full"
-    >
-      <option value="all">All Status</option>
-      <option value="active">Active</option>
-      <option value="inactive">Inactive</option>
-    </select>
-
-  </div>
-</div>
+            <input
+              type="text"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Search by category name or code..."
+              className="input-field w-full !pl-10"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* TABLE */}
 
@@ -448,8 +406,6 @@ export default function CategoriesPage() {
                   <TableHeading className="hidden md:table-cell">
                     Description
                   </TableHeading>
-
-                  <TableHeading>Status</TableHeading>
 
                   <TableHeading right>
                     Actions
@@ -477,7 +433,6 @@ export default function CategoriesPage() {
                       }}
                     >
                       <FolderOpen className="mx-auto mb-3 h-10 w-10 opacity-30" />
-
                       No categories found
                     </td>
                   </tr>
@@ -500,7 +455,6 @@ export default function CategoriesPage() {
                           style={{
                             backgroundColor:
                               "var(--bg-tertiary)",
-
                             color: "var(--accent)",
                           }}
                         >
@@ -528,12 +482,6 @@ export default function CategoriesPage() {
                         >
                           {category.description || "—"}
                         </p>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <StatusBadge
-                          active={category.is_active}
-                        />
                       </td>
 
                       <td
@@ -590,7 +538,6 @@ export default function CategoriesPage() {
               }}
             >
               <FolderOpen className="mx-auto mb-3 h-10 w-10 opacity-30" />
-
               No categories found
             </div>
           ) : (
@@ -613,7 +560,6 @@ export default function CategoriesPage() {
                       style={{
                         backgroundColor:
                           "var(--bg-tertiary)",
-
                         color: "var(--accent)",
                       }}
                     >
@@ -621,10 +567,6 @@ export default function CategoriesPage() {
                         ?.charAt(0)
                         .toUpperCase()}
                     </div>
-
-                    <StatusBadge
-                      active={category.is_active}
-                    />
                   </div>
 
                   <div>
@@ -771,7 +713,6 @@ export default function CategoriesPage() {
               className="sticky top-0 z-10 flex items-center justify-between px-6 py-5"
               style={{
                 backgroundColor: "var(--bg-card)",
-
                 borderBottom:
                   "1px solid var(--border-color)",
               }}
@@ -810,22 +751,27 @@ export default function CategoriesPage() {
               className="space-y-5 p-6"
             >
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {/* ✅ FIX: Removed 'disabled' and added 'onChange' so user can edit the code */}
                 <Field label="Category Code *">
                   <input
-                    required
                     type="text"
-                    disabled={isSubmitting}
+                    required
                     value={formData.category_code}
-                    placeholder="e.g. CAT-001"
-                    onChange={(event) =>
+                    onChange={(e) =>
                       setFormData({
                         ...formData,
-                        category_code:
-                          event.target.value,
+                        category_code: e.target.value,
                       })
                     }
                     className="input-field"
+                    placeholder="e.g. cat_1"
                   />
+                  <p
+                    className="text-[10px] mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Auto-generated • You can change it
+                  </p>
                 </Field>
 
                 <Field label="Category Name *">
@@ -863,45 +809,6 @@ export default function CategoriesPage() {
                 />
               </Field>
 
-              <label
-                className="flex cursor-pointer items-center gap-3 rounded-lg p-3"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  disabled={isSubmitting}
-                  checked={formData.is_active}
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      is_active:
-                        event.target.checked,
-                    })
-                  }
-                  className="h-5 w-5"
-                  style={{
-                    accentColor: "var(--accent)",
-                  }}
-                />
-
-                <div>
-                  <p className="text-sm font-medium">
-                    Active Category
-                  </p>
-
-                  <p
-                    className="text-xs"
-                    style={{
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    Category is available for products
-                  </p>
-                </div>
-              </label>
-
               <div
                 className="flex gap-3 border-t pt-5"
                 style={{
@@ -916,7 +823,6 @@ export default function CategoriesPage() {
                   style={{
                     backgroundColor:
                       "var(--bg-tertiary)",
-
                     border:
                       "1px solid var(--border-color)",
                   }}
@@ -987,7 +893,6 @@ export default function CategoriesPage() {
                 style={{
                   backgroundColor:
                     "var(--bg-tertiary)",
-
                   border:
                     "1px solid var(--border-color)",
                 }}
@@ -1010,7 +915,6 @@ export default function CategoriesPage() {
     </div>
   );
 }
-
 
 // ==========================================
 // COMPONENTS

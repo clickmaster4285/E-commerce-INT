@@ -1,5 +1,4 @@
 'use client';
-
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -7,22 +6,11 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Check karein ke kya user login hai?
-    const token = localStorage.getItem('token');
-
-    if (token) {
-      // Agar token hai, toh Dashboard par bhej do
-      router.push('/dashboard');
-    } else {
-      // Agar token nahi hai, toh Login page par bhej do
-      router.push('/login');
-    }
+    // Seedha login par bhej do. 
+    // Agar user ke paas valid cookie hogi, toh middleware.js usay 
+    // automatically /admin/dashboard par redirect kar dega!
+    router.push('/login');
   }, [router]);
 
-  // Jab tak redirect ho raha hai, ye chota sa message dikhega
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <p className="text-xl text-gray-600">Redirecting...</p>
-    </div>
-  );
+  return null; // Kuch render karne ki zaroorat nahi
 }

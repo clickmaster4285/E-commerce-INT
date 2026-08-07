@@ -6,6 +6,7 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
+const cookieParser = require("cookie-parser"); // ✅ 1. Import kiya
 
 const connectDB = require("./config/db");
 const User = require("./models/User");
@@ -42,11 +43,14 @@ if (!PORT || !CLIENT_URL) {
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+app.use(cookieParser()); // ✅ 2. Middleware add kiya taake req.cookies kaam kare
 
 app.use(
   cors({
     origin: CLIENT_URL,
     credentials: true,
+    origin: "http://localhost:3000",
+    credentials: true, // ✅ 3. Ye BOHAT ZAROORI hai taake browser cookies accept kare
   })
 );
 
@@ -187,8 +191,11 @@ const startServer = async () => {
       console.log(`🌐 Client URL: ${CLIENT_URL}`);
       console.log(`🚀 Socket.io Ready`);
     });
-  } catch (err) {
-    console.error("❌ Server start failed:", err.message);
+  } catch (error) {
+    console.error(
+      "❌ Server start failed:",
+      error.message
+    );
     process.exit(1);
   }
 };

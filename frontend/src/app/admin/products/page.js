@@ -36,7 +36,21 @@ const ITEMS_PER_PAGE = 20;
 const ATTRIBUTE_PRESETS = [
   {
     name: "Color",
-    values: ["Black", "White", "Gray", "Red", "Blue", "Green", "Yellow",  "Brown", "Pink", "Orange", "Purple", "Gold", "Silver"],
+    values: [
+      "Black",
+      "White",
+      "Gray",
+      "Red",
+      "Blue",
+      "Green",
+      "Yellow",
+      "Brown",
+      "Pink",
+      "Orange",
+      "Purple",
+      "Gold",
+      "Silver",
+    ],
   },
   {
     name: "Size",
@@ -44,27 +58,81 @@ const ATTRIBUTE_PRESETS = [
   },
   {
     name: "Material",
-    values: ["Cotton", "Polyester", "Leather", "Denim", "Wool", "Silk", "Linen", "Nylon",],
+    values: [
+      "Cotton",
+      "Polyester",
+      "Leather",
+      "Denim",
+      "Wool",
+      "Silk",
+      "Linen",
+      "Nylon",
+    ],
   },
   {
     name: "Fit",
-    values: ["Regular Fit", "Slim Fit", "Loose Fit", "Relaxed Fit", "Oversized", "Skinny", "Straight", "Tapered"],
+    values: [
+      "Regular Fit",
+      "Slim Fit",
+      "Loose Fit",
+      "Relaxed Fit",
+      "Oversized",
+      "Skinny",
+      "Straight",
+      "Tapered",
+    ],
   },
   {
     name: "Pattern",
-    values: ["Solid", "Striped", "Checked", "Plaid", "Printed", "Floral", "Camouflage"],
+    values: [
+      "Solid",
+      "Striped",
+      "Checked",
+      "Plaid",
+      "Printed",
+      "Floral",
+      "Camouflage",
+    ],
   },
   {
     name: "Sleeve",
-    values: ["Full Sleeve", "Half Sleeve", "Sleeveless", "3/4 Sleeve", "Long Sleeve", "Short Sleeve", "Cap Sleeve"],
+    values: [
+      "Full Sleeve",
+      "Half Sleeve",
+      "Sleeveless",
+      "3/4 Sleeve",
+      "Long Sleeve",
+      "Short Sleeve",
+      "Cap Sleeve",
+    ],
   },
   {
     name: "Collar",
-    values: ["Round Neck", "V-Neck", "Collared", "Mandarin Collar", "Polo Collar", "Turtleneck", "Hooded", "Boat Neck"],
+    values: [
+      "Round Neck",
+      "V-Neck",
+      "Collared",
+      "Mandarin Collar",
+      "Polo Collar",
+      "Turtleneck",
+      "Hooded",
+      "Boat Neck",
+    ],
   },
   {
     name: "Occasion",
-    values: ["Casual", "Formal", "Party", "Wedding", "Sports", "Gym", "Office", "Outdoor", "Daily Wear", "Festive"],
+    values: [
+      "Casual",
+      "Formal",
+      "Party",
+      "Wedding",
+      "Sports",
+      "Gym",
+      "Office",
+      "Outdoor",
+      "Daily Wear",
+      "Festive",
+    ],
   },
   {
     name: "Gender",
@@ -76,17 +144,33 @@ const ATTRIBUTE_PRESETS = [
   },
   {
     name: "Care",
-    values: ["Machine Wash", "Hand Wash", "Dry Clean Only", "Do Not Bleach", "Iron Safe", "Wash Separately"],
+    values: [
+      "Machine Wash",
+      "Hand Wash",
+      "Dry Clean Only",
+      "Do Not Bleach",
+      "Iron Safe",
+      "Wash Separately",
+    ],
   },
   {
     name: "Style",
-    values: ["Casual", "Formal", "Sporty", "Classic", "Modern", "Vintage", "Bohemian", "Streetwear", "Ethnic", "Western"],
+    values: [
+      "Casual",
+      "Formal",
+      "Sporty",
+      "Classic",
+      "Modern",
+      "Vintage",
+      "Bohemian",
+      "Streetwear",
+      "Ethnic",
+      "Western",
+    ],
   },
 ];
 
-const API_ORIGIN =
-  process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-  "http://localhost:5000";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 const createEmptyVariant = (sku = "") => ({
   _id: null,
@@ -122,41 +206,52 @@ const getImageUrl = (url) => {
 };
 
 const compressProductImage = (file) => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const image = new Image();
     const imageUrl = URL.createObjectURL(file);
 
     image.onload = () => {
-      const MAX_SIDE = 1400;
+      // ✅ 1. Low Quality Check (Minimum Resolution)
+      const MIN_WIDTH = 800;
+      const MIN_HEIGHT = 800;
 
+      if (image.width < MIN_WIDTH || image.height < MIN_HEIGHT) {
+        URL.revokeObjectURL(imageUrl);
+        reject(
+          new Error(
+            `Image quality is too low. Minimum resolution required is ${MIN_WIDTH}x${MIN_HEIGHT}px.`,
+          ),
+        );
+        return;
+      }
+
+      // ✅ 2. High Quality Max Limit (Allow up to 2000px for high quality)
+      const MAX_SIDE = 2000;
       let width = image.width;
       let height = image.height;
 
       if (width > MAX_SIDE || height > MAX_SIDE) {
         const ratio = Math.min(MAX_SIDE / width, MAX_SIDE / height);
-
         width = Math.round(width * ratio);
         height = Math.round(height * ratio);
       }
 
       const canvas = document.createElement("canvas");
-
       canvas.width = width;
       canvas.height = height;
 
       const ctx = canvas.getContext("2d");
-
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-
       ctx.drawImage(image, 0, 0, width, height);
 
+      // ✅ 3. High Quality Compression (0.95 instead of 0.82)
       canvas.toBlob(
         (blob) => {
           URL.revokeObjectURL(imageUrl);
 
           if (!blob) {
-            resolve(file);
+            reject(new Error("Image processing failed"));
             return;
           }
 
@@ -170,13 +265,13 @@ const compressProductImage = (file) => {
           );
         },
         "image/webp",
-        0.82,
+        0.95, // High quality
       );
     };
 
     image.onerror = () => {
       URL.revokeObjectURL(imageUrl);
-      resolve(file);
+      reject(new Error("Failed to load image"));
     };
 
     image.src = imageUrl;
@@ -196,7 +291,14 @@ export default function ProductsPage() {
 
   // PAGINATION
   const [currentPage, setCurrentPage] = useState(1);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
 
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const [showNewBrandModal, setShowNewBrandModal] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -469,7 +571,7 @@ export default function ProductsPage() {
         ...variants[variantIndex],
         attributes: [
           ...variants[variantIndex].attributes,
-          { name: "", value: "", isCustom: false }, // 👈 Naya
+          { name: "", value: "", isCustom: false },
         ],
       };
       return { ...prev, variants };
@@ -535,6 +637,8 @@ export default function ProductsPage() {
 
     if (validFiles.length !== selectedFiles.length) {
       toast.error("Only JPG, PNG and WebP images are allowed");
+      event.target.value = "";
+      return;
     }
 
     try {
@@ -553,7 +657,6 @@ export default function ProductsPage() {
 
         variants[variantIndex] = {
           ...variants[variantIndex],
-
           images: [...variants[variantIndex].images, ...images],
         };
 
@@ -563,9 +666,11 @@ export default function ProductsPage() {
         };
       });
 
-      toast.success("Image optimized successfully");
-    } catch {
-      toast.error("Image processing failed");
+      // ✅ Changed Success Message
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      // ✅ Shows the specific error message (e.g., low resolution)
+      toast.error(error.message || "Image processing failed");
     }
 
     event.target.value = "";
@@ -596,6 +701,37 @@ export default function ProductsPage() {
     });
   };
 
+  // Quick Category Create
+  const createCategoryMutation = useMutation({
+    mutationFn: (data) => categoryApi.create(data),
+    onSuccess: (newCategory) => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setFormData({ ...formData, category_id: newCategory._id }); // Auto Select
+      setShowNewCategoryModal(false);
+      setNewCategoryName("");
+      toast.success("Category created and selected!");
+    },
+    onError: (error) =>
+      toast.error(error.response?.data?.message || "Failed to create category"),
+  });
+
+  // Quick Brand Create
+  // Quick Brand Create
+  const createBrandMutation = useMutation({
+    mutationFn: (data) => brandApi.create(data),
+    onSuccess: (newBrand) => {
+      queryClient.invalidateQueries({ queryKey: ["brands"] });
+
+      // ✅ FIX: Backend brand object 'data' key ke andar bhejta hai
+      setFormData({ ...formData, brand_id: newBrand.data._id });
+
+      setShowNewBrandModal(false);
+      setNewBrandName("");
+      toast.success("Brand created and selected!");
+    },
+    onError: (error) =>
+      toast.error(error.response?.data?.message || "Failed to create brand"),
+  });
   // ==========================================
   // EDIT
   // ==========================================
@@ -947,11 +1083,8 @@ export default function ProductsPage() {
 
   return (
     <div
-      className="min-h-screen space-y-6 p-6"
+      className="space-y-5"
       style={{
-        // backgroundColor:
-        //   "var(--bg-primary)",
-
         color: "var(--text-primary)",
       }}
     >
@@ -992,8 +1125,10 @@ export default function ProductsPage() {
               type="button"
               onClick={() => setViewMode("table")}
               title="Table view"
-              className={`rounded-md p-2 transition ${
-                viewMode === "table" ? "bg-emerald-600 text-white" : ""
+              className={`rounded-md p-2 transition-all duration-200 ${
+                viewMode === "table"
+                  ? "bg-emerald-600 text-white"
+                  : "hover:bg-black/5"
               }`}
             >
               <List className="h-4 w-4" />
@@ -1003,8 +1138,10 @@ export default function ProductsPage() {
               type="button"
               onClick={() => setViewMode("grid")}
               title="Grid view"
-              className={`rounded-md p-2 transition ${
-                viewMode === "grid" ? "bg-emerald-600 text-white" : ""
+              className={`rounded-md p-2 transition-all duration-200 ${
+                viewMode === "grid"
+                  ? "bg-emerald-600 text-white"
+                  : "hover:bg-black/5"
               }`}
             >
               <Grid3x3 className="h-4 w-4" />
@@ -1014,7 +1151,7 @@ export default function ProductsPage() {
           <button
             type="button"
             onClick={openNewProduct}
-            className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:scale-105"
+            className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-md"
             style={{
               backgroundColor: "var(--accent)",
 
@@ -1029,7 +1166,7 @@ export default function ProductsPage() {
 
       {/* STATS */}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Products" value={products.length} />
 
         <StatCard
@@ -1050,71 +1187,91 @@ export default function ProductsPage() {
       {/* FILTERS */}
 
       <div
-        className="rounded-xl p-4"
+        className="rounded-xl p-4 shadow-sm"
         style={{
           backgroundColor: "var(--bg-card)",
 
           border: "1px solid var(--border-color)",
         }}
       >
-        <div className="flex flex-col gap-3">
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
-              style={{
-                color: "var(--text-muted)",
-              }}
-            />
+        <div className="flex flex-col gap-4">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+              <Search
+                className="h-5 w-5 transition-colors duration-200"
+                style={{
+                  color: "var(--text-muted)",
+                }}
+              />
+            </div>
 
             <input
               type="text"
               value={search}
               placeholder="Search by product name or SKU..."
               onChange={(e) => changeSearch(e.target.value)}
-              className="input-field !pl-10"
+              className="input-field !pl-11 w-full transition-all duration-200 focus:shadow-md"
             />
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <select
-              value={filterCategory}
-              onChange={(e) => changeCategory(e.target.value)}
-              className="input-field min-w-[160px] flex-1"
-            >
-              <option value="all">All Categories</option>
+            <div className="relative min-w-[160px] flex-1 group">
+              <select
+                value={filterCategory}
+                onChange={(e) => changeCategory(e.target.value)}
+                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
+              >
+                <option value="all">All Categories</option>
 
-              {categories.map((category) => (
-                <option key={category._id} value={category._id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+                {categories.map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
+                style={{ color: "var(--text-muted)" }}
+              />
+            </div>
 
-            <select
-              value={filterBrand}
-              onChange={(e) => changeBrand(e.target.value)}
-              className="input-field min-w-[160px] flex-1"
-            >
-              <option value="all">All Brands</option>
+            <div className="relative min-w-[160px] flex-1 group">
+              <select
+                value={filterBrand}
+                onChange={(e) => changeBrand(e.target.value)}
+                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
+              >
+                <option value="all">All Brands</option>
 
-              {brands.map((brand) => (
-                <option key={brand._id} value={brand._id}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
+                {brands.map((brand) => (
+                  <option key={brand._id} value={brand._id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
+                style={{ color: "var(--text-muted)" }}
+              />
+            </div>
 
-            <select
-              value={filterStatus}
-              onChange={(e) => changeStatus(e.target.value)}
-              className="input-field min-w-[160px] flex-1"
-            >
-              <option value="all">All Status</option>
+            <div className="relative min-w-[160px] flex-1 group">
+              <select
+                value={filterStatus}
+                onChange={(e) => changeStatus(e.target.value)}
+                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
+              >
+                <option value="all">All Status</option>
 
-              <option value="active">Active</option>
+                <option value="active">Active</option>
 
-              <option value="inactive">Inactive</option>
-            </select>
+                <option value="inactive">Inactive</option>
+              </select>
+              <ChevronDown
+                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
+                style={{ color: "var(--text-muted)" }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1123,7 +1280,7 @@ export default function ProductsPage() {
 
       {viewMode === "table" && (
         <div
-          className="overflow-hidden rounded-xl"
+          className="overflow-hidden rounded-xl shadow-sm"
           style={{
             backgroundColor: "var(--bg-card)",
 
@@ -1184,7 +1341,7 @@ export default function ProductsPage() {
                       <tr
                         key={product._id}
                         onClick={() => openProductDetails(product)}
-                        className="cursor-pointer transition hover:bg-black/5"
+                        className="cursor-pointer transition-colors duration-150 hover:bg-black/[0.04]"
                         style={{
                           borderTop: "1px solid var(--border-color)",
                         }}
@@ -1297,7 +1454,7 @@ export default function ProductsPage() {
       {/* GRID */}
 
       {viewMode === "grid" && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedProducts.map((product) => {
             const variant = product.variants?.[0];
 
@@ -1307,7 +1464,7 @@ export default function ProductsPage() {
               <div
                 key={product._id}
                 onClick={() => openProductDetails(product)}
-                className="cursor-pointer overflow-hidden rounded-xl transition hover:-translate-y-1"
+                className="cursor-pointer overflow-hidden rounded-xl shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                 style={{
                   backgroundColor: "var(--bg-card)",
 
@@ -1412,7 +1569,7 @@ export default function ProductsPage() {
               type="button"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className="rounded-lg p-2 transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg p-2 transition-all duration-200 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
               style={{
                 backgroundColor: "var(--bg-card)",
 
@@ -1432,7 +1589,7 @@ export default function ProductsPage() {
               onClick={() =>
                 setCurrentPage((page) => Math.min(totalPages, page + 1))
               }
-              className="rounded-lg p-2 transition disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg p-2 transition-all duration-200 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
               style={{
                 backgroundColor: "var(--bg-card)",
 
@@ -1488,7 +1645,7 @@ export default function ProductsPage() {
 
                   setProductToDelete(null);
                 }}
-                className="rounded-lg px-4 py-2.5 text-sm font-semibold"
+                className="rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-sm"
                 style={{
                   backgroundColor: "var(--bg-tertiary)",
 
@@ -1502,7 +1659,7 @@ export default function ProductsPage() {
                 type="button"
                 disabled={deleteMutation.isPending}
                 onClick={confirmDelete}
-                className="rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+                className="rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-600 hover:shadow-md disabled:opacity-50"
               >
                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </button>
@@ -1516,7 +1673,7 @@ export default function ProductsPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div
-            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl"
+            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl shadow-2xl"
             style={{
               backgroundColor: "var(--bg-card)",
 
@@ -1550,7 +1707,7 @@ export default function ProductsPage() {
                 type="button"
                 title="Close"
                 onClick={closeProductModal}
-                className="rounded-lg p-2"
+                className="rounded-lg p-2 transition-all duration-200 hover:bg-black/5"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1565,7 +1722,7 @@ export default function ProductsPage() {
               }}
             >
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white transition-all duration-200">
                   {currentStep > 1 ? <Check className="h-4 w-4" /> : "1"}
                 </div>
 
@@ -1581,7 +1738,7 @@ export default function ProductsPage() {
 
               <div className="flex items-center gap-2">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-all duration-200 ${
                     currentStep === 2
                       ? "bg-emerald-500 text-white"
                       : "bg-gray-700 text-gray-400"
@@ -1600,51 +1757,101 @@ export default function ProductsPage() {
               {currentStep === 1 && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Field label="Category *">
-                      <select
-                        required
-                        value={formData.category_id}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            category_id: e.target.value,
-                          })
-                        } 
-                        className="input-field " 
-                        
-                      >
-                        <option   value="">Select product category</option>
+               <Field label="Category *">
+  <div className="relative">
+    {/* Dropdown Trigger Button */}
+    <button
+      type="button"
+      onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+      className="input-field w-full flex justify-between items-center text-left"
+    >
+      {formData.category_id 
+        ? categories.find((c) => c._id === formData.category_id)?.name 
+        : "Select product category"}
+      <ChevronDown className="h-4 w-4 shrink-0" />
+    </button>
 
-                        {categories.map((category) => (
-                          <option  key={category._id} value={category._id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
+    {/* Dropdown Menu (Scrollable + Create New Option) */}
+    {isCategoryDropdownOpen && (
+      <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg" 
+           style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", maxHeight: "12rem", overflowY: "auto" }}>
+        
+        {/* Categories List */}
+        {categories.map((cat) => (
+          <div
+            key={cat._id}
+            onClick={() => {
+              setFormData({ ...formData, category_id: cat._id });
+              setIsCategoryDropdownOpen(false);
+            }}
+            className="px-3 py-2 text-sm cursor-pointer transition-colors hover:bg-black/5"
+            style={{ color: formData.category_id === cat._id ? "var(--accent)" : "var(--text-primary)" }}
+          >
+            {cat.name}
+          </div>
+        ))}
 
-                    <Field label="Brand *">
-                      <select
-                      
-                        required
-                        value={formData.brand_id}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            brand_id: e.target.value,
-                          })
-                        }
-                        className="input-field"
-                      >
-                        <option value="">Select product brand</option>
+        {/* Create New Option at Bottom */}
+        <div
+          onClick={() => {
+            setIsCategoryDropdownOpen(false);
+            setShowNewCategoryModal(true);
+          }}
+          className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 transition-colors hover:bg-black/5"
+          style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}
+        >
+          <Plus className="h-4 w-4" /> Create New Category
+        </div>
+      </div>
+    )}
+  </div>
+</Field>
 
-                        {brands.map((brand) => (
-                          <option key={brand._id} value={brand._id}>
-                            {brand.name}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
+                   <Field label="Brand *">
+  <div className="relative">
+    <button
+      type="button"
+      onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+      className="input-field w-full flex justify-between items-center text-left"
+    >
+      {formData.brand_id 
+        ? brands.find((b) => b._id === formData.brand_id)?.name 
+        : "Select product brand"}
+      <ChevronDown className="h-4 w-4 shrink-0" />
+    </button>
+
+    {isBrandDropdownOpen && (
+      <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg" 
+           style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", maxHeight: "12rem", overflowY: "auto" }}>
+        
+        {brands.map((brand) => (
+          <div
+            key={brand._id}
+            onClick={() => {
+              setFormData({ ...formData, brand_id: brand._id });
+              setIsBrandDropdownOpen(false);
+            }}
+            className="px-3 py-2 text-sm cursor-pointer transition-colors hover:bg-black/5"
+            style={{ color: formData.brand_id === brand._id ? "var(--accent)" : "var(--text-primary)" }}
+          >
+            {brand.name}
+          </div>
+        ))}
+
+        <div
+          onClick={() => {
+            setIsBrandDropdownOpen(false);
+            setShowNewBrandModal(true);
+          }}
+          className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 transition-colors hover:bg-black/5"
+          style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}
+        >
+          <Plus className="h-4 w-4" /> Create New Brand
+        </div>
+      </div>
+    )}
+  </div>
+</Field>
                   </div>
 
                   <Field label="Product Name *">
@@ -1659,7 +1866,7 @@ export default function ProductsPage() {
                           name: e.target.value,
                         })
                       }
-                      className="input-field"
+                      className="input-field w-full transition-all duration-200"
                     />
                   </Field>
 
@@ -1674,7 +1881,7 @@ export default function ProductsPage() {
                           description: e.target.value,
                         })
                       }
-                      className="input-field resize-none"
+                      className="input-field w-full resize-none transition-all duration-200"
                     />
                   </Field>
 
@@ -1683,33 +1890,26 @@ export default function ProductsPage() {
                       <input
                         type="number"
                         min="0"
-                        placeholder="e.g. 18"
+                        max="100"
+                        placeholder="%"
                         value={formData.tax}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            tax: e.target.value,
-                          })
-                        }
-                        className="input-field"
+                        onChange={(e) => {
+                          let val = e.target.value;
+
+                          // Agar user field clear kare toh empty string allow karo
+                          if (val === "") {
+                            setFormData({ ...formData, tax: "" });
+                          } else {
+                            // Number mein convert karke 0 se 100 ke beech clamp (limit) karo
+                            let num = Number(val);
+                            if (num < 0) num = 0;
+                            if (num > 100) num = 100;
+
+                            setFormData({ ...formData, tax: String(num) });
+                          }
+                        }}
+                        className="input-field w-full transition-all duration-200 focus:shadow-md"
                       />
-                    </Field>
-
-                    <Field label="Status">
-                      <select
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            status: e.target.value,
-                          })
-                        }
-                        className="input-field"
-                      >
-                        <option value="active">Active</option>
-
-                        <option value="inactive">Inactive</option>
-                      </select>
                     </Field>
                   </div>
 
@@ -1717,10 +1917,9 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       onClick={handleNextStep}
-                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold"
+                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
                       style={{
                         backgroundColor: "var(--accent)",
-
                         color: "var(--accent-text)",
                       }}
                     >
@@ -1732,7 +1931,6 @@ export default function ProductsPage() {
               )}
 
               {/* STEP 2 */}
-
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -1740,18 +1938,13 @@ export default function ProductsPage() {
                       <h4 className="flex items-center gap-2 text-lg font-bold">
                         <Sparkles
                           className="h-5 w-5"
-                          style={{
-                            color: "var(--accent)",
-                          }}
+                          style={{ color: "var(--accent)" }}
                         />
                         Variants ({formData.variants.length})
                       </h4>
-
                       <p
                         className="mt-1 text-xs"
-                        style={{
-                          color: "var(--text-muted)",
-                        }}
+                        style={{ color: "var(--text-muted)" }}
                       >
                         SKU, pricing, stock, attributes and images
                       </p>
@@ -1760,10 +1953,9 @@ export default function ProductsPage() {
                     <button
                       type="button"
                       onClick={addVariant}
-                      className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
+                      className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
                       style={{
                         backgroundColor: "var(--accent)",
-
                         color: "var(--accent-text)",
                       }}
                     >
@@ -1776,16 +1968,12 @@ export default function ProductsPage() {
                     {formData.variants.map((variant, index) => (
                       <div
                         key={variant._id || index}
-                        className="overflow-hidden rounded-xl"
-                        style={{
-                          border: "1px solid var(--border-color)",
-                        }}
+                        className="overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-sm"
+                        style={{ borderColor: "var(--border-color)" }}
                       >
                         <div
-                          className="flex cursor-pointer items-center justify-between px-5 py-4"
-                          style={{
-                            backgroundColor: "var(--bg-tertiary)",
-                          }}
+                          className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors duration-150 hover:bg-black/[0.02]"
+                          style={{ backgroundColor: "var(--bg-tertiary)" }}
                           onClick={() =>
                             setExpandedVariant(
                               expandedVariant === index ? -1 : index,
@@ -1796,12 +1984,9 @@ export default function ProductsPage() {
                             <p className="font-semibold">
                               {variant.sku || `Variant ${index + 1}`}
                             </p>
-
                             <p
                               className="text-xs"
-                              style={{
-                                color: "var(--text-muted)",
-                              }}
+                              style={{ color: "var(--text-muted)" }}
                             >
                               {variant.title || `Variant #${index + 1}`}
                             </p>
@@ -1812,7 +1997,6 @@ export default function ProductsPage() {
                               title="Duplicate variant"
                               onClick={(e) => {
                                 e.stopPropagation();
-
                                 duplicateVariant(index);
                               }}
                             >
@@ -1825,7 +2009,6 @@ export default function ProductsPage() {
                               background="rgba(239,68,68,.10)"
                               onClick={(e) => {
                                 e.stopPropagation();
-
                                 removeVariant(index);
                               }}
                             >
@@ -1833,7 +2016,7 @@ export default function ProductsPage() {
                             </IconButton>
 
                             <ChevronDown
-                              className={`h-5 w-5 transition-transform ${
+                              className={`h-5 w-5 transition-transform duration-200 ${
                                 expandedVariant === index ? "rotate-180" : ""
                               }`}
                             />
@@ -1844,7 +2027,6 @@ export default function ProductsPage() {
                           <div className="space-y-6 p-5">
                             <div>
                               <SectionTitle>Identification</SectionTitle>
-
                               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <Field label="SKU *">
                                   <input
@@ -1859,7 +2041,7 @@ export default function ProductsPage() {
                                         e.target.value,
                                       )
                                     }
-                                    className="input-field"
+                                    className="input-field w-full transition-all duration-200 focus:shadow-md"
                                   />
                                 </Field>
 
@@ -1876,7 +2058,7 @@ export default function ProductsPage() {
                                         e.target.value,
                                       )
                                     }
-                                    className="input-field"
+                                    className="input-field w-full transition-all duration-200 focus:shadow-md"
                                   />
                                 </Field>
                               </div>
@@ -1894,7 +2076,7 @@ export default function ProductsPage() {
                                         e.target.value,
                                       )
                                     }
-                                    className="input-field resize-none"
+                                    className="input-field w-full resize-none transition-all duration-200 focus:shadow-md"
                                   />
                                 </Field>
                               </div>
@@ -1902,7 +2084,6 @@ export default function ProductsPage() {
 
                             <div>
                               <SectionTitle>Pricing & Stock</SectionTitle>
-
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                                 <NumberField
                                   label="Cost Price *"
@@ -1912,7 +2093,6 @@ export default function ProductsPage() {
                                     updateVariant(index, "cost_price", value)
                                   }
                                 />
-
                                 <NumberField
                                   label="Selling Price *"
                                   placeholder="e.g. 1500"
@@ -1921,7 +2101,6 @@ export default function ProductsPage() {
                                     updateVariant(index, "selling_price", value)
                                   }
                                 />
-
                                 <NumberField
                                   label="Quantity"
                                   placeholder="e.g. 50"
@@ -1930,7 +2109,6 @@ export default function ProductsPage() {
                                     updateVariant(index, "quantity", value)
                                   }
                                 />
-
                                 <NumberField
                                   label="Min Qty"
                                   placeholder="e.g. 5"
@@ -1939,7 +2117,6 @@ export default function ProductsPage() {
                                     updateVariant(index, "min_qnt", value)
                                   }
                                 />
-
                                 <NumberField
                                   label="Max Qty"
                                   placeholder="e.g. 100"
@@ -1953,7 +2130,6 @@ export default function ProductsPage() {
 
                             <div>
                               <SectionTitle>Attributes</SectionTitle>
-
                               <div className="space-y-3">
                                 {variant.attributes.map(
                                   (attribute, attrIndex) => {
@@ -1967,127 +2143,156 @@ export default function ProductsPage() {
                                         key={attrIndex}
                                         className="flex flex-wrap items-center gap-3"
                                       >
-                                        {/* 1. Attribute Name Select */}
-                                        <select
-                                          value={attribute.name}
-                                          onChange={(e) => {
-                                            const variants = [
-                                              ...formData.variants,
-                                            ];
-                                            const attributes = [
-                                              ...variants[index].attributes,
-                                            ];
-                                            attributes[attrIndex] = {
-                                              ...attributes[attrIndex],
-                                              name: e.target.value,
-                                              value: "",
-                                              isCustom: false,
-                                            };
-                                            variants[index] = {
-                                              ...variants[index],
-                                              attributes,
-                                            };
-                                            setFormData({
-                                              ...formData,
-                                              variants,
-                                            });
-                                          }}
-                                          className="input-field min-w-[160px] flex-1"
-                                        >
-                                          {ATTRIBUTE_PRESETS.map((p) => (
-                                            <option key={p.name} value={p.name}>
-                                              {p.name}
-                                            </option>
-                                          ))}
-                                        </select>
+                                        <div className="relative min-w-[160px] flex-1">
+                                          <select
+                                            value={attribute.name}
+                                            onChange={(e) => {
+                                              const variants = [
+                                                ...formData.variants,
+                                              ];
+                                              const attributes = [
+                                                ...variants[index].attributes,
+                                              ];
+                                              attributes[attrIndex] = {
+                                                ...attributes[attrIndex],
+                                                name: e.target.value,
+                                                value: "",
+                                                isCustom: false,
+                                              };
+                                              variants[index] = {
+                                                ...variants[index],
+                                                attributes,
+                                              };
+                                              setFormData({
+                                                ...formData,
+                                                variants,
+                                              });
+                                            }}
+                                            className="input-field w-full appearance-none pr-8 cursor-pointer transition-all duration-200 focus:shadow-md"
+                                          >
+                                            {ATTRIBUTE_PRESETS.map((p) => (
+                                              <option
+                                                key={p.name}
+                                                value={p.name}
+                                              >
+                                                {p.name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <ChevronDown
+                                            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none"
+                                            style={{
+                                              color: "var(--text-muted)",
+                                            }}
+                                          />
+                                        </div>
 
-                                        {/* 2. Attribute Value (Conditional) */}
                                         {preset ? (
                                           <>
-                                            <select
-                                              value={
-                                                isCustom
-                                                  ? "__custom__"
-                                                  : attribute.value
-                                              }
-                                              onChange={(e) => {
-                                                const val = e.target.value;
-                                                const variants = [
-                                                  ...formData.variants,
-                                                ];
-                                                const attributes = [
-                                                  ...variants[index].attributes,
-                                                ];
-                                                attributes[attrIndex] = {
-                                                  ...attributes[attrIndex],
-                                                  isCustom:
-                                                    val === "__custom__",
-                                                  value:
-                                                    val === "__custom__"
-                                                      ? preset.name === "Color"
-                                                        ? "#000000"
-                                                        : ""
-                                                      : val,
-                                                };
-                                                variants[index] = {
-                                                  ...variants[index],
-                                                  attributes,
-                                                };
-                                                setFormData({
-                                                  ...formData,
-                                                  variants,
-                                                });
-                                              }}
-                                              className="input-field min-w-[160px] flex-1"
-                                            >
-                                              {preset.values.map((v) => (
-                                                <option key={v} value={v}>
-                                                  {v}
+                                            <div className="relative min-w-[160px] flex-1">
+                                              <select
+                                                value={
+                                                  isCustom
+                                                    ? "__custom__"
+                                                    : attribute.value
+                                                }
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  const variants = [
+                                                    ...formData.variants,
+                                                  ];
+                                                  const attributes = [
+                                                    ...variants[index]
+                                                      .attributes,
+                                                  ];
+                                                  attributes[attrIndex] = {
+                                                    ...attributes[attrIndex],
+                                                    isCustom:
+                                                      val === "__custom__",
+                                                    value:
+                                                      val === "__custom__"
+                                                        ? preset.name ===
+                                                          "Color"
+                                                          ? "#000000"
+                                                          : ""
+                                                        : val,
+                                                  };
+                                                  variants[index] = {
+                                                    ...variants[index],
+                                                    attributes,
+                                                  };
+                                                  setFormData({
+                                                    ...formData,
+                                                    variants,
+                                                  });
+                                                }}
+                                                className="input-field w-full appearance-none pr-8 cursor-pointer transition-all duration-200 focus:shadow-md"
+                                              >
+                                                {preset.values.map((v) => (
+                                                  <option key={v} value={v}>
+                                                    {v}
+                                                  </option>
+                                                ))}
+                                                <option value="__custom__">
+                                                  + Custom
                                                 </option>
-                                              ))}
-                                              <option value="__custom__">
-                                                + Custom
-                                              </option>
-                                            </select>
+                                              </select>
+                                              <ChevronDown
+                                                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none"
+                                                style={{
+                                                  color: "var(--text-muted)",
+                                                }}
+                                              />
+                                            </div>
 
-                                            {/* 3. Custom Input (Color Picker ya Text) */}
                                             {isCustom &&
-  (preset.name === "Color" ? (
-    <div className="flex items-center gap-2 flex-1">
-      <div className="flex items-center gap-2 flex-1">
-        <input
-          type="color"
-          value={attribute.value || "#000000"}
-          onChange={(e) =>
-            updateAttribute(
-              index,
-              attrIndex,
-              "value",
-              e.target.value
-            )
-          }
-          className="w-12 h-10 cursor-pointer rounded border"
-          style={{ borderColor: "var(--border-color)" }}
-          title="Pick custom RGB color"
-        />
-        <div className="flex items-center gap-2 flex-1">
-          <div
-            className="w-6 h-6 rounded border"
-            style={{
-              backgroundColor: attribute.value || "#000000",
-              borderColor: "var(--border-color)",
-            }}
-          />
-          <span
-            className="text-sm font-mono"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {attribute.value || "#000000"}
-          </span>
-        </div>
-      </div>
-    </div>
-  ) : (
+                                              (preset.name === "Color" ? (
+                                                <div className="flex items-center gap-2 flex-1">
+                                                  <input
+                                                    type="color"
+                                                    value={
+                                                      attribute.value ||
+                                                      "#000000"
+                                                    }
+                                                    onChange={(e) =>
+                                                      updateAttribute(
+                                                        index,
+                                                        attrIndex,
+                                                        "value",
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    className="h-10 w-12 cursor-pointer rounded border p-1 transition-all duration-200"
+                                                    style={{
+                                                      borderColor:
+                                                        "var(--border-color)",
+                                                    }}
+                                                    title="Pick custom RGB color"
+                                                  />
+                                                  <div className="flex items-center gap-2 flex-1">
+                                                    <div
+                                                      className="h-6 w-6 rounded border"
+                                                      style={{
+                                                        backgroundColor:
+                                                          attribute.value ||
+                                                          "#000000",
+                                                        borderColor:
+                                                          "var(--border-color)",
+                                                      }}
+                                                    />
+                                                    <span
+                                                      className="text-sm font-mono"
+                                                      style={{
+                                                        color:
+                                                          "var(--text-muted)",
+                                                      }}
+                                                    >
+                                                      {attribute.value ||
+                                                        "#000000"}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ) : (
                                                 <input
                                                   type="text"
                                                   placeholder="Custom value..."
@@ -2100,12 +2305,11 @@ export default function ProductsPage() {
                                                       e.target.value,
                                                     )
                                                   }
-                                                  className="input-field flex-1"
+                                                  className="input-field flex-1 transition-all duration-200 focus:shadow-md"
                                                 />
                                               ))}
                                           </>
                                         ) : (
-                                          /* 4. Fallback: Jab koi preset select na ho */
                                           <input
                                             type="text"
                                             placeholder="Value e.g. Black"
@@ -2118,11 +2322,10 @@ export default function ProductsPage() {
                                                 e.target.value,
                                               )
                                             }
-                                            className="input-field flex-1"
+                                            className="input-field flex-1 transition-all duration-200 focus:shadow-md"
                                           />
                                         )}
 
-                                        {/* 5. Remove Button */}
                                         <IconButton
                                           title="Remove attribute"
                                           color="var(--danger)"
@@ -2141,7 +2344,7 @@ export default function ProductsPage() {
                                 <button
                                   type="button"
                                   onClick={() => addAttribute(index)}
-                                  className="flex items-center gap-2 text-sm font-semibold"
+                                  className="flex items-center gap-2 text-sm font-semibold transition-all duration-200 hover:opacity-80"
                                   style={{ color: "var(--accent)" }}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -2152,12 +2355,9 @@ export default function ProductsPage() {
 
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
-
                               <label
-                                className="block cursor-pointer rounded-xl border-2 border-dashed p-7 text-center"
-                                style={{
-                                  borderColor: "var(--border-color)",
-                                }}
+                                className="block cursor-pointer rounded-xl border-2 border-dashed p-7 text-center transition-all duration-200 hover:bg-black/[0.02]"
+                                style={{ borderColor: "var(--border-color)" }}
                               >
                                 <input
                                   hidden
@@ -2166,18 +2366,16 @@ export default function ProductsPage() {
                                   accept="image/jpeg,image/png,image/webp"
                                   onChange={(e) => handleImageUpload(index, e)}
                                 />
-
-                                <Upload className="mx-auto mb-3 h-7 w-7" />
-
+                                <Upload
+                                  className="mx-auto mb-3 h-7 w-7"
+                                  style={{ color: "var(--text-muted)" }}
+                                />
                                 <p className="text-sm font-medium">
                                   Click to select product images
                                 </p>
-
                                 <p
                                   className="mt-1 text-xs"
-                                  style={{
-                                    color: "var(--text-muted)",
-                                  }}
+                                  style={{ color: "var(--text-muted)" }}
                                 >
                                   JPG, PNG or WebP • Images automatically
                                   optimized
@@ -2187,19 +2385,24 @@ export default function ProductsPage() {
                               {variant.images.length > 0 && (
                                 <div className="mt-4 flex flex-wrap gap-3">
                                   {variant.images.map((image, imageIndex) => (
-                                    <div key={imageIndex} className="relative">
+                                    <div
+                                      key={imageIndex}
+                                      className="group relative"
+                                    >
                                       <img
                                         src={image.preview}
                                         alt=""
-                                        className="h-24 w-24 rounded-lg object-cover"
+                                        className="h-24 w-24 rounded-lg border object-cover transition-all duration-200"
+                                        style={{
+                                          borderColor: "var(--border-color)",
+                                        }}
                                       />
-
                                       <button
                                         type="button"
                                         onClick={() =>
                                           removeImage(index, imageIndex)
                                         }
-                                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
+                                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100 hover:bg-red-600 hover:scale-110"
                                       >
                                         <X className="h-4 w-4" />
                                       </button>
@@ -2216,30 +2419,27 @@ export default function ProductsPage() {
 
                   <div
                     className="flex justify-between border-t pt-5"
-                    style={{
-                      borderColor: "var(--border-color)",
-                    }}
+                    style={{ borderColor: "var(--border-color)" }}
                   >
                     <button
                       type="button"
                       onClick={() => setCurrentStep(1)}
-                      className="rounded-lg px-5 py-2.5 text-sm font-medium"
+                      className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-black/[0.04]"
                       style={{
                         backgroundColor: "var(--bg-tertiary)",
-
                         border: "1px solid var(--border-color)",
                       }}
                     >
-                      ← Back
+                      <ChevronLeft className="h-4 w-4" />
+                      Back
                     </button>
 
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold disabled:opacity-50"
+                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
                         backgroundColor: "var(--accent)",
-
                         color: "var(--accent-text)",
                       }}
                     >
@@ -2248,7 +2448,6 @@ export default function ProductsPage() {
                         : editingProduct
                           ? "Update Product"
                           : "Create Product"}
-
                       <Check className="h-4 w-4" />
                     </button>
                   </div>
@@ -2258,22 +2457,161 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+           {/* ==========================================
+          QUICK ADD CATEGORY MODAL
+      ========================================== */}
+      {showNewCategoryModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-sm rounded-xl p-5 shadow-2xl" 
+            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+          >
+            <h3 className="text-lg font-bold mb-4">Create New Category</h3>
+            <input
+              type="text"
+              placeholder="Enter category name..."
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              className="input-field w-full mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newCategoryName.trim()) {
+                  createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" });
+                }
+              }}
+            />
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowNewCategoryModal(false)} 
+                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-80" 
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" })}
+                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                {createCategoryMutation.isPending ? "Creating..." : "Create & Select"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          QUICK ADD BRAND MODAL
+      ========================================== */}
+      {showNewBrandModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div 
+            className="w-full max-w-sm rounded-xl p-5 shadow-2xl" 
+            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+          >
+            <h3 className="text-lg font-bold mb-4">Create New Brand</h3>
+            <input
+              type="text"
+              placeholder="Enter brand name..."
+              value={newBrandName}
+              onChange={(e) => setNewBrandName(e.target.value)}
+              className="input-field w-full mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newBrandName.trim()) {
+                  createBrandMutation.mutate({ name: newBrandName.trim(), description: "" });
+                }
+              }}
+            />
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowNewBrandModal(false)} 
+                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-80" 
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => createBrandMutation.mutate({ name: newBrandName.trim(), description: "" })}
+                disabled={!newBrandName.trim() || createBrandMutation.isPending}
+                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                {createBrandMutation.isPending ? "Creating..." : "Create & Select"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Add Brand Modal */}
+      {showNewBrandModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-xl p-5"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <h3 className="text-lg font-bold mb-4">Create New Brand</h3>
+            <input
+              type="text"
+              placeholder="Enter brand name..."
+              value={newBrandName}
+              onChange={(e) => setNewBrandName(e.target.value)}
+              className="input-field w-full mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowNewBrandModal(false)}
+                className="flex-1 rounded-lg px-4 py-2 text-sm"
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  createBrandMutation.mutate({
+                    name: newBrandName,
+                    description: "",
+                  })
+                }
+                disabled={!newBrandName.trim() || createBrandMutation.isPending}
+                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                {createBrandMutation.isPending
+                  ? "Creating..."
+                  : "Create & Select"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// ==========================================
+// POLISHED HELPER COMPONENTS
+// ==========================================
+
 function Field({ label, children }) {
   return (
-    <div>
+    <div className="space-y-1.5">
       <label
-        className="mb-2 block text-sm font-medium"
-        style={{
-          color: "var(--text-secondary)",
-        }}
+        className="block text-sm font-medium"
+        style={{ color: "var(--text-secondary)" }}
       >
         {label}
       </label>
-
       {children}
     </div>
   );
@@ -2288,7 +2626,7 @@ function NumberField({ label, value, placeholder, onChange }) {
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="input-field"
+        className="input-field w-full transition-all duration-200 focus:shadow-md"
       />
     </Field>
   );
@@ -2298,39 +2636,32 @@ function SectionTitle({ children }) {
   return (
     <p
       className="mb-3 text-xs font-bold uppercase tracking-wider"
-      style={{
-        color: "var(--text-muted)",
-      }}
+      style={{ color: "var(--text-muted)" }}
     >
       {children}
     </p>
   );
 }
 
+// Compact Summary Cards
 function StatCard({ title, value, color }) {
   return (
     <div
-      className="rounded-xl p-5"
+      className="rounded-xl p-4 transition-all duration-200 hover:shadow-md"
       style={{
         backgroundColor: "var(--bg-card)",
-
         border: "1px solid var(--border-color)",
       }}
     >
       <p
-        className="text-sm"
-        style={{
-          color: "var(--text-muted)",
-        }}
+        className="text-xs font-medium uppercase tracking-wide"
+        style={{ color: "var(--text-muted)" }}
       >
         {title}
       </p>
-
       <p
-        className="mt-1 text-2xl font-bold"
-        style={{
-          color: color || "var(--text-primary)",
-        }}
+        className="mt-1.5 text-2xl font-bold tracking-tight"
+        style={{ color: color || "var(--text-primary)" }}
       >
         {value}
       </p>
@@ -2341,12 +2672,10 @@ function StatCard({ title, value, color }) {
 function TableHeading({ children, right = false }) {
   return (
     <th
-      className={`px-6 py-4 text-xs font-semibold uppercase tracking-wider ${
+      className={`px-6 py-3.5 text-xs font-semibold uppercase tracking-wider ${
         right ? "text-right" : "text-left"
       }`}
-      style={{
-        color: "var(--text-muted)",
-      }}
+      style={{ color: "var(--text-muted)" }}
     >
       {children}
     </th>
@@ -2355,15 +2684,13 @@ function TableHeading({ children, right = false }) {
 
 function StatusBadge({ status }) {
   const active = status === "active";
-
   return (
     <span
-      className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize"
+      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize transition-all duration-200"
       style={{
         backgroundColor: active
           ? "rgba(16,185,129,.15)"
           : "rgba(239,68,68,.15)",
-
         color: active ? "var(--success)" : "var(--danger)",
       }}
     >
@@ -2384,11 +2711,8 @@ function IconButton({
       type="button"
       title={title}
       onClick={onClick}
-      className="rounded-lg p-2 transition hover:scale-110"
-      style={{
-        color,
-        backgroundColor: background,
-      }}
+      className="rounded-lg p-2 transition-all duration-200 hover:scale-110 hover:shadow-sm"
+      style={{ color, backgroundColor: background }}
     >
       {children}
     </button>

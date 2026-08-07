@@ -26,11 +26,12 @@ const productSchema = new mongoose.Schema(
       default: "",
     },
 
-    tax: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+   tax:{
+ type:Number,
+ default:0,
+ min:0,
+ max:100,
+},
 
     status: {
       type: String,
@@ -55,6 +56,15 @@ const productSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    is_deleted: {
+  type: Boolean,
+  default: false,
+},
+
+deleted_at: {
+  type: Date,
+  default: null,
+},
   },
   {
     timestamps: {
