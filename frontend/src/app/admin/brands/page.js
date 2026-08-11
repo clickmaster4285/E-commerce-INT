@@ -104,14 +104,18 @@ const getInitials = (name) => {
   if (!name) return "??";
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 };
-
 const getLogoUrl = (brand) => {
   if (brand.logo?.img_url) {
     if (brand.logo.img_url.startsWith("http")) {
       return brand.logo.img_url;
     }
-    return `http://localhost:5000/${brand.logo.img_url}`;
+
+    const serverUrl =
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+    return `${serverUrl}/${brand.logo.img_url}`;
   }
+
   return "";
 };
 

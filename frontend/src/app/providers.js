@@ -1,8 +1,10 @@
-'use client';
+"use client";
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Toaster } from 'sonner'; // <-- Ye add kiya
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { Toaster } from "sonner";
+import { Provider as ReduxProvider } from "react-redux";
+import { store } from "@/redux/store";
 
 export default function Providers({ children }) {
   const [queryClient] = useState(
@@ -17,10 +19,11 @@ export default function Providers({ children }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      {/* Toast Notification Component */}
-      <Toaster position="top-right" richColors closeButton />
-    </QueryClientProvider>
+    <ReduxProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
+      </QueryClientProvider>
+    </ReduxProvider>
   );
 }
