@@ -3,10 +3,12 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { brandApi } from "../../../../apis/brandApi";
+import { productApi } from "../../../../apis/productApi"; // ✅ NEW IMPORT
 import { Country } from "country-state-city";
 
-// ✅ 1. SOCKET HOOK IMPORT KIYA
+// ✅ SOCKET HOOKS IMPORT
 import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
+import { useSocket } from "@/hooks/useSocket";
 
 /* ================= Icons ================= */
 function Ico(props) {
@@ -53,7 +55,7 @@ function Spin(cls) {
 
 /* ================= Helpers ================= */
 function ini(n) { return n ? n.split(" ").map(function(w){return w[0]}).join("").substring(0,2).toUpperCase() : "??"; }
-function lurl(b) { if(b&&b.logo&&b.logo.img_url){return b.logo.img_url.startsWith("http")?b.logo.img_url:"http://localhost:5000/"+b.logo.img_url;} return ""; }
+function lurl(b) { if(b&&b.logo&&b.logo.img_url){return b.logo.img_url.startsWith("http")?b.logo.img_url:"http://192.168.88.64:5000/"+b.logo.img_url;} return ""; }
 function fd(d) { return d?new Date(d).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"}):"—"; }
 function fdt(d) { return d?new Date(d).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—"; }
 function tago(d) { if(!d)return""; var m=Math.floor((Date.now()-new Date(d).getTime())/60000); if(m<1)return"now"; if(m<60)return m+"m ago"; var h=Math.floor(m/60); if(h<24)return h+"h ago"; var dy=Math.floor(h/24); return dy<30?dy+"d ago":fd(d); }
@@ -225,11 +227,14 @@ function CDD(props) {
 
 
 /* ================================================================
-   MAIN COMPONENT
+   MAIN COMPONENT — ✅ FIXED WITH REAL-TIME PRODUCT SYNC
    ================================================================ */
 export default function BrandDetailPage() {
-  // ✅ 2. SOCKET HOOK CALL KIYA (Real-time updates ke liye)
+  // ✅ Brand socket sync (for brand CRUD)
   useBrandSocketSync();
+
+  // ✅✅✅ Direct socket access for product events
+  var { socket, isConnected } = useSocket();
 
   var router=useRouter(), pathname=usePathname(), params=useParams();
   var brandId=params.id, qc=useQueryClient();
@@ -243,12 +248,69 @@ export default function BrandDetailPage() {
   var lp=useState(""),logoPrev=lp[0],setLogoPrev=lp[1];
 
   var allC=useMemo(function(){return Country.getAllCountries().map(function(c){return{name:c.name,isoCode:c.isoCode}})},[]);
+
+  // ✅ Brand Query
   var q=useQuery({queryKey:["brands"],queryFn:brandApi.getAll});
   var brands=q.data||[], loading=q.isLoading;
   var brand=brands.find(function(b){return b._id===brandId});
 
+  // ✅✅✅ NEW: Dedicated Products Query for this Brand
+  var productsQuery = useQuery({
+    queryKey: ["brand-products", brandId],
+    queryFn: function() {
+      return productApi.getByBrand(brandId);
+    },
+    enabled: !!brandId,
+  });
+
+  var brandProducts = productsQuery.data || [];
+  var productsLoading = productsQuery.isLoading;
+
   var uMut=useMutation({mutationFn:function(r){return brandApi.update(r.id,r.data)},onSuccess:function(){qc.invalidateQueries({queryKey:["brands"]});setLogoFile(null);setLogoPrev("");setShowEdit(false)}});
   var dMut=useMutation({mutationFn:function(){return brandApi.delete(brandId)},onSuccess:function(){qc.invalidateQueries({queryKey:["brands"]});router.push(backPath)}});
+
+  // ✅✅✅ FIXED: Socket listeners for REAL-TIME product updates
+  useEffect(function() {
+    if (!socket || !isConnected || !brandId) return;
+
+    function handleProductCreated(newProduct) {
+      console.log("📥 Real-time Product Created:", newProduct?.name);
+      // Check if product belongs to this brand
+      var productBrandId = newProduct.brand_id?._id || newProduct.brand_id;
+      if (productBrandId === brandId) {
+        qc.invalidateQueries({ queryKey: ["brand-products", brandId] });
+        qc.invalidateQueries({ queryKey: ["brands"] });
+      }
+    }
+
+    function handleProductDeleted(deletedProductId) {
+      console.log("📥 Real-time Product Deleted:", deletedProductId);
+      // Always invalidate since we don't know which brand it belonged to
+      qc.invalidateQueries({ queryKey: ["brand-products", brandId] });
+      qc.invalidateQueries({ queryKey: ["brands"] });
+    }
+
+    function handleProductUpdated(updatedProduct) {
+      console.log("📥 Real-time Product Updated:", updatedProduct?.name);
+      var productBrandId = updatedProduct.brand_id?._id || updatedProduct.brand_id;
+      if (productBrandId === brandId) {
+        qc.invalidateQueries({ queryKey: ["brand-products", brandId] });
+        qc.invalidateQueries({ queryKey: ["brands"] });
+      }
+    }
+
+    socket.on("productCreated", handleProductCreated);
+    socket.on("productDeleted", handleProductDeleted);
+    socket.on("productUpdated", handleProductUpdated);
+
+    console.log("✅ BrandDetail: Real-time product listeners ACTIVE for brand:", brandId);
+
+    return function() {
+      socket.off("productCreated", handleProductCreated);
+      socket.off("productDeleted", handleProductDeleted);
+      socket.off("productUpdated", handleProductUpdated);
+    };
+  }, [socket, isConnected, qc, brandId]);
 
   var cs={backgroundColor:"var(--bg-card)",borderRadius:"12px"};
   var is_={backgroundColor:"var(--bg-tertiary)",border:"1px solid var(--border-color)",color:"var(--text-primary)",borderRadius:"8px"};
@@ -258,8 +320,6 @@ export default function BrandDetailPage() {
   function doSubmit(ev){
     ev.preventDefault();
     var fd=new FormData();
-    // ✅ FIX: Brand Code ko update waqt send nahi kar rahe, ya agar send bhi karein to backend ignore karega.
-    // Lekin safety ke liye hum form.brand_code bhej rahe hain, par input field locked hai.
     fd.append("brand_code", form.brand_code); 
     fd.append("name", form.name);
     fd.append("description", form.description||"");
@@ -276,18 +336,12 @@ export default function BrandDetailPage() {
   var hasLogo=!!(brand&&brand.logo&&brand.logo.img_url);
   var wasUp=!!(brand&&brand.created_at&&brand.updated_at&&brand.created_at!==brand.updated_at);
 
-  // ✅ FIXED: Use brand.products array from API
-  var totalProducts = (brand && brand.products && Array.isArray(brand.products)) ? brand.products.length : 0;
-  
-  // ✅ FIXED: Calculate active products using status field
-  var activeProducts = (brand && brand.products && Array.isArray(brand.products)) 
-    ? brand.products.filter(function(p){ return p.status === "active"; }).length 
-    : 0;
-  
-  // ✅ FIXED: Calculate unique categories using category_id._id
-  var uniqueCategories = (brand && brand.products && Array.isArray(brand.products))
-    ? new Set(brand.products.map(function(p){ return p.category_id?._id || p.category_id; }).filter(Boolean)).size
-    : 0;
+  // ✅✅✅ FIXED: Use brandProducts from dedicated query
+  var totalProducts = brandProducts.length;
+  var activeProducts = brandProducts.filter(function(p){ return p.status === "active"; }).length;
+  var uniqueCategories = new Set(
+    brandProducts.map(function(p){ return p.category_id?._id || p.category_id; }).filter(Boolean)
+  ).size;
 
   if(loading){return React.createElement("div",{className:"w-full flex items-center justify-center py-24",style:{color:"var(--text-primary)"}},React.createElement("div",{className:"rounded-xl py-14 px-20 flex items-center gap-2",style:cs},Spin("w-4 h-4"),React.createElement("span",{className:"text-[13px]",style:{color:"var(--text-muted)"}},"Loading...")))}
 
@@ -302,12 +356,8 @@ export default function BrandDetailPage() {
   return React.createElement("div",{className:"w-full",style:{color:"var(--text-primary)"}},
     React.createElement("div",{className:"w-full space-y-4"},
 
-      /* ================================================================
-         HEADER
-         ================================================================ */
+      /* HEADER */
       React.createElement("div",{className:"px-1"},
-
-        /* Row 1: Breadcrumb */
         React.createElement("div",{className:"flex items-center gap-1.5 mb-3"},
           React.createElement("button",{onClick:function(){router.push(backPath)},
             className:"text-[12px] font-medium transition hover:opacity-70",
@@ -317,16 +367,12 @@ export default function BrandDetailPage() {
           React.createElement("span",{className:"text-[12px] font-medium",style:{color:"var(--text-primary)"}},brand.name)
         ),
 
-        /* Row 2: Logo + Name + Description + Actions */
         React.createElement("div",{className:"flex items-start gap-4"},
-
-          /* Logo */
           React.createElement("div",{className:"w-14 h-14 rounded-xl overflow-hidden shrink-0 flex items-center justify-center",style:{backgroundColor:"var(--bg-card)", border: "1px solid var(--border-color)"}},
             hasLogo?React.createElement("img",{src:logoSrc,alt:brand.name,className:"w-full h-full object-contain p-1"})
               :React.createElement("span",{className:"text-xl font-bold",style:{color:"#34d399"}},ini(brand.name))
           ),
 
-          /* Name + Description + Meta */
           React.createElement("div",{className:"flex-1 min-w-0 pt-0.5"},
             React.createElement("div",{className:"flex items-center gap-2 mb-0.5"},
               React.createElement("h1",{className:"text-[18px] font-semibold truncate leading-tight"},brand.name),
@@ -341,21 +387,15 @@ export default function BrandDetailPage() {
             )
           ),
 
-          /* Action buttons */
           React.createElement("div",{className:"flex items-center gap-1 shrink-0 pt-1"},
             React.createElement(SBtn,{onClick:doEdit},React.createElement(Ico,{d:D.edit,className:"w-3.5 h-3.5"}),"Edit"),
             React.createElement(SBtn,{danger:true,onClick:function(){setShowDel(true)},disabled:deleting},React.createElement(Ico,{d:D.trash,className:"w-3.5 h-3.5"}),"Delete")
           )
-
         )
       ),
 
-      /* ================================================================
-         TABS + CONTENT CARD
-         ================================================================ */
+      /* TABS + CONTENT */
       React.createElement("div",{className:"rounded-xl overflow-hidden",style:cs},
-
-        /* ---- TAB BAR ---- */
         React.createElement("div",{className:"px-5 flex items-center gap-5",style:{borderBottom:"1px solid var(--border-color)"}},
           tabList.map(function(tb){
             var active = tab===tb.id;
@@ -377,14 +417,10 @@ export default function BrandDetailPage() {
           })
         ),
 
-        /* ---- TAB CONTENT ---- */
         React.createElement("div",{className:"p-5"},
 
-          /* =============================================
-             TAB 1: BRAND INFO
-             ============================================= */
+          /* TAB 1: BRAND INFO */
           tab==="info"?React.createElement("div",{className:"grid grid-cols-1 lg:grid-cols-3 gap-4"},
-
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"Details"),
               React.createElement("div",{className:"divide-y",style:{borderColor:"var(--border-color)"}},
@@ -396,14 +432,12 @@ export default function BrandDetailPage() {
                 React.createElement(InfoRow,{label:"Updated",value:wasUp?fdt(brand.updated_at):"Never"})
               )
             ),
-
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"Description"),
               React.createElement("p",{className:"text-[12px] leading-relaxed whitespace-pre-wrap break-words",style:{color:"var(--text-secondary)"}},
                 brand.description||"No description provided."
               )
             ),
-
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"Logo"),
               hasLogo?React.createElement("div",{className:"space-y-3"},
@@ -427,15 +461,10 @@ export default function BrandDetailPage() {
                 React.createElement("span",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"No logo uploaded")
               )
             )
-
           ):null,
 
-          /* =============================================
-             TAB 2: PRODUCTS (✅ FULLY FIXED)
-             ============================================= */
+          /* ✅✅✅ TAB 2: PRODUCTS — FIXED WITH REAL-TIME DATA */
           tab==="products"?React.createElement("div",{className:"space-y-4"},
-
-            // Stats Cards
             React.createElement("div",{className:"grid grid-cols-2 lg:grid-cols-4 gap-3"},
               React.createElement(InnerCard,null,
                 React.createElement("div",{className:"flex items-center gap-2 mb-1"},
@@ -469,69 +498,69 @@ export default function BrandDetailPage() {
               )
             ),
 
-            // Products Table
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"Products Under This Brand"),
-              brand.products && brand.products.length > 0
-                ? React.createElement("div",{className:"overflow-x-auto"},
-                    React.createElement("table",{className:"w-full text-[12px]",style:{borderCollapse:"collapse"}},
-                      React.createElement("thead",null,
-                        React.createElement("tr",{style:{borderBottom:"1px solid var(--border-color)"}},
-                          React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Product Name"),
-                          React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Category"),
-                          React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Created"),
-                          React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Status"),
-                          React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Action")
+              productsLoading
+                ? React.createElement("div",{className:"flex items-center justify-center py-8 gap-2"},
+                    Spin("w-4 h-4"),
+                    React.createElement("span",{className:"text-[12px]",style:{color:"var(--text-muted)"}},"Loading products...")
+                  )
+                : brandProducts.length > 0
+                  ? React.createElement("div",{className:"overflow-x-auto"},
+                      React.createElement("table",{className:"w-full text-[12px]",style:{borderCollapse:"collapse"}},
+                        React.createElement("thead",null,
+                          React.createElement("tr",{style:{borderBottom:"1px solid var(--border-color)"}},
+                            React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Product Name"),
+                            React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Category"),
+                            React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Created"),
+                            React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Status"),
+                            React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Action")
+                          )
+                        ),
+                        React.createElement("tbody",null,
+                          brandProducts.map(function(p,i){
+                            var isActive = p.status === "active";
+                            return React.createElement("tr",{key:p._id||i,style:{borderBottom: i < brandProducts.length - 1 ? "1px solid var(--border-color)" : "none"}},
+                              React.createElement("td",{className:"py-2.5 px-2 font-medium",style:{color:"var(--text-primary)"}},p.name||"—"),
+                              React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-secondary)"}},
+                                p.category_id?.name || p.category_id || "—"
+                              ),
+                              React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-muted)"}},
+                                p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"
+                              ),
+                              React.createElement("td",{className:"py-2.5 px-2 text-center"},
+                                React.createElement("span",{className:"inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                  style:{
+                                    backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                                    color: isActive ? "#34d399" : "#f87171"
+                                  }
+                                }, isActive ? "Active" : "Inactive")
+                              ),
+                              React.createElement("td",{className:"py-2.5 px-2 text-center"},
+                                React.createElement("button", {
+                                  type: "button",
+                                  onClick: function() { router.push("/admin/products/" + p._id); },
+                                  className: "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition hover:opacity-80",
+                                  style: { backgroundColor: "var(--bg-tertiary)", color: "var(--accent)", border: "1px solid var(--border-color)" }
+                                }, React.createElement(Ico, {d: D.eye, className: "w-3 h-3"}), "View")
+                              )
+                            );
+                          })
                         )
-                      ),
-                      React.createElement("tbody",null,
-                        brand.products.map(function(p,i){
-                          var isActive = p.status === "active";
-                          return React.createElement("tr",{key:p._id||i,style:{borderBottom:"1px solid var(--border-color)"}},
-                            React.createElement("td",{className:"py-2.5 px-2 font-medium",style:{color:"var(--text-primary)"}},p.name||"—"),
-                            React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-secondary)"}},
-                              p.category_id?.name || p.category_id || "—"
-                            ),
-                            React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-muted)"}},
-                              p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"
-                            ),
-                            React.createElement("td",{className:"py-2.5 px-2 text-center"},
-                              React.createElement("span",{className:"inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                style:{
-                                  backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
-                                  color: isActive ? "#34d399" : "#f87171"
-                                }
-                              }, isActive ? "Active" : "Inactive")
-                            ),
-                            React.createElement("td",{className:"py-2.5 px-2 text-center"},
-                              React.createElement("button", {
-                                type: "button",
-                                onClick: function() { router.push("/admin/products/" + p._id); },
-                                className: "inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition hover:opacity-80",
-                                style: { backgroundColor: "var(--bg-tertiary)", color: "var(--accent)", border: "1px solid var(--border-color)" }
-                              }, React.createElement(Ico, {d: D.eye, className: "w-3 h-3"}), "View")
-                            )
-                          );
-                        })
                       )
                     )
-                  )
-                : React.createElement("div",{className:"flex flex-col items-center justify-center py-8 gap-2"},
-                    React.createElement("div",{className:"w-12 h-12 rounded-xl flex items-center justify-center",style:{border:"1px dashed var(--border-color)"}},
-                      React.createElement(Ico,{d:D.box,className:"w-5 h-5",sw:1.5})
-                    ),
-                    React.createElement("p",{className:"text-[12px] font-medium",style:{color:"var(--text-secondary)"}},"No products yet"),
-                    React.createElement("p",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"Products assigned to this brand will appear here.")
-                  )
+                  : React.createElement("div",{className:"flex flex-col items-center justify-center py-8 gap-2"},
+                      React.createElement("div",{className:"w-12 h-12 rounded-xl flex items-center justify-center",style:{border:"1px dashed var(--border-color)"}},
+                        React.createElement(Ico,{d:D.box,className:"w-5 h-5",sw:1.5})
+                      ),
+                      React.createElement("p",{className:"text-[12px] font-medium",style:{color:"var(--text-secondary)"}},"No products yet"),
+                      React.createElement("p",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"Products assigned to this brand will appear here.")
+                    )
             )
-
           ):null,
 
-          /* =============================================
-             TAB 3: ACTIVITY
-             ============================================= */
+          /* TAB 3: ACTIVITY */
           tab==="activity"?React.createElement("div",{className:"grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4"},
-
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"Timeline"),
               React.createElement(TItem,{icon:React.createElement(Ico,{d:D.plus,className:"w-3.5 h-3.5",sw:1.5}),title:"Brand Created",sub:"Added to the system",user:brand.createdby,date:brand.created_at,color:"#34d399",last:!wasUp}),
@@ -541,7 +570,6 @@ export default function BrandDetailPage() {
                 React.createElement("span",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"No updates yet. Changes will appear here.")
               ):null
             ),
-
             React.createElement(InnerCard,null,
               React.createElement(SecTitle,null,"People"),
               React.createElement("div",{className:"divide-y",style:{borderColor:"var(--border-color)"}},
@@ -550,16 +578,12 @@ export default function BrandDetailPage() {
                   :React.createElement(Person,{user:null,label:"Updated By",color:"#60a5fa",fallback:"No updates yet"})
               )
             )
-
           ):null
-
         )
-
       ),
-
     ),
 
-    /* ===== EDIT MODAL ===== */
+    /* EDIT MODAL */
     showEdit?React.createElement("div",{className:"fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"},
       React.createElement("div",{className:"w-full max-w-md rounded-xl overflow-hidden",style:Object.assign({},cs,{border:"1px solid var(--border-color)"})},
         React.createElement("div",{className:"px-4 py-3 flex items-center justify-between",style:{borderBottom:"1px solid var(--border-color)"}},
@@ -568,20 +592,14 @@ export default function BrandDetailPage() {
         ),
         React.createElement("form",{onSubmit:doSubmit,className:"p-4 space-y-3 max-h-[70vh] overflow-y-auto"},
           React.createElement("div",{className:"grid grid-cols-2 gap-2.5"},
-            
-            // ✅ FIXED: Brand Code Input - Disabled & Read Only
             React.createElement("div",null,
               React.createElement("label",{className:"block text-[11px] mb-1",style:{color:"var(--text-muted)"}},"Code (Locked)"),
               React.createElement("input",{
-                type:"text",
-                value:form.brand_code,
-                readOnly: true, // ✅ Cannot type
-                disabled: true, // ✅ Visually disabled
+                type:"text", value:form.brand_code, readOnly: true, disabled: true,
                 className:"h-8 px-2.5 rounded-lg text-[12px] w-full outline-none opacity-60 cursor-not-allowed",
-                style: Object.assign({}, is_, { backgroundColor: "rgba(0,0,0,0.2)" }) // Darker background
+                style: Object.assign({}, is_, { backgroundColor: "rgba(0,0,0,0.2)" })
               })
             ),
-
             React.createElement("div",null,React.createElement("label",{className:"block text-[11px] mb-1",style:{color:"var(--text-muted)"}},"Name *"),React.createElement("input",{type:"text",value:form.name,onChange:function(ev){setForm(Object.assign({},form,{name:ev.target.value}))},required:true,disabled:submitting,className:"h-8 px-2.5 rounded-lg text-[12px] w-full outline-none disabled:opacity-40",style:is_}))
           ),
           React.createElement("div",null,React.createElement("label",{className:"block text-[11px] mb-1",style:{color:"var(--text-muted)"}},"Description"),React.createElement("textarea",{value:form.description,onChange:function(ev){setForm(Object.assign({},form,{description:ev.target.value}))},rows:2,disabled:submitting,className:"px-2.5 py-2 rounded-lg text-[12px] w-full outline-none disabled:opacity-40 resize-none",style:is_})),
@@ -607,7 +625,7 @@ export default function BrandDetailPage() {
       )
     ):null,
 
-    /* ===== DELETE MODAL ===== */
+    /* DELETE MODAL */
     showDel?React.createElement("div",{className:"fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"},
       React.createElement("style",null,"@keyframes mi{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}"),
       React.createElement("div",{className:"w-full max-w-xs rounded-xl p-4",style:Object.assign({},cs,{border:"1px solid var(--border-color)",animation:"mi .15s ease-out"})},
@@ -624,6 +642,5 @@ export default function BrandDetailPage() {
         )
       )
     ):null
-
   );
 }

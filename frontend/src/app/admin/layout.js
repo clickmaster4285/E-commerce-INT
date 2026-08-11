@@ -5,18 +5,57 @@ import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '../Component/Sidebar';
 import Navbar from '../Component/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
+import Cookies from 'js-cookie';
+
+// ✅ IMPORT store socket sync hook
+import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(null); // null = checking
+  
+  // ✅ Store data state - socket se real-time update hoga
+  const [storeData, setStoreData] = useState(null);
+
   const router = useRouter();
   const pathname = usePathname();
 
+  // ✅ Socket sync initialize karo - yeh store updates automatically sunega
+  useStoreSocketSync();
+
+  // ✅ FIXED: localStorage → Cookies
   useEffect(() => {
-    const saved = localStorage.getItem('theme') || 'dark';
+    const saved = Cookies.get('theme') || 'dark';
     setTheme(saved);
     document.documentElement.classList.toggle('light', saved === 'light');
+  }, []);
+
+  // ✅ FIXED: localStorage → Cookies (cached store data load)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cached = Cookies.get('storeData');
+      if (cached) {
+        try {
+          setStoreData(JSON.parse(cached));
+        } catch (e) {
+          console.error('Failed to parse cached storeData:', e);
+        }
+      }
+    }
+  }, []);
+
+  // ✅ Custom event listener - jab socket se store update aaye
+  useEffect(() => {
+    const handleStoreUpdate = (e) => {
+      console.log('🔄 Layout received storeUpdated event:', e.detail?.store_name);
+      if (e.detail) {
+        setStoreData(e.detail);
+      }
+    };
+
+    window.addEventListener('storeUpdated', handleStoreUpdate);
+    return () => window.removeEventListener('storeUpdated', handleStoreUpdate);
   }, []);
 
   // Authentication Check
@@ -51,10 +90,11 @@ export default function AdminLayout({ children }) {
     return null;
   }
 
+  // ✅ FIXED: localStorage → Cookies
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+    Cookies.set('theme', newTheme, { expires: 365, path: '/' });
     document.documentElement.classList.toggle('light', newTheme === 'light');
   };
 
@@ -80,11 +120,13 @@ export default function AdminLayout({ children }) {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <Sidebar onNavigate={closeSidebar} />
+        {/* ✅ storeData pass karo Sidebar ko */}
+        <Sidebar onNavigate={closeSidebar} storeData={storeData} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} />
+        {/* ✅ storeData pass karo Navbar ko bhi */}
+        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
           {children}
         </main>

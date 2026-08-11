@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+// ✅ SOCKET HOOK IMPORT KIYA
+import { useProductSocketSync } from "@/hooks/useProductSocketSync";
+
 import {
   AlertTriangle,
   Check,
@@ -12,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Eye,
   Grid3x3,
   List,
   Package,
@@ -211,7 +215,6 @@ const compressProductImage = (file) => {
     const imageUrl = URL.createObjectURL(file);
 
     image.onload = () => {
-      // ✅ 1. Low Quality Check (Minimum Resolution)
       const MIN_WIDTH = 800;
       const MIN_HEIGHT = 800;
 
@@ -219,13 +222,12 @@ const compressProductImage = (file) => {
         URL.revokeObjectURL(imageUrl);
         reject(
           new Error(
-            `Image quality is too low. Minimum resolution required is ${MIN_WIDTH}x${MIN_HEIGHT}px.`,
-          ),
+            `Image quality is too low. Minimum resolution required is ${MIN_WIDTH}x${MIN_HEIGHT}px.`
+          )
         );
         return;
       }
 
-      // ✅ 2. High Quality Max Limit (Allow up to 2000px for high quality)
       const MAX_SIDE = 2000;
       let width = image.width;
       let height = image.height;
@@ -245,7 +247,6 @@ const compressProductImage = (file) => {
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(image, 0, 0, width, height);
 
-      // ✅ 3. High Quality Compression (0.95 instead of 0.82)
       canvas.toBlob(
         (blob) => {
           URL.revokeObjectURL(imageUrl);
@@ -261,11 +262,11 @@ const compressProductImage = (file) => {
             new File([blob], newName, {
               type: "image/webp",
               lastModified: Date.now(),
-            }),
+            })
           );
         },
         "image/webp",
-        0.95, // High quality
+        0.95
       );
     };
 
@@ -282,14 +283,15 @@ export default function ProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  useProductSocketSync();
+
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const [viewMode, setViewMode] = useState("table");
+  const [viewMode, setViewMode] = useState("list"); // Changed default to list to match brands
 
-  // PAGINATION
   const [currentPage, setCurrentPage] = useState(1);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
@@ -343,16 +345,11 @@ export default function ProductsPage() {
 
   const createMutation = useMutation({
     mutationFn: productApi.create,
-
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["products"],
-      });
-
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product created successfully");
       closeProductModal();
     },
-
     onError: (error) => {
       toast.error(error.response?.data?.message || "Product creation failed");
     },
@@ -364,16 +361,11 @@ export default function ProductsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => productApi.update(id, data),
-
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["products"],
-      });
-
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product updated successfully");
       closeProductModal();
     },
-
     onError: (error) => {
       toast.error(error.response?.data?.message || "Product update failed");
     },
@@ -385,18 +377,12 @@ export default function ProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: productApi.delete,
-
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["products"],
-      });
-
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success("Product deleted successfully");
-
       setShowDeleteModal(false);
       setProductToDelete(null);
     },
-
     onError: (error) => {
       toast.error(error.response?.data?.message || "Product delete failed");
     },
@@ -444,7 +430,6 @@ export default function ProductsPage() {
         description: "",
         tax: "0",
         status: "active",
-
         variants: [createEmptyVariant(result.sku)],
       });
 
@@ -463,16 +448,12 @@ export default function ProductsPage() {
 
   const getNextLocalSku = async () => {
     const result = await variantApi.getNextSku();
-
     const databaseSku = getSkuNumber(result.sku);
-
     const localSku = Math.max(
       0,
-      ...formData.variants.map((variant) => getSkuNumber(variant.sku)),
+      ...formData.variants.map((variant) => getSkuNumber(variant.sku))
     );
-
     const nextNumber = Math.max(databaseSku, localSku + 1);
-
     return `sku_${nextNumber}`;
   };
 
@@ -483,7 +464,6 @@ export default function ProductsPage() {
   const addVariant = async () => {
     try {
       const sku = await getNextLocalSku();
-
       const newIndex = formData.variants.length;
 
       setFormData((prev) => ({
@@ -500,30 +480,20 @@ export default function ProductsPage() {
   const duplicateVariant = async (index) => {
     try {
       const sku = await getNextLocalSku();
-
       const oldVariant = formData.variants[index];
 
       const copiedVariant = {
         ...oldVariant,
         _id: null,
         sku,
-
-        attributes: oldVariant.attributes.map((item) => ({
-          ...item,
-        })),
-
+        attributes: oldVariant.attributes.map((item) => ({ ...item })),
         images: [],
       };
 
       setFormData((prev) => {
         const variants = [...prev.variants];
-
         variants.splice(index + 1, 0, copiedVariant);
-
-        return {
-          ...prev,
-          variants,
-        };
+        return { ...prev, variants };
       });
 
       setExpandedVariant(index + 1);
@@ -547,16 +517,8 @@ export default function ProductsPage() {
   const updateVariant = (index, field, value) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-
-      variants[index] = {
-        ...variants[index],
-        [field]: value,
-      };
-
-      return {
-        ...prev,
-        variants,
-      };
+      variants[index] = { ...variants[index], [field]: value };
+      return { ...prev, variants };
     });
   };
 
@@ -581,42 +543,23 @@ export default function ProductsPage() {
   const updateAttribute = (variantIndex, attrIndex, field, value) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-
       const attributes = [...variants[variantIndex].attributes];
-
-      attributes[attrIndex] = {
-        ...attributes[attrIndex],
-        [field]: value,
-      };
-
-      variants[variantIndex] = {
-        ...variants[variantIndex],
-        attributes,
-      };
-
-      return {
-        ...prev,
-        variants,
-      };
+      attributes[attrIndex] = { ...attributes[attrIndex], [field]: value };
+      variants[variantIndex] = { ...variants[variantIndex], attributes };
+      return { ...prev, variants };
     });
   };
 
   const removeAttribute = (variantIndex, attrIndex) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-
       variants[variantIndex] = {
         ...variants[variantIndex],
-
         attributes: variants[variantIndex].attributes.filter(
-          (_, i) => i !== attrIndex,
+          (_, i) => i !== attrIndex
         ),
       };
-
-      return {
-        ...prev,
-        variants,
-      };
+      return { ...prev, variants };
     });
   };
 
@@ -626,13 +569,11 @@ export default function ProductsPage() {
 
   const handleImageUpload = async (variantIndex, event) => {
     const selectedFiles = Array.from(event.target.files || []);
-
     if (!selectedFiles.length) return;
 
     const validTypes = ["image/jpeg", "image/png", "image/webp"];
-
     const validFiles = selectedFiles.filter((file) =>
-      validTypes.includes(file.type),
+      validTypes.includes(file.type)
     );
 
     if (validFiles.length !== selectedFiles.length) {
@@ -643,7 +584,7 @@ export default function ProductsPage() {
 
     try {
       const compressedFiles = await Promise.all(
-        validFiles.map((file) => compressProductImage(file)),
+        validFiles.map((file) => compressProductImage(file))
       );
 
       const images = compressedFiles.map((file) => ({
@@ -654,22 +595,15 @@ export default function ProductsPage() {
 
       setFormData((prev) => {
         const variants = [...prev.variants];
-
         variants[variantIndex] = {
           ...variants[variantIndex],
           images: [...variants[variantIndex].images, ...images],
         };
-
-        return {
-          ...prev,
-          variants,
-        };
+        return { ...prev, variants };
       });
 
-      // ✅ Changed Success Message
       toast.success("Image uploaded successfully");
     } catch (error) {
-      // ✅ Shows the specific error message (e.g., low resolution)
       toast.error(error.message || "Image processing failed");
     }
 
@@ -679,7 +613,6 @@ export default function ProductsPage() {
   const removeImage = (variantIndex, imageIndex) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-
       const image = variants[variantIndex].images[imageIndex];
 
       if (image.preview?.startsWith("blob:")) {
@@ -688,16 +621,12 @@ export default function ProductsPage() {
 
       variants[variantIndex] = {
         ...variants[variantIndex],
-
         images: variants[variantIndex].images.filter(
-          (_, i) => i !== imageIndex,
+          (_, i) => i !== imageIndex
         ),
       };
 
-      return {
-        ...prev,
-        variants,
-      };
+      return { ...prev, variants };
     });
   };
 
@@ -706,25 +635,23 @@ export default function ProductsPage() {
     mutationFn: (data) => categoryApi.create(data),
     onSuccess: (newCategory) => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
-      setFormData({ ...formData, category_id: newCategory._id }); // Auto Select
+      setFormData({ ...formData, category_id: newCategory._id });
       setShowNewCategoryModal(false);
       setNewCategoryName("");
       toast.success("Category created and selected!");
     },
     onError: (error) =>
-      toast.error(error.response?.data?.message || "Failed to create category"),
+      toast.error(
+        error.response?.data?.message || "Failed to create category"
+      ),
   });
 
-  // Quick Brand Create
   // Quick Brand Create
   const createBrandMutation = useMutation({
     mutationFn: (data) => brandApi.create(data),
     onSuccess: (newBrand) => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
-
-      // ✅ FIX: Backend brand object 'data' key ke andar bhejta hai
       setFormData({ ...formData, brand_id: newBrand.data._id });
-
       setShowNewBrandModal(false);
       setNewBrandName("");
       toast.success("Brand created and selected!");
@@ -732,6 +659,7 @@ export default function ProductsPage() {
     onError: (error) =>
       toast.error(error.response?.data?.message || "Failed to create brand"),
   });
+
   // ==========================================
   // EDIT
   // ==========================================
@@ -740,28 +668,20 @@ export default function ProductsPage() {
     const variants = product.variants?.length
       ? product.variants.map((variant) => ({
           _id: variant._id,
-
           sku: variant.sku || "",
           title: variant.title || "",
           description: variant.description || "",
-
           cost_price: String(variant.cost_price ?? ""),
-
           selling_price: String(variant.selling_price ?? ""),
-
           quantity: String(variant.quantity ?? 0),
-
           min_qnt: String(variant.min_qnt ?? 0),
-
           max_qnt: String(variant.max_qnt ?? 0),
-
           attributes: Object.entries(variant.attributes || {}).map(
             ([name, value]) => ({
               name,
               value: String(value),
-            }),
+            })
           ),
-
           images: (variant.images || []).map((image) => ({
             existing: true,
             metadata: image,
@@ -772,17 +692,11 @@ export default function ProductsPage() {
 
     setFormData({
       category_id: product.category_id?._id || product.category_id || "",
-
       brand_id: product.brand_id?._id || product.brand_id || "",
-
       name: product.name || "",
-
       description: product.description || "",
-
       tax: String(product.tax ?? 0),
-
       status: product.status || "active",
-
       variants,
     });
 
@@ -803,7 +717,6 @@ export default function ProductsPage() {
 
   const confirmDelete = () => {
     if (!productToDelete) return;
-
     deleteMutation.mutate(productToDelete._id);
   };
 
@@ -816,17 +729,14 @@ export default function ProductsPage() {
       toast.error("Please select category");
       return;
     }
-
     if (!formData.brand_id) {
       toast.error("Please select brand");
       return;
     }
-
     if (!formData.name.trim()) {
       toast.error("Product name is required");
       return;
     }
-
     setCurrentStep(2);
   };
 
@@ -861,7 +771,16 @@ export default function ProductsPage() {
 
       if (variant.cost_price === "" || variant.selling_price === "") {
         toast.error("Cost price and selling price are required");
+        return;
+      }
 
+      const costPrice = Number(variant.cost_price);
+      const sellingPrice = Number(variant.selling_price);
+
+      if (sellingPrice <= costPrice) {
+        toast.error(
+          `Selling Price (Rs. ${sellingPrice}) must be greater than Cost Price (Rs. ${costPrice}) for variant "${variant.title || variant.sku}"`
+        );
         return;
       }
     }
@@ -869,15 +788,10 @@ export default function ProductsPage() {
     const data = new FormData();
 
     data.append("category_id", formData.category_id);
-
     data.append("brand_id", formData.brand_id);
-
     data.append("name", formData.name.trim());
-
     data.append("description", formData.description);
-
     data.append("tax", formData.tax || "0");
-
     data.append("status", formData.status);
 
     const imageVariantIndexes = [];
@@ -887,7 +801,6 @@ export default function ProductsPage() {
 
       variant.attributes.forEach((attribute) => {
         const name = attribute.name.trim();
-
         if (name) {
           attributes[name] = attribute.value;
         }
@@ -901,44 +814,40 @@ export default function ProductsPage() {
         .filter((image) => !image.existing && image.file)
         .forEach((image) => {
           data.append("images", image.file);
-
           imageVariantIndexes.push(index);
         });
 
+      let finalSku = variant.sku.trim();
+
+      if (editingProduct) {
+        const originalVariant = editingProduct.variants?.find(
+          (v) => v._id && String(v._id) === String(variant._id)
+        );
+        if (originalVariant) {
+          finalSku = originalVariant.sku;
+        }
+      }
+
       return {
         _id: variant._id || undefined,
-
-        sku: variant.sku.trim(),
-
+        sku: finalSku,
         title: variant.title.trim(),
-
         description: variant.description,
-
         cost_price: Number(variant.cost_price || 0),
-
         selling_price: Number(variant.selling_price || 0),
-
         quantity: Number(variant.quantity || 0),
-
         min_qnt: Number(variant.min_qnt || 0),
-
         max_qnt: Number(variant.max_qnt || 0),
-
         attributes,
-
         existing_images: existingImages,
       };
     });
 
     data.append("variants", JSON.stringify(variants));
-
     data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
     if (editingProduct) {
-      updateMutation.mutate({
-        id: editingProduct._id,
-        data,
-      });
+      updateMutation.mutate({ id: editingProduct._id, data });
     } else {
       createMutation.mutate(data);
     }
@@ -973,21 +882,20 @@ export default function ProductsPage() {
     const keyword = search.trim().toLowerCase();
 
     const skuMatch = (product.variants || []).some((variant) =>
-      variant.sku?.toLowerCase().includes(keyword),
+      variant.sku?.toLowerCase().includes(keyword)
     );
 
     const matchSearch =
-      !keyword || product.name?.toLowerCase().includes(keyword) || skuMatch;
+      !keyword ||
+      product.name?.toLowerCase().includes(keyword) ||
+      skuMatch;
 
     const categoryId = product.category_id?._id || product.category_id;
-
     const brandId = product.brand_id?._id || product.brand_id;
 
     const matchCategory =
       filterCategory === "all" || categoryId === filterCategory;
-
     const matchBrand = filterBrand === "all" || brandId === filterBrand;
-
     const matchStatus =
       filterStatus === "all" || product.status === filterStatus;
 
@@ -1000,13 +908,12 @@ export default function ProductsPage() {
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredProducts.length / ITEMS_PER_PAGE),
+    Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)
   );
 
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-
-    currentPage * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
   );
 
   useEffect(() => {
@@ -1040,32 +947,41 @@ export default function ProductsPage() {
   // ==========================================
 
   const activeProducts = products.filter(
-    (product) => product.status === "active",
+    (product) => product.status === "active"
   ).length;
 
   const totalVariants = products.reduce(
     (total, product) => total + (product.variants || []).length,
-    0,
+    0
   );
 
   const totalStock = products.reduce(
     (total, product) =>
       total +
       (product.variants || []).reduce(
-        (variantTotal, variant) => variantTotal + Number(variant.quantity || 0),
-
-        0,
+        (variantTotal, variant) =>
+          variantTotal + Number(variant.quantity || 0),
+        0
       ),
-
-    0,
+    0
   );
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+  const isDeleting = deleteMutation.isPending;
+
+  // ==========================================
+  // REUSABLE STYLES (Matching Brands Page)
+  // ==========================================
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+  const inputStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    color: "var(--text-primary)",
+  };
 
   // ==========================================
   // LOADING
   // ==========================================
-
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -1073,7 +989,6 @@ export default function ProductsPage() {
           className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent"
           style={{
             borderColor: "var(--accent)",
-
             borderTopColor: "transparent",
           }}
         />
@@ -1082,364 +997,220 @@ export default function ProductsPage() {
   }
 
   return (
-    <div
-      className="space-y-5"
-      style={{
-        color: "var(--text-primary)",
-      }}
-    >
-      {/* HEADER */}
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
+      
+      {/* ===== HEADER (Icon Removed, Matches Brand Page) ===== */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold">
-            <Package
-              className="h-8 w-8"
-              style={{
-                color: "var(--accent)",
-              }}
-            />
-            Products
+          <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            Product Management
           </h1>
-
-          <p
-            className="mt-1 text-sm"
-            style={{
-              color: "var(--text-muted)",
-            }}
-          >
+          <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
             Manage products, variants, stock and pricing
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div
-            className="flex rounded-lg p-1"
-            style={{
-              backgroundColor: "var(--bg-card)",
-
-              border: "1px solid var(--border-color)",
-            }}
-          >
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setViewMode("table")}
-              title="Table view"
-              className={`rounded-md p-2 transition-all duration-200 ${
-                viewMode === "table"
-                  ? "bg-emerald-600 text-white"
-                  : "hover:bg-black/5"
-              }`}
+              onClick={() => setViewMode("list")}
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition"
+              style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}
+              title="List view"
             >
-              <List className="h-4 w-4" />
+              <List className="w-4 h-4" />
             </button>
-
             <button
               type="button"
               onClick={() => setViewMode("grid")}
+              className="h-9 w-9 rounded-lg flex items-center justify-center transition"
+              style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}
               title="Grid view"
-              className={`rounded-md p-2 transition-all duration-200 ${
-                viewMode === "grid"
-                  ? "bg-emerald-600 text-white"
-                  : "hover:bg-black/5"
-              }`}
             >
-              <Grid3x3 className="h-4 w-4" />
+              <Grid3x3 className="w-4 h-4" />
             </button>
           </div>
 
           <button
             type="button"
             onClick={openNewProduct}
-            className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-md"
-            style={{
-              backgroundColor: "var(--accent)",
-
-              color: "var(--accent-text)",
-            }}
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="w-4 h-4" />
             Add Product
           </button>
         </div>
       </div>
 
-      {/* STATS */}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Products" value={products.length} />
-
-        <StatCard
-          title="Active Products"
-          value={activeProducts}
-          color="var(--success)"
-        />
-
-        <StatCard
-          title="Total Variants"
-          value={totalVariants}
-          color="var(--info)"
-        />
-
-        <StatCard title="Units in Stock" value={totalStock} />
-      </div>
-
-      {/* FILTERS */}
-
-      <div
-        className="rounded-xl p-4 shadow-sm"
-        style={{
-          backgroundColor: "var(--bg-card)",
-
-          border: "1px solid var(--border-color)",
-        }}
-      >
-        <div className="flex flex-col gap-4">
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
-              <Search
-                className="h-5 w-5 transition-colors duration-200"
-                style={{
-                  color: "var(--text-muted)",
-                }}
-              />
-            </div>
-
-            <input
-              type="text"
-              value={search}
-              placeholder="Search by product name or SKU..."
-              onChange={(e) => changeSearch(e.target.value)}
-              className="input-field !pl-11 w-full transition-all duration-200 focus:shadow-md"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <div className="relative min-w-[160px] flex-1 group">
-              <select
-                value={filterCategory}
-                onChange={(e) => changeCategory(e.target.value)}
-                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
-              >
-                <option value="all">All Categories</option>
-
-                {categories.map((category) => (
-                  <option key={category._id} value={category._id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
-                style={{ color: "var(--text-muted)" }}
-              />
-            </div>
-
-            <div className="relative min-w-[160px] flex-1 group">
-              <select
-                value={filterBrand}
-                onChange={(e) => changeBrand(e.target.value)}
-                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
-              >
-                <option value="all">All Brands</option>
-
-                {brands.map((brand) => (
-                  <option key={brand._id} value={brand._id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
-                style={{ color: "var(--text-muted)" }}
-              />
-            </div>
-
-            <div className="relative min-w-[160px] flex-1 group">
-              <select
-                value={filterStatus}
-                onChange={(e) => changeStatus(e.target.value)}
-                className="input-field w-full appearance-none pr-10 cursor-pointer transition-all duration-200"
-              >
-                <option value="all">All Status</option>
-
-                <option value="active">Active</option>
-
-                <option value="inactive">Inactive</option>
-              </select>
-              <ChevronDown
-                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none transition-colors duration-200"
-                style={{ color: "var(--text-muted)" }}
-              />
-            </div>
-          </div>
+      {/* ===== STAT CARDS (Matches Brand Page Layout) ===== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Products</p>
+          <p className="text-[20px] font-bold mt-1">{products.length}</p>
+        </div>
+        <div className="rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Active</p>
+          <p className="text-[20px] font-bold mt-1 text-emerald-500">{activeProducts}</p>
+        </div>
+        <div className="rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Variants</p>
+          <p className="text-[20px] font-bold mt-1 text-blue-500">{totalVariants}</p>
+        </div>
+        <div className="rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Units in Stock</p>
+          <p className="text-[20px] font-bold mt-1">{totalStock}</p>
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* ===== SEARCH (Matches Brand Page) ===== */}
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+          <Search className="w-4 h-4" />
+        </span>
+        <input
+          type="text"
+          placeholder="Search by product name or SKU..."
+          value={search}
+          onChange={(e) => changeSearch(e.target.value)}
+          className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+          style={inputStyle}
+        />
+      </div>
 
-      {viewMode === "table" && (
-        <div
-          className="overflow-hidden rounded-xl shadow-sm"
-          style={{
-            backgroundColor: "var(--bg-card)",
+      {/* ===== FILTERS (Matches Brand Page - Separate Row) ===== */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <select
+            value={filterCategory}
+            onChange={(e) => changeCategory(e.target.value)}
+            className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
+            style={inputStyle}
+          >
+            <option value="all">All Categories</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </span>
+        </div>
 
-            border: "1px solid var(--border-color)",
-          }}
-        >
+        <div className="relative">
+          <select
+            value={filterBrand}
+            onChange={(e) => changeBrand(e.target.value)}
+            className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
+            style={inputStyle}
+          >
+            <option value="all">All Brands</option>
+            {brands.map((brand) => (
+              <option key={brand._id} value={brand._id}>
+                {brand.name}
+              </option>
+            ))}
+          </select>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </span>
+        </div>
+
+        <div className="relative">
+          <select
+            value={filterStatus}
+            onChange={(e) => changeStatus(e.target.value)}
+            className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
+            style={inputStyle}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </span>
+        </div>
+      </div>
+
+      {/* ===== TABLE (Matches Brand Page Styling) ===== */}
+      {viewMode === "list" && (
+        <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                }}
-              >
+            <table className="w-full text-[13px]">
+              <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                 <tr>
-                  <TableHeading>Product</TableHeading>
-
-                  <TableHeading>Category</TableHeading>
-
-                  <TableHeading>Brand</TableHeading>
-
-                  <TableHeading>Price</TableHeading>
-
-                  <TableHeading>Stock</TableHeading>
-
-                  <TableHeading>Status</TableHeading>
-
-                  <TableHeading right>Actions</TableHeading>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Brand</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Stock</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
+                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {paginatedProducts.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-6 py-14 text-center"
-                      style={{
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      <Package className="mx-auto mb-3 h-10 w-10 opacity-30" />
+                    <td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+                      <Package className="mx-auto mb-3 h-8 w-8 opacity-30" />
                       No products found
                     </td>
                   </tr>
                 ) : (
                   paginatedProducts.map((product) => {
                     const firstVariant = product.variants?.[0];
-
                     const quantity = Number(firstVariant?.quantity || 0);
-
                     const minimum = Number(firstVariant?.min_qnt || 0);
-
                     const lowStock = quantity <= minimum;
-
                     const image = firstVariant?.images?.[0]?.img_url;
 
                     return (
                       <tr
                         key={product._id}
                         onClick={() => openProductDetails(product)}
-                        className="cursor-pointer transition-colors duration-150 hover:bg-black/[0.04]"
+                        className="transition cursor-pointer"
                         style={{
-                          borderTop: "1px solid var(--border-color)",
+                          borderBottom: "1px solid var(--border-color)",
+                          backgroundColor: "var(--bg-card)",
                         }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
                       >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
                             {image ? (
-                              <img
-                                src={getImageUrl(image)}
-                                alt={product.name}
-                                className="h-11 w-11 rounded-lg object-cover"
-                              />
+                              <img src={getImageUrl(image)} alt={product.name} className="h-8 w-8 rounded-full object-cover shrink-0" />
                             ) : (
-                              <div
-                                className="flex h-11 w-11 items-center justify-center rounded-lg font-bold"
-                                style={{
-                                  backgroundColor: "var(--bg-tertiary)",
-                                }}
-                              >
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
                                 {product.name?.charAt(0).toUpperCase()}
                               </div>
                             )}
-
-                            <div>
-                              <p className="font-semibold">{product.name}</p>
-
-                              <p
-                                className="text-xs font-mono"
-                                style={{
-                                  color: "var(--text-muted)",
-                                }}
-                              >
-                                {firstVariant?.sku || "—"}
-                              </p>
+                            <div className="min-w-0">
+                              <p className="font-medium text-[13px] truncate max-w-[140px]">{product.name}</p>
+                              <p className="text-[11px] font-mono truncate" style={{ color: "var(--text-muted)" }}>{firstVariant?.sku || "—"}</p>
                             </div>
                           </div>
                         </td>
-
-                        <td className="px-6 py-4 text-sm">
-                          {getCategoryName(product)}
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(product)}</td>
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(product)}</td>
+                        <td className="px-4 py-2.5 font-semibold text-emerald-500 text-[13px]">
+                          Rs. {Number(firstVariant?.selling_price || 0).toLocaleString()}
                         </td>
-
-                        <td className="px-6 py-4 text-sm">
-                          {getBrandName(product)}
-                        </td>
-
-                        <td className="px-6 py-4 font-semibold text-emerald-500">
-                          Rs.{" "}
-                          {Number(
-                            firstVariant?.selling_price || 0,
-                          ).toLocaleString()}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={
-                                lowStock
-                                  ? "font-semibold text-red-500"
-                                  : "font-semibold text-emerald-500"
-                              }
-                            >
-                              {quantity}
-                            </span>
-
-                            {lowStock && (
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            )}
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[13px] font-medium ${lowStock ? "text-red-500" : "text-emerald-500"}`}>{quantity}</span>
+                            {lowStock && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
                           </div>
                         </td>
-
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-2.5">
                           <StatusBadge status={product.status} />
                         </td>
-
-                        <td
-                          className="px-6 py-4"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-end gap-2">
-                            <IconButton
-                              title="Edit product"
-                              color="var(--info)"
-                              background="rgba(59,130,246,.10)"
-                              onClick={() => handleEdit(product)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </IconButton>
-
-                            <IconButton
-                              title="Delete product"
-                              color="var(--danger)"
-                              background="rgba(239,68,68,.10)"
-                              onClick={() => handleDelete(product)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </IconButton>
-                          </div>
+                        <td className="px-4 py-2.5 whitespace-nowrap w-1" onClick={(e) => e.stopPropagation()}>
+                          <ActionButtons product={product} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} isDeleting={isDeleting} />
                         </td>
                       </tr>
                     );
@@ -1451,91 +1222,41 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* GRID */}
-
+      {/* ===== GRID (Matches Brand Page Styling) ===== */}
       {viewMode === "grid" && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {paginatedProducts.map((product) => {
             const variant = product.variants?.[0];
-
             const image = variant?.images?.[0]?.img_url;
 
             return (
               <div
                 key={product._id}
                 onClick={() => openProductDetails(product)}
-                className="cursor-pointer overflow-hidden rounded-xl shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-
-                  border: "1px solid var(--border-color)",
-                }}
+                className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer"
+                style={cardStyle}
               >
-                <div
-                  className="flex aspect-square items-center justify-center overflow-hidden"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                  }}
-                >
-                  {image ? (
-                    <img
-                      src={getImageUrl(image)}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
+                <div className="flex items-start justify-between">
+                   {image ? (
+                    <img src={getImageUrl(image)} alt={product.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
                   ) : (
-                    <Package className="h-16 w-16 opacity-20" />
-                  )}
-                </div>
-
-                <div className="space-y-3 p-4">
-                  <div>
-                    <h3 className="font-bold">{product.name}</h3>
-
-                    <p
-                      className="mt-1 text-xs font-mono"
-                      style={{
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {variant?.sku || "—"}
-                    </p>
-                  </div>
-
-                  <p
-                    className="text-xl font-bold"
-                    style={{
-                      color: "var(--accent)",
-                    }}
-                  >
-                    Rs. {Number(variant?.selling_price || 0).toLocaleString()}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <StatusBadge status={product.status} />
-
-                    <div
-                      className="flex gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <IconButton
-                        title="Edit"
-                        color="var(--info)"
-                        background="rgba(59,130,246,.10)"
-                        onClick={() => handleEdit(product)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </IconButton>
-
-                      <IconButton
-                        title="Delete"
-                        color="var(--danger)"
-                        background="rgba(239,68,68,.10)"
-                        onClick={() => handleDelete(product)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </IconButton>
+                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                      {product.name?.charAt(0).toUpperCase()}
                     </div>
+                  )}
+                  <StatusBadge status={product.status} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-[13px] truncate">{product.name}</p>
+                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
+                </div>
+                
+                <div className="flex items-center justify-between mt-auto pt-2">
+                   <span className="text-[13px] font-bold text-emerald-500">
+                    Rs. {Number(variant?.selling_price || 0).toLocaleString()}
+                  </span>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ActionButtons product={product} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} isDeleting={isDeleting} />
                   </div>
                 </div>
               </div>
@@ -1544,122 +1265,73 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* PAGINATION */}
-
+      {/* ===== PAGINATION (Matches Brand Page) ===== */}
       {filteredProducts.length > ITEMS_PER_PAGE && (
-        <div
-          className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"
-          style={{
-            borderColor: "var(--border-color)",
-          }}
-        >
-          <p
-            className="text-sm"
-            style={{
-              color: "var(--text-muted)",
-            }}
-          >
-            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-            {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of{" "}
-            {filteredProducts.length} products
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
           </p>
-
           <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className="rounded-lg p-2 transition-all duration-200 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                backgroundColor: "var(--bg-card)",
-
-                border: "1px solid var(--border-color)",
-              }}
+              className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+              title="Previous page"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-
-            <span className="px-2 text-sm font-medium">
+            
+            <span className="px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
               Page {currentPage} of {totalPages}
             </span>
 
             <button
               type="button"
               disabled={currentPage === totalPages}
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              className="rounded-lg p-2 transition-all duration-200 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                backgroundColor: "var(--bg-card)",
-
-                border: "1px solid var(--border-color)",
-              }}
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+              title="Next page"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* DELETE MODAL */}
-
+      {/* ===== DELETE MODAL (Unchanged Logic, Styling matches) ===== */}
       {showDeleteModal && productToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div
-            className="w-full max-w-sm rounded-xl p-5 shadow-2xl"
-            style={{
-              backgroundColor: "var(--bg-card)",
-
-              border: "1px solid var(--border-color)",
-            }}
-          >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/10">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+                <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
-
-              <div>
-                <h3 className="font-semibold">
-                  Delete "{productToDelete.name}
-                  "?
-                </h3>
-
-                <p
-                  className="mt-1 text-sm leading-5"
-                  style={{
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  This action cannot be undone. Product, variants and images
-                  will be permanently removed.
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold">Delete "{productToDelete.name}"?</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  This action cannot be undone. Product, variants and images will be permanently removed.
                 </p>
               </div>
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="flex gap-2 mt-5">
               <button
                 type="button"
-                onClick={() => {
-                  setShowDeleteModal(false);
-
-                  setProductToDelete(null);
-                }}
-                className="rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-sm"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-
-                  border: "1px solid var(--border-color)",
-                }}
+                onClick={() => { setShowDeleteModal(false); setProductToDelete(null); }}
+                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
                 onClick={confirmDelete}
-                className="rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-600 hover:shadow-md disabled:opacity-50"
+                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger)" }}
               >
                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </button>
@@ -1668,263 +1340,96 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* ADD / EDIT MODAL */}
-
+      {/* ===== ADD / EDIT MODAL (Logic Unchanged, Wrapper Styling Updated) ===== */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div
-            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl shadow-2xl"
-            style={{
-              backgroundColor: "var(--bg-card)",
-
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div
-              className="sticky top-0 z-20 flex items-center justify-between px-6 py-5"
-              style={{
-                backgroundColor: "var(--bg-card)",
-
-                borderBottom: "1px solid var(--border-color)",
-              }}
-            >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl shadow-2xl" style={cardStyle}>
+            {/* Modal Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-4 rounded-t-xl" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
               <div>
-                <h3 className="text-xl font-bold">
-                  {editingProduct ? "Edit Product" : "New Product"}
-                </h3>
-
-                <p
-                  className="mt-1 text-sm"
-                  style={{
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  Add product and variant information
-                </p>
+                <h3 className="text-base font-semibold">{editingProduct ? "Edit Product" : "New Product"}</h3>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>Add product and variant information</p>
               </div>
-
-              <button
-                type="button"
-                title="Close"
-                onClick={closeProductModal}
-                className="rounded-lg p-2 transition-all duration-200 hover:bg-black/5"
-              >
+              <button type="button" onClick={closeProductModal} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}>
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* STEPS */}
-
-            <div
-              className="flex items-center gap-4 px-6 py-4"
-              style={{
-                borderBottom: "1px solid var(--border-color)",
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white transition-all duration-200">
-                  {currentStep > 1 ? <Check className="h-4 w-4" /> : "1"}
+            {/* Steps Indicator */}
+            <div className="flex items-center gap-4 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+               <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
+                  {currentStep > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
                 </div>
-
-                <span className="text-sm font-medium">Product Info</span>
+                <span className="text-xs font-medium">Product Info</span>
               </div>
-
-              <div
-                className="h-px w-12"
-                style={{
-                  backgroundColor: "var(--border-color)",
-                }}
-              />
-
+              <div className="h-px w-8" style={{ backgroundColor: "var(--border-color)" }} />
               <div className="flex items-center gap-2">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-all duration-200 ${
-                    currentStep === 2
-                      ? "bg-emerald-500 text-white"
-                      : "bg-gray-700 text-gray-400"
-                  }`}
-                >
-                  2
-                </div>
-
-                <span className="text-sm font-medium">Variants</span>
+                <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${currentStep === 2 ? "bg-emerald-500 text-white" : "bg-gray-700 text-gray-400"}`}>2</div>
+                <span className="text-xs font-medium">Variants</span>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6">
+            <form onSubmit={handleSubmit} className="p-5">
               {/* STEP 1 */}
-
               {currentStep === 1 && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-               <Field label="Category *">
-  <div className="relative">
-    {/* Dropdown Trigger Button */}
-    <button
-      type="button"
-      onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-      className="input-field w-full flex justify-between items-center text-left"
-    >
-      {formData.category_id 
-        ? categories.find((c) => c._id === formData.category_id)?.name 
-        : "Select product category"}
-      <ChevronDown className="h-4 w-4 shrink-0" />
-    </button>
-
-    {/* Dropdown Menu (Scrollable + Create New Option) */}
-    {isCategoryDropdownOpen && (
-      <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg" 
-           style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", maxHeight: "12rem", overflowY: "auto" }}>
-        
-        {/* Categories List */}
-        {categories.map((cat) => (
-          <div
-            key={cat._id}
-            onClick={() => {
-              setFormData({ ...formData, category_id: cat._id });
-              setIsCategoryDropdownOpen(false);
-            }}
-            className="px-3 py-2 text-sm cursor-pointer transition-colors hover:bg-black/5"
-            style={{ color: formData.category_id === cat._id ? "var(--accent)" : "var(--text-primary)" }}
-          >
-            {cat.name}
-          </div>
-        ))}
-
-        {/* Create New Option at Bottom */}
-        <div
-          onClick={() => {
-            setIsCategoryDropdownOpen(false);
-            setShowNewCategoryModal(true);
-          }}
-          className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 transition-colors hover:bg-black/5"
-          style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}
-        >
-          <Plus className="h-4 w-4" /> Create New Category
-        </div>
-      </div>
-    )}
-  </div>
-</Field>
-
-                   <Field label="Brand *">
-  <div className="relative">
-    <button
-      type="button"
-      onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
-      className="input-field w-full flex justify-between items-center text-left"
-    >
-      {formData.brand_id 
-        ? brands.find((b) => b._id === formData.brand_id)?.name 
-        : "Select product brand"}
-      <ChevronDown className="h-4 w-4 shrink-0" />
-    </button>
-
-    {isBrandDropdownOpen && (
-      <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg" 
-           style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", maxHeight: "12rem", overflowY: "auto" }}>
-        
-        {brands.map((brand) => (
-          <div
-            key={brand._id}
-            onClick={() => {
-              setFormData({ ...formData, brand_id: brand._id });
-              setIsBrandDropdownOpen(false);
-            }}
-            className="px-3 py-2 text-sm cursor-pointer transition-colors hover:bg-black/5"
-            style={{ color: formData.brand_id === brand._id ? "var(--accent)" : "var(--text-primary)" }}
-          >
-            {brand.name}
-          </div>
-        ))}
-
-        <div
-          onClick={() => {
-            setIsBrandDropdownOpen(false);
-            setShowNewBrandModal(true);
-          }}
-          className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 transition-colors hover:bg-black/5"
-          style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}
-        >
-          <Plus className="h-4 w-4" /> Create New Brand
-        </div>
-      </div>
-    )}
-  </div>
-</Field>
-                  </div>
-
-                  <Field label="Product Name *">
-                    <input
-                      required
-                      type="text"
-                      placeholder="e.g. Cotton T-Shirt"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          name: e.target.value,
-                        })
-                      }
-                      className="input-field w-full transition-all duration-200"
-                    />
-                  </Field>
-
-                  <Field label="Description">
-                    <textarea
-                      rows={4}
-                      placeholder="Enter product description..."
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
-                      className="input-field w-full resize-none transition-all duration-200"
-                    />
-                  </Field>
-
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Field label="Tax (%)">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder="%"
-                        value={formData.tax}
-                        onChange={(e) => {
-                          let val = e.target.value;
-
-                          // Agar user field clear kare toh empty string allow karo
-                          if (val === "") {
-                            setFormData({ ...formData, tax: "" });
-                          } else {
-                            // Number mein convert karke 0 se 100 ke beech clamp (limit) karo
-                            let num = Number(val);
-                            if (num < 0) num = 0;
-                            if (num > 100) num = 100;
-
-                            setFormData({ ...formData, tax: String(num) });
-                          }
-                        }}
-                        className="input-field w-full transition-all duration-200 focus:shadow-md"
-                      />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Field label="Category *">
+                      <div className="relative">
+                        <button type="button" onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)} className="input-field w-full flex justify-between items-center text-left h-9 px-3 rounded-md text-sm">
+                          <span className="truncate">{formData.category_id ? categories.find((c) => c._id === formData.category_id)?.name : "Select product category"}</span>
+                          <ChevronDown className="h-4 w-4 shrink-0" />
+                        </button>
+                        {isCategoryDropdownOpen && (
+                          <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg max-h-48 overflow-y-auto" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+                            {categories.map((cat) => (
+                              <div key={cat._id} onClick={() => { setFormData({ ...formData, category_id: cat._id }); setIsCategoryDropdownOpen(false); }} className="px-3 py-2 text-sm cursor-pointer hover:bg-black/5" style={{ color: formData.category_id === cat._id ? "var(--accent)" : "var(--text-primary)" }}>
+                                {cat.name}
+                              </div>
+                            ))}
+                            <div onClick={() => { setIsCategoryDropdownOpen(false); setShowNewCategoryModal(true); }} className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}>
+                              <Plus className="h-4 w-4" /> Create New Category
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Field>
+                    <Field label="Brand *">
+                       <div className="relative">
+                        <button type="button" onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)} className="input-field w-full flex justify-between items-center text-left h-9 px-3 rounded-md text-sm">
+                           <span className="truncate">{formData.brand_id ? brands.find((b) => b._id === formData.brand_id)?.name : "Select product brand"}</span>
+                          <ChevronDown className="h-4 w-4 shrink-0" />
+                        </button>
+                        {isBrandDropdownOpen && (
+                          <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg max-h-48 overflow-y-auto" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+                            {brands.map((brand) => (
+                              <div key={brand._id} onClick={() => { setFormData({ ...formData, brand_id: brand._id }); setIsBrandDropdownOpen(false); }} className="px-3 py-2 text-sm cursor-pointer hover:bg-black/5" style={{ color: formData.brand_id === brand._id ? "var(--accent)" : "var(--text-primary)" }}>
+                                {brand.name}
+                              </div>
+                            ))}
+                            <div onClick={() => { setIsBrandDropdownOpen(false); setShowNewBrandModal(true); }} className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}>
+                              <Plus className="h-4 w-4" /> Create New Brand
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </Field>
                   </div>
-
+                  <Field label="Product Name *">
+                    <input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-field w-full h-9 px-3 rounded-md text-sm" />
+                  </Field>
+                  <Field label="Description">
+                    <textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-field w-full px-3 py-2 rounded-md text-sm resize-none" />
+                  </Field>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Field label="Tax (%)">
+                      <input type="number" min="0" max="100" placeholder="%" value={formData.tax} onChange={(e) => { let val = e.target.value; if (val === "") setFormData({ ...formData, tax: "" }); else { let num = Number(val); if (num < 0) num = 0; if (num > 100) num = 100; setFormData({ ...formData, tax: String(num) }); } }} className="input-field w-full h-9 px-3 rounded-md text-sm" />
+                    </Field>
+                  </div>
                   <div className="flex justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={handleNextStep}
-                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: "var(--accent)",
-                        color: "var(--accent-text)",
-                      }}
-                    >
-                      Next: Variants
-                      <ChevronRight className="h-4 w-4" />
+                    <button type="button" onClick={handleNextStep} className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                      Next: Variants <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -1932,479 +1437,131 @@ export default function ProductsPage() {
 
               {/* STEP 2 */}
               {currentStep === 2 && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-5">
+                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="flex items-center gap-2 text-lg font-bold">
-                        <Sparkles
-                          className="h-5 w-5"
-                          style={{ color: "var(--accent)" }}
-                        />
+                      <h4 className="flex items-center gap-2 text-sm font-bold">
+                        <Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} />
                         Variants ({formData.variants.length})
                       </h4>
-                      <p
-                        className="mt-1 text-xs"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        SKU, pricing, stock, attributes and images
-                      </p>
+                      <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, attributes and images</p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={addVariant}
-                      className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: "var(--accent)",
-                        color: "var(--accent-text)",
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Variant
+                    <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                      <Plus className="h-3.5 w-3.5" /> Add Variant
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {formData.variants.map((variant, index) => (
-                      <div
-                        key={variant._id || index}
-                        className="overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-sm"
-                        style={{ borderColor: "var(--border-color)" }}
-                      >
-                        <div
-                          className="flex cursor-pointer items-center justify-between px-5 py-4 transition-colors duration-150 hover:bg-black/[0.02]"
-                          style={{ backgroundColor: "var(--bg-tertiary)" }}
-                          onClick={() =>
-                            setExpandedVariant(
-                              expandedVariant === index ? -1 : index,
-                            )
-                          }
-                        >
+                      <div key={variant._id || index} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
+                        <div className="flex cursor-pointer items-center justify-between px-4 py-3 transition hover:bg-black/[0.02]" style={{ backgroundColor: "var(--bg-tertiary)" }} onClick={() => setExpandedVariant(expandedVariant === index ? -1 : index)}>
                           <div>
-                            <p className="font-semibold">
-                              {variant.sku || `Variant ${index + 1}`}
-                            </p>
-                            <p
-                              className="text-xs"
-                              style={{ color: "var(--text-muted)" }}
-                            >
-                              {variant.title || `Variant #${index + 1}`}
-                            </p>
+                            <p className="text-sm font-semibold">{variant.sku || `Variant ${index + 1}`}</p>
+                            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{variant.title || `Variant #${index + 1}`}</p>
                           </div>
-
-                          <div className="flex items-center gap-2">
-                            <IconButton
-                              title="Duplicate variant"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                duplicateVariant(index);
-                              }}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </IconButton>
-
-                            <IconButton
-                              title="Delete variant"
-                              color="var(--danger)"
-                              background="rgba(239,68,68,.10)"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeVariant(index);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </IconButton>
-
-                            <ChevronDown
-                              className={`h-5 w-5 transition-transform duration-200 ${
-                                expandedVariant === index ? "rotate-180" : ""
-                              }`}
-                            />
+                          <div className="flex items-center gap-1.5">
+                            <IconButton title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateVariant(index); }}><Copy className="h-3.5 w-3.5" /></IconButton>
+                            <IconButton title="Delete" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={(e) => { e.stopPropagation(); removeVariant(index); }}><Trash2 className="h-3.5 w-3.5" /></IconButton>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
                           </div>
                         </div>
 
                         {expandedVariant === index && (
-                          <div className="space-y-6 p-5">
+                          <div className="space-y-4 p-4">
                             <div>
                               <SectionTitle>Identification</SectionTitle>
-                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                 <Field label="SKU *">
-                                  <input
-                                    required
-                                    type="text"
-                                    placeholder="e.g. sku_4"
-                                    value={variant.sku}
-                                    onChange={(e) =>
-                                      updateVariant(
-                                        index,
-                                        "sku",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="input-field w-full transition-all duration-200 focus:shadow-md"
-                                  />
+                                  <input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={(e) => updateVariant(index, "sku", e.target.value)} className={`input-field w-full h-9 px-3 rounded-md text-sm ${editingProduct && variant._id ? "opacity-60 cursor-not-allowed" : ""}`} />
                                 </Field>
-
                                 <Field label="Variant Title *">
-                                  <input
-                                    required
-                                    type="text"
-                                    placeholder="e.g. Black - Large"
-                                    value={variant.title}
-                                    onChange={(e) =>
-                                      updateVariant(
-                                        index,
-                                        "title",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="input-field w-full transition-all duration-200 focus:shadow-md"
-                                  />
+                                  <input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={(e) => updateVariant(index, "title", e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm" />
                                 </Field>
                               </div>
-
-                              <div className="mt-4">
+                              <div className="mt-3">
                                 <Field label="Variant Description">
-                                  <textarea
-                                    rows={3}
-                                    placeholder="Enter variant description..."
-                                    value={variant.description}
-                                    onChange={(e) =>
-                                      updateVariant(
-                                        index,
-                                        "description",
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="input-field w-full resize-none transition-all duration-200 focus:shadow-md"
-                                  />
+                                  <textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={(e) => updateVariant(index, "description", e.target.value)} className="input-field w-full px-3 py-2 rounded-md text-sm resize-none" />
                                 </Field>
                               </div>
                             </div>
 
                             <div>
                               <SectionTitle>Pricing & Stock</SectionTitle>
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                                <NumberField
-                                  label="Cost Price *"
-                                  placeholder="e.g. 1000"
-                                  value={variant.cost_price}
-                                  onChange={(value) =>
-                                    updateVariant(index, "cost_price", value)
-                                  }
-                                />
-                                <NumberField
-                                  label="Selling Price *"
-                                  placeholder="e.g. 1500"
-                                  value={variant.selling_price}
-                                  onChange={(value) =>
-                                    updateVariant(index, "selling_price", value)
-                                  }
-                                />
-                                <NumberField
-                                  label="Quantity"
-                                  placeholder="e.g. 50"
-                                  value={variant.quantity}
-                                  onChange={(value) =>
-                                    updateVariant(index, "quantity", value)
-                                  }
-                                />
-                                <NumberField
-                                  label="Min Qty"
-                                  placeholder="e.g. 5"
-                                  value={variant.min_qnt}
-                                  onChange={(value) =>
-                                    updateVariant(index, "min_qnt", value)
-                                  }
-                                />
-                                <NumberField
-                                  label="Max Qty"
-                                  placeholder="e.g. 100"
-                                  value={variant.max_qnt}
-                                  onChange={(value) =>
-                                    updateVariant(index, "max_qnt", value)
-                                  }
-                                />
+                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                                <NumberField label="Cost Price *" placeholder="1000" value={variant.cost_price} onChange={(v) => updateVariant(index, "cost_price", v)} />
+                                <NumberField label="Selling Price *" placeholder="1500" value={variant.selling_price} onChange={(v) => updateVariant(index, "selling_price", v)} />
+                                <NumberField label="Quantity" placeholder="50" value={variant.quantity} onChange={(v) => updateVariant(index, "quantity", v)} />
+                                <NumberField label="Min Qty" placeholder="5" value={variant.min_qnt} onChange={(v) => updateVariant(index, "min_qnt", v)} />
+                                <NumberField label="Max Qty" placeholder="100" value={variant.max_qnt} onChange={(v) => updateVariant(index, "max_qnt", v)} />
                               </div>
+                               {variant.cost_price !== "" && variant.selling_price !== "" && Number(variant.selling_price) <= Number(variant.cost_price) && (
+                                <div className="mt-2 flex items-center gap-2 rounded border border-red-500/30 bg-red-500/10 px-3 py-2">
+                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                                  <p className="text-xs font-medium text-red-500">Selling Price must be greater than Cost Price</p>
+                                </div>
+                              )}
                             </div>
 
                             <div>
                               <SectionTitle>Attributes</SectionTitle>
-                              <div className="space-y-3">
-                                {variant.attributes.map(
-                                  (attribute, attrIndex) => {
-                                    const preset = ATTRIBUTE_PRESETS.find(
-                                      (p) => p.name === attribute.name,
-                                    );
-                                    const isCustom = !!attribute.isCustom;
-
-                                    return (
-                                      <div
-                                        key={attrIndex}
-                                        className="flex flex-wrap items-center gap-3"
-                                      >
-                                        <div className="relative min-w-[160px] flex-1">
-                                          <select
-                                            value={attribute.name}
-                                            onChange={(e) => {
-                                              const variants = [
-                                                ...formData.variants,
-                                              ];
-                                              const attributes = [
-                                                ...variants[index].attributes,
-                                              ];
-                                              attributes[attrIndex] = {
-                                                ...attributes[attrIndex],
-                                                name: e.target.value,
-                                                value: "",
-                                                isCustom: false,
-                                              };
-                                              variants[index] = {
-                                                ...variants[index],
-                                                attributes,
-                                              };
-                                              setFormData({
-                                                ...formData,
-                                                variants,
-                                              });
-                                            }}
-                                            className="input-field w-full appearance-none pr-8 cursor-pointer transition-all duration-200 focus:shadow-md"
-                                          >
-                                            {ATTRIBUTE_PRESETS.map((p) => (
-                                              <option
-                                                key={p.name}
-                                                value={p.name}
-                                              >
-                                                {p.name}
-                                              </option>
-                                            ))}
-                                          </select>
-                                          <ChevronDown
-                                            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none"
-                                            style={{
-                                              color: "var(--text-muted)",
-                                            }}
-                                          />
-                                        </div>
-
-                                        {preset ? (
-                                          <>
-                                            <div className="relative min-w-[160px] flex-1">
-                                              <select
-                                                value={
-                                                  isCustom
-                                                    ? "__custom__"
-                                                    : attribute.value
-                                                }
-                                                onChange={(e) => {
-                                                  const val = e.target.value;
-                                                  const variants = [
-                                                    ...formData.variants,
-                                                  ];
-                                                  const attributes = [
-                                                    ...variants[index]
-                                                      .attributes,
-                                                  ];
-                                                  attributes[attrIndex] = {
-                                                    ...attributes[attrIndex],
-                                                    isCustom:
-                                                      val === "__custom__",
-                                                    value:
-                                                      val === "__custom__"
-                                                        ? preset.name ===
-                                                          "Color"
-                                                          ? "#000000"
-                                                          : ""
-                                                        : val,
-                                                  };
-                                                  variants[index] = {
-                                                    ...variants[index],
-                                                    attributes,
-                                                  };
-                                                  setFormData({
-                                                    ...formData,
-                                                    variants,
-                                                  });
-                                                }}
-                                                className="input-field w-full appearance-none pr-8 cursor-pointer transition-all duration-200 focus:shadow-md"
-                                              >
-                                                {preset.values.map((v) => (
-                                                  <option key={v} value={v}>
-                                                    {v}
-                                                  </option>
-                                                ))}
-                                                <option value="__custom__">
-                                                  + Custom
-                                                </option>
-                                              </select>
-                                              <ChevronDown
-                                                className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none"
-                                                style={{
-                                                  color: "var(--text-muted)",
-                                                }}
-                                              />
-                                            </div>
-
-                                            {isCustom &&
-                                              (preset.name === "Color" ? (
-                                                <div className="flex items-center gap-2 flex-1">
-                                                  <input
-                                                    type="color"
-                                                    value={
-                                                      attribute.value ||
-                                                      "#000000"
-                                                    }
-                                                    onChange={(e) =>
-                                                      updateAttribute(
-                                                        index,
-                                                        attrIndex,
-                                                        "value",
-                                                        e.target.value,
-                                                      )
-                                                    }
-                                                    className="h-10 w-12 cursor-pointer rounded border p-1 transition-all duration-200"
-                                                    style={{
-                                                      borderColor:
-                                                        "var(--border-color)",
-                                                    }}
-                                                    title="Pick custom RGB color"
-                                                  />
-                                                  <div className="flex items-center gap-2 flex-1">
-                                                    <div
-                                                      className="h-6 w-6 rounded border"
-                                                      style={{
-                                                        backgroundColor:
-                                                          attribute.value ||
-                                                          "#000000",
-                                                        borderColor:
-                                                          "var(--border-color)",
-                                                      }}
-                                                    />
-                                                    <span
-                                                      className="text-sm font-mono"
-                                                      style={{
-                                                        color:
-                                                          "var(--text-muted)",
-                                                      }}
-                                                    >
-                                                      {attribute.value ||
-                                                        "#000000"}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                <input
-                                                  type="text"
-                                                  placeholder="Custom value..."
-                                                  value={attribute.value}
-                                                  onChange={(e) =>
-                                                    updateAttribute(
-                                                      index,
-                                                      attrIndex,
-                                                      "value",
-                                                      e.target.value,
-                                                    )
-                                                  }
-                                                  className="input-field flex-1 transition-all duration-200 focus:shadow-md"
-                                                />
-                                              ))}
-                                          </>
-                                        ) : (
-                                          <input
-                                            type="text"
-                                            placeholder="Value e.g. Black"
-                                            value={attribute.value}
-                                            onChange={(e) =>
-                                              updateAttribute(
-                                                index,
-                                                attrIndex,
-                                                "value",
-                                                e.target.value,
-                                              )
-                                            }
-                                            className="input-field flex-1 transition-all duration-200 focus:shadow-md"
-                                          />
-                                        )}
-
-                                        <IconButton
-                                          title="Remove attribute"
-                                          color="var(--danger)"
-                                          background="rgba(239,68,68,.10)"
-                                          onClick={() =>
-                                            removeAttribute(index, attrIndex)
-                                          }
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </IconButton>
+                              <div className="space-y-2">
+                                {variant.attributes.map((attribute, attrIndex) => {
+                                  const preset = ATTRIBUTE_PRESETS.find((p) => p.name === attribute.name);
+                                  const isCustom = !!attribute.isCustom;
+                                  return (
+                                    <div key={attrIndex} className="flex flex-wrap items-center gap-2">
+                                      <div className="relative min-w-[140px] flex-1">
+                                        <select value={attribute.name} onChange={(e) => { const variants = [...formData.variants]; const attributes = [...variants[index].attributes]; attributes[attrIndex] = { ...attributes[attrIndex], name: e.target.value, value: "", isCustom: false }; variants[index] = { ...variants[index], attributes }; setFormData({ ...formData, variants }); }} className="input-field w-full appearance-none pr-8 h-9 pl-3 rounded-md text-sm cursor-pointer">
+                                          {ATTRIBUTE_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
+                                        </select>
+                                        <ChevronDown className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
                                       </div>
-                                    );
-                                  },
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => addAttribute(index)}
-                                  className="flex items-center gap-2 text-sm font-semibold transition-all duration-200 hover:opacity-80"
-                                  style={{ color: "var(--accent)" }}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Add Attribute
+                                      {preset ? (
+                                        <>
+                                          <div className="relative min-w-[140px] flex-1">
+                                            <select value={isCustom ? "__custom__" : attribute.value} onChange={(e) => { const val = e.target.value; const variants = [...formData.variants]; const attributes = [...variants[index].attributes]; attributes[attrIndex] = { ...attributes[attrIndex], isCustom: val === "__custom__", value: val === "__custom__" ? (preset.name === "Color" ? "#000000" : "") : val }; variants[index] = { ...variants[index], attributes }; setFormData({ ...formData, variants }); }} className="input-field w-full appearance-none pr-8 h-9 pl-3 rounded-md text-sm cursor-pointer">
+                                              {preset.values.map((v) => (<option key={v} value={v}>{v}</option>))}
+                                              <option value="__custom__">+ Custom</option>
+                                            </select>
+                                            <ChevronDown className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
+                                          </div>
+                                          {isCustom && (preset.name === "Color" ? (
+                                            <div className="flex items-center gap-2 flex-1">
+                                              <input type="color" value={attribute.value || "#000000"} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="h-9 w-10 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
+                                              <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{attribute.value || "#000000"}</span>
+                                            </div>
+                                          ) : (
+                                            <input type="text" placeholder="Custom value..." value={attribute.value} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="input-field flex-1 h-9 px-3 rounded-md text-sm" />
+                                          ))}
+                                        </>
+                                      ) : (
+                                        <input type="text" placeholder="Value e.g. Black" value={attribute.value} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="input-field flex-1 h-9 px-3 rounded-md text-sm" />
+                                      )}
+                                      <IconButton title="Remove" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={() => removeAttribute(index, attrIndex)}><Trash2 className="h-3.5 w-3.5" /></IconButton>
+                                    </div>
+                                  );
+                                })}
+                                <button type="button" onClick={() => addAttribute(index)} className="flex items-center gap-1.5 text-xs font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}>
+                                  <Plus className="h-3.5 w-3.5" /> Add Attribute
                                 </button>
                               </div>
                             </div>
 
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
-                              <label
-                                className="block cursor-pointer rounded-xl border-2 border-dashed p-7 text-center transition-all duration-200 hover:bg-black/[0.02]"
-                                style={{ borderColor: "var(--border-color)" }}
-                              >
-                                <input
-                                  hidden
-                                  multiple
-                                  type="file"
-                                  accept="image/jpeg,image/png,image/webp"
-                                  onChange={(e) => handleImageUpload(index, e)}
-                                />
-                                <Upload
-                                  className="mx-auto mb-3 h-7 w-7"
-                                  style={{ color: "var(--text-muted)" }}
-                                />
-                                <p className="text-sm font-medium">
-                                  Click to select product images
-                                </p>
-                                <p
-                                  className="mt-1 text-xs"
-                                  style={{ color: "var(--text-muted)" }}
-                                >
-                                  JPG, PNG or WebP • Images automatically
-                                  optimized
-                                </p>
+                              <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
+                                <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleImageUpload(index, e)} />
+                                <Upload className="mx-auto mb-2 h-6 w-6" style={{ color: "var(--text-muted)" }} />
+                                <p className="text-xs font-medium">Click to select images</p>
+                                <p className="mt-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>JPG, PNG or WebP • Auto optimized</p>
                               </label>
-
                               {variant.images.length > 0 && (
-                                <div className="mt-4 flex flex-wrap gap-3">
+                                <div className="mt-3 flex flex-wrap gap-2">
                                   {variant.images.map((image, imageIndex) => (
-                                    <div
-                                      key={imageIndex}
-                                      className="group relative"
-                                    >
-                                      <img
-                                        src={image.preview}
-                                        alt=""
-                                        className="h-24 w-24 rounded-lg border object-cover transition-all duration-200"
-                                        style={{
-                                          borderColor: "var(--border-color)",
-                                        }}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeImage(index, imageIndex)
-                                        }
-                                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow-md transition-all duration-200 group-hover:opacity-100 hover:bg-red-600 hover:scale-110"
-                                      >
-                                        <X className="h-4 w-4" />
+                                    <div key={imageIndex} className="group relative">
+                                      <img src={image.preview} alt="" className="h-16 w-16 rounded border object-cover" style={{ borderColor: "var(--border-color)" }} />
+                                      <button type="button" onClick={() => removeImage(index, imageIndex)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-600">
+                                        <X className="h-3 w-3" />
                                       </button>
                                     </div>
                                   ))}
@@ -2417,38 +1574,12 @@ export default function ProductsPage() {
                     ))}
                   </div>
 
-                  <div
-                    className="flex justify-between border-t pt-5"
-                    style={{ borderColor: "var(--border-color)" }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(1)}
-                      className="flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-black/[0.04]"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        border: "1px solid var(--border-color)",
-                      }}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Back
+                  <div className="flex justify-between border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                    <button type="button" onClick={() => setCurrentStep(1)} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                      <ChevronLeft className="h-4 w-4" /> Back
                     </button>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{
-                        backgroundColor: "var(--accent)",
-                        color: "var(--accent-text)",
-                      }}
-                    >
-                      {isSubmitting
-                        ? "Saving..."
-                        : editingProduct
-                          ? "Update Product"
-                          : "Create Product"}
-                      <Check className="h-4 w-4" />
+                    <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                      {isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"} <Check className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -2458,43 +1589,15 @@ export default function ProductsPage() {
         </div>
       )}
 
-           {/* ==========================================
-          QUICK ADD CATEGORY MODAL
-      ========================================== */}
+      {/* QUICK ADD CATEGORY MODAL */}
       {showNewCategoryModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div 
-            className="w-full max-w-sm rounded-xl p-5 shadow-2xl" 
-            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
-          >
-            <h3 className="text-lg font-bold mb-4">Create New Category</h3>
-            <input
-              type="text"
-              placeholder="Enter category name..."
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="input-field w-full mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newCategoryName.trim()) {
-                  createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" });
-                }
-              }}
-            />
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowNewCategoryModal(false)} 
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-80" 
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" })}
-                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "var(--accent)" }}
-              >
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl p-5 shadow-2xl" style={cardStyle}>
+            <h3 className="text-sm font-bold mb-3">Create New Category</h3>
+            <input type="text" placeholder="Enter category name..." value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm mb-3" autoFocus onKeyDown={(e) => { if (e.key === "Enter" && newCategoryName.trim()) createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" }); }} />
+            <div className="flex gap-2">
+              <button onClick={() => setShowNewCategoryModal(false)} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={() => createCategoryMutation.mutate({ name: newCategoryName.trim(), description: "" })} disabled={!newCategoryName.trim() || createCategoryMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
                 {createCategoryMutation.isPending ? "Creating..." : "Create & Select"}
               </button>
             </div>
@@ -2502,94 +1605,16 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* ==========================================
-          QUICK ADD BRAND MODAL
-      ========================================== */}
+      {/* QUICK ADD BRAND MODAL */}
       {showNewBrandModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div 
-            className="w-full max-w-sm rounded-xl p-5 shadow-2xl" 
-            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
-          >
-            <h3 className="text-lg font-bold mb-4">Create New Brand</h3>
-            <input
-              type="text"
-              placeholder="Enter brand name..."
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              className="input-field w-full mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newBrandName.trim()) {
-                  createBrandMutation.mutate({ name: newBrandName.trim(), description: "" });
-                }
-              }}
-            />
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowNewBrandModal(false)} 
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-80" 
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => createBrandMutation.mutate({ name: newBrandName.trim(), description: "" })}
-                disabled={!newBrandName.trim() || createBrandMutation.isPending}
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "var(--accent)" }}
-              >
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl p-5 shadow-2xl" style={cardStyle}>
+            <h3 className="text-sm font-bold mb-3">Create New Brand</h3>
+            <input type="text" placeholder="Enter brand name..." value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm mb-3" autoFocus onKeyDown={(e) => { if (e.key === "Enter" && newBrandName.trim()) createBrandMutation.mutate({ name: newBrandName.trim(), description: "" }); }} />
+            <div className="flex gap-2">
+              <button onClick={() => setShowNewBrandModal(false)} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={() => createBrandMutation.mutate({ name: newBrandName.trim(), description: "" })} disabled={!newBrandName.trim() || createBrandMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>
                 {createBrandMutation.isPending ? "Creating..." : "Create & Select"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Add Brand Modal */}
-      {showNewBrandModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div
-            className="w-full max-w-sm rounded-xl p-5"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <h3 className="text-lg font-bold mb-4">Create New Brand</h3>
-            <input
-              type="text"
-              placeholder="Enter brand name..."
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              className="input-field w-full mb-4"
-              autoFocus
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowNewBrandModal(false)}
-                className="flex-1 rounded-lg px-4 py-2 text-sm"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() =>
-                  createBrandMutation.mutate({
-                    name: newBrandName,
-                    description: "",
-                  })
-                }
-                disabled={!newBrandName.trim() || createBrandMutation.isPending}
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: "var(--accent)" }}
-              >
-                {createBrandMutation.isPending
-                  ? "Creating..."
-                  : "Create & Select"}
               </button>
             </div>
           </div>
@@ -2600,18 +1625,13 @@ export default function ProductsPage() {
 }
 
 // ==========================================
-// POLISHED HELPER COMPONENTS
+// HELPER COMPONENTS (Updated to match Brand Page Scale)
 // ==========================================
 
 function Field({ label, children }) {
   return (
-    <div className="space-y-1.5">
-      <label
-        className="block text-sm font-medium"
-        style={{ color: "var(--text-secondary)" }}
-      >
-        {label}
-      </label>
+    <div className="space-y-1">
+      <label className="block text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>
       {children}
     </div>
   );
@@ -2620,65 +1640,14 @@ function Field({ label, children }) {
 function NumberField({ label, value, placeholder, onChange }) {
   return (
     <Field label={label}>
-      <input
-        type="number"
-        min="0"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="input-field w-full transition-all duration-200 focus:shadow-md"
-      />
+      <input type="number" min="0" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm" />
     </Field>
   );
 }
 
 function SectionTitle({ children }) {
   return (
-    <p
-      className="mb-3 text-xs font-bold uppercase tracking-wider"
-      style={{ color: "var(--text-muted)" }}
-    >
-      {children}
-    </p>
-  );
-}
-
-// Compact Summary Cards
-function StatCard({ title, value, color }) {
-  return (
-    <div
-      className="rounded-xl p-4 transition-all duration-200 hover:shadow-md"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
-      }}
-    >
-      <p
-        className="text-xs font-medium uppercase tracking-wide"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {title}
-      </p>
-      <p
-        className="mt-1.5 text-2xl font-bold tracking-tight"
-        style={{ color: color || "var(--text-primary)" }}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function TableHeading({ children, right = false }) {
-  return (
-    <th
-      className={`px-6 py-3.5 text-xs font-semibold uppercase tracking-wider ${
-        right ? "text-right" : "text-left"
-      }`}
-      style={{ color: "var(--text-muted)" }}
-    >
-      {children}
-    </th>
+    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{children}</p>
   );
 }
 
@@ -2686,35 +1655,54 @@ function StatusBadge({ status }) {
   const active = status === "active";
   return (
     <span
-      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize transition-all duration-200"
-      style={{
-        backgroundColor: active
-          ? "rgba(16,185,129,.15)"
-          : "rgba(239,68,68,.15)",
-        color: active ? "var(--success)" : "var(--danger)",
-      }}
+      className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap"
+      style={
+        active
+          ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
+          : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }
+      }
     >
-      {status}
+      {active ? "Active" : "Inactive"}
     </span>
   );
 }
 
-function IconButton({
-  children,
-  onClick,
-  title,
-  color = "var(--text-muted)",
-  background = "var(--bg-card)",
-}) {
+function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className="rounded-lg p-2 transition-all duration-200 hover:scale-110 hover:shadow-sm"
-      style={{ color, backgroundColor: background }}
-    >
+    <button type="button" title={title} onClick={onClick} className="rounded p-1.5 transition hover:bg-black/5 flex items-center justify-center" style={{ color, backgroundColor: background }}>
       {children}
     </button>
+  );
+}
+
+// ✅ ActionButtons - Exactly like Brand Page
+function ActionButtons({ product, onView, onEdit, onDelete, isDeleting }) {
+  return (
+    <div className="flex items-center justify-end gap-1 sm:gap-2">
+      <button
+        onClick={(e) => { e.stopPropagation(); onView(product); }}
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
+        style={{ color: "#34d399" }}
+        title="View Details"
+      >
+        <Eye className="w-4 h-4" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onEdit(product); }}
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+        style={{ color: "var(--text-secondary)" }}
+        title="Edit"
+      >
+        <Pencil className="w-4 h-4" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(product); }}
+        disabled={isDeleting}
+        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
+        title="Delete"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
   );
 }

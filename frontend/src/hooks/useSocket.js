@@ -1,72 +1,69 @@
 "use client";
-
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ;
-console.log("SOCKET_URL =", SOCKET_URL);
-export const useSocket = () => {
-  const [socket, setSocket] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
 
-  // ✅ Token lene ka function (har baar fresh)
-  const getToken = useCallback(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("token");
-    }
-    return null;
-  }, []);
+let globalSocket = null;
+
+function getSocket() {
+  if (globalSocket && globalSocket.connected) return globalSocket;
+
+  // ✅ FIXED: 5000 (backend) not 3000 (frontend)
+  const SOCKET_URL =
+    process.env.NEXT_PUBLIC_SOCKET_URL ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    "http://localhost:5000";
+
+  console.log("🔌 Creating socket connection to:", SOCKET_URL);
+
+  globalSocket = io(SOCKET_URL, {
+    withCredentials: true,
+    transports: ["polling", "websocket"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    autoConnect: true,
+  });
+
+  globalSocket.on("connect", () => {
+    console.log("✅ Socket Connected:", globalSocket.id);
+  });
+
+  globalSocket.on("disconnect", (reason) => {
+    console.log("❌ Socket Disconnected:", reason);
+  });
+
+  globalSocket.on("connect_error", (err) => {
+    console.error("⚠️ Socket Connection Error:", err.message);
+  });
+
+  return globalSocket;
+}
+
+export function useSocket() {
+  const [connected, setConnected] = useState(false);
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    const token = getToken();
-console.log("Socket Token:", token);
-    // ⚠️ Agar token nahi hai toh connect mat karo
-    if (!token) {
-      console.warn("⚠️ No token found. Socket not connected.");
-      return;
-    }
+    const s = getSocket();
+    socketRef.current = s;
+    setConnected(s.connected);
 
-    const newSocket = io(SOCKET_URL, {
-transports: ["websocket", "polling"],
-      auth: {
-        token: token, // ✅ Token yahan pass ho raha hai
-      },
-      autoConnect: false, // ✅ Pehle manual connect karein
-    });
+    const onConnect = () => setConnected(true);
+    const onDisconnect = () => setConnected(false);
 
-    // Connect event handlers
-    newSocket.on("connect", () => {
-      console.log("🟢 Socket Connected:", newSocket.id);
-      setIsConnected(true);
-    });
+    s.on("connect", onConnect);
+    s.on("disconnect", onDisconnect);
 
-    newSocket.on("disconnect", () => {
-      console.log("🔴 Socket Disconnected");
-      setIsConnected(false);
-    });
+    if (s.connected) setConnected(true);
 
-    newSocket.on("connect_error", (err) => {
-  console.log("❌ Full Socket Error:", err);
-  console.log("❌ Error Message:", err.message);
-  setIsConnected(false);
-});
-
-    // ✅ Ab manually connect karein (token already set hai)
-    newSocket.connect();
-    setSocket(newSocket);
-
-    // Cleanup
     return () => {
-      newSocket.disconnect();
+      s.off("connect", onConnect);
+      s.off("disconnect", onDisconnect);
     };
-  }, [getToken]); // ✅ getToken change hone par re-run
+  }, []);
 
-  // ✅ Save/Login ke baad dobara connect karne ka function
-  const reconnect = useCallback(() => {
-    if (socket) {
-      socket.auth.token = getToken(); // 🔄 Fresh token update
-      socket.connect();
-    }
-  }, [socket, getToken]);
+  return { socket: socketRef.current, isConnected: connected };
+}
 
-  return { socket, isConnected, reconnect };
-};
+export { getSocket };

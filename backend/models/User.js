@@ -1,3 +1,4 @@
+// backend/models/User.js
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
@@ -7,14 +8,12 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     username: {
       type: String,
       required: true,
       unique: true,
       trim: true,
     },
-
     email: {
       type: String,
       required: true,
@@ -22,50 +21,68 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-
     password: {
       type: String,
       required: true,
       minlength: 6,
     },
-
+    phone: {
+      type: String,
+      default: "",
+    },
     role: {
       type: String,
       default: "user",
       enum: ["user", "admin", "staff"],
     },
-
-    // ✅ BOSS KI REQUIREMENT: Har user ka store se link hona zaroori hai
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
-      default: null, // Admin seeding ke waqt set hoga
+      default: null,
     },
-
-    // --- AUDIT FIELDS ---
+    avatar: {
+      type: String,
+      default: null,
+    },
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    permissions: {
+      products: { type: Boolean, default: true },
+      brands: { type: Boolean, default: true },
+      categories: { type: Boolean, default: true },
+      users: { type: Boolean, default: false },
+      orders: { type: Boolean, default: true },
+      settings: { type: Boolean, default: true },
+    },
+    preferences: {
+      darkMode: { type: Boolean, default: true },
+      notifications: {
+        email: { type: Boolean, default: true },
+        push: { type: Boolean, default: true },
+        weekly: { type: Boolean, default: true },
+      },
+    },
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
-
     updatedby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
-
     deletedby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
-
     is_deleted: {
       type: Boolean,
       default: false,
     },
-
     deleted_at: {
       type: Date,
       default: null,
@@ -79,7 +96,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Soft delete method
 userSchema.methods.softDelete = function (userId) {
   this.is_deleted = true;
   this.deleted_at = new Date();

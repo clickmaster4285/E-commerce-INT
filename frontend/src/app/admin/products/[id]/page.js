@@ -2,7 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// ✅ SOCKET HOOK IMPORT KIYA
+import { useProductSocketSync } from "@/hooks/useProductSocketSync";
+import { useSocket } from "@/hooks/useSocket"; // ✅ Socket direct access ke liye
 
 import {
   ArrowLeft,
@@ -50,7 +54,7 @@ import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { variantApi } from "@/apis/variantApi";
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 const ATTRIBUTE_PRESETS = [
   { name: "Color", values: ["Black", "White", "Gray", "Red", "Blue", "Green", "Yellow", "Brown", "Pink", "Orange", "Purple", "Gold", "Silver"] },
@@ -91,8 +95,34 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("overview");
+
+  // ✅ SOCKET SYNC HOOK CALL KIYA
+  useProductSocketSync();
+
+  // ✅ DIRECT SOCKET ACCESS (For delete redirect logic)
+  const { socket, isConnected } = useSocket();
+
   const id = params?.id;
+
+  // ✅ AUTO-REDIRECT ON DELETE FROM ANOTHER TAB
+  useEffect(() => {
+    if (!socket || !isConnected || !id) return;
+
+    const handleDeleted = (data) => {
+      if (data?.id === id) {
+        toast.info("This product was deleted from another session.");
+        router.push("/admin/products");
+      }
+    };
+
+    socket.on("productDeleted", handleDeleted);
+
+    return () => {
+      socket.off("productDeleted", handleDeleted);
+    };
+  }, [socket, isConnected, id, router]);
+
+  const [activeTab, setActiveTab] = useState("overview");
 
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -344,16 +374,35 @@ export default function ProductDetailPage() {
     setCurrentStep(2);
   };
 
+  // ==========================================
+  // SUBMIT  ✅ SKU LOCK + SELLING PRICE VALIDATION
+  // ==========================================
+
   const handleSubmit = (event) => {
     event.preventDefault();
     const skuSet = new Set();
+
     for (const variant of formData.variants) {
       const sku = variant.sku.trim();
       if (!sku) { toast.error("SKU is required"); return; }
       if (skuSet.has(sku)) { toast.error(`Duplicate SKU: ${sku}`); return; }
       skuSet.add(sku);
       if (!variant.title.trim()) { toast.error("Variant title is required"); return; }
-      if (variant.cost_price === "" || variant.selling_price === "") { toast.error("Cost price and selling price are required"); return; }
+      if (variant.cost_price === "" || variant.selling_price === "") {
+        toast.error("Cost price and selling price are required");
+        return;
+      }
+
+      // ✅ SELLING PRICE MUST BE GREATER THAN COST PRICE
+      const costPrice = Number(variant.cost_price);
+      const sellingPrice = Number(variant.selling_price);
+
+      if (sellingPrice <= costPrice) {
+        toast.error(
+          `Selling Price (Rs. ${sellingPrice}) must be greater than Cost Price (Rs. ${costPrice}) for variant "${variant.title || variant.sku}"`
+        );
+        return;
+      }
     }
 
     const data = new FormData();
@@ -365,20 +414,40 @@ export default function ProductDetailPage() {
     data.append("status", formData.status);
 
     const imageVariantIndexes = [];
+
     const variants = formData.variants.map((variant, index) => {
       const attributes = {};
       variant.attributes.forEach((attribute) => {
         const name = attribute.name.trim();
         if (name) attributes[name] = attribute.value;
       });
-      const existingImages = variant.images.filter((image) => image.existing).map((image) => image.metadata);
-      variant.images.filter((image) => !image.existing && image.file).forEach((image) => {
-        data.append("images", image.file);
-        imageVariantIndexes.push(index);
-      });
+
+      const existingImages = variant.images
+        .filter((image) => image.existing)
+        .map((image) => image.metadata);
+
+      variant.images
+        .filter((image) => !image.existing && image.file)
+        .forEach((image) => {
+          data.append("images", image.file);
+          imageVariantIndexes.push(index);
+        });
+
+      // ✅ EDIT MODE MEIN EXISTING VARIANT KA SKU LOCK KARO
+      let finalSku = variant.sku.trim();
+
+      if (editingProduct) {
+        const originalVariant = editingProduct.variants?.find(
+          (v) => v._id && String(v._id) === String(variant._id)
+        );
+        if (originalVariant) {
+          finalSku = originalVariant.sku; // ✅ Original SKU force karo
+        }
+      }
+
       return {
         _id: variant._id || undefined,
-        sku: variant.sku.trim(),
+        sku: finalSku, // ✅ Locked SKU
         title: variant.title.trim(),
         description: variant.description,
         cost_price: Number(variant.cost_price || 0),
@@ -519,7 +588,7 @@ export default function ProductDetailPage() {
 
       {/* CONTENT CARD */}
       <div className="rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        
+
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -639,7 +708,7 @@ export default function ProductDetailPage() {
           </div>
         )}
 
-        {/* ✅ CATEGORY TAB - BEAUTIFUL CARD DESIGN */}
+        {/* ✅ CATEGORY TAB */}
         {activeTab === "category" && (
           <div>
             <div className="mb-6">
@@ -648,7 +717,6 @@ export default function ProductDetailPage() {
             </div>
             {product.category_id ? (
               <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                {/* Card Header */}
                 <div className="p-6 flex flex-col sm:flex-row sm:items-center gap-5 border-b" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                   <div className="h-16 w-16 shrink-0 rounded-2xl flex items-center justify-center shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                     <FolderOpen className="h-8 w-8" />
@@ -665,8 +733,6 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                 </div>
-                
-                {/* Card Body */}
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Description</h4>
@@ -698,7 +764,7 @@ export default function ProductDetailPage() {
           </div>
         )}
 
-        {/* ✅ BRAND TAB - BEAUTIFUL CARD DESIGN */}
+        {/* ✅ BRAND TAB */}
         {activeTab === "brand" && (
           <div>
             <div className="mb-6">
@@ -707,7 +773,6 @@ export default function ProductDetailPage() {
             </div>
             {product.brand_id ? (
               <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                {/* Card Header */}
                 <div className="p-6 flex flex-col sm:flex-row sm:items-center gap-5 border-b" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                   <div className="h-16 w-16 shrink-0 rounded-2xl flex items-center justify-center shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                     <Store className="h-8 w-8" />
@@ -724,8 +789,6 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                 </div>
-                
-                {/* Card Body */}
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Description</h4>
@@ -764,7 +827,7 @@ export default function ProductDetailPage() {
               <h2 className="text-2xl font-bold">Activity Log</h2>
               <p style={{ color: "var(--text-muted)" }}>Track all changes and updates made to this product</p>
             </div>
-            
+
             <div className="relative space-y-6">
               <div className="absolute left-8 top-0 bottom-0 w-0.5" style={{ backgroundColor: "var(--border-color)" }} />
 
@@ -957,11 +1020,42 @@ export default function ProductDetailPage() {
                             <div>
                               <SectionTitle>Identification</SectionTitle>
                               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <Field label="SKU *"><input required type="text" placeholder="e.g. sku_4" value={variant.sku} onChange={(e) => updateVariant(index, "sku", e.target.value)} className="input-field" /></Field>
-                                <Field label="Variant Title *"><input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={(e) => updateVariant(index, "title", e.target.value)} className="input-field" /></Field>
+
+                                {/* ✅ SKU FIELD — EDIT MODE MEIN READONLY + LOCKED */}
+                                <Field label="SKU *">
+                                  <input
+                                    required
+                                    type="text"
+                                    placeholder="e.g. sku_4"
+                                    value={variant.sku}
+                                    readOnly={!!editingProduct && !!variant._id}
+                                    onChange={(e) => updateVariant(index, "sku", e.target.value)}
+                                    className={`input-field ${
+                                      editingProduct && variant._id
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : ""
+                                    }`}
+                                    title={
+                                      editingProduct && variant._id
+                                        ? "SKU cannot be changed after creation"
+                                        : ""
+                                    }
+                                  />
+                                  {editingProduct && variant._id && (
+                                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                                      {/* 🔒 SKU cannot be changed after product creation */}
+                                    </p>
+                                  )}
+                                </Field>
+
+                                <Field label="Variant Title *">
+                                  <input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={(e) => updateVariant(index, "title", e.target.value)} className="input-field" />
+                                </Field>
                               </div>
                               <div className="mt-4">
-                                <Field label="Variant Description"><textarea rows={3} placeholder="Enter variant description..." value={variant.description} onChange={(e) => updateVariant(index, "description", e.target.value)} className="input-field resize-none" /></Field>
+                                <Field label="Variant Description">
+                                  <textarea rows={3} placeholder="Enter variant description..." value={variant.description} onChange={(e) => updateVariant(index, "description", e.target.value)} className="input-field resize-none" />
+                                </Field>
                               </div>
                             </div>
 
@@ -974,6 +1068,18 @@ export default function ProductDetailPage() {
                                 <NumberField label="Min Qty" placeholder="e.g. 5" value={variant.min_qnt} onChange={(value) => updateVariant(index, "min_qnt", value)} />
                                 <NumberField label="Max Qty" placeholder="e.g. 100" value={variant.max_qnt} onChange={(value) => updateVariant(index, "max_qnt", value)} />
                               </div>
+
+                              {/* ✅ LIVE PRICE WARNING */}
+                              {variant.cost_price !== "" &&
+                                variant.selling_price !== "" &&
+                                Number(variant.selling_price) <= Number(variant.cost_price) && (
+                                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5">
+                                    <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                                    <p className="text-sm font-medium text-red-500">
+                                      Selling Price (Rs. {Number(variant.selling_price).toLocaleString()}) must be greater than Cost Price (Rs. {Number(variant.cost_price).toLocaleString()})
+                                    </p>
+                                  </div>
+                                )}
                             </div>
 
                             <div>
@@ -1041,9 +1147,9 @@ export default function ProductDetailPage() {
                               {variant.images.length > 0 && (
                                 <div className="mt-4 flex flex-wrap gap-3">
                                   {variant.images.map((image, imageIndex) => (
-                                    <div key={imageIndex} className="relative">
-                                      <img src={image.preview} alt="" className="h-24 w-24 rounded-lg object-cover" />
-                                      <button type="button" onClick={() => removeImage(index, imageIndex)} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"><X className="h-4 w-4" /></button>
+                                    <div key={imageIndex} className="relative group">
+                                      <img src={image.preview} alt="" className="h-24 w-24 rounded-lg object-cover border" style={{ borderColor: "var(--border-color)" }} />
+                                      <button type="button" onClick={() => removeImage(index, imageIndex)} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:scale-110"><X className="h-4 w-4" /></button>
                                     </div>
                                   ))}
                                 </div>
@@ -1071,11 +1177,14 @@ export default function ProductDetailPage() {
   );
 }
 
-// Variant Card Component
+// ==========================================
+// VARIANT CARD COMPONENT
+// ==========================================
+
 function VariantCard({ variant, number }) {
   const attributes = Object.entries(variant.attributes || {});
   const isLowStock = Number(variant.quantity) <= Number(variant.min_qnt);
-  
+
   return (
     <div className="rounded-2xl overflow-hidden transition-all hover:shadow-lg flex flex-col" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
       <div className="p-5 border-b" style={{ borderColor: "var(--border-color)" }}>
@@ -1164,6 +1273,10 @@ function VariantCard({ variant, number }) {
     </div>
   );
 }
+
+// ==========================================
+// HELPER COMPONENTS
+// ==========================================
 
 function Field({ label, children }) {
   return (

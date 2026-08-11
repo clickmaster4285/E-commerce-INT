@@ -1,10 +1,11 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/categoryApi";
 import { toast } from "sonner";
+import { useSocket } from "@/hooks/useSocket";
 
 import {
   ArrowLeft,
@@ -27,8 +28,8 @@ export default function CategoryDetailPage({ params }) {
   const queryClient = useQueryClient();
   const { id } = use(params);
   const [activeTab, setActiveTab] = useState("overview");
-  
-  // ✅ Edit Modal States
+  const { socket, isConnected } = useSocket(); // ✅ Fixed: destructure properly
+
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     category_code: "",
@@ -46,7 +47,36 @@ export default function CategoryDetailPage({ params }) {
     enabled: !!id,
   });
 
-  // ✅ Update Mutation
+  // ✅ SOCKET: Real-time Sync for Current Category (FIXED EVENT NAMES)
+  useEffect(() => {
+    if (!socket || !isConnected || !id) return;
+
+    const handleCategoryUpdated = (updatedCategory) => {
+      console.log("📥 Detail page received: categoryUpdated", updatedCategory);
+      if (updatedCategory._id === id) {
+        queryClient.setQueryData(["category", id], updatedCategory);
+        toast.info("Category updated in real-time");
+      }
+    };
+
+    const handleCategoryDeleted = (data) => {
+      console.log("📥 Detail page received: categoryDeleted", data);
+      if (data.id === id) {
+        toast.warning("This category was deleted by another user");
+        router.push("/admin/categories");
+      }
+    };
+
+    // ✅ FIXED: Use correct event names (no colon)
+    socket.on("categoryUpdated", handleCategoryUpdated);
+    socket.on("categoryDeleted", handleCategoryDeleted);
+
+    return () => {
+      socket.off("categoryUpdated", handleCategoryUpdated);
+      socket.off("categoryDeleted", handleCategoryDeleted);
+    };
+  }, [socket, isConnected, id, queryClient, router]);
+
   const categoryMutation = useMutation({
     mutationFn: ({ id, data }) => categoryApi.update(id, data),
     onSuccess: () => {
@@ -60,7 +90,6 @@ export default function CategoryDetailPage({ params }) {
     },
   });
 
-  // ✅ Handle Edit Click
   const handleEdit = () => {
     if (!category) return;
     setFormData({
@@ -71,7 +100,6 @@ export default function CategoryDetailPage({ params }) {
     setShowModal(true);
   };
 
-  // ✅ Handle Form Submit
   const handleSubmit = (event) => {
     event.preventDefault();
     categoryMutation.mutate({
@@ -178,7 +206,6 @@ export default function CategoryDetailPage({ params }) {
             </div>
           </div>
           
-          {/* ✅ Edit Button Added Here */}
           <button
             type="button"
             onClick={handleEdit}
@@ -234,10 +261,8 @@ export default function CategoryDetailPage({ params }) {
           border: "1px solid var(--border-color)",
         }}
       >
-        {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Category Information */}
             <div
               className="rounded-xl p-5"
               style={{
@@ -271,7 +296,6 @@ export default function CategoryDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Right Column: System Metadata */}
             <div
               className="rounded-xl p-5"
               style={{
@@ -309,7 +333,6 @@ export default function CategoryDetailPage({ params }) {
           </div>
         )}
 
-        {/* ACTIVITY TAB */}
         {activeTab === "activity" && (
           <div className="space-y-6">
             <div>
@@ -318,10 +341,8 @@ export default function CategoryDetailPage({ params }) {
             </div>
 
             <div className="relative space-y-6">
-              {/* Timeline Line */}
               <div className="absolute left-8 top-0 bottom-0 w-0.5" style={{ backgroundColor: "var(--border-color)" }} />
 
-              {/* Created Activity */}
               <div className="relative flex gap-6">
                 <div
                   className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl z-10"
@@ -387,7 +408,6 @@ export default function CategoryDetailPage({ params }) {
                 </div>
               </div>
 
-              {/* Updated Activity - Conditional */}
               {category.updatedby ? (
                 <div className="relative flex gap-6">
                   <div
@@ -485,7 +505,6 @@ export default function CategoryDetailPage({ params }) {
         )}
       </div>
 
-      {/* ✅ EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div
@@ -520,23 +539,15 @@ export default function CategoryDetailPage({ params }) {
 
             <form onSubmit={handleSubmit} className="space-y-5 p-6">
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {/* ✅ CATEGORY CODE MADE READONLY - NO EXTRA MESSAGE */}
                 <Field label="Category Code *">
                   <input
                     type="text"
                     required
+                    readOnly
                     value={formData.category_code}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category_code: e.target.value,
-                      })
-                    }
-                    className="input-field"
-                    placeholder="e.g. cat_1"
+                    className="input-field cursor-not-allowed opacity-70 bg-gray-100 dark:bg-gray-800"
                   />
-                  <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-                    Auto-generated • You can change it
-                  </p>
                 </Field>
 
                 <Field label="Category Name *">
@@ -607,9 +618,6 @@ export default function CategoryDetailPage({ params }) {
   );
 }
 
-// ==========================================
-// HELPER COMPONENTS
-// ==========================================
 function Field({ label, children }) {
   return (
     <div>

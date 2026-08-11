@@ -12,6 +12,9 @@ import {
 
 import DashboardCard from '../../Component/DashboardCard';
 
+// ✅ Import store socket sync
+import { useStoreSocketSync } from '../../../hooks/useStoreSocketSync';
+
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -24,6 +27,9 @@ export default function Dashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hoveredBar, setHoveredBar] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  // ✅ Store socket sync initialize karo
+  useStoreSocketSync();
 
   const [dashboardData, setDashboardData] = useState({
     products: 156,
@@ -90,7 +96,7 @@ export default function Dashboard() {
         const lastIndex = updatedMonths.length - 1;
 
         updatedMonths[lastIndex] = {
-...updatedMonths[lastIndex],
+          ...updatedMonths[lastIndex],
           revenue: Math.min(
             updatedMonths[lastIndex].revenue + 2,
             100
@@ -101,7 +107,7 @@ export default function Dashboard() {
       });
 
       return {
-...previous,
+        ...previous,
         revenue: newRevenue,
         revenueTrend: previous.revenueTrend + 1,
       };
@@ -162,13 +168,13 @@ export default function Dashboard() {
     const range = maxValue - minValue || 1;
 
     return revenueHistory
-.map((value, index) => {
+      .map((value, index) => {
         const x = (index / (revenueHistory.length - 1)) * 600;
         const y = 210 - ((value - minValue) / range) * 175;
 
         return `${x},${y}`;
       })
-.join(' ');
+      .join(' ');
   };
 
   const getPointPosition = (value, index) => {
@@ -209,10 +215,10 @@ export default function Dashboard() {
         >
           <RefreshCw
             size={16}
-            className={isRefreshing? 'animate-spin': ''}
+            className={isRefreshing ? 'animate-spin' : ''}
           />
 
-          {isRefreshing? 'Refreshing...': 'Refresh Data'}
+          {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
         </button>
       </section>
 
@@ -269,8 +275,8 @@ export default function Dashboard() {
                     <div
                       className={`w-2 origin-bottom rounded-t-sm bg-[var(--accent)] transition-all duration-300 ease-out sm:w-5 md:w-7 ${
                         hoveredBar === index
-? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--accent)]'
-: 'group-hover:scale-y-105'
+                          ? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--accent)]'
+                          : 'group-hover:scale-y-105'
                       }`}
                       style={{
                         height: `${item.revenue}%`,
@@ -281,8 +287,8 @@ export default function Dashboard() {
                     <div
                       className={`w-2 origin-bottom rounded-t-sm bg-[var(--danger)] transition-all duration-300 ease-out sm:w-5 md:w-7 ${
                         hoveredBar === index
-? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--danger)]'
-: 'group-hover:scale-y-105'
+                          ? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--danger)]'
+                          : 'group-hover:scale-y-105'
                       }`}
                       style={{
                         height: `${item.expense}%`,
@@ -293,8 +299,8 @@ export default function Dashboard() {
                   <span
                     className={`text-[10px] transition-colors sm:text-xs ${
                       hoveredBar === index
-? 'font-bold text-[var(--text-primary)]'
-: 'text-[var(--text-muted)]'
+                        ? 'font-bold text-[var(--text-primary)]'
+                        : 'text-[var(--text-muted)]'
                     }`}
                   >
                     {item.month}
@@ -356,7 +362,7 @@ export default function Dashboard() {
               ))}
 
               {/* Vertical Hover Line */}
-              {hoveredPoint!== null && (
+              {hoveredPoint !== null && (
                 <line
                   x1={
                     (hoveredPoint /
@@ -437,7 +443,7 @@ export default function Dashboard() {
                     <circle
                       cx={x}
                       cy={y}
-                      r={hoveredPoint === index? 10: 5}
+                      r={hoveredPoint === index ? 10 : 5}
                       fill="var(--accent)"
                       className="transition-all duration-300"
                     />
@@ -466,8 +472,8 @@ export default function Dashboard() {
                     onMouseLeave={() => setHoveredPoint(null)}
                     className={`cursor-pointer transition-colors ${
                       hoveredPoint === index
-? 'font-bold text-[var(--accent)]'
-: ''
+                        ? 'font-bold text-[var(--accent)]'
+                        : ''
                     }`}
                   >
                     {month}

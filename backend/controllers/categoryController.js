@@ -1,5 +1,21 @@
 const Category = require("../models/Category");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
+const { getIO } = require("../utils/socket");
+
+// ==========================================
+// SOCKET EMIT HELPER
+// ==========================================
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.emit(event, data);
+      console.log(`📡 Socket emitted: ${event}`);
+    }
+  } catch (error) {
+    console.warn(`⚠️ Socket emit failed for ${event}:`, error.message);
+  }
+};
 
 // ==========================================
 // GET NEXT CATEGORY CODE
@@ -18,7 +34,6 @@ const getNextCode = async (req, res) => {
 // ==========================================
 const createCategory = async (req, res) => {
   try {
-    // Agar frontend ne code bheja hai toh wo use karo, warna generate karo
     let categoryCode = req.body.category_code;
     if (!categoryCode) {
       categoryCode = await getNextCategoryCode();
@@ -33,6 +48,8 @@ const createCategory = async (req, res) => {
       is_deleted: false,
     });
 
+    emitSocketEvent("categoryCreated", category);
+
     res.status(201).json(category);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -44,9 +61,7 @@ const createCategory = async (req, res) => {
 // ==========================================
 const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find({
-      is_deleted: false,
-    })
+    const categories = await Category.find({ is_deleted: false })
       .select("-__v")
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
@@ -94,13 +109,14 @@ const updateCategory = async (req, res) => {
       return res.status(404).json({ message: "Category not found" });
     }
 
-    // User code ko change bhi kar sake isliye ye line add ki hai
     category.category_code = req.body.category_code ?? category.category_code;
     category.name = req.body.name ?? category.name;
     category.description = req.body.description ?? category.description;
     category.updatedby = req.user?._id || null;
 
     await category.save();
+
+    emitSocketEvent("categoryUpdated", category);
 
     res.status(200).json(category);
   } catch (error) {
@@ -127,6 +143,8 @@ const deleteCategory = async (req, res) => {
     category.deletedby = req.user?._id || null;
 
     await category.save();
+
+    emitSocketEvent("categoryDeleted", { id: req.params.id });
 
     res.status(200).json({
       success: true,

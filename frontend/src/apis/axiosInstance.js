@@ -1,4 +1,5 @@
 import axios from "axios";
+import Cookies from "js-cookie";
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_SERVERURL,
@@ -27,7 +28,10 @@ axiosInstance.interceptors.response.use(
       if (originalRequest.url === "/users/refresh-token") {
         // Refresh token bhi fail ho gaya, toh seedha login par jao
         if (typeof window !== "undefined") {
-          localStorage.clear();
+          // ✅ FIXED: localStorage.clear() → Cookies remove
+          Cookies.remove("theme", { path: "/" });
+          Cookies.remove("storeData", { path: "/" });
+          Cookies.remove("storeName", { path: "/" });
           window.location.href = "/login";
         }
         return Promise.reject(error);
@@ -44,7 +48,10 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         // Agar Refresh Token bhi expire ho gaya, toh user ko login par bhej do
         if (typeof window !== "undefined") {
-          localStorage.clear();
+          // ✅ FIXED: localStorage.clear() → Cookies remove
+          Cookies.remove("theme", { path: "/" });
+          Cookies.remove("storeData", { path: "/" });
+          Cookies.remove("storeName", { path: "/" });
           window.location.href = "/login";
         }
         return Promise.reject(refreshError);

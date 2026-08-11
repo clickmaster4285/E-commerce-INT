@@ -6,6 +6,11 @@ export const productApi = {
       .get("/products")
       .then((res) => res.data),
 
+  getByBrand: (brandId) =>
+    axiosInstance
+      .get(`/products?brand_id=${brandId}`)
+      .then((res) => res.data),
+
   getById: (id) =>
     axiosInstance
       .get(`/products/${id}`)
