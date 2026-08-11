@@ -345,4 +345,37 @@ main::-webkit-scrollbar-thumb {
   }
 }
 
+/* =========================
+USER WEBSITE THEME
+========================= */
 
+.user-theme {
+
+background:#020d08;
+
+color:#ffffff;
+
+min-height:100vh;
+
+}
+
+
+.user-theme a {
+
+color:inherit;
+
+}
+
+
+.user-theme input {
+
+color:white;
+
+}
+
+
+.user-theme input::placeholder {
+
+color:#94a3b8;
+
+}
