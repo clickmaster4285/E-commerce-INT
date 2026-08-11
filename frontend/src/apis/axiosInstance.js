@@ -6,7 +6,33 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
-// Request Interceptor
+// ==========================================
+// 🔐 HELPER: Sirf Admin pages par redirect kare
+// ==========================================
+const redirectToLogin = () => {
+  if (typeof window === "undefined") return;
+
+  const path = window.location.pathname;
+
+  // ✅ Agar user already /login par hai, toh kuch mat karo (infinite loop se bachao)
+  if (path === "/login" || path === "/register") {
+    return;
+  }
+
+  // ✅ Agar admin page par hai, toh login par bhejo
+  if (path.startsWith("/admin")) {
+    localStorage.clear();
+    window.location.href = "/login";
+    return;
+  }
+
+  // ❌ Agar user page par hai (/, /product, /category, /brand) toh REDIRECT MAT KARO
+  // Sirf error silently reject hoga, user page waise hi kaam karega
+};
+
+// ==========================================
+// 📤 Request Interceptor
+// ==========================================
 axiosInstance.interceptors.request.use(
   (config) => {
     return config;
@@ -14,10 +40,12 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Response Interceptor (FIXED - Infinite Loop Se Bachao)
+// ==========================================
+// 📥 Response Interceptor (SMART - Admin + User Dono Ke Liye)
+// ==========================================
 axiosInstance.interceptors.response.use(
   (response) => response,
-  
+
   async (error) => {
     const originalRequest = error.config;
 
@@ -26,14 +54,8 @@ axiosInstance.interceptors.response.use(
       
       // Refresh token call karte waqt khud ko call karne se roko
       if (originalRequest.url === "/users/refresh-token") {
-        // Refresh token bhi fail ho gaya, toh seedha login par jao
-        if (typeof window !== "undefined") {
-          // ✅ FIXED: localStorage.clear() → Cookies remove
-          Cookies.remove("theme", { path: "/" });
-          Cookies.remove("storeData", { path: "/" });
-          Cookies.remove("storeName", { path: "/" });
-          window.location.href = "/login";
-        }
+        // Refresh token bhi fail ho gaya
+        redirectToLogin(); // ✅ Smart redirect (sirf admin pages par)
         return Promise.reject(error);
       }
 
@@ -46,14 +68,8 @@ axiosInstance.interceptors.response.use(
         // Refresh successful hone ke baad, original request dobara bhej do
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        // Agar Refresh Token bhi expire ho gaya, toh user ko login par bhej do
-        if (typeof window !== "undefined") {
-          // ✅ FIXED: localStorage.clear() → Cookies remove
-          Cookies.remove("theme", { path: "/" });
-          Cookies.remove("storeData", { path: "/" });
-          Cookies.remove("storeName", { path: "/" });
-          window.location.href = "/login";
-        }
+        // Agar Refresh Token bhi expire ho gaya
+        redirectToLogin(); // ✅ Smart redirect (sirf admin pages par)
         return Promise.reject(refreshError);
       }
     }
