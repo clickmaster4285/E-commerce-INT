@@ -427,6 +427,16 @@ export default function StoreInfoPage() {
         (resp) => {
           console.log("📥 Server response:", resp);
 
+          // ✅ CHECK FOR PERMISSION ERROR
+          if (resp?.success === false && resp?.message?.toLowerCase().includes("permission")) {
+            toast.error(resp.message, {
+              duration: 6000,
+              description: "Contact an administrator or another staff member to grant you store access.",
+            });
+            setLoading(false);
+            return;
+          }
+
           if (resp?.success) {
             const saved = resp.data || formData;
             setFormData((p) => ({
@@ -602,7 +612,7 @@ export default function StoreInfoPage() {
         <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
           <div className="w-full space-y-5">
 
-            {/* ── HEADER ─ */}
+            {/* ── HEADER  */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-center gap-3">
                 <button
@@ -987,7 +997,7 @@ export default function StoreInfoPage() {
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
 
-        {/* ── HEADER ── */}
+        {/* ── HEADER ─ */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>

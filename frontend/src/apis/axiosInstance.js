@@ -1,9 +1,8 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_SERVERURL,
-  withCredentials: true,
+  withCredentials: true, // 🔥 Cookies bhejne ke liye zaroori
 });
 
 // ==========================================
@@ -25,9 +24,12 @@ const redirectToLogin = () => {
     window.location.href = "/login";
     return;
   }
-
-  // ❌ Agar user page par hai (/, /product, /category, /brand) toh REDIRECT MAT KARO
-  // Sirf error silently reject hoga, user page waise hi kaam karega
+  
+  // ✅ Staff dashboard ya other protected routes ke liye bhi redirect
+  if (path.startsWith("/dashboard")) {
+     window.location.href = "/login";
+     return;
+  }
 };
 
 // ==========================================
@@ -41,7 +43,7 @@ axiosInstance.interceptors.request.use(
 );
 
 // ==========================================
-// 📥 Response Interceptor (SMART - Admin + User Dono Ke Liye)
+// 📥 Response Interceptor (SMART - Fixed for Login)
 // ==========================================
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -49,13 +51,20 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // 🛑 FIX: Agar request LOGIN endpoint ki hai, toh Refresh Token logic SKIP karo.
+    // Kyunke login ke waqt token hota hi nahi hai, refresh try karna error deta hai.
+    const isLoginRequest = originalRequest.url?.includes("/users/login");
+    
+    if (isLoginRequest) {
+      return Promise.reject(error); // Seedha error frontend ko bhej do (e.g., Wrong Password)
+    }
+
     // Agar 401 Unauthorized hai aur humne abhi tak retry nahi kiya
     if (error.response?.status === 401 && !originalRequest._retry) {
       
       // Refresh token call karte waqt khud ko call karne se roko
       if (originalRequest.url === "/users/refresh-token") {
-        // Refresh token bhi fail ho gaya
-        redirectToLogin(); // ✅ Smart redirect (sirf admin pages par)
+        redirectToLogin(); 
         return Promise.reject(error);
       }
 
@@ -69,7 +78,7 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         // Agar Refresh Token bhi expire ho gaya
-        redirectToLogin(); // ✅ Smart redirect (sirf admin pages par)
+        redirectToLogin(); 
         return Promise.reject(refreshError);
       }
     }

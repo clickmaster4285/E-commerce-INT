@@ -1,141 +1,360 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import axiosInstance from "@/apis/axiosInstance";
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import axiosInstance from "@/apis/axiosInstance";
+import { Eye, EyeOff, Shield, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await axiosInstance.post(
-        "/users/login",
-        userData
-      );
+      const response = await axiosInstance.post("/users/login", userData);
       return response.data;
     },
     onSuccess: (data) => {
-      if (data.user.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/dashboard');
+      const allowedRoles = ['admin', 'staff', 'manager'];
+
+      if (!allowedRoles.includes(data.user?.role)) {
+        toast.error('Access Denied', {
+          description: 'Your account does not have permission to access this portal.',
+          duration: 4000,
+        });
+        axiosInstance.post("/users/logout");
+        return;
       }
+
+      const name = data.user?.name || '';
+      const firstName = name.split(' ')[0];
+      toast.success(`Welcome back${firstName ? `, ${firstName}` : ''}!`, {
+        description: 'Redirecting you to the dashboard...',
+        duration: 3000,
+      });
+
+      setTimeout(() => {
+        router.push('/admin/dashboard');
+      }, 1200);
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Login failed!');
+      const message = error.response?.data?.message || 'Login failed. Please try again.';
+      toast.error('Authentication Failed', {
+        description: message,
+        duration: 4000,
+      });
     }
   });
 
   const handleLogin = (e) => {
     e.preventDefault();
+
+    if (!email.trim()) {
+      toast.warning('Email Required', {
+        description: 'Please enter your email address.',
+        duration: 3000,
+      });
+      return;
+    }
+    if (!password.trim()) {
+      toast.warning('Password Required', {
+        description: 'Please enter your password.',
+        duration: 3000,
+      });
+      return;
+    }
+
     loginMutation.mutate({ email, password });
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-900">
-      {/* Left Side - Header Top par, Content Center mein, Footer Bottom par */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gray-950">
+    <div className="min-h-screen flex" style={{ backgroundColor: '#0a0c14' }}>
+      
+      {/* ===== LEFT SIDE — Branding ===== */}
+      <div 
+        className="hidden lg:flex lg:w-[55%] flex-col justify-between p-10 xl:p-14 relative overflow-hidden"
+        style={{ backgroundColor: '#060810' }}
+      >
+        {/* Subtle gradient overlay */}
+        <div 
+          className="absolute inset-0 opacity-30"
+          style={{ 
+            background: 'radial-gradient(ellipse at 30% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 70%)' 
+          }} 
+        />
         
-        {/* TOP: Header (Logo yahan rahega) */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">C</span>
+        {/* Grid pattern */}
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px'
+          }}
+        />
+
+        {/* Logo */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div 
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: '#10b981' }}
+          >
+            <span className="text-white font-bold text-base">C</span>
           </div>
-          <span className="text-white font-semibold text-xl">ClickMasters</span>
+          <span className="text-white font-semibold text-lg tracking-tight">ClickMasters</span>
         </div>
 
-        {/* MIDDLE: Content Center mein aayega */}
-        <div className="flex-1 flex flex-col justify-center -mt-20">
-          <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
-            E-Commerce Inventory<br />
-            <span className="text-emerald-500">Operating System</span>
-          </h1>
+        {/* Center content */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center -mt-16 max-w-lg">
+          <div 
+            className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          >
+            <div className="flex items-center gap-2 mb-6">
+              <div 
+                className="h-px w-8"
+                style={{ backgroundColor: '#10b981' }}
+              />
+              <span 
+                className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+                style={{ color: '#10b981' }}
+              >
+                Inventory Management
+              </span>
+            </div>
+            
+            <h1 className="text-[2.5rem] xl:text-[2.75rem] font-bold text-white mb-5 leading-[1.15] tracking-tight">
+              E-Commerce<br />
+              Inventory<br />
+              <span style={{ color: '#10b981' }}>Operating System</span>
+            </h1>
+            
+            <p className="text-[15px] leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Restricted Access Portal.<br />
+              Authorized Administrators & Staff Only.
+            </p>
 
-          <p className="text-gray-400 text-lg mb-8">
-            Inventory · Brands · Categories · Products · Analytics.<br />
-            Manage everything from one secure workspace.
-          </p>
-
-          <div className="flex gap-3">
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Inventory</button>
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Brands</button>
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Analytics</button>
+            {/* Stats row */}
+            <div className="flex items-center gap-8">
+              {[
+                { value: '99.9%', label: 'Uptime' },
+                { value: '256-bit', label: 'Encrypted' },
+                { value: '24/7', label: 'Monitored' },
+              ].map((stat, i) => (
+                <div key={i}>
+                  <p className="text-white font-bold text-lg">{stat.value}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* BOTTOM: Footer */}
-        <div className="text-gray-500 text-sm">© 2026 ClickMasters</div>
+        {/* Footer */}
+        <div className="relative z-10 flex items-center justify-between">
+          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.2)' }}>© 2026 ClickMasters</p>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#10b981' }} />
+            <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>All systems operational</span>
+          </div>
+        </div>
       </div>
 
-      {/* Right Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-900">
-        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-emerald-500 text-xs font-bold uppercase tracking-wider">Secure Sign-In</span>
+      {/* ===== RIGHT SIDE — Login Form ===== */}
+      <div 
+        className="w-full lg:w-[45%] flex items-center justify-center p-6 sm:p-8 relative"
+        style={{ backgroundColor: '#0a0c14' }}
+      >
+        {/* Subtle glow */}
+        <div 
+          className="absolute top-1/4 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20 pointer-events-none"
+          style={{ backgroundColor: '#10b981' }}
+        />
+
+        <div 
+          className={`w-full max-w-[400px] transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+        >
+          {/* Mobile logo */}
+          <div className="flex lg:hidden items-center gap-2.5 mb-8 justify-center">
+            <div 
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: '#10b981' }}
+            >
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <span className="text-white font-semibold text-base">ClickMasters</span>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
-          <p className="text-gray-400 text-sm mb-6">Use your work account to continue.</p>
+          {/* Secure badge */}
+          <div className="flex items-center gap-2 mb-6">
+            <div 
+              className="w-7 h-7 rounded-md flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.15)' }}
+            >
+              <Shield size={14} style={{ color: '#10b981' }} />
+            </div>
+            <span 
+              className="text-[11px] font-semibold uppercase tracking-[0.15em]"
+              style={{ color: '#10b981' }}
+            >
+              Secure Sign-In
+            </span>
+          </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              {/* Ab yahan sirf "Email" likha hai */}
-              <label className="block text-gray-300 text-sm mb-2">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500"
-                placeholder="you@example.com"
-                required
-              />
+          {/* Heading */}
+          <h2 className="text-[1.6rem] font-bold text-white mb-1.5 tracking-tight">
+            Welcome back
+          </h2>
+          <p className="text-[13px] mb-8" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            Sign in to your admin or staff account
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            
+            {/* Email */}
+            <div className="space-y-2">
+              <label 
+                className="block text-[12px] font-medium"
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+              >
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail 
+                  size={16} 
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: 'rgba(255,255,255,0.2)' }}
+                />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full h-11 pl-10 pr-4 rounded-lg text-[13px] outline-none transition-all duration-200 placeholder-transparent"
+                  style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.04)', 
+                    border: '1px solid rgba(255,255,255,0.08)', 
+                    color: '#fff',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.08)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255,255,255,0.08)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-gray-300 text-sm mb-2">Password</label>
+            {/* Password */}
+            <div className="space-y-2">
+              <label 
+                className="block text-[12px] font-medium"
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+              >
+                Password
+              </label>
               <div className="relative">
+                <Lock 
+                  size={16} 
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: 'rgba(255,255,255,0.2)' }}
+                />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500 pr-12"
+                  className="w-full h-11 pl-10 pr-11 rounded-lg text-[13px] outline-none transition-all duration-200 placeholder-transparent"
+                  style={{ 
+                    backgroundColor: 'rgba(255,255,255,0.04)', 
+                    border: '1px solid rgba(255,255,255,0.08)', 
+                    color: '#fff',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.08)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(255,255,255,0.08)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="••••••••"
                   required
                 />
+                {/* ✅ Eye Icon Button */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors duration-150"
+                  style={{ color: 'rgba(255,255,255,0.25)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
+                  tabIndex={-1}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-emerald-500" />
-                <span className="text-gray-300 text-sm">Remember me</span>
-              </label>
-              <a href="#" className="text-emerald-500 text-sm font-medium hover:text-emerald-400">Forgot password?</a>
-            </div>
-
+            {/* Submit */}
             <button
               type="submit"
               disabled={loginMutation.isPending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-70"
+              className="w-full h-11 rounded-lg text-[13px] font-semibold transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 group"
+              style={{ 
+                backgroundColor: '#10b981', 
+                color: '#fff',
+              }}
+              onMouseEnter={(e) => {
+                if (!loginMutation.isPending) {
+                  e.currentTarget.style.backgroundColor = '#059669';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(16, 185, 129, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#10b981';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
-              {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
+              {loginMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight size={15} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                </>
+              )}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
+            <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>Protected</span>
+            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
+          </div>
+
+          {/* Footer note */}
+          <div className="flex items-center justify-center gap-2">
+            <Lock size={11} style={{ color: 'rgba(255,255,255,0.15)' }} />
+            <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+              Unauthorized access is strictly prohibited
+            </p>
+          </div>
         </div>
       </div>
     </div>

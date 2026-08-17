@@ -7,17 +7,26 @@ const {
   updateCategory,
   deleteCategory,
 } = require("../controllers/categoryController");
-
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware");
-
+const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 
-router.get("/next-code", authMiddleware, adminMiddleware, getNextCode);
-router.post("/", authMiddleware, adminMiddleware, createCategory);
-router.put("/:id", authMiddleware, adminMiddleware, updateCategory);
-router.delete("/:id", authMiddleware, adminMiddleware, deleteCategory);
+// ✅ GET next code — No permission (just generates a code)
+router.get("/next-code", authMiddleware, getNextCode);
+
+// ✅ CREATE — Permission required
+router.post("/", authMiddleware, checkPermission("categories"), createCategory);
+
+// ✅ UPDATE — Permission required
+router.put("/:id", authMiddleware, checkPermission("categories"), updateCategory);
+
+// ✅ DELETE — Permission required
+router.delete("/:id", authMiddleware, checkPermission("categories"), deleteCategory);
+
+// ✅ GET all — No permission (read-only, sab dekh saken)
 router.get("/", authMiddleware, getCategories);
+
+// ✅ GET by id — No permission (read-only)
 router.get("/:id", authMiddleware, getCategoryById);
 
 module.exports = router;

@@ -1,54 +1,58 @@
-  const express = require("express");
+const express = require("express");
 
-  const {
-    createProduct,
-    getProducts,
-    getProductById,
-    updateProduct,
-    deleteProduct,
-  } = require("../controllers/productController");
+const {
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  toggleProductStatus,
+} = require("../controllers/productController");
 
-  const authMiddleware = require("../middleware/authMiddleware");
-  const adminMiddleware = require("../middleware/adminMiddleware");
+const authMiddleware = require("../middleware/authMiddleware");
+const { checkPermission } = require("../middleware/checkPermission");
 
-  const {
-    productImagesUpload,
-    validateProductImages,
-  } = require("../middleware/productImageMiddleware");
+const {
+  productImagesUpload,
+  validateProductImages,
+} = require("../middleware/productImageMiddleware");
 
-  const saveProductImages = require("../middleware/saveProductImages");
+const saveProductImages = require("../middleware/saveProductImages");
 
-  const router = express.Router();
+const router = express.Router();
 
-  // CREATE PRODUCT
-  router.post(
-    "/",
-    authMiddleware,
-    adminMiddleware,
-    productImagesUpload,
-    validateProductImages,
-    saveProductImages,
-    createProduct,
-  );
+// ✅ CREATE PRODUCT — Permission required
+router.post(
+  "/",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  createProduct,
+);
 
-  // UPDATE PRODUCT
-  router.put(
-    "/:id",
-    authMiddleware,
-    adminMiddleware,
-    productImagesUpload,
-    validateProductImages,
-    saveProductImages,
-    updateProduct,
-  );
+// ✅ UPDATE PRODUCT — Permission required
+router.put(
+  "/:id",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  updateProduct,
+);
 
-  // DELETE PRODUCT
-  router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
+// ✅ DELETE PRODUCT — Permission required
+router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
 
-  // GET ALL PRODUCTS
-  router.get("/", authMiddleware, getProducts);
+// ✅ TOGGLE STATUS — Permission required
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
 
-  // GET SINGLE PRODUCT
-  router.get("/:id", authMiddleware, getProductById);
+// ✅ GET ALL PRODUCTS — No permission (read-only, sab dekh saken)
+router.get("/", authMiddleware, getProducts);
 
-  module.exports = router;
+// ✅ GET SINGLE PRODUCT — No permission (read-only)
+router.get("/:id", authMiddleware, getProductById);
+
+module.exports = router;

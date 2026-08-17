@@ -30,4 +30,10 @@ export const productApi = {
     axiosInstance
       .delete(`/products/${id}`)
       .then((res) => res.data),
+
+  // ✅ YEH NAYA FUNCTION ADD KIYA GAYA HAI
+  toggleStatus: (id) =>
+    axiosInstance
+      .patch(`/products/${id}/toggle-status`)
+      .then((res) => res.data),
 };

@@ -1,7 +1,7 @@
 const express = require("express");
 
 const {
-  getNextBrandCode,    // ✅ NEW: Added
+  getNextBrandCode,
   createBrand,
   getBrands,
   getBrandById,
@@ -12,15 +12,14 @@ const {
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { checkPermission } = require("../middleware/checkPermission");
 const upload = require("../middleware/uploadConfig");
 const processBrandLogo = require("../middleware/imageMiddleware");
 
 const router = express.Router();
 
-
 // ================================
-// ✅ NEW: GET NEXT BRAND CODE (BRD-001, BRD-002, ...)
-// ⚠️ Ye /:id se PEHLE hona zaroori hai!
+// GET NEXT BRAND CODE — No permission needed (just generates a code)
 // ================================
 router.get(
   "/next-code",
@@ -28,29 +27,26 @@ router.get(
   getNextBrandCode
 );
 
-
 // ================================
-// CREATE BRAND
+// CREATE BRAND — Permission required
 // ================================
 router.post(
   "/",
   authMiddleware,
-  adminMiddleware,
+  checkPermission("brands"),
   upload.single("logo"),
   processBrandLogo,
   createBrand
 );
 
-
 // ================================
-// GET ALL BRANDS
+// GET ALL BRANDS — No permission needed (read-only)
 // ================================
 router.get(
   "/",
   authMiddleware,
   getBrands
 );
-
 
 // ================================
 // GET BRAND WITH PRODUCTS
@@ -61,7 +57,6 @@ router.get(
   getBrandWithProducts
 );
 
-
 // ================================
 // GET SINGLE BRAND
 // ================================
@@ -71,29 +66,26 @@ router.get(
   getBrandById
 );
 
-
 // ================================
-// UPDATE BRAND
+// UPDATE BRAND — Permission required
 // ================================
 router.put(
   "/:id",
   authMiddleware,
-  adminMiddleware,
+  checkPermission("brands"),
   upload.single("logo"),
   processBrandLogo,
   updateBrand
 );
 
-
 // ================================
-// DELETE BRAND
+// DELETE BRAND — Permission required
 // ================================
 router.delete(
   "/:id",
   authMiddleware,
-  adminMiddleware,
+  checkPermission("brands"),
   deleteBrand
 );
-
 
 module.exports = router;
