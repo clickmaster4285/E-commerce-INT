@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { getStoreInfo, updateStoreInfo } = require("../controllers/storeController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { checkPermission } = require("../middleware/checkPermission"); // ✅ ADDED
 
 // ✅ Multer setup for file upload (Logo)
 const multer = require("multer");
@@ -41,11 +42,10 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // Max 5MB limit
 });
-// ✅ PUBLIC ROUTE — User GUI ke liye (bina login ke)
-router.get("/public", getStoreInfo);
-// ✅ Routes with Auth Middleware
+
+// ✅ Routes with Auth Middleware + Permission Check
 router.route("/")
-  .get(authMiddleware, getStoreInfo) // Sirf logged in user dekh sakta hai
-  .put(authMiddleware, upload.single('logo'), updateStoreInfo); // Sirf logged in admin update kar sakta hai
+  .get(authMiddleware, getStoreInfo) // Everyone can view
+  .put(authMiddleware, checkPermission("store"), upload.single('logo'), updateStoreInfo); // ✅ NEED STORE PERMISSION
 
 module.exports = router;

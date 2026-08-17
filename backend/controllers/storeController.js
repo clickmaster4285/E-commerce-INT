@@ -1,12 +1,12 @@
 const Store = require("../models/Store");
+const { getIO } = require("../utils/socket");
+const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 
 // @desc    Get Store Info
 const getStoreInfo = async (req, res) => {
   try {
     let store = await Store.findOne();
-    if (!store) {
-      store = await Store.create({});
-    }
+    if (!store) store = await Store.create({});
     res.status(200).json({ success: true, data: store.toObject() });
   } catch (error) {
     console.error("Get Store Error:", error);
@@ -17,12 +17,18 @@ const getStoreInfo = async (req, res) => {
 // @desc    Update Store Info
 const updateStoreInfo = async (req, res) => {
   try {
-    const userRole = (req.user?.role || "").toLowerCase();
+    // ✅ CHECK STORE PERMISSION
+    if (req.user.role !== "admin" && !req.user.permissions?.store) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You don't have permission to edit store settings. Please contact an administrator or another staff member to grant you store access.",
+      });
+    }
 
     let store = await Store.findOne();
-    if (!store) {
-      store = await Store.create({});
-    }
+    if (!store) store = await Store.create({});
+
+    const oldData = store.toObject();
 
     const {
       store_name, tagline, email, phone,
@@ -65,28 +71,41 @@ const updateStoreInfo = async (req, res) => {
     if (terms_conditions !== undefined) store.terms_conditions = terms_conditions;
 
     if (social_links) {
-      store.social_links =
-        typeof social_links === "string" ? JSON.parse(social_links) : social_links;
+      store.social_links = typeof social_links === "string" ? JSON.parse(social_links) : social_links;
     }
 
-    // ✅✅✅ LOGO — ALWAYS use relativePath (NEVER absolute path!)
+    let logoChanged = false;
     if (req.file) {
-      // Prefer relativePath from socket handler, fallback to filename-based path
       const relativePath = req.file.relativePath || `uploads/store/${req.file.filename}`;
-      
-      // Safety: agar kisi wajah se absolute path aa jaye, to usko clean karo
       const cleanPath = relativePath.includes("/uploads/")
         ? relativePath.substring(relativePath.indexOf("uploads/"))
         : relativePath;
 
-      store.logo = {
-        img_url: cleanPath,
-        public_id: req.file.filename,
-      };
-      console.log("   💾 Logo saved to DB:", store.logo.img_url);
+      store.logo = { img_url: cleanPath, public_id: req.file.filename };
+      logoChanged = true;
     }
 
     const updatedStore = await store.save();
+
+    // ✅ LOG ACTIVITY
+    const trackedFields = ["store_name", "tagline", "email", "phone", "address", "currency", "store_status", "primary_color"];
+    const changes = getChanges(oldData, updatedStore.toObject(), trackedFields);
+    if (logoChanged) changes.push({ field: "logo", oldValue: "(old)", newValue: "(new)" });
+
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    if (changes.length > 0) {
+        const changedFields = changes.map((c) => c.field).join(", ");
+        await pushGlobalActivity(io, {
+            action: `${performerName} updated ${changedFields} for Store`,
+            category: "Store Management",
+            performedBy: performerId,
+            performedByName: performerName,
+            details: { changes },
+        }, performerId);
+    }
 
     res.status(200).json({
       success: true,

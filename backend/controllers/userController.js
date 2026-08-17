@@ -2,12 +2,17 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Store = require("../models/Store");
+const { getIO } = require("../utils/socket");
+const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 
-const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
+// ==========================================
+// HELPER: Generate Tokens
+// ==========================================
+const generateTokens = (userId, role) => {
+  const accessToken = jwt.sign({ userId, role }, process.env.JWT_SECRET, {
     expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 60}m`,
   });
-  const refreshToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
+  const refreshToken = jwt.sign({ userId, role }, process.env.JWT_SECRET, {
     expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d`,
   });
   return { accessToken, refreshToken };
@@ -15,12 +20,14 @@ const generateTokens = (userId) => {
 
 const getCookieOptions = (maxAge) => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: false,
+  sameSite: "lax",
   maxAge,
 });
 
-// ✅ REGISTER
+// ==========================================
+// REGISTER
+// ==========================================
 const createUser = async (req, res) => {
   try {
     const { name, username, phone, email, password } = req.body;
@@ -28,15 +35,12 @@ const createUser = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Email and password are required" });
     }
-
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) {
       return res.status(400).json({ success: false, message: "User already exists" });
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const defaultStore = await Store.findOne();
-
     const user = await User.create({
       name,
       username: username || email.split("@")[0] + Math.floor(Math.random() * 9999),
@@ -45,12 +49,9 @@ const createUser = async (req, res) => {
       password: hashedPassword,
       storeId: defaultStore?._id,
     });
-
-    const { accessToken, refreshToken } = generateTokens(user._id);
-
+    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
-
     res.status(201).json({
       success: true,
       message: "User registered successfully",
@@ -78,19 +79,37 @@ const loginUser = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Please provide email and password" });
     }
-
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
-
+    if (user.role !== "admin" && user.role !== "staff" && user.role !== "manager") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only administrators, managers and staff members can log in.",
+      });
+    }
+    if (user.status === "inactive" || user.is_deleted) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is inactive. Please contact administrator.",
+      });
+    }
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
-    const { accessToken, refreshToken } = generateTokens(user._id);
+    const io = req.io || getIO();
+    await pushGlobalActivity(io, {
+      action: `${user.name} logged in`,
+      category: "Authentication",
+      performedBy: user._id,
+      performedByName: user.name,
+      details: { ip: req.ip },
+    }, user._id);
 
+    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
@@ -113,15 +132,17 @@ const loginUser = async (req, res) => {
   }
 };
 
-// ✅ REFRESH TOKEN
+// ==========================================
+// REFRESH TOKEN
+// ==========================================
 const refreshAccessToken = async (req, res) => {
   try {
     const token = req.cookies.refreshToken;
     if (!token) return res.status(401).json({ success: false, message: "Refresh token required" });
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { accessToken } = generateTokens(decoded.userId);
-
+    const user = await User.findById(decoded.userId);
+    if (!user) return res.status(401).json({ success: false, message: "User not found" });
+    const { accessToken } = generateTokens(decoded.userId, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
@@ -129,14 +150,33 @@ const refreshAccessToken = async (req, res) => {
   }
 };
 
-// ✅ LOGOUT
-const logoutUser = (req, res) => {
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
-  res.json({ success: true, message: "Logged out successfully" });
+// ==========================================
+// LOGOUT
+// ==========================================
+const logoutUser = async (req, res) => {
+  try {
+    if (req.user?._id) {
+      const io = req.io || getIO();
+      await pushGlobalActivity(io, {
+        action: `${req.user.name || "User"} logged out`,
+        category: "Authentication",
+        performedBy: req.user._id,
+        performedByName: req.user.name || "User",
+      }, req.user._id);
+    }
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.json({ success: true, message: "Logged out successfully" });
+  }
 };
 
-// ✅ GET PROFILE
+// ==========================================
+// GET PROFILE
+// ==========================================
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password").populate("storeId");
@@ -147,12 +187,13 @@ const getProfile = async (req, res) => {
   }
 };
 
-// ✅ GET ME
+// ==========================================
+// GET ME
+// ==========================================
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password").populate("storeId");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
     res.json({
       success: true,
       user: {
@@ -186,10 +227,12 @@ const getMe = async (req, res) => {
   }
 };
 
-// ✅ UPDATE PROFILE
+// ==========================================
+// UPDATE PROFILE (REST API)
+// ==========================================
 const updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, store, permissions, preferences } = req.body;
+    const { name, email, phone, role, status, store, permissions, preferences } = req.body;
     const userId = req.user._id;
 
     await User.findByIdAndUpdate(userId, {
@@ -212,6 +255,23 @@ const updateProfile = async (req, res) => {
       });
     }
 
+    const trackedFields = ["name", "email", "phone", "role", "status"];
+    const changes = getChanges(oldData, { ...oldData, ...updateFields }, trackedFields);
+
+    if (changes.length > 0) {
+      const performerName = user.name || "User";
+      const changedFields = changes.map((c) => c.field).join(", ");
+      const io = req.io || getIO();
+      
+      await pushGlobalActivity(io, {
+        action: `${performerName} updated ${changedFields} in profile`,
+        category: "Authentication",
+        performedBy: userId,
+        performedByName: performerName,
+        details: { changes },
+      }, userId);
+    }
+
     res.json({ success: true, message: "✅ Profile & Store saved!" });
   } catch (error) {
     console.error("updateProfile error:", error);
@@ -219,12 +279,14 @@ const updateProfile = async (req, res) => {
   }
 };
 
-// ✅ CHANGE PASSWORD
+// ==========================================
+// CHANGE PASSWORD (REST API)
+// ==========================================
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.user._id);
-
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
     const isValid = await bcrypt.compare(currentPassword, user.password);
     if (!isValid)
       return res.status(400).json({ success: false, message: "Current password is incorrect" });
@@ -233,6 +295,14 @@ const changePassword = async (req, res) => {
     user.updatedby = req.user._id;
     await user.save();
 
+    const io = req.io || getIO();
+    await pushGlobalActivity(io, {
+      action: `${user.name} changed password`,
+      category: "Authentication",
+      performedBy: user._id,
+      performedByName: user.name,
+    }, user._id);
+
     res.json({ success: true, message: "✅ Password changed successfully!" });
   } catch (error) {
     console.error("changePassword error:", error);
@@ -240,7 +310,9 @@ const changePassword = async (req, res) => {
   }
 };
 
-// ✅ TOGGLE 2FA
+// ==========================================
+// TOGGLE 2FA
+// ==========================================
 const toggle2FA = async (req, res) => {
   try {
     const { enabled } = req.body;
@@ -248,6 +320,17 @@ const toggle2FA = async (req, res) => {
       twoFactorEnabled: enabled,
       updatedby: req.user._id,
     });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    const io = req.io || getIO();
+    await pushGlobalActivity(io, {
+      action: `${user.name} ${enabled ? "enabled" : "disabled"} 2FA`,
+      category: "Authentication",
+      performedBy: user._id,
+      performedByName: user.name,
+      details: { enabled },
+    }, user._id);
+
     res.json({ success: true, message: "✅ 2FA setting updated!" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -257,17 +340,14 @@ const toggle2FA = async (req, res) => {
 // ==========================================
 // SOCKET-SPECIFIC FUNCTIONS
 // ==========================================
-
 const getProfileInfo = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (!userId || userId === "guest") {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-
     const user = await User.findById(userId).select("-password").populate("storeId");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
     const store = user.storeId || {};
     const profileData = {
       _id: user._id,
@@ -276,9 +356,9 @@ const getProfileInfo = async (req, res) => {
       email: user.email || store.email || "",
       phone: user.phone || store.phone || "",
       role: user.role,
-      status: user.is_deleted ? "Inactive" : "Active",
+      status: user.status || (user.is_deleted ? "Inactive" : "Active"),
       avatar: user.avatar || null,
-      created_at: user.createdAt,
+      created_at: user.created_at,
       website: user.website || store.website || "",
       address: user.address || store.address || "",
       twoFactorEnabled: user.twoFactorEnabled || false,
@@ -299,7 +379,6 @@ const getProfileInfo = async (req, res) => {
       primary_color: store.primary_color || "#10b981",
       stats: { logins: user.loginCount || 0, roles: 1, sessions: user.sessionCount || 0 },
     };
-
     return res.json({ success: true, data: profileData, user: profileData });
   } catch (error) {
     console.error("❌ Get Profile Info Error:", error);
@@ -313,7 +392,6 @@ const updateProfileInfo = async (req, res) => {
     if (!userId || userId === "guest") {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-
     const {
       name,
       email,
@@ -331,12 +409,15 @@ const updateProfileInfo = async (req, res) => {
       store_status,
     } = req.body;
 
+    const oldData = user.toObject();
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
-    if (email !== undefined) userUpdateFields.email = email;
+    if (email !== undefined) userUpdateFields.email = email.toLowerCase().trim();
     if (phone !== undefined) userUpdateFields.phone = phone;
     if (website !== undefined) userUpdateFields.website = website;
     if (address !== undefined) userUpdateFields.address = address;
+    if (role !== undefined) userUpdateFields.role = role;
+    if (status !== undefined) userUpdateFields.status = status;
     userUpdateFields.updatedby = userId;
 
     const updatedUser = await User.findByIdAndUpdate(userId, userUpdateFields, {
@@ -350,7 +431,6 @@ const updateProfileInfo = async (req, res) => {
 
     let updatedStore = null;
     const storeUpdateFields = {};
-
     if (store_name !== undefined) storeUpdateFields.store_name = store_name;
     if (tagline !== undefined) storeUpdateFields.tagline = tagline;
     if (primary_color !== undefined) storeUpdateFields.primary_color = primary_color;
@@ -386,11 +466,13 @@ const updateProfileInfo = async (req, res) => {
       email: updatedUser.email || store.email || "",
       phone: updatedUser.phone || store.phone || "",
       role: updatedUser.role,
-      status: updatedUser.is_deleted ? "Inactive" : "Active",
+      status: updatedUser.status || (updatedUser.is_deleted ? "Inactive" : "Active"),
       avatar: updatedUser.avatar || null,
-      created_at: updatedUser.createdAt,
+      created_at: updatedUser.created_at,
       website: updatedUser.website || store.website || "",
       address: updatedUser.address || store.address || "",
+      store,
+      store_name: store.store_name || "",
       store,
       store_name: store.store_name || "",
       primary_color: store.primary_color || "#10b981",
@@ -402,6 +484,10 @@ const updateProfileInfo = async (req, res) => {
     };
 
     return res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: userData,
+      user: userData,
       success: true,
       message: "Profile updated successfully",
       data: userData,
@@ -421,15 +507,12 @@ const changePasswordSocket = async (req, res) => {
     if (!userId || userId === "guest") {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ success: false, message: "All password fields are required" });
     }
-
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
     const isValid = await bcrypt.compare(currentPassword, user.password);
     if (!isValid)
       return res.status(400).json({ success: false, message: "Current password is incorrect" });
@@ -437,6 +520,14 @@ const changePasswordSocket = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = userId;
     await user.save();
+
+    const io = req.io || getIO();
+    await pushGlobalActivity(io, {
+      action: `${user.name} changed password`,
+      category: "Authentication",
+      performedBy: userId,
+      performedByName: user.name,
+    }, userId);
 
     return res.json({ success: true, message: "Password changed successfully" });
   } catch (error) {

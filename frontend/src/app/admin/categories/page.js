@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { categoryApi } from "../../../apis/categoryApi";
 import { toast } from "sonner";
+import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -83,7 +84,6 @@ const getInitials = (name) => {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 };
 
-// Avatar component simplified to match Brand style logic but for categories
 const Avatar = ({ category, size = "w-8 h-8" }) => {
   return (
     <div
@@ -100,6 +100,8 @@ export default function CategoriesPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+
+  useCategorySocketSync();
 
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState("list");
@@ -120,39 +122,89 @@ export default function CategoriesPage() {
     description: "",
   });
 
+  // ==========================================
+  // ✅ CHANGE 1: useQuery with retry: false + error handling
+  // ==========================================
+  const {
+    data: categories = [],
+    isLoading: loading,
+    isError,
+    error,
+  } = useQuery({ 
+    queryKey: ["categories"], 
+    queryFn: categoryApi.getAll,
+    retry: false,
+  });
+
+  // ✅ Permission error toast for fetch
+  useEffect(() => {
+    if (isError && error) {
+      const msg = error.message || "";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        toast.error("You don't have permission to view categories.", {
+          duration: 6000,
+          description: "Contact an administrator to grant you access.",
+        });
+      }
+    }
+  }, [isError, error]);
+
   const resetForm = () => {
     setFormData({ category_code: "", name: "", description: "" });
     setEditingCategory(null);
     setAutoCategoryCode("");
   };
 
+  // ==========================================
+  // FETCH NEXT CODE — silent fallback on permission error
+  // ==========================================
   const fetchNextCategoryCode = async () => {
     try {
       setLoadingCode(true);
-      const nextCode = await categoryApi.getNextCode();
-      setAutoCategoryCode(nextCode);
-      if (!editingCategory) {
-        setFormData((prev) => ({ ...prev, category_code: nextCode }));
+      const response = await categoryApi.getNextCode();
+      
+      const nextCode = response?.nextCode || response?.data?.nextCode;
+
+      if (nextCode && typeof nextCode === 'string') {
+        setAutoCategoryCode(nextCode);
+        if (!editingCategory) {
+          setFormData((prev) => ({ ...prev, category_code: nextCode }));
+        }
+      } else {
+        throw new Error("Invalid code format");
       }
     } catch (err) {
-      console.error("Failed to fetch next category code:", err);
-      // Fallback logic similar to brands
-      const lastCategory = categories
-        .filter((c) => c.category_code && /^CAT-\d+$/.test(c.category_code)) // Adjusted regex for CAT- format if needed, or keep generic
-        .sort((a, b) => {
+      // ✅ Silent fallback — no red console error on permission issue
+      if (err.message?.toLowerCase().includes("permission") || err.message?.toLowerCase().includes("access denied")) {
+        console.log("⚠️ No categories permission — using local fallback code");
+      } else {
+        console.error("Failed to fetch next category code, using fallback:", err);
+      }
+      
+      const codedCategories = categories.filter((c) => c.category_code && /^CAT-\d+$/i.test(c.category_code));
+      
+      if (codedCategories.length > 0) {
+        const sorted = codedCategories.sort((a, b) => {
           const numA = parseInt(a.category_code.split("-")[1], 10);
           const numB = parseInt(b.category_code.split("-")[1], 10);
           return numB - numA;
-        })[0];
-
-      let nextNum = 1;
-      if (lastCategory) {
-        nextNum = parseInt(lastCategory.category_code.split("-")[1], 10) + 1;
-      }
-      const fallbackCode = `CAT-${String(nextNum).padStart(3, "0")}`;
-      setAutoCategoryCode(fallbackCode);
-      if (!editingCategory) {
-        setFormData((prev) => ({ ...prev, category_code: fallbackCode }));
+        });
+        
+        const lastCode = sorted[0].category_code;
+        const lastNum = parseInt(lastCode.split("-")[1], 10);
+        const nextNum = lastNum + 1;
+        const fallbackCode = `CAT-${String(nextNum).padStart(3, "0")}`;
+        
+        setAutoCategoryCode(fallbackCode);
+        if (!editingCategory) {
+          setFormData((prev) => ({ ...prev, category_code: fallbackCode }));
+        }
+      } else {
+        const fallbackCode = "CAT-001";
+        setAutoCategoryCode(fallbackCode);
+        if (!editingCategory) {
+          setFormData((prev) => ({ ...prev, category_code: fallbackCode }));
+        }
       }
     } finally {
       setLoadingCode(false);
@@ -163,35 +215,32 @@ export default function CategoriesPage() {
     router.push(`${pathname}/${id}`);
   };
 
-  const {
-    data: categories = [],
-    isLoading: loading,
-  } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
-
   /* ==========================================
-     ✅ CREATE / UPDATE — with TOAST
+     ✅ CHANGE 2: CREATE / UPDATE — Permission error toast
      ========================================== */
   const categoryMutation = useMutation({
     mutationFn: ({ data, id }) => (id ? categoryApi.update(id, data) : categoryApi.create(data)),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
-      toast.success(
-        variables.id
-          ? "Category updated successfully"
-          : "Category added successfully"
-      );
+      toast.success(variables.id ? "Category updated successfully" : "Category added successfully");
       resetForm();
       setShowModal(false);
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.message || "Category operation failed"
-      );
+      const msg = error.response?.data?.message || error.message || "Category operation failed";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        toast.error(msg, {
+          duration: 6000,
+          description: "Contact an administrator to grant you category access.",
+        });
+      } else {
+        toast.error(msg);
+      }
     },
   });
 
   /* ==========================================
-     ✅ DELETE — with TOAST
+     ✅ CHANGE 3: DELETE — Permission error toast
      ========================================== */
   const deleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => categoryApi.delete(id))),
@@ -201,9 +250,15 @@ export default function CategoriesPage() {
       toast.success("Category deleted successfully");
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.message || "Category delete failed"
-      );
+      const msg = error.response?.data?.message || error.message || "Category delete failed";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        toast.error(msg, {
+          duration: 6000,
+          description: "Contact an administrator to grant you category access.",
+        });
+      } else {
+        toast.error(msg);
+      }
     },
   });
 
@@ -368,7 +423,7 @@ export default function CategoriesPage() {
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
-        {/* ===== Header (Icon Removed to match Brand Page) ===== */}
+        {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
@@ -412,13 +467,12 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* ===== Stat Cards (Simplified to match Brand layout structure) ===== */}
+        {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Categories</p>
             <p className="text-[20px] font-bold mt-1">{categories.length}</p>
           </div>
-          {/* You can add more stats here if needed, keeping the grid consistent */}
         </div>
 
         {/* ===== Search ===== */}
@@ -534,7 +588,6 @@ export default function CategoriesPage() {
                             style={{ accentColor: "var(--accent)" }}
                           />
                         </td>
-                        {/* ✅ CHANGED: Category Code now looks like Brand Code (Simple Text) */}
                         <td className="px-4 py-2.5">
                           <span className="text-[13px] font-mono truncate max-w-[100px] block" style={{ color: "var(--text-secondary)" }}>
                             {category.category_code || "—"}
@@ -573,7 +626,6 @@ export default function CategoriesPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{category.name}</p>
-                  {/* ✅ CHANGED: Code style matches Brand card */}
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                 </div>
                 {category.description && (
@@ -802,6 +854,6 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
-    </div>
+    </div> 
   );
 }

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['192.168.88.64'],
+  allowedDevOrigins: ['192.168.88.69'],
   async rewrites() {
     return [
       {

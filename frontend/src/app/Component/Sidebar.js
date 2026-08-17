@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
@@ -15,15 +15,18 @@ import {
   X,
   Store,
   User,
+  Users,
 } from "lucide-react";
 
-const menu = [
-  { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-  { name: "Brands", icon: Tag, path: "/admin/brands" },
-  { name: "Categories", icon: FolderOpen, path: "/admin/categories" },
-  { name: "Products", icon: Package, path: "/admin/products" },
-  { name: "Store Info", icon: Store, path: "/admin/store-info" },
-  { name: "Profile", icon: User, path: "/admin/profile" },
+// ✅ ALL menu items with permissionKey
+const allMenuItems = [
+  { name: "Dashboard",  icon: LayoutDashboard, path: "/admin/dashboard",   permissionKey: null },
+  { name: "Brands",     icon: Tag,             path: "/admin/brands",      permissionKey: "brands" },
+  { name: "Categories", icon: FolderOpen,      path: "/admin/categories",  permissionKey: "categories" },
+  { name: "Products",   icon: Package,         path: "/admin/products",    permissionKey: "products" },
+  { name: "Store Info", icon: Store,           path: "/admin/store-info",  permissionKey: "store" },
+  { name: "Profile",    icon: User,            path: "/admin/profile",     permissionKey: "profile" },
+  { name: "Employees",  icon: Users,           path: "/admin/employees",   permissionKey: "employees" },
 ];
 
 // ✅ GLOBAL singleton socket
@@ -32,7 +35,7 @@ let sidebarSocket = null;
 function getSidebarSocket() {
   if (sidebarSocket && sidebarSocket.connected) return sidebarSocket;
 
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://192.168.88.64:3000";
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
 
   sidebarSocket = io(SOCKET_URL, {
     withCredentials: true,
@@ -45,7 +48,14 @@ function getSidebarSocket() {
   return sidebarSocket;
 }
 
-export default function Sidebar({ onNavigate }) {
+export function disconnectSidebarSocket() {
+  if (sidebarSocket) {
+    sidebarSocket.disconnect();
+    sidebarSocket = null;
+  }
+}
+
+export default function Sidebar({ onNavigate, userData }) {
   const pathname = usePathname();
   const dispatch = useDispatch();
 
@@ -53,28 +63,117 @@ export default function Sidebar({ onNavigate }) {
   const primaryColor = useSelector((state) => state.storeInfo.primaryColor);
   const isLoaded = useSelector((state) => state.storeInfo.isLoaded);
 
-  // ✅ Ref to prevent infinite loop - track if WE dispatched
   const isSelfDispatching = useRef(false);
 
-  // ✅ Mobile sidebar band karo route change pe
+  const [socketPermissions, setSocketPermissions] = useState(null);
+  const [socketRole, setSocketRole] = useState(null);
+
+  useEffect(() => {
+    setSocketPermissions(null);
+    setSocketRole(null);
+  }, [pathname]);
+
+  // ✅ Fetch & listen for permissions via socket
+  useEffect(() => {
+    const socket = getSidebarSocket();
+
+    const handleProfileData = (res) => {
+      if (!res) return;
+      const data = res.data || res.user || res;
+      if (data) {
+        console.log("📥 Sidebar socket → profile permissions:", data.permissions);
+        console.log("📥 Sidebar socket → role:", data.role);
+        setSocketPermissions(data.permissions || {});
+        setSocketRole(data.role || "");
+      }
+    };
+
+    const handleConnect = () => {
+      console.log("🟢 Sidebar socket connected for permissions:", socket.id);
+      socket.emit("getProfile");
+    };
+
+    if (socket.connected) {
+      socket.emit("getProfile");
+    } else {
+      socket.on("connect", handleConnect);
+    }
+
+    socket.on("profileData", handleProfileData);
+
+    const handleProfileUpdated = (res) => {
+      const data = res?.data || res?.user || res;
+      if (data) {
+        console.log("🔄 Sidebar socket → permissions updated:", data.permissions);
+        setSocketPermissions(data.permissions || {});
+        setSocketRole(data.role || "");
+      }
+    };
+    socket.on("profileUpdated", handleProfileUpdated);
+
+    // ✅ permissionsUpdated — current user ke liye apply karo
+    const handlePermissionsUpdated = (data) => {
+      console.log("🔔 Sidebar socket → permissionsUpdated broadcast:", data);
+
+      const currentUserId = localStorage.getItem("current_staff_id");
+      if (data?.userId && currentUserId && data.userId === currentUserId) {
+        console.log("✅ Permissions match current user — updating sidebar!");
+        setSocketPermissions(data.permissions || {});
+      }
+    };
+    socket.on("permissionsUpdated", handlePermissionsUpdated);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("profileData", handleProfileData);
+      socket.off("profileUpdated", handleProfileUpdated);
+      socket.off("permissionsUpdated", handlePermissionsUpdated);
+    };
+  }, [pathname]);
+
+  // ✅ PERMISSION-BASED MENU FILTERING — FIXED LOGIC
+  const visibleMenuItems = useMemo(() => {
+    const permissions = socketPermissions || userData?.permissions || {};
+    const role = socketRole || userData?.role || "";
+
+    console.log("🔍 Sidebar filter → role:", role, "permissions:", permissions);
+
+    // Admin ko sab dikhega
+    if (role === "admin") return allMenuItems;
+
+    // Staff ke liye filter
+    return allMenuItems.filter((item) => {
+      // ✅ permissionKey null hai (Dashboard) → sabko dikhega
+      if (!item.permissionKey) return true;
+
+      // ✅ FIX: Sirf explicitly false hone pe hide karo
+      //    true → dikhega, undefined → dikhega (purana user), false → chhup jayega
+      const permValue = permissions[item.permissionKey];
+
+      // Agar socket se permissions aa chuki hain aur value explicitly false hai → hide
+      if (permValue === false) return false;
+
+      // Baqi sab cases (true, undefined) → show
+      return true;
+    });
+  }, [socketPermissions, socketRole, userData]);
+
+  // Mobile close on route change
   useEffect(() => {
     if (onNavigate) onNavigate();
   }, [pathname]);
 
-  // ✅ SOCKET: Store info fetch karo aur Redux update karo
+  // Socket store info fetch
   useEffect(() => {
     const socket = getSidebarSocket();
 
     const handleStoreData = (data) => {
       if (!data || !data.store_name) return;
-
       console.log("📥 Sidebar socket → store data:", data.store_name);
 
-      // ✅ Mark ke yeh hum khud dispatch kar rahe hain
       isSelfDispatching.current = true;
       dispatch(setStoreInfo(data));
 
-      // ✅ Reset flag after a tick
       setTimeout(() => {
         isSelfDispatching.current = false;
       }, 100);
@@ -114,10 +213,9 @@ export default function Sidebar({ onNavigate }) {
     };
   }, [dispatch]);
 
-  // ✅ CUSTOM EVENT: Doosre components se update aaye (but NOT from self)
+  // Custom event listener
   useEffect(() => {
     const handleCustomEvent = (e) => {
-      // ✅ Agar khud ne dispatch kiya hai toh ignore karo (INFINITE LOOP FIX)
       if (isSelfDispatching.current) return;
 
       if (e.detail?.store_name) {
@@ -134,7 +232,7 @@ export default function Sidebar({ onNavigate }) {
     return () => window.removeEventListener("storeUpdated", handleCustomEvent);
   }, [dispatch]);
 
-  // ✅ FAILSAFE: 3 second baad agar loaded nahi hai toh dobara fetch
+  // Failsafe fetch
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!isLoaded) {
@@ -149,7 +247,6 @@ export default function Sidebar({ onNavigate }) {
     return () => clearTimeout(timer);
   }, [isLoaded]);
 
-  // ✅ DISPLAY VALUES
   const displayName = storeName || "My Store";
   const displayColor = primaryColor || "#10b981";
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || "S";
@@ -165,7 +262,7 @@ export default function Sidebar({ onNavigate }) {
         shadow-sm
       "
     >
-      {/* ===== HEADER / LOGO ===== */}
+      {/* HEADER / LOGO */}
       <div
         className="
           flex h-16 shrink-0
@@ -184,9 +281,7 @@ export default function Sidebar({ onNavigate }) {
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
             style={{ backgroundColor: displayColor }}
           >
-            <span className="text-sm font-bold text-white">
-              {firstLetter}
-            </span>
+            <span className="text-sm font-bold text-white">{firstLetter}</span>
           </div>
 
           <span className="truncate text-sm font-semibold tracking-tight text-[var(--text-primary)]">
@@ -211,17 +306,19 @@ export default function Sidebar({ onNavigate }) {
         </button>
       </div>
 
-      {/* ===== NAVIGATION ===== */}
+      {/* NAVIGATION */}
       <nav
         aria-label="Main navigation"
         className="flex-1 overflow-y-auto px-2 py-2"
       >
         <div className="space-y-0.5">
-          {menu.map((item) => {
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
             const active =
               pathname === item.path ||
-              pathname.startsWith(`${item.path}/`);
+              pathname.startsWith(`${item.path}/`) ||
+              (item.path === "/admin/employees" &&
+                pathname === "/admin/employee");
 
             return (
               <Link
@@ -256,7 +353,7 @@ export default function Sidebar({ onNavigate }) {
         </div>
       </nav>
 
-      {/* ===== FOOTER ===== */}
+      {/* FOOTER */}
       <div className="shrink-0 border-t border-[var(--border-sidebar)] px-3 py-2">
         <p className="text-center text-[10px] text-[var(--text-muted)]">
           Powered by{" "}

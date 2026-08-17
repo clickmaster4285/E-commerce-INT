@@ -6,10 +6,11 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
+  toggleProductStatus,
 } = require("../controllers/productController");
 
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware");
+const { checkPermission } = require("../middleware/checkPermission");
 
 const {
   productImagesUpload,
@@ -20,31 +21,38 @@ const saveProductImages = require("../middleware/saveProductImages");
 
 const router = express.Router();
 
-// ✅ PUBLIC — User storefront ke liye (koi login nahi chahiye)
-router.get("/", getProducts);
-router.get("/:id", getProductById);
-
-// 🔐 ADMIN — Create/Update/Delete (login + admin zaroori)
+// ✅ CREATE PRODUCT — Permission required
 router.post(
   "/",
   authMiddleware,
-  adminMiddleware,
+  checkPermission("products"),
   productImagesUpload,
   validateProductImages,
   saveProductImages,
-  createProduct
+  createProduct,
 );
 
+// ✅ UPDATE PRODUCT — Permission required
 router.put(
   "/:id",
   authMiddleware,
-  adminMiddleware,
+  checkPermission("products"),
   productImagesUpload,
   validateProductImages,
   saveProductImages,
-  updateProduct
+  updateProduct,
 );
 
-router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
+// ✅ DELETE PRODUCT — Permission required
+router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
+
+// ✅ TOGGLE STATUS — Permission required
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
+
+// ✅ GET ALL PRODUCTS — No permission (read-only, sab dekh saken)
+router.get("/", authMiddleware, getProducts);
+
+// ✅ GET SINGLE PRODUCT — No permission (read-only)
+router.get("/:id", authMiddleware, getProductById);
 
 module.exports = router;

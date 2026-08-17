@@ -7,12 +7,50 @@ import Navbar from '../Component/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
+import { io } from 'socket.io-client';
+
+// ==========================================
+// ✅ ROUTE → PERMISSION MAPPING
+// ==========================================
+const ROUTE_PERMISSIONS = {
+  '/admin/brands': 'brands',
+  '/admin/categories': 'categories',
+  '/admin/products': 'products',
+  '/admin/store-info': 'store',
+  '/admin/profile': 'profile',
+  '/admin/employees': 'employees',
+};
+
+// ✅ Singleton socket for layout permission listener
+let layoutPermSocket = null;
+
+function getLayoutPermSocket() {
+  if (layoutPermSocket && layoutPermSocket.connected) return layoutPermSocket;
+
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  layoutPermSocket = io(SOCKET_URL, {
+    withCredentials: true,
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+  });
+
+  return layoutPermSocket;
+}
 
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
+  // const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [storeData, setStoreData] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [permissionCheckDone, setPermissionCheckDone] = useState(false);
+
+  // ✅ LIVE permissions from socket — updates in real-time
+  const [livePermissions, setLivePermissions] = useState(null);
+  const [liveRole, setLiveRole] = useState(null);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -36,9 +74,7 @@ export default function AdminLayout({ children }) {
       if (cached) {
         try {
           setStoreData(JSON.parse(cached));
-        } catch (e) {
-          console.error('Failed to parse cached storeData:', e);
-        }
+        } catch (e) {}
       }
     }
   }, []);
@@ -46,6 +82,7 @@ export default function AdminLayout({ children }) {
   // Socket listener
   useEffect(() => {
     const handleStoreUpdate = (e) => {
+      if (e.detail) setStoreData(e.detail);
       if (e.detail) setStoreData(e.detail);
     };
     window.addEventListener('storeUpdated', handleStoreUpdate);
@@ -61,9 +98,53 @@ export default function AdminLayout({ children }) {
 
     const checkAuth = async () => {
       try {
-        await axiosInstance.get('/users/profile');
+        const response = await axiosInstance.get('/users/profile');
+        console.log('🔍 RAW API RESPONSE:', response.data);
+
         setIsAuthenticated(true);
+
+        let extractedUser = null;
+        if (response.data?.user) extractedUser = response.data.user;
+        else if (response.data?.data?.user) extractedUser = response.data.data.user;
+        else if (response.data?.role) extractedUser = response.data;
+        else if (response.data?.data?.role) extractedUser = response.data.data;
+
+        setUserData(extractedUser);
+
+        if (extractedUser?._id) {
+          localStorage.setItem('current_staff_id', extractedUser._id);
+        }
+
+        console.log('✅ USER:', extractedUser?.name, '| ROLE:', extractedUser?.role, '| PERMS:', extractedUser?.permissions);
+
+        // Initial permission check
+        const role = extractedUser?.role?.toLowerCase();
+        const perms = extractedUser?.permissions;
+
+        if (role === 'admin') {
+          setPermissionCheckDone(true);
+          return;
+        }
+
+        if (!perms || typeof perms !== 'object' || !Object.values(perms).some((v) => v === true)) {
+          setPermissionCheckDone(true);
+          router.replace('/admin/access-denied');
+          return;
+        }
+
+        // Check current route
+        const matched = Object.entries(ROUTE_PERMISSIONS).find(
+          ([route]) => pathname === route || pathname.startsWith(route + '/')
+        );
+        if (matched && perms[matched[1]] === false) {
+          setPermissionCheckDone(true);
+          router.replace('/admin/access-denied');
+          return;
+        }
+
+        setPermissionCheckDone(true);
       } catch (error) {
+        console.error('❌ Auth failed:', error.message);
         setIsAuthenticated(false);
         // ✅ Admin login par bhejo (user login par nahi)
         router.push('/admin/login');
@@ -81,10 +162,10 @@ export default function AdminLayout({ children }) {
   // Loading state
   if (isAuthenticated === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>
+      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#0a0c14' }}>
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-          <p className="text-sm">Checking authentication...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: '#10b981', borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Verifying access...</p>
         </div>
       </div>
     );
@@ -104,14 +185,12 @@ export default function AdminLayout({ children }) {
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const closeSidebar = () => setSidebarOpen(false);
 
+  if (pathname === '/admin/access-denied') return <>{children}</>;
+
   return (
     <div className="flex h-screen overflow-hidden">
       {sidebarOpen && (
-        <div
-          onClick={closeSidebar}
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          aria-hidden="true"
-        />
+        <div onClick={closeSidebar} className="fixed inset-0 bg-black/50 z-40 md:hidden" aria-hidden="true" />
       )}
       
       <div
@@ -125,7 +204,6 @@ export default function AdminLayout({ children }) {
       >
         <Sidebar onNavigate={closeSidebar} storeData={storeData} />
       </div>
-
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
