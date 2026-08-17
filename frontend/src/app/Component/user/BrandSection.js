@@ -1,237 +1,115 @@
 "use client";
 
 import Link from "next/link";
-
-
-const brands = [
-
-{
-name:"Apple",
-logo:"",
-link:"/brand/apple"
-},
-
-{
-name:"Samsung",
-logo:"S",
-link:"/brand/samsung"
-},
-
-{
-name:"Sony",
-logo:"SONY",
-link:"/brand/sony"
-},
-
-{
-name:"Xiaomi",
-logo:"MI",
-link:"/brand/xiaomi"
-},
-
-{
-name:"HP",
-logo:"HP",
-link:"/brand/hp"
-},
-
-{
-name:"Lenovo",
-logo:"L",
-link:"/brand/lenovo"
-}
-
-];
-
-
-
-
-export default function BrandSection(){
-
-
-return (
-
-<section
-
-className="
-bg-[#020d08]
-px-5
-py-12
-"
-
->
-
-
-<div
-
-className="
-max-w-[1400px]
-mx-auto
-"
-
->
-
-
-{/* HEADER */}
-
-<div
-
-className="
-flex
-items-center
-justify-between
-mb-7
-"
-
->
-
-
-<h2
-
-className="
-text-xl
-font-bold
-text-white
-"
-
->
-
-Top Brands
-
-</h2>
-
-
-
-<Link
-
-href="/brands"
-
-className="
-text-sm
-text-[#d4af37]
-hover:text-yellow-300
-"
-
->
-
-View All →
-
-</Link>
-
-
-</div>
-
-
-
-
-
-
-
-
-{/* BRAND CARDS */}
-
-
-<div
-
-className="
-grid
-grid-cols-2
-sm:grid-cols-3
-md:grid-cols-6
-gap-4
-"
-
->
-
-
-{
-
-brands.map((brand)=>(
-
-
-<Link
-
-href={brand.link}
-
-key={brand.name}
-
-className="
-h-28
-rounded-xl
-bg-[#071b12]
-border
-border-white/10
-flex
-flex-col
-items-center
-justify-center
-gap-3
-hover:border-[#d4af37]
-hover:bg-[#10251a]
-transition-all
-duration-300
-group
-"
-
->
-
-
-
-<div
-
-className="
-text-3xl
-font-black
-text-[#d4af37]
-group-hover:scale-110
-transition
-"
-
->
-
-{brand.logo}
-
-
-</div>
-
-
-
-<p
-
-className="
-text-sm
-text-gray-300
-group-hover:text-white
-"
-
->
-
-{brand.name}
-
-</p>
-
-
-
-</Link>
-
-
-))
-
-}
-
-
-</div>
-
-
-
-
-</div>
-
-
-</section>
-
-
-);
-
-
+import { useQuery } from "@tanstack/react-query";
+import { brandApi } from "@/apis/brandApi";
+import { Package } from "lucide-react";
+
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+export default function BrandSection() {
+  // ✅ Real brands database se
+  const { data: brands = [], isLoading, isError } = useQuery({
+    queryKey: ["brands"],
+    queryFn: brandApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ✅ Logo URL helper
+  const getLogoUrl = (logo) => {
+    const raw = typeof logo === "string" ? logo : logo?.img_url;
+    if (!raw) return null;
+    if (raw.startsWith("http")) return raw;
+    const path = raw.startsWith("/") ? raw : `/${raw}`;
+    return `${API_ORIGIN}${path}`;
+  };
+
+  return (
+    <section className="px-4 lg:px-6 py-8 lg:py-12">
+      <div className="max-w-[1400px] mx-auto">
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-4 lg:mb-5">
+          <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
+            Top Brands
+          </h2>
+        </div>
+
+        {/* LOADING — Skeleton */}
+        {isLoading && (
+          <div className="flex gap-3 overflow-hidden">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="w-[140px] sm:w-[160px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[130px] animate-pulse"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* ERROR */}
+        {isError && (
+          <div className="text-center py-8 text-[var(--user-text-muted)] text-sm">
+            Brands are unavailable right now.
+          </div>
+        )}
+
+        {/* ✅ AUTO-SCROLL MARQUEE — same as categories */}
+        {!isLoading && !isError && brands.length > 0 && (
+          <div className="relative">
+            {/* Edge fades */}
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-r from-[var(--user-bg)] to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-l from-[var(--user-bg)] to-transparent z-10" />
+
+            {/* Marquee container */}
+            <div className="marquee overflow-hidden py-2">
+              <div className="marquee-track flex w-max">
+                {/* ✅ List 2x duplicate = seamless loop */}
+                {[...brands, ...brands].map((brand, i) => {
+                  const logoUrl = getLogoUrl(brand.logo);
+
+                  return (
+                    <Link
+                      key={`${brand._id}-${i}`}
+                      href={`/brand/${brand._id}`}
+                      className="mr-3 w-[140px] sm:w-[160px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[130px] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
+                    >
+                      {/* ✅ Logo (white circle) */}
+                      {logoUrl ? (
+                        <div className="w-14 h-14 rounded-full bg-[var(--user-text)] flex items-center justify-center p-2">
+                          <img
+                            src={logoUrl}
+                            alt={brand.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
+                          <span className="text-2xl font-black text-[var(--user-accent)]">
+                            {brand.name?.charAt(0)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* ✅ Brand name */}
+                      <p className="text-xs text-[var(--user-text-muted)] text-center capitalize line-clamp-1 w-full">
+                        {brand.name}
+                      </p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EMPTY */}
+        {!isLoading && !isError && brands.length === 0 && (
+          <div className="text-center py-8 text-[var(--user-text-subtle)] text-sm">
+            <Package size={32} className="mx-auto mb-2 opacity-50" />
+            No brands available yet.
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }

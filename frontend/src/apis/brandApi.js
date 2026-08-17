@@ -96,4 +96,4 @@ export const brandApi = {
       method: "DELETE",
     });
   },
-};
+};  

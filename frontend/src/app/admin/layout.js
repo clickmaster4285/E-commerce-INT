@@ -6,32 +6,30 @@ import Sidebar from '../Component/Sidebar';
 import Navbar from '../Component/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
-
-// ✅ IMPORT store socket sync hook
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(null); // null = checking
-  
-  // ✅ Store data state - socket se real-time update hoga
+  const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [storeData, setStoreData] = useState(null);
 
   const router = useRouter();
   const pathname = usePathname();
 
-  // ✅ Socket sync initialize karo - yeh store updates automatically sunega
+  // ✅ Login page par layout apply NAHI karna
+  const isLoginPage = pathname === '/admin/login';
+
   useStoreSocketSync();
 
-  // ✅ FIXED: localStorage → Cookies
+  // Theme
   useEffect(() => {
     const saved = Cookies.get('theme') || 'dark';
     setTheme(saved);
     document.documentElement.classList.toggle('light', saved === 'light');
   }, []);
 
-  // ✅ FIXED: localStorage → Cookies (cached store data load)
+  // Store data cache
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = Cookies.get('storeData');
@@ -45,33 +43,40 @@ export default function AdminLayout({ children }) {
     }
   }, []);
 
-  // ✅ Custom event listener - jab socket se store update aaye
+  // Socket listener
   useEffect(() => {
     const handleStoreUpdate = (e) => {
-      console.log('🔄 Layout received storeUpdated event:', e.detail?.store_name);
-      if (e.detail) {
-        setStoreData(e.detail);
-      }
+      if (e.detail) setStoreData(e.detail);
     };
-
     window.addEventListener('storeUpdated', handleStoreUpdate);
     return () => window.removeEventListener('storeUpdated', handleStoreUpdate);
   }, []);
 
-  // Authentication Check
+  // ✅ Authentication Check — SIRF login page ke ilawa
   useEffect(() => {
+    if (isLoginPage) {
+      setIsAuthenticated(true); // Login page ko bypass karo
+      return;
+    }
+
     const checkAuth = async () => {
       try {
         await axiosInstance.get('/users/profile');
         setIsAuthenticated(true);
       } catch (error) {
         setIsAuthenticated(false);
-        router.push('/login');
+        // ✅ Admin login par bhejo (user login par nahi)
+        router.push('/admin/login');
       }
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, isLoginPage]);
+
+  // ✅ Login page — bina Sidebar/Navbar ke sirf children
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   // Loading state
   if (isAuthenticated === null) {
@@ -85,12 +90,10 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  // Not authenticated - redirect will happen via useEffect
   if (!isAuthenticated) {
     return null;
   }
 
-  // ✅ FIXED: localStorage → Cookies
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
@@ -120,12 +123,10 @@ export default function AdminLayout({ children }) {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* ✅ storeData pass karo Sidebar ko */}
         <Sidebar onNavigate={closeSidebar} storeData={storeData} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* ✅ storeData pass karo Navbar ko bhi */}
         <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
           {children}

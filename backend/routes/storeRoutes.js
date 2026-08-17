@@ -41,7 +41,8 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // Max 5MB limit
 });
-
+// ✅ PUBLIC ROUTE — User GUI ke liye (bina login ke)
+router.get("/public", getStoreInfo);
 // ✅ Routes with Auth Middleware
 router.route("/")
   .get(authMiddleware, getStoreInfo) // Sirf logged in user dekh sakta hai

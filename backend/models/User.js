@@ -40,10 +40,9 @@ const userSchema = new mongoose.Schema(
       ref: "Store",
       default: null,
     },
-    avatar: {
-      type: String,
-      default: null,
-    },
+    avatar: 
+    { type: String, default: "" },
+
     twoFactorEnabled: {
       type: Boolean,
       default: false,

@@ -1,19 +1,20 @@
-  import "./globals.css";
-  import Providers from "./providers";
+import "./globals.css";
+import "./user.css";
+import Providers from "./providers";
 
-  export const metadata = {
-    title: "Inventory App",
-    description: "Inventory Management System",
-  };
+export const metadata = {
+  title: "Inventory App",
+  description: "Inventory Management System",
+};
 
-  export default function RootLayout({ children }) {
-    return (
-      <html lang="en">
-        <body>
-          <Providers>
-            {children}
-          </Providers>
-        </body>
-      </html>
-    );
-  }
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
+    </html>
+  );
+}

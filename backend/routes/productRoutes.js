@@ -1,54 +1,50 @@
-  const express = require("express");
+const express = require("express");
 
-  const {
-    createProduct,
-    getProducts,
-    getProductById,
-    updateProduct,
-    deleteProduct,
-  } = require("../controllers/productController");
+const {
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+} = require("../controllers/productController");
 
-  const authMiddleware = require("../middleware/authMiddleware");
-  const adminMiddleware = require("../middleware/adminMiddleware");
+const authMiddleware = require("../middleware/authMiddleware");
+const adminMiddleware = require("../middleware/adminMiddleware");
 
-  const {
-    productImagesUpload,
-    validateProductImages,
-  } = require("../middleware/productImageMiddleware");
+const {
+  productImagesUpload,
+  validateProductImages,
+} = require("../middleware/productImageMiddleware");
 
-  const saveProductImages = require("../middleware/saveProductImages");
+const saveProductImages = require("../middleware/saveProductImages");
 
-  const router = express.Router();
+const router = express.Router();
 
-  // CREATE PRODUCT
-  router.post(
-    "/",
-    authMiddleware,
-    adminMiddleware,
-    productImagesUpload,
-    validateProductImages,
-    saveProductImages,
-    createProduct,
-  );
+// ✅ PUBLIC — User storefront ke liye (koi login nahi chahiye)
+router.get("/", getProducts);
+router.get("/:id", getProductById);
 
-  // UPDATE PRODUCT
-  router.put(
-    "/:id",
-    authMiddleware,
-    adminMiddleware,
-    productImagesUpload,
-    validateProductImages,
-    saveProductImages,
-    updateProduct,
-  );
+// 🔐 ADMIN — Create/Update/Delete (login + admin zaroori)
+router.post(
+  "/",
+  authMiddleware,
+  adminMiddleware,
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  createProduct
+);
 
-  // DELETE PRODUCT
-  router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
+router.put(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  updateProduct
+);
 
-  // GET ALL PRODUCTS
-  router.get("/", authMiddleware, getProducts);
+router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
 
-  // GET SINGLE PRODUCT
-  router.get("/:id", authMiddleware, getProductById);
-
-  module.exports = router;
+module.exports = router;

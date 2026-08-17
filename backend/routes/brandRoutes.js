@@ -1,7 +1,7 @@
 const express = require("express");
 
 const {
-  getNextBrandCode,    // ✅ NEW: Added
+  getNextBrandCode,
   createBrand,
   getBrands,
   getBrandById,
@@ -17,21 +17,12 @@ const processBrandLogo = require("../middleware/imageMiddleware");
 
 const router = express.Router();
 
+// ✅ PUBLIC — All brands
+router.get("/", getBrands);
 
-// ================================
-// ✅ NEW: GET NEXT BRAND CODE (BRD-001, BRD-002, ...)
-// ⚠️ Ye /:id se PEHLE hona zaroori hai!
-// ================================
-router.get(
-  "/next-code",
-  authMiddleware,
-  getNextBrandCode
-);
+// 🔐 ADMIN — ⚠️ SPECIFIC routes PEHLE
+router.get("/next-code", authMiddleware, getNextBrandCode);
 
-
-// ================================
-// CREATE BRAND
-// ================================
 router.post(
   "/",
   authMiddleware,
@@ -41,40 +32,6 @@ router.post(
   createBrand
 );
 
-
-// ================================
-// GET ALL BRANDS
-// ================================
-router.get(
-  "/",
-  authMiddleware,
-  getBrands
-);
-
-
-// ================================
-// GET BRAND WITH PRODUCTS
-// ================================
-router.get(
-  "/:id/details",
-  authMiddleware,
-  getBrandWithProducts
-);
-
-
-// ================================
-// GET SINGLE BRAND
-// ================================
-router.get(
-  "/:id",
-  authMiddleware,
-  getBrandById
-);
-
-
-// ================================
-// UPDATE BRAND
-// ================================
 router.put(
   "/:id",
   authMiddleware,
@@ -84,16 +41,10 @@ router.put(
   updateBrand
 );
 
+router.delete("/:id", authMiddleware, adminMiddleware, deleteBrand);
 
-// ================================
-// DELETE BRAND
-// ================================
-router.delete(
-  "/:id",
-  authMiddleware,
-  adminMiddleware,
-  deleteBrand
-);
-
+// ✅ PUBLIC — ⚠️ DYNAMIC routes LAST mein
+router.get("/:id/details", getBrandWithProducts);
+router.get("/:id", getBrandById);
 
 module.exports = router;

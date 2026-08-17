@@ -1,0 +1,178 @@
+/* ==========================================
+   USER THEME — DARK MODE (Default)
+========================================== */
+:root {
+  /* Backgrounds */
+  --user-bg:            #000000;
+  --user-bg-elevated:   #0a0a0a;
+  --user-bg-card:       #111111;
+  --user-bg-hover:      #1a1a1a;
+  --user-bg-input:      #0d0d0d;
+
+  /* Text */
+  --user-text:          #ffffff;
+  --user-text-secondary:#e5e5e5;
+  --user-text-muted:    #a3a3a3;
+  --user-text-subtle:   #666666;
+  --user-text-disabled: #404040;
+
+  /* Borders */
+  --user-border:        #1f1f1f;
+  --user-border-soft:   #141414;
+  --user-border-hover:  #2a2a2a;
+
+  /* Accent */
+  --user-accent:        #ffffff;
+  --user-accent-hover:  #e5e5e5;
+  --user-accent-text:   #000000;
+  --user-accent-soft:   rgba(255, 255, 255, 0.08);
+
+  /* Logo background (dono modes mein white) */
+  --user-logo-bg:       #ffffff;
+
+  /* Status */
+  --user-success:       #10b981;
+  --user-danger:        #ef4444;
+  --user-warning:       #f59e0b;
+  --user-info:          #3b82f6;
+
+  /* Shadows */
+  --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.5);
+  --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.5);
+  --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.6);
+
+  /* Radius */
+  --user-radius-sm:     8px;
+  --user-radius-md:     12px;
+  --user-radius-lg:     16px;
+  --user-radius-xl:     24px;
+
+  --user-transition:    0.2s ease;
+}
+
+/* ==========================================
+   LIGHT MODE — Overrides
+========================================== */
+.user-theme.light {
+  --user-bg:            #fafafa;
+  --user-bg-elevated:   #ffffff;
+  --user-bg-card:       #ffffff;
+  --user-bg-hover:      #f0f0f0;
+  --user-bg-input:      #f5f5f5;
+
+  --user-text:          #0a0a0a;
+  --user-text-secondary:#262626;
+  --user-text-muted:    #525252;
+  --user-text-subtle:   #8a8a8a;
+  --user-text-disabled: #c4c4c4;
+
+  --user-border:        #e6e6e6;
+  --user-border-soft:   #f0f0f0;
+  --user-border-hover:  #cfcfcf;
+
+  --user-accent:        #0a0a0a;
+  --user-accent-hover:  #333333;
+  --user-accent-text:   #ffffff;
+  --user-accent-soft:   rgba(0, 0, 0, 0.06);
+
+  --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.06);
+  --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);
+  --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.10);
+}
+
+/* ==========================================
+   WRAPPER BASE
+========================================== */
+.user-theme {
+  background: var(--user-bg);
+  color: var(--user-text);
+  min-height: 100vh;
+}
+
+.user-theme a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ==========================================
+   SCROLLBAR UTILITIES
+========================================== */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.user-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.user-theme ::-webkit-scrollbar-track {
+  background: var(--user-bg);
+}
+.user-theme ::-webkit-scrollbar-thumb {
+  background: var(--user-border-hover);
+  border-radius: 999px;
+}
+.user-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--user-text-subtle);
+}
+
+/* ==========================================
+   TEXT SELECTION
+========================================== */
+.user-theme ::selection {
+  background: var(--user-accent);
+  color: var(--user-accent-text);
+}
+
+/* ==========================================
+   CHROME AUTOFILL FIX
+========================================== */
+.user-theme input:-webkit-autofill,
+.user-theme input:-webkit-autofill:hover,
+.user-theme input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--user-bg-input) inset !important;
+  -webkit-text-fill-color: var(--user-text) !important;
+  caret-color: var(--user-text);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* ==========================================
+   FIX: Accent buttons ka text hamesha sahi
+   (~ = sirf EXACT class match, group-hover safe)
+========================================== */
+[class~="text-[var(--user-accent-text)]"] {
+  color: var(--user-accent-text) !important;
+}
+
+/* Focus outlines clean */
+.user-theme a:focus,
+.user-theme button:focus {
+  outline: none;
+}
+
+/* ==========================================
+   MARQUEE — Auto-scroll loop
+========================================== */
+.marquee-track {
+  animation: user-marquee 45s linear infinite;
+  will-change: transform;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes user-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@media (max-width: 640px) {
+  .marquee-track {
+    animation-duration: 30s;
+  }
+}

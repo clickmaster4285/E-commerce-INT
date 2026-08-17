@@ -1,143 +1,346 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { GoogleLogin } from "@react-oauth/google";
+import { Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck } from "lucide-react";
 import axiosInstance from "@/apis/axiosInstance";
-import { useRouter } from 'next/navigation';
+import { storeApi } from "@/apis/storeApi";
+import { categoryApi } from "@/apis/categoryApi";
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+// ✅ Store Logo — dynamic + fallback letter
+function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
+  const logoUrl = store?.logo?.img_url
+    ? store.logo.img_url.startsWith("http")
+      ? store.logo.img_url
+      : `${API_ORIGIN}/${store.logo.img_url}`
+    : null;
+  const letter = (store?.store_name || "C").charAt(0).toUpperCase();
+
+  if (!logoUrl) {
+    return (
+      <div
+        className={`${sizeClass} rounded-lg bg-[var(--user-accent)] flex items-center justify-center shrink-0`}
+      >
+        <span className="text-[var(--user-accent-text)] font-black text-lg lg:text-xl">
+          {letter}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={logoUrl}
+      alt={store?.store_name || "Store"}
+      className={`${sizeClass} rounded-lg object-cover shrink-0`}
+    />
+  );
+}
+
+// ✅ Category Badge — dynamic
+function CategoryBadge({ icon, label }) {
+  return (
+    <div className="flex items-center gap-2 px-4 lg:px-5 py-2.5 lg:py-3 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl text-[var(--user-text-secondary)] text-xs lg:text-sm">
+      <span className="text-[var(--user-accent)]">{icon}</span>
+      {label}
+    </div>
+  );
+}
+
+export default function UserLoginPage() {
   const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const loginMutation = useMutation({
-    mutationFn: async (userData) => {
-      const response = await axiosInstance.post(
-        "/users/login",
-        userData
-      );
-      return response.data;
-    },
-    onSuccess: (data) => {
-      if (data.user.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
-    },
-    onError: (error) => {
-      alert(error.response?.data?.message || 'Login failed!');
-    }
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  // ✅ Store info (public)
+  const { data: store = null } = useQuery({
+    queryKey: ["storeInfo"],
+    queryFn: storeApi.getPublic,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const handleLogin = (e) => {
+  // ✅ Top 3 categories (branding ke liye)
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: categoryApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const storeName = store?.store_name || "ClickMasters";
+  const tagline =
+    store?.tagline ||
+    "Mobiles · Laptops · Watches · Accessories\nShop everything from one trusted store.";
+  const topCategories = categories.slice(0, 3);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    loginMutation.mutate({ email, password });
+    setError("");
+    setLoading(true);
+    try {
+      const endpoint = isLogin ? "/users/login" : "/users/register";
+      const payload = isLogin
+        ? { email, password }
+        : { name, username, phone, email, password };
+
+      await axiosInstance.post(endpoint, payload);
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.response?.data?.message || `${isLogin ? "Login" : "Registration"} failed.`);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async (credential) => {
+    setError("");
+    setLoading(true);
+    try {
+      await axiosInstance.post("/users/google-login", { credential });
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.response?.data?.message || "Google login failed.");
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-900">
-      {/* Left Side - Header Top par, Content Center mein, Footer Bottom par */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gray-950">
-        
-        {/* TOP: Header (Logo yahan rahega) */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">C</span>
-          </div>
-          <span className="text-white font-semibold text-xl">ClickMasters</span>
+    <main className="user-theme min-h-screen flex bg-[var(--user-bg)]">
+      {/* ==========================================
+          LEFT SIDE — BRANDING (Desktop only)
+      ========================================== */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-[var(--user-bg-elevated)] relative overflow-hidden border-r border-[var(--user-border)]">
+        {/* Subtle glows */}
+        <div className="absolute top-[-120px] left-[-120px] w-[400px] h-[400px] rounded-full bg-[var(--user-accent)]/5 blur-3xl" />
+        <div className="absolute bottom-[-120px] right-[-120px] w-[400px] h-[400px] rounded-full bg-[var(--user-accent)]/5 blur-3xl" />
+
+        {/* TOP: Logo */}
+        <div className="flex items-center gap-3 relative">
+          <StoreLogo store={store} />
+          <span className="text-[var(--user-text)] font-black text-xl tracking-wide">
+            {storeName}
+          </span>
         </div>
 
-        {/* MIDDLE: Content Center mein aayega */}
-        <div className="flex-1 flex flex-col justify-center -mt-20">
-          <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
-            E-Commerce Inventory<br />
-            <span className="text-emerald-500">Operating System</span>
+        {/* MIDDLE: Content */}
+        <div className="flex-1 flex flex-col justify-center -mt-20 relative">
+          <h1 className="text-5xl font-black text-[var(--user-text)] mb-4 leading-tight">
+            Premium Shopping
+            <br />
+            <span className="text-[var(--user-accent)]">Experience</span>
           </h1>
 
-          <p className="text-gray-400 text-lg mb-8">
-            Inventory · Brands · Categories · Products · Analytics.<br />
-            Manage everything from one secure workspace.
+          <p className="text-[var(--user-text-muted)] text-lg mb-8 max-w-md leading-relaxed whitespace-pre-line">
+            {tagline}
           </p>
 
-          <div className="flex gap-3">
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Inventory</button>
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Brands</button>
-            <button className="px-6 py-3 bg-gray-800 text-white rounded-lg border border-gray-700 hover:bg-gray-700 transition">Analytics</button>
-          </div>
+          {topCategories.length > 0 && (
+            <div className="flex gap-3 flex-wrap">
+              {topCategories.map((cat) => (
+                <CategoryBadge
+                  key={cat._id}
+                  icon={<span className="font-black">{cat.name.charAt(0)}</span>}
+                  label={cat.name}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* BOTTOM: Footer */}
-        <div className="text-gray-500 text-sm">© 2026 ClickMasters</div>
-      </div>
-
-      {/* Right Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-900">
-        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-emerald-500 text-xs font-bold uppercase tracking-wider">Secure Sign-In</span>
-          </div>
-
-          <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
-          <p className="text-gray-400 text-sm mb-6">Use your work account to continue.</p>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              {/* Ab yahan sirf "Email" likha hai */}
-              <label className="block text-gray-300 text-sm mb-2">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-300 text-sm mb-2">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500 pr-12"
-                  placeholder="••••••••"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-emerald-500" />
-                <span className="text-gray-300 text-sm">Remember me</span>
-              </label>
-              <a href="#" className="text-emerald-500 text-sm font-medium hover:text-emerald-400">Forgot password?</a>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-70"
-            >
-              {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
+        <div className="text-[var(--user-text-subtle)] text-sm relative">
+          © {new Date().getFullYear()} {storeName}. All rights reserved.
         </div>
       </div>
-    </div>
+
+      {/* ==========================================
+          RIGHT SIDE — FORM
+      ========================================== */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-5 sm:p-6 lg:p-8 bg-[var(--user-bg)]">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-6 lg:mb-8">
+            <StoreLogo store={store} sizeClass="w-9 h-9 lg:w-10 lg:h-10" />
+            <span className="text-[var(--user-text)] font-black text-lg lg:text-xl tracking-wide">
+              {storeName}
+            </span>
+          </div>
+
+          <div className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
+            {/* Badge */}
+            <div className="flex items-center gap-2 mb-3 lg:mb-4">
+              <ShieldCheck size={16} className="text-[var(--user-accent)] lg:w-[18px] lg:h-[18px]" />
+              <span className="text-[var(--user-accent)] text-[10px] lg:text-xs font-bold uppercase tracking-wider">
+                {isLogin ? "User Sign-In" : "Create Account"}
+              </span>
+            </div>
+
+            <h2 className="text-xl lg:text-2xl font-black text-[var(--user-text)] mb-1">
+              {isLogin ? "Welcome Back" : "Create Account"}
+            </h2>
+            <p className="text-[var(--user-text-muted)] text-sm mb-5 lg:mb-6">
+              {isLogin
+                ? "Continue shopping with your account."
+                : "Create your account in just 30 seconds."}
+            </p>
+
+            {/* Error */}
+            {error && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Google Button — Sirf Login */}
+            {isLogin && (
+              <>
+                <div className="flex justify-center">
+                  {googleClientId ? (
+                    <GoogleLogin
+                      onSuccess={(res) => handleGoogleLogin(res.credential)}
+                      onError={() => setError("Google login failed. Try again.")}
+                      theme="filled_black"
+                      shape="pill"
+                      size="large"
+                      width={320}
+                      text="continue_with"
+                    />
+                  ) : (
+                    <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
+                      Google login unavailable
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 my-5 lg:my-6">
+                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                  <span className="text-[var(--user-text-subtle)] text-[10px] lg:text-xs uppercase tracking-widest">
+                    or with email
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                </div>
+              </>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-3 lg:space-y-4">
+              {!isLogin && (
+                <div className="relative">
+                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full name"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="relative">
+                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="relative">
+                  <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Phone number (03001234567)"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
+              <div className="relative">
+                <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email address"
+                  className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                />
+              </div>
+
+              <div className="relative">
+                <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  minLength={6}
+                  className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <LogIn size={18} />
+                )}
+                {loading
+                  ? isLogin
+                    ? "Logging in..."
+                    : "Creating account..."
+                  : isLogin
+                  ? "Login"
+                  : "Create Account"}
+              </button>
+            </form>
+
+            {/* Toggle — clean text link */}
+            <p className="text-center mt-5 lg:mt-6 text-[var(--user-text-muted)] text-sm">
+              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError("");
+                }}
+                className="text-[var(--user-accent)] hover:underline font-semibold bg-transparent border-0 p-0 outline-none focus:outline-none"
+              >
+                {isLogin ? "Register" : "Login"}
+              </button>
+            </p>
+          </div>
+
+          <p className="text-center mt-5 text-[11px] text-[var(--user-text-subtle)]">
+            By continuing, you agree to our Terms & Privacy Policy.
+          </p>
+        </div>
+      </div>
+    </main>
   );
 }

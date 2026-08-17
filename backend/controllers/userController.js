@@ -13,7 +13,6 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-// ✅ COOKIE OPTIONS (reusable)
 const getCookieOptions = (maxAge) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -24,7 +23,7 @@ const getCookieOptions = (maxAge) => ({
 // ✅ REGISTER
 const createUser = async (req, res) => {
   try {
-    const { name, username, email, password } = req.body;
+    const { name, username, phone, email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Email and password are required" });
@@ -39,7 +38,10 @@ const createUser = async (req, res) => {
     const defaultStore = await Store.findOne();
 
     const user = await User.create({
-      name, username, email,
+      name,
+      username: username || email.split("@")[0] + Math.floor(Math.random() * 9999),
+      phone,
+      email,
       password: hashedPassword,
       storeId: defaultStore?._id,
     });
@@ -52,7 +54,15 @@ const createUser = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "User registered successfully",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || null,
+      },
     });
   } catch (error) {
     console.error("createUser error:", error);
@@ -60,12 +70,10 @@ const createUser = async (req, res) => {
   }
 };
 
-// ✅ LOGIN
+// ✅ LOGIN — FIXED (avatar in response)
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    console.log("🔐 Login attempt:", email);
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Please provide email and password" });
@@ -73,13 +81,11 @@ const loginUser = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      console.log("❌ User not found:", email);
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      console.log("❌ Password mismatch for:", email);
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
@@ -88,12 +94,18 @@ const loginUser = async (req, res) => {
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
 
-    console.log("✅ Login success:", email);
-
     res.json({
       success: true,
       message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || null,
+      },
     });
   } catch (error) {
     console.error("loginUser error:", error);
@@ -144,14 +156,22 @@ const getMe = async (req, res) => {
     res.json({
       success: true,
       user: {
-        _id: user._id, name: user.name, username: user.username,
-        email: user.email, phone: user.phone || "", role: user.role,
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
         status: user.is_deleted ? "Inactive" : "Active",
         avatar: user.avatar || null,
         twoFactorEnabled: user.twoFactorEnabled || false,
         permissions: user.permissions || {
-          products: true, brands: true, categories: true,
-          users: false, orders: true, settings: true,
+          products: true,
+          brands: true,
+          categories: true,
+          users: false,
+          orders: true,
+          settings: true,
         },
         preferences: user.preferences || {
           darkMode: true,
@@ -173,13 +193,22 @@ const updateProfile = async (req, res) => {
     const userId = req.user._id;
 
     await User.findByIdAndUpdate(userId, {
-      name, email, phone, permissions, preferences, updatedby: userId,
+      name,
+      email,
+      phone,
+      permissions,
+      preferences,
+      updatedby: userId,
     });
 
     if (store && req.user.storeId) {
       await Store.findByIdAndUpdate(req.user.storeId, {
-        store_name: store.name, email: store.email, phone: store.phone,
-        support_email: store.email, support_phone: store.phone, address: store.address,
+        store_name: store.name,
+        email: store.email,
+        phone: store.phone,
+        support_email: store.email,
+        support_phone: store.phone,
+        address: store.address,
       });
     }
 
@@ -197,7 +226,8 @@ const changePassword = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     const isValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isValid) return res.status(400).json({ success: false, message: "Current password is incorrect" });
+    if (!isValid)
+      return res.status(400).json({ success: false, message: "Current password is incorrect" });
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = req.user._id;
@@ -215,7 +245,8 @@ const toggle2FA = async (req, res) => {
   try {
     const { enabled } = req.body;
     await User.findByIdAndUpdate(req.user._id, {
-      twoFactorEnabled: enabled, updatedby: req.user._id,
+      twoFactorEnabled: enabled,
+      updatedby: req.user._id,
     });
     res.json({ success: true, message: "✅ 2FA setting updated!" });
   } catch (error) {
@@ -239,7 +270,9 @@ const getProfileInfo = async (req, res) => {
 
     const store = user.storeId || {};
     const profileData = {
-      _id: user._id, name: user.name, username: user.username,
+      _id: user._id,
+      name: user.name,
+      username: user.username,
       email: user.email || store.email || "",
       phone: user.phone || store.phone || "",
       role: user.role,
@@ -250,14 +283,19 @@ const getProfileInfo = async (req, res) => {
       address: user.address || store.address || "",
       twoFactorEnabled: user.twoFactorEnabled || false,
       permissions: user.permissions || {
-        products: true, brands: true, categories: true,
-        users: false, orders: true, settings: true,
+        products: true,
+        brands: true,
+        categories: true,
+        users: false,
+        orders: true,
+        settings: true,
       },
       preferences: user.preferences || {
         darkMode: true,
         notifications: { email: true, push: true, weekly: true },
       },
-      store, store_name: store.store_name || "",
+      store,
+      store_name: store.store_name || "",
       primary_color: store.primary_color || "#10b981",
       stats: { logins: user.loginCount || 0, roles: 1, sessions: user.sessionCount || 0 },
     };
@@ -277,12 +315,21 @@ const updateProfileInfo = async (req, res) => {
     }
 
     const {
-      name, email, phone, website, address,
-      store_name, tagline, primary_color, currency,
-      country, city, state, zip_code, store_status,
+      name,
+      email,
+      phone,
+      website,
+      address,
+      store_name,
+      tagline,
+      primary_color,
+      currency,
+      country,
+      city,
+      state,
+      zip_code,
+      store_status,
     } = req.body;
-
-    console.log("📥 updateProfileInfo body:", req.body);
 
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
@@ -292,11 +339,14 @@ const updateProfileInfo = async (req, res) => {
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
 
-    const updatedUser = await User.findByIdAndUpdate(userId, userUpdateFields, { new: true, runValidators: true })
-      .select("-password").populate("storeId");
+    const updatedUser = await User.findByIdAndUpdate(userId, userUpdateFields, {
+      new: true,
+      runValidators: true,
+    })
+      .select("-password")
+      .populate("storeId");
 
     if (!updatedUser) return res.status(404).json({ success: false, message: "User not found" });
-    console.log("✅ User updated:", updatedUser.name);
 
     let updatedStore = null;
     const storeUpdateFields = {};
@@ -316,7 +366,6 @@ const updateProfileInfo = async (req, res) => {
     if (website !== undefined) storeUpdateFields.website = website;
 
     if (Object.keys(storeUpdateFields).length > 0) {
-      console.log("🏪 Updating store with fields:", storeUpdateFields);
       let store = updatedUser.storeId ? await Store.findById(updatedUser.storeId) : null;
       if (!store) store = await Store.findOne();
       if (!store) store = await Store.create({});
@@ -327,12 +376,13 @@ const updateProfileInfo = async (req, res) => {
         await updatedUser.save();
       }
       await updatedUser.populate("storeId");
-      console.log("✅ Store updated:", updatedStore.store_name);
     }
 
     const store = updatedStore || updatedUser.storeId || {};
     const userData = {
-      _id: updatedUser._id, name: updatedUser.name, username: updatedUser.username,
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      username: updatedUser.username,
       email: updatedUser.email || store.email || "",
       phone: updatedUser.phone || store.phone || "",
       role: updatedUser.role,
@@ -341,14 +391,21 @@ const updateProfileInfo = async (req, res) => {
       created_at: updatedUser.createdAt,
       website: updatedUser.website || store.website || "",
       address: updatedUser.address || store.address || "",
-      store, store_name: store.store_name || "",
+      store,
+      store_name: store.store_name || "",
       primary_color: store.primary_color || "#10b981",
-      stats: { logins: updatedUser.loginCount || 0, roles: 1, sessions: updatedUser.sessionCount || 0 },
+      stats: {
+        logins: updatedUser.loginCount || 0,
+        roles: 1,
+        sessions: updatedUser.sessionCount || 0,
+      },
     };
 
     return res.json({
-      success: true, message: "Profile updated successfully",
-      data: userData, user: userData,
+      success: true,
+      message: "Profile updated successfully",
+      data: userData,
+      user: userData,
       store: updatedStore || updatedUser.storeId || null,
       storeUpdated: !!updatedStore,
     });
@@ -374,7 +431,8 @@ const changePasswordSocket = async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     const isValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isValid) return res.status(400).json({ success: false, message: "Current password is incorrect" });
+    if (!isValid)
+      return res.status(400).json({ success: false, message: "Current password is incorrect" });
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = userId;
@@ -387,8 +445,100 @@ const changePasswordSocket = async (req, res) => {
   }
 };
 
+// ==========================================
+// 🌐 GOOGLE LOGIN — FIXED (avatar in response)
+// ==========================================
+const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential missing" });
+    }
+
+    const payload = JSON.parse(
+      Buffer.from(credential.split(".")[1], "base64").toString()
+    );
+
+    const { email, name, picture } = payload;
+    if (!email) {
+      return res.status(400).json({ message: "Google account mein email nahi mili" });
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword = Math.random().toString(36).slice(2) + "A1!";
+      user = await User.create({
+        name: name || email.split("@")[0],
+        username:
+          email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") +
+          Math.floor(Math.random() * 9999),
+        email,
+        password: await bcrypt.hash(randomPassword, 10),
+        role: "user",
+        avatar: picture || "",
+      });
+    } else {
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+        await user.save();
+      }
+    }
+
+   const accessToken = jwt.sign(
+  { userId: user._id, role: user.role },   // ✅ SAHI
+  process.env.JWT_SECRET,
+  { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10}m` }
+);
+
+const refreshToken = jwt.sign(
+  { userId: user._id, role: user.role },   // ✅ SAHI
+  process.env.JWT_SECRET,
+  { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d` }
+);
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10) * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30) * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      success: true,
+      message: "Google login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || null,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Google login failed", error: error.message });
+  }
+};
+
 module.exports = {
-  createUser, loginUser, refreshAccessToken, logoutUser,
-  getProfile, getMe, updateProfile, changePassword, toggle2FA,
-  getProfileInfo, updateProfileInfo, changePasswordSocket,
+  createUser,
+  loginUser,
+  refreshAccessToken,
+  logoutUser,
+  getProfile,
+  getMe,
+  updateProfile,
+  changePassword,
+  toggle2FA,
+  getProfileInfo,
+  updateProfileInfo,
+  changePasswordSocket,
+  googleLogin,
 };
