@@ -247,6 +247,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
               <span className="text-[13px]">Select Country</span>
             </span>
           )}
+          
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {selectedCountry && (
@@ -445,13 +446,34 @@ export default function BrandsPage() {
     router.push(`${pathname}/${id}`);
   };
 
+  // ✅ CHANGE 1: useQuery mein retry: false add kiya
   const {
     data: brands = [],
     isLoading: loading,
-  } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll });
+    isError,
+    error,
+  } = useQuery({ 
+    queryKey: ["brands"], 
+    queryFn: brandApi.getAll,
+    retry: false,
+  });
+
+  // ✅ CHANGE 1 continued: Permission error toast for fetch
+  useEffect(() => {
+    if (isError && error) {
+      const msg = error.message || "";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("403")) {
+        toast.error("You don't have permission to view brands.", {
+          duration: 6000,
+          description: "Contact an administrator to grant you access.",
+        });
+      }
+    }
+  }, [isError, error]);
 
   /* ==========================================
      ✅ CREATE / UPDATE — with TOAST
+     ✅ CHANGE 2: Permission error check in onError
      ========================================== */
   const brandMutation = useMutation({
     mutationFn: ({ data, id }) => (id ? brandApi.update(id, data) : brandApi.create(data)),
@@ -466,14 +488,21 @@ export default function BrandsPage() {
       setShowModal(false);
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.message || "Brand operation failed"
-      );
+      const msg = error.response?.data?.message || error.message || "Brand operation failed";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        toast.error(msg, {
+          duration: 6000,
+          description: "Contact an administrator to grant you brand access.",
+        });
+      } else {
+        toast.error(msg);
+      }
     },
   });
 
   /* ==========================================
      ✅ DELETE — with TOAST
+     ✅ CHANGE 3: Permission error check in onError
      ========================================== */
   const deleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => brandApi.delete(id))),
@@ -483,9 +512,15 @@ export default function BrandsPage() {
       toast.success("Brand deleted successfully");
     },
     onError: (error) => {
-      toast.error(
-        error.response?.data?.message || "Brand delete failed"
-      );
+      const msg = error.response?.data?.message || error.message || "Brand delete failed";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        toast.error(msg, {
+          duration: 6000,
+          description: "Contact an administrator to grant you brand access.",
+        });
+      } else {
+        toast.error(msg);
+      }
     },
   });
 
@@ -688,7 +723,6 @@ export default function BrandsPage() {
     </div>
   );
 
-  // ✅ FIXED ACTION BUTTONS: Added flex-shrink-0, min-w, min-h, and increased padding
   const ActionButtons = ({ brand }) => (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
       <button
@@ -888,7 +922,6 @@ export default function BrandsPage() {
                     </th>
                     <SortHeader label="Country" sortKey="country" />
                     <SortHeader label="Status" sortKey="status" />
-                    {/* ✅ FIXED TABLE HEADER: Added whitespace-nowrap */}
                     <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       Actions
                     </th>
@@ -938,7 +971,6 @@ export default function BrandsPage() {
                         <td className="px-4 py-2.5">
                           <StatusBadge active={brand.is_active} />
                         </td>
-                        {/* ✅ FIXED TABLE CELL: Added whitespace-nowrap and w-1 to prevent shrinking */}
                         <td className="px-4 py-2.5 whitespace-nowrap w-1">
                           <ActionButtons brand={brand} />
                         </td>
@@ -1036,7 +1068,7 @@ export default function BrandsPage() {
         )}
       </div>
 
-      {/* ===== Add/Edit Modal ===== */}
+      {/* ===== Add/Edit Modal (ONLY ONE — duplicate removed) ===== */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-lg rounded-xl overflow-visible" style={cardStyle}>
@@ -1057,12 +1089,11 @@ export default function BrandsPage() {
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code *</label>
                   <div className="relative">
-                                        <input
+                    <input
                       type="text"
                       value={formData.brand_code}
                       onChange={(e) => setFormData({ ...formData, brand_code: e.target.value })}
                       required
-                      // ✅ FIX: Agar editingBrand hai to readOnly aur disabled kar do
                       readOnly={!!editingBrand}
                       disabled={isSubmitting || loadingCode || !!editingBrand}
                       className={`h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 ${editingBrand ? 'cursor-not-allowed opacity-70' : ''}`}

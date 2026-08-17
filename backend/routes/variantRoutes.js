@@ -12,7 +12,7 @@ const {
 const Variant = require("../models/Variant");
 
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware");
+const { staffPermissionCheck } = require("../middleware/checkPermission");
 
 const {
   productImagesUpload,
@@ -57,7 +57,7 @@ const setUpdateProductId = async (req, res, next) => {
 router.post(
   "/",
   authMiddleware,
-  adminMiddleware,
+  staffPermissionCheck,
   productImagesUpload,
   validateProductImages,
   setCreateProductId,
@@ -68,6 +68,7 @@ router.post(
 router.get(
   "/next-sku",
   authMiddleware,
+  staffPermissionCheck,
   getNextSkuNumber
 );
 
@@ -75,7 +76,7 @@ router.get(
 router.put(
   "/:id",
   authMiddleware,
-  adminMiddleware,
+  staffPermissionCheck,
   setUpdateProductId,
   productImagesUpload,
   validateProductImages,
@@ -88,7 +89,7 @@ router.put(
 router.delete(
   "/:id",
   authMiddleware,
-  adminMiddleware,
+  staffPermissionCheck,
   deleteVariant
 );
 
@@ -97,6 +98,7 @@ router.delete(
 router.get(
   "/",
   authMiddleware,
+  staffPermissionCheck,
   getVariants
 );
 
@@ -105,6 +107,7 @@ router.get(
 router.get(
   "/:id",
   authMiddleware,
+  staffPermissionCheck,
   getVariantById
 );
 

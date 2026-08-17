@@ -67,7 +67,7 @@ function StatusPill(props) {
   var on = props.active;
   var c = on?"#34d399":"#f87171";
   return React.createElement("span", {
-    className: "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium",
+    className: "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium shrink-0",
     style: { backgroundColor: on?"rgba(16,185,129,0.08)":"rgba(239,68,68,0.08)", color: c }
   }, React.createElement("span", {className:"w-1 h-1 rounded-full",style:{backgroundColor:c}}), on?"Active":"Inactive");
 }
@@ -91,7 +91,7 @@ function SecTitle(props) {
 
 function InnerCard(props) {
   return React.createElement("div", {
-    className:"rounded-xl p-4",
+    className:"rounded-xl p-4 " + (props.className || ""),
     style:{
       backgroundColor:"transparent",
       border:"1px solid var(--border-color)",
@@ -116,7 +116,7 @@ function SBtn(props) {
   return React.createElement("button", {
     type: props.type||"button", onClick: props.onClick, disabled: props.disabled,
     onMouseEnter: function(){setHov(true);}, onMouseLeave: function(){setHov(false);},
-    className: "h-7 px-2.5 rounded-md text-[12px] font-medium inline-flex items-center gap-1 transition-all duration-150 disabled:opacity-40 cursor-pointer",
+    className: "h-7 px-2.5 rounded-md text-[12px] font-medium inline-flex items-center justify-center gap-1 transition-all duration-150 disabled:opacity-40 cursor-pointer",
     style: { backgroundColor: bg, color: cl, border: "none" }
   }, props.children);
 }
@@ -275,7 +275,6 @@ export default function BrandDetailPage() {
 
     function handleProductCreated(newProduct) {
       console.log("📥 Real-time Product Created:", newProduct?.name);
-      // Check if product belongs to this brand
       var productBrandId = newProduct.brand_id?._id || newProduct.brand_id;
       if (productBrandId === brandId) {
         qc.invalidateQueries({ queryKey: ["brand-products", brandId] });
@@ -285,7 +284,6 @@ export default function BrandDetailPage() {
 
     function handleProductDeleted(deletedProductId) {
       console.log("📥 Real-time Product Deleted:", deletedProductId);
-      // Always invalidate since we don't know which brand it belonged to
       qc.invalidateQueries({ queryKey: ["brand-products", brandId] });
       qc.invalidateQueries({ queryKey: ["brands"] });
     }
@@ -336,7 +334,6 @@ export default function BrandDetailPage() {
   var hasLogo=!!(brand&&brand.logo&&brand.logo.img_url);
   var wasUp=!!(brand&&brand.created_at&&brand.updated_at&&brand.created_at!==brand.updated_at);
 
-  // ✅✅✅ FIXED: Use brandProducts from dedicated query
   var totalProducts = brandProducts.length;
   var activeProducts = brandProducts.filter(function(p){ return p.status === "active"; }).length;
   var uniqueCategories = new Set(
@@ -364,43 +361,39 @@ export default function BrandDetailPage() {
             style:{color:"var(--text-muted)",background:"none",border:"none",cursor:"pointer",padding:0}
           },"Brands"),
           React.createElement(Ico,{d:D.chevron,className:"w-3 h-3",sw:1.5}),
-          React.createElement("span",{className:"text-[12px] font-medium",style:{color:"var(--text-primary)"}},brand.name)
+          React.createElement("span",{className:"text-[12px] font-medium truncate",style:{color:"var(--text-primary)"}},brand.name)
         ),
 
-        React.createElement("div",{className:"flex items-start gap-4"},
-          React.createElement("div",{className:"w-14 h-14 rounded-xl overflow-hidden shrink-0 flex items-center justify-center",style:{backgroundColor:"var(--bg-card)", border: "1px solid var(--border-color)"}},
-            hasLogo?React.createElement("img",{src:logoSrc,alt:brand.name,className:"w-full h-full object-contain p-1"})
-              :React.createElement("span",{className:"text-xl font-bold",style:{color:"#34d399"}},ini(brand.name))
+        React.createElement("div",{className:"flex items-start gap-2 mb-3"},
+          React.createElement("div",{className:"w-12 h-12 rounded-lg overflow-hidden shrink-0 flex items-center justify-center",style:{backgroundColor:"var(--bg-card)", border: "1px solid var(--border-color)"}},
+            hasLogo?React.createElement("img",{src:logoSrc,alt:brand.name,className:"w-full h-full object-contain p-0.5"})
+              :React.createElement("span",{className:"text-lg font-bold",style:{color:"#34d399"}},ini(brand.name))
           ),
-
           React.createElement("div",{className:"flex-1 min-w-0 pt-0.5"},
-            React.createElement("div",{className:"flex items-center gap-2 mb-0.5"},
-              React.createElement("h1",{className:"text-[18px] font-semibold truncate leading-tight"},brand.name),
-              React.createElement(StatusPill,{active:brand.is_active})
-            ),
-            brand.description?React.createElement("p",{className:"text-[12px] truncate mb-1.5",style:{color:"var(--text-muted)"}},brand.description):null,
-            React.createElement("div",{className:"flex items-center gap-2 flex-wrap"},
-              React.createElement("span",{className:"text-[11px] font-mono px-2 py-0.5 rounded-md",style:{backgroundColor:"var(--bg-tertiary)",color:"var(--text-muted)"}},brand.brand_code||"—"),
-              brand.country?React.createElement("span",{className:"text-[11px] px-2 py-0.5 rounded-md",style:{backgroundColor:"var(--bg-tertiary)",color:"var(--text-muted)"}},brand.country):null,
-              React.createElement("span",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"Created "+fd(brand.created_at)),
-              wasUp?React.createElement("span",{className:"text-[11px]",style:{color:"var(--text-muted)"}},"· Updated "+tago(brand.updated_at)):null
+            React.createElement("h1",{className:"text-[16px] font-semibold truncate leading-tight mb-0.5"},brand.name),
+            React.createElement("div",{className:"flex items-center gap-2 text-[11px]",style:{color:"var(--text-muted)"}},
+              React.createElement("span",{className:"font-mono"},brand.brand_code||"—"),
+              brand.country?React.createElement("span",null,"· "+brand.country):null
             )
           ),
-
-          React.createElement("div",{className:"flex items-center gap-1 shrink-0 pt-1"},
-            React.createElement(SBtn,{onClick:doEdit},React.createElement(Ico,{d:D.edit,className:"w-3.5 h-3.5"}),"Edit"),
-            React.createElement(SBtn,{danger:true,onClick:function(){setShowDel(true)},disabled:deleting},React.createElement(Ico,{d:D.trash,className:"w-3.5 h-3.5"}),"Delete")
+          React.createElement("div",{className:"shrink-0 ml-auto pt-1"},
+            React.createElement(StatusPill,{active:brand.is_active})
           )
+        ),
+
+        React.createElement("div",{className:"flex items-center gap-2 w-full"},
+          React.createElement(SBtn,{onClick:doEdit, className:"flex-1"},React.createElement(Ico,{d:D.edit,className:"w-3.5 h-3.5"}),"Edit"),
+          React.createElement(SBtn,{danger:true,onClick:function(){setShowDel(true)},disabled:deleting, className:"flex-1"},React.createElement(Ico,{d:D.trash,className:"w-3.5 h-3.5"}),"Delete")
         )
       ),
 
       /* TABS + CONTENT */
       React.createElement("div",{className:"rounded-xl overflow-hidden",style:cs},
-        React.createElement("div",{className:"px-5 flex items-center gap-5",style:{borderBottom:"1px solid var(--border-color)"}},
+        React.createElement("div",{className:"px-5 flex items-center gap-5 overflow-x-auto",style:{borderBottom:"1px solid var(--border-color)", scrollbarWidth:"none"}},
           tabList.map(function(tb){
             var active = tab===tb.id;
             return React.createElement("button",{key:tb.id,type:"button",onClick:function(){setTab(tb.id)},
-              className:"flex items-center gap-1.5 text-[12px] font-medium transition-colors duration-150",
+              className:"flex items-center gap-1.5 text-[12px] font-medium transition-colors duration-150 whitespace-nowrap",
               style:{
                 background:"none", border:"none", cursor:"pointer",
                 padding:"10px 0 9px 0",
@@ -417,13 +410,15 @@ export default function BrandDetailPage() {
           })
         ),
 
-        React.createElement("div",{className:"p-5"},
+        React.createElement("div",{className:"p-4 sm:p-5"},
 
-          /* TAB 1: BRAND INFO */
-          tab==="info"?React.createElement("div",{className:"grid grid-cols-1 lg:grid-cols-3 gap-4"},
-            React.createElement(InnerCard,null,
+          /* ✅ TAB 1: BRAND INFO - MOBILE RESPONSIVE FIX */
+          tab==="info"?React.createElement("div",{className:"grid grid-cols-1 md:grid-cols-3 gap-3"},
+            
+            // Details Card
+            React.createElement(InnerCard,{className:"flex flex-col"},
               React.createElement(SecTitle,null,"Details"),
-              React.createElement("div",{className:"divide-y",style:{borderColor:"var(--border-color)"}},
+              React.createElement("div",{className:"divide-y flex-1",style:{borderColor:"var(--border-color)"}},
                 React.createElement(InfoRow,{label:"Code",value:brand.brand_code,mono:true}),
                 React.createElement(InfoRow,{label:"Name",value:brand.name}),
                 React.createElement(InfoRow,{label:"Country",value:brand.country||"—"}),
@@ -432,15 +427,21 @@ export default function BrandDetailPage() {
                 React.createElement(InfoRow,{label:"Updated",value:wasUp?fdt(brand.updated_at):"Never"})
               )
             ),
-            React.createElement(InnerCard,null,
+
+            // Description Card
+            React.createElement(InnerCard,{className:"flex flex-col"},
               React.createElement(SecTitle,null,"Description"),
-              React.createElement("p",{className:"text-[12px] leading-relaxed whitespace-pre-wrap break-words",style:{color:"var(--text-secondary)"}},
-                brand.description||"No description provided."
+              React.createElement("div",{className:"flex-1"},
+                React.createElement("p",{className:"text-[12px] leading-relaxed whitespace-pre-wrap break-words",style:{color:"var(--text-secondary)"}},
+                  brand.description||"No description provided."
+                )
               )
             ),
-            React.createElement(InnerCard,null,
+
+            // Logo Card
+            React.createElement(InnerCard,{className:"flex flex-col"},
               React.createElement(SecTitle,null,"Logo"),
-              hasLogo?React.createElement("div",{className:"space-y-3"},
+              hasLogo?React.createElement("div",{className:"space-y-3 flex-1"},
                 React.createElement("div",{className:"flex items-center gap-2.5"},
                   React.createElement("div",{className:"w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center",style:{border:"1px solid var(--border-color)",borderRadius:"8px"}},
                     React.createElement("img",{src:logoSrc,alt:"",className:"w-full h-full object-contain p-0.5"})),
@@ -454,7 +455,7 @@ export default function BrandDetailPage() {
                   React.createElement(InfoRow,{label:"Type",value:brand.logo.mimeType,mono:true}),
                   React.createElement(InfoRow,{label:"Dimensions",value:brand.logo.width&&brand.logo.height?brand.logo.width+"x"+brand.logo.height+"px":"—",mono:true})
                 )
-              ):React.createElement("div",{className:"flex flex-col items-center justify-center py-6 gap-2"},
+              ):React.createElement("div",{className:"flex flex-col items-center justify-center py-6 gap-2 flex-1"},
                 React.createElement("div",{className:"w-12 h-12 rounded-xl flex items-center justify-center",style:{border:"1px dashed var(--border-color)"}},
                   React.createElement(Ico,{d:D.image,className:"w-5 h-5",sw:1.5})
                 ),
@@ -463,7 +464,7 @@ export default function BrandDetailPage() {
             )
           ):null,
 
-          /* ✅✅✅ TAB 2: PRODUCTS — FIXED WITH REAL-TIME DATA */
+          /* TAB 2: PRODUCTS */
           tab==="products"?React.createElement("div",{className:"space-y-4"},
             React.createElement("div",{className:"grid grid-cols-2 lg:grid-cols-4 gap-3"},
               React.createElement(InnerCard,null,
@@ -506,13 +507,13 @@ export default function BrandDetailPage() {
                     React.createElement("span",{className:"text-[12px]",style:{color:"var(--text-muted)"}},"Loading products...")
                   )
                 : brandProducts.length > 0
-                  ? React.createElement("div",{className:"overflow-x-auto"},
+                  ? React.createElement("div",{className:"overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0"},
                       React.createElement("table",{className:"w-full text-[12px]",style:{borderCollapse:"collapse"}},
                         React.createElement("thead",null,
                           React.createElement("tr",{style:{borderBottom:"1px solid var(--border-color)"}},
                             React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Product Name"),
                             React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Category"),
-                            React.createElement("th",{className:"text-left py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Created"),
+                            React.createElement("th",{className:"text-left py-2 px-2 font-medium hidden sm:table-cell",style:{color:"var(--text-muted)"}},"Created"),
                             React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Status"),
                             React.createElement("th",{className:"text-center py-2 px-2 font-medium",style:{color:"var(--text-muted)"}},"Action")
                           )
@@ -525,7 +526,7 @@ export default function BrandDetailPage() {
                               React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-secondary)"}},
                                 p.category_id?.name || p.category_id || "—"
                               ),
-                              React.createElement("td",{className:"py-2.5 px-2",style:{color:"var(--text-muted)"}},
+                              React.createElement("td",{className:"py-2.5 px-2 hidden sm:table-cell",style:{color:"var(--text-muted)"}},
                                 p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"
                               ),
                               React.createElement("td",{className:"py-2.5 px-2 text-center"},

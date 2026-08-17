@@ -1,15 +1,15 @@
 const Brand = require("../models/brand");
-const Product = require("../models/Product"); // ✅ Capital P
+const Product = require("../models/Product");
 const path = require("path");
 const fs = require("fs-extra");
-const { getIO } = require("../utils/socket"); // ✅ SOCKET IMPORT ADDED
+const { getIO } = require("../utils/socket");
+const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 
 // ================================
 // GET NEXT BRAND CODE
 // ================================
 const getNextBrandCode = async (req, res) => {
   try {
-    // ✅ Sirf active brands mein se last code nikalein
     const lastBrand = await Brand.findOne({
       brand_code: { $regex: /^BRD-\d+$/ },
       is_deleted: false,
@@ -18,26 +18,16 @@ const getNextBrandCode = async (req, res) => {
       .select("brand_code");
 
     let nextNumber = 1;
-
     if (lastBrand && lastBrand.brand_code) {
       const lastNum = parseInt(lastBrand.brand_code.split("-")[1], 10);
-      if (!isNaN(lastNum)) {
-        nextNumber = lastNum + 1;
-      }
+      if (!isNaN(lastNum)) nextNumber = lastNum + 1;
     }
 
     const nextCode = `BRD-${String(nextNumber).padStart(3, "0")}`;
-
-    res.status(200).json({
-      success: true,
-      data: { nextCode },
-    });
+    res.status(200).json({ success: true, data: { nextCode } });
   } catch (error) {
     console.log("❌ Get next brand code error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
@@ -48,7 +38,6 @@ const createBrand = async (req, res) => {
   try {
     console.log("========== CREATE BRAND ==========");
 
-    // ✅ Check: same brand_code active brand pehle se na ho
     if (req.body.brand_code) {
       const existing = await Brand.findOne({
         brand_code: req.body.brand_code,
@@ -68,37 +57,19 @@ const createBrand = async (req, res) => {
       updatedby: req.user?._id || null,
     };
 
-    if (req.brandImage) {
-      brandData.logo = req.brandImage;
-    }
+    if (req.brandImage) brandData.logo = req.brandImage;
 
     const brand = await Brand.create(brandData);
 
     if (req.tempBrandFolder && req.tempBrandFolder.startsWith("temp_")) {
-      const oldFolderPath = path.join(
-        __dirname,
-        "../uploads/brands",
-        req.tempBrandFolder
-      );
-
-      const newFolderPath = path.join(
-        __dirname,
-        "../uploads/brands",
-        brand._id.toString()
-      );
+      const oldFolderPath = path.join(__dirname, "../uploads/brands", req.tempBrandFolder);
+      const newFolderPath = path.join(__dirname, "../uploads/brands", brand._id.toString());
 
       if (await fs.pathExists(oldFolderPath)) {
         await fs.rename(oldFolderPath, newFolderPath);
-        console.log(`📁 Folder renamed: ${req.tempBrandFolder} → ${brand._id}`);
-
         const oldImgUrl = brand.logo?.img_url || "";
         const newImgUrl = oldImgUrl.replace(req.tempBrandFolder, brand._id.toString());
-
-        await Brand.findByIdAndUpdate(brand._id, {
-          "logo.img_url": newImgUrl,
-        });
-
-        console.log(`🔄 Logo URL updated: ${newImgUrl}`);
+        await Brand.findByIdAndUpdate(brand._id, { "logo.img_url": newImgUrl });
       }
     }
 
@@ -106,9 +77,23 @@ const createBrand = async (req, res) => {
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
-    // ✅ SOCKET EMIT - Brand Created
+    // ✅ LOG ACTIVITY
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    await pushGlobalActivity(io, {
+      action: `${performerName} created brand "${updatedBrand.brand_name || updatedBrand.name}"`,
+      category: "Brand Management",
+      performedBy: performerId,
+      performedByName: performerName,
+      details: {
+        brandCode: updatedBrand.brand_code,
+        brandName: updatedBrand.brand_name || updatedBrand.name,
+      },
+    }, performerId);
+
     try {
-      const io = getIO();
       io.emit("brandCreated", updatedBrand.toObject());
     } catch (socketErr) {
       console.log("⚠️ Socket emit skipped:", socketErr.message);
@@ -117,35 +102,25 @@ const createBrand = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Brand created successfully",
-      data: {
-        ...updatedBrand.toObject(),
-        products: [],
-      },
+      data: { ...updatedBrand.toObject(), products: [] },
     });
   } catch (error) {
-    // ✅ Duplicate Key Error (11000) ko handle karna
     if (error.code === 11000) {
-      console.log("❌ Create error: Duplicate Brand Code");
       return res.status(400).json({
         success: false,
         message: "This Brand Code already exists. Please use a different code.",
       });
     }
-
     console.log("❌ Create error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
 // ================================
-// GET ALL BRANDS (✅ Only Active + Products via brand_id)
+// GET ALL BRANDS
 // ================================
 const getBrands = async (req, res) => {
   try {
-    // ✅ Sirf non-deleted brands fetch karein
     const brands = await Brand.find({ is_deleted: false })
       .sort({ created_at: -1 })
       .populate("createdby", "name email")
@@ -156,42 +131,28 @@ const getBrands = async (req, res) => {
         const products = await Product.find({ brand_id: brand._id })
           .populate("category_id", "name")
           .select("name brand_id category_id status created_at");
-
-        return {
-          ...brand.toObject(),
-          products: products,
-        };
+        return { ...brand.toObject(), products };
       })
     );
 
-    res.status(200).json({
-      success: true,
-      data: brandsWithProducts,
-    });
+    res.status(200).json({ success: true, data: brandsWithProducts });
   } catch (error) {
     console.log("❌ Get brands error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
 // ================================
-// GET SINGLE BRAND (✅ Only Active + Products via brand_id)
+// GET SINGLE BRAND
 // ================================
 const getBrandById = async (req, res) => {
   try {
-    // ✅ Deleted brand access block karein
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
     if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found",
-      });
+      return res.status(404).json({ success: false, message: "Brand not found" });
     }
 
     const products = await Product.find({ brand_id: brand._id })
@@ -200,35 +161,25 @@ const getBrandById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        ...brand.toObject(),
-        products: products,
-      },
+      data: { ...brand.toObject(), products },
     });
   } catch (error) {
     console.log("❌ Get brand by id error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
 // ================================
-// GET BRAND WITH PRODUCTS (✅ Only Active)
+// GET BRAND WITH PRODUCTS
 // ================================
 const getBrandWithProducts = async (req, res) => {
   try {
-    // ✅ Deleted brand access block karein
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
     if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found",
-      });
+      return res.status(404).json({ success: false, message: "Brand not found" });
     }
 
     const products = await Product.find({ brand_id: brand._id })
@@ -237,33 +188,23 @@ const getBrandWithProducts = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        ...brand.toObject(),
-        products: products,
-      },
+      data: { ...brand.toObject(), products },
     });
   } catch (error) {
     console.log("❌ Get brand with products error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
 // ================================
-// UPDATE BRAND (✅ Only Active Brands)
+// UPDATE BRAND
 // ================================
 const updateBrand = async (req, res) => {
   try {
-    // ✅ Deleted brand update block karein
     const existingBrand = await Brand.findOne({ _id: req.params.id, is_deleted: false });
 
     if (!existingBrand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found",
-      });
+      return res.status(404).json({ success: false, message: "Brand not found" });
     }
 
     const updateData = {
@@ -273,20 +214,12 @@ const updateBrand = async (req, res) => {
 
     if (req.brandImage) {
       if (existingBrand.logo?.img_url) {
-        const oldFolderPath = path.join(
-          __dirname,
-          "../uploads/brands",
-          existingBrand._id.toString()
-        );
-
+        const oldFolderPath = path.join(__dirname, "../uploads/brands", existingBrand._id.toString());
         if (await fs.pathExists(oldFolderPath)) {
           await fs.remove(oldFolderPath);
-          console.log(`🗑️ Old brand folder deleted: ${oldFolderPath}`);
         }
       }
-
       updateData.logo = req.brandImage;
-
       if (updateData.logo.img_url) {
         updateData.logo.img_url = updateData.logo.img_url.replace(
           /uploads\/brands\/[^/]+\//,
@@ -295,9 +228,11 @@ const updateBrand = async (req, res) => {
       }
     }
 
-    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-    })
+    // Track changes
+    const trackedFields = ["brand_name", "name", "brand_code", "description", "country", "status"];
+    const changes = getChanges(existingBrand.toObject(), updateData, trackedFields);
+
+    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { new: true })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
@@ -305,9 +240,25 @@ const updateBrand = async (req, res) => {
       .populate("category_id", "name")
       .select("name brand_id category_id status created_at");
 
-    // ✅ SOCKET EMIT - Brand Updated
+    // ✅ LOG ACTIVITY
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    const changedFields = changes.map((c) => c.field).join(", ");
+    const actionMsg = changes.length > 0
+      ? `${performerName} updated ${changedFields} for brand "${brand.brand_name || brand.name}"`
+      : `${performerName} updated brand "${brand.brand_name || brand.name}"`;
+
+    await pushGlobalActivity(io, {
+      action: actionMsg,
+      category: "Brand Management",
+      performedBy: performerId,
+      performedByName: performerName,
+      details: { changes, brandId: brand._id },
+    }, performerId);
+
     try {
-      const io = getIO();
       io.emit("brandUpdated", brand.toObject());
     } catch (socketErr) {
       console.log("⚠️ Socket emit skipped:", socketErr.message);
@@ -316,61 +267,49 @@ const updateBrand = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Brand updated successfully",
-      data: {
-        ...brand.toObject(),
-        products: products,
-      },
+      data: { ...brand.toObject(), products },
     });
   } catch (error) {
-    // ✅ Duplicate Key Error (11000) ko handle karna (Update ke waqt)
     if (error.code === 11000) {
-      console.log("❌ Update error: Duplicate Brand Code");
       return res.status(400).json({
         success: false,
         message: "This Brand Code already exists. Please use a different code.",
       });
     }
-
     console.log("❌ Update error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
 // ================================
-// ✅ SOFT DELETE BRAND (Hard Delete NAHI, Images Bhi Safe)
+// SOFT DELETE BRAND
 // ================================
 const deleteBrand = async (req, res) => {
   try {
-    // ✅ Sirf active brand dhundhein
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false });
 
     if (!brand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found or already deleted",
-      });
+      return res.status(404).json({ success: false, message: "Brand not found or already deleted" });
     }
 
     console.log("========== SOFT DELETE BRAND ==========");
-    console.log("Brand ID:", brand._id);
 
-    // ⚠️ Soft delete mein images DELETE NAHI hoti
-    // Restore karne par images wapas chahiye hongi
-    console.log("📁 Brand images preserved for possible restore");
-
-    // ✅ Model method se soft delete karein
     await brand.softDelete(req.user._id);
 
-    console.log("✅ Brand soft deleted from DB:", brand._id);
-    console.log("   deleted_at:", brand.deleted_at);
-    console.log("   deletedby:", brand.deletedby);
+    // ✅ LOG ACTIVITY
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
 
-    // ✅ SOCKET EMIT - Brand Deleted
+    await pushGlobalActivity(io, {
+      action: `${performerName} deleted brand "${brand.brand_name || brand.name}"`,
+      category: "Brand Management",
+      performedBy: performerId,
+      performedByName: performerName,
+      details: { brandId: brand._id, brandCode: brand.brand_code },
+    }, performerId);
+
     try {
-      const io = getIO();
       io.emit("brandDeleted", { _id: brand._id.toString() });
     } catch (socketErr) {
       console.log("⚠️ Socket emit skipped:", socketErr.message);
@@ -379,23 +318,14 @@ const deleteBrand = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Brand soft deleted successfully",
-      data: {
-        _id: brand._id,
-        deleted_at: brand.deleted_at,
-      },
+      data: { _id: brand._id, deleted_at: brand.deleted_at },
     });
   } catch (error) {
     console.log("❌ Soft delete error:", error.message);
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// ================================
-// EXPORT
-// ================================
 module.exports = {
   getNextBrandCode,
   createBrand,

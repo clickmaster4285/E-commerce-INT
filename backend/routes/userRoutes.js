@@ -12,6 +12,7 @@ const {
   toggle2FA,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { checkPermission } = require("../middleware/checkPermission");
 
 const router = express.Router();
 
@@ -27,23 +28,23 @@ router.post("/logout", logoutUser);
 // 🔒 PROTECTED ROUTES (Auth Required)
 // ==========================================
 
-// ✅ GET /api/users/me - Frontend profile page ke liye (primary endpoint)
+// ✅ GET /api/users/me — Har logged-in user apna data dekh sake (NO permission)
 router.get("/me", authMiddleware, getMe);
 
-// ✅ GET /api/users/profile - Legacy endpoint (backward compatibility)
+// ✅ GET /api/users/profile — Har logged-in user apna profile dekh sake (NO permission)
 router.get("/profile", authMiddleware, getProfile);
 
-// ✅ PUT /api/users/profile - Update profile + store info
-router.put("/profile", authMiddleware, updateProfile);
+// ✅ PUT /api/users/profile — Permission required
+router.put("/profile", authMiddleware, checkPermission("profile"), updateProfile);
 
-// ✅ PUT /api/users/password - Change password
-router.put("/password", authMiddleware, changePassword);
+// ✅ PUT /api/users/password — Permission required
+router.put("/password", authMiddleware, checkPermission("profile"), changePassword);
 
-// ✅ PUT /api/users/2fa - Toggle two-factor authentication
-router.put("/2fa", authMiddleware, toggle2FA);
+// ✅ PUT /api/users/2fa — Permission required
+router.put("/2fa", authMiddleware, checkPermission("profile"), toggle2FA);
 
 // ==========================================
-// 🛡️ 404 HANDLER (Is route file ke liye)
+// 🛡️ 404 HANDLER
 // ==========================================
 router.use((req, res) => {
   res.status(404).json({

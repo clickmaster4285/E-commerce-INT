@@ -13,12 +13,14 @@ const User = require("./models/User");
 const Store = require("./models/Store");
 const { initSocket } = require("./utils/socket");
 
+// Routes
 const categoryRoutes = require("./routes/categoryRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const productRoutes = require("./routes/productRoutes");
 const userRoutes = require("./routes/userRoutes");
 const variantRoutes = require("./routes/variantRoutes");
 const storeRoutes = require("./routes/storeRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -26,16 +28,17 @@ const server = http.createServer(app);
 // ==========================================
 // CONSTANTS
 // ==========================================
-const ROLES = { ADMIN: "admin" };
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL;
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
 
-if (!PORT || !CLIENT_URL) {
-  console.error("❌ CRITICAL: PORT or CLIENT_URL is missing in .env file!");
+if (!CLIENT_URL) {
+  console.error("❌ CRITICAL: CLIENT_URL is missing in .env file!");
 }
 
-// ✅ CORS — localhost + network IP + .env value, sab allow
+// ==========================================
+// CORS CONFIGURATION
+// ==========================================
 const buildAllowedOrigins = () => {
   const origins = new Set();
   origins.add("http://localhost:3000");
@@ -45,15 +48,13 @@ const buildAllowedOrigins = () => {
 };
 
 const allowedOrigins = buildAllowedOrigins();
-console.log("🌐 Allowed CORS origins:", allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // curl, mobile apps
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     if (/^http:\/\/192\.168\.\d+\.\d+:3000$/.test(origin)) return callback(null, true);
     if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-    console.warn("⚠️ CORS blocked origin:", origin);
     callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -71,8 +72,14 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
   etag: true,
 }));
 
-// ✅ Socket initialize AFTER middleware
+// Socket initialize
 const io = initSocket(server);
+
+// Attach io to every request for controller-level broadcasting
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // ==========================================
 // ROUTES
@@ -83,21 +90,19 @@ app.use("/api/products", productRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/variants", variantRoutes);
 app.use("/api/store", storeRoutes);
+app.use("/api/employees", employeeRoutes);
 
 app.get("/", (req, res) => {
-  res.send(`Backend server is running with Socket.io 🚀 | Client: ${CLIENT_URL}`);
+  res.send("Backend server is running 🚀");
 });
 
 // ==========================================
-//  STORE + 👤 ADMIN SEEDING
+// STORE + ADMIN SEEDING
 // ==========================================
 const seedDefaultData = async () => {
   try {
     const storeName = process.env.DEFAULT_STORE_NAME;
-    if (!storeName) {
-      console.warn("⚠️ DEFAULT_STORE_NAME not found in .env");
-      return;
-    }
+    if (!storeName) return;
 
     let defaultStore = await Store.findOne({ store_name: storeName });
     if (!defaultStore) {
@@ -120,19 +125,14 @@ const seedDefaultData = async () => {
         primary_color: process.env.DEFAULT_STORE_PRIMARY_COLOR,
       });
       console.log("✅ Default store seeded:", storeName);
-    } else {
-      console.log("ℹ️ Store already exists:", defaultStore.store_name);
     }
 
-    const adminName = process.env.DEFAULT_ADMIN_NAME;
-    const adminUsername = process.env.DEFAULT_ADMIN_USERNAME;
     const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
     const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+    const adminUsername = process.env.DEFAULT_ADMIN_USERNAME;
+    const adminName = process.env.DEFAULT_ADMIN_NAME;
 
-    if (!adminEmail || !adminPassword) {
-      console.log("⚠️ Admin credentials missing in .env");
-      return;
-    }
+    if (!adminEmail || !adminPassword) return;
 
     let admin = await User.findOne({
       $or: [{ email: adminEmail }, { username: adminUsername }],
@@ -145,20 +145,17 @@ const seedDefaultData = async () => {
         username: adminUsername,
         email: adminEmail,
         password: hashedPassword,
-        role: ROLES.ADMIN,
+        role: "admin",
         storeId: defaultStore._id,
       });
       console.log("✅ Default admin seeded:", adminEmail);
-      console.log("   🔑 Password:", adminPassword);
     } else {
       let updated = false;
       if (!admin.storeId) { admin.storeId = defaultStore._id; updated = true; }
-      if (admin.role !== ROLES.ADMIN) { admin.role = ROLES.ADMIN; updated = true; }
+      if (admin.role !== "admin") { admin.role = "admin"; updated = true; }
       if (updated) {
         await admin.save();
         console.log("🔄 Admin updated with storeId & role");
-      } else {
-        console.log("ℹ️ Admin already exists:", adminEmail);
       }
     }
   } catch (err) {
@@ -174,6 +171,7 @@ const startServer = async () => {
   try {
     await connectDB();
 
+    // Ensure upload directories exist
     const uploadDir = path.join(__dirname, "uploads");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
     const storeUploadDir = path.join(uploadDir, "store");
@@ -181,11 +179,10 @@ const startServer = async () => {
 
     await seedDefaultData();
 
-    server.listen(PORT, () => {
+    server.listen(PORT, "0.0.0.0", () => {
       console.log(`✅ Server running on port ${PORT}`);
-      console.log(`🌐 Client URL: ${CLIENT_URL}`);
+      console.log(`🌐 Client: ${CLIENT_URL}`);
       console.log(`🚀 Socket.io Ready`);
-      console.log(`📁 Uploads: ${uploadDir}`);
     });
   } catch (error) {
     console.error("❌ Server start failed:", error.message);

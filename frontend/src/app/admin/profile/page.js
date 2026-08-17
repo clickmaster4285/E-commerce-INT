@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   User,
   Mail,
@@ -27,33 +27,36 @@ import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
 
 /* ═══════════════════════════════════════════════
-   REUSABLE PIECES  (Brand-page design language)
+   REUSABLE COMPONENTS
 ═══════════════════════════════════════════════ */
 
-const InfoRow = ({ icon: Icon, label, value, isLink = false, accent = false }) => (
-  <div
-    className="flex items-start gap-3 py-2.5"
-    style={{ borderBottom: "1px solid var(--border-color)" }}
-  >
-    <Icon
-      size={15}
-      className="mt-0.5 shrink-0"
-      style={{ color: accent ? "#34d399" : "var(--text-muted)" }}
-    />
-    <span
-      className="text-[12px] w-28 shrink-0 leading-snug"
-      style={{ color: "var(--text-muted)" }}
+const InfoRow = ({ icon: Icon, label, value, isLink = false, accent = false }) => {
+  const displayValue = value || "—";
+  return (
+    <div
+      className="flex items-start gap-3 py-2.5"
+      style={{ borderBottom: "1px solid var(--border-color)" }}
     >
-      {label}
-    </span>
-    <span
-      className={`text-[13px] font-medium break-all leading-snug ${isLink ? "hover:underline cursor-pointer" : ""}`}
-      style={{ color: isLink || accent ? "#34d399" : "var(--text-primary)" }}
-    >
-      {value || "—"}
-    </span>
-  </div>
-);
+      <Icon
+        size={15}
+        className="mt-0.5 shrink-0"
+        style={{ color: accent ? "#34d399" : "var(--text-muted)" }}
+      />
+      <span
+        className="text-[12px] w-28 shrink-0 leading-snug"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {label}
+      </span>
+      <span
+        className={`text-[13px] font-medium break-all leading-snug ${isLink ? "hover:underline cursor-pointer" : ""}`}
+        style={{ color: isLink || accent ? "#34d399" : "var(--text-primary)" }}
+      >
+        {displayValue}
+      </span>
+    </div>
+  );
+};
 
 const InputField = ({ label, value, onChange, type = "text", icon: Icon, disabled }) => (
   <div className="space-y-1.5">
@@ -73,7 +76,7 @@ const InputField = ({ label, value, onChange, type = "text", icon: Icon, disable
       )}
       <input
         type={type}
-        value={value}
+        value={value || ""}
         onChange={onChange}
         disabled={disabled}
         className={`w-full h-9 rounded-md text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-40 disabled:cursor-not-allowed ${Icon ? "pl-9 pr-3" : "px-3"}`}
@@ -87,7 +90,7 @@ const InputField = ({ label, value, onChange, type = "text", icon: Icon, disable
   </div>
 );
 
-const PasswordField = ({ label, value, onChange, show, toggle }) => (
+const PasswordField = ({ label, value, onChange, show, toggle, disabled }) => (
   <div className="space-y-1.5">
     <label
       className="block text-[12px] font-medium"
@@ -99,9 +102,10 @@ const PasswordField = ({ label, value, onChange, show, toggle }) => (
       <input
         type={show ? "text" : "password"}
         placeholder="••••••••"
-        value={value}
+        value={value || ""}
         onChange={onChange}
-        className="w-full h-9 rounded-md px-3 pr-9 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+        disabled={disabled}
+        className="w-full h-9 rounded-md px-3 pr-9 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
           backgroundColor: "var(--bg-tertiary)",
           border: "1px solid var(--border-color)",
@@ -111,7 +115,8 @@ const PasswordField = ({ label, value, onChange, show, toggle }) => (
       <button
         type="button"
         onClick={toggle}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 transition hover:opacity-70"
+        disabled={disabled}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 transition hover:opacity-70 disabled:opacity-40"
         style={{ color: "var(--text-muted)" }}
       >
         {show ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -120,7 +125,6 @@ const PasswordField = ({ label, value, onChange, show, toggle }) => (
   </div>
 );
 
-/* Shared card style — identical to Brand page */
 const cardStyle = {
   backgroundColor: "var(--bg-card)",
   border: "1px solid var(--border-color)",
@@ -137,6 +141,9 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
 
+  // ✅ CHANGE 1: Track permissions from server
+  const [hasProfilePermission, setHasProfilePermission] = useState(true);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -145,67 +152,60 @@ export default function ProfilePage() {
   const [showPwd, setShowPwd] = useState({ current: false, new: false, confirm: false });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  const isSelfUpdating = useRef(false);
-
-  /* ── build data from any user object format ── */
-  const buildData = useCallback((u) => {
-    if (!u) return null;
-    const store = u.store || u.storeId || {};
+  /* ── build data from any user object ── */
+  const buildData = useCallback((user) => {
+    if (!user) return null;
+    const store = user.store || user.storeId || {};
     return {
-      name: u.name || "Admin User",
-      username: u.username || "admin",
-      email: u.email || store.email || "",
-      phone: u.phone || store.phone || "",
-      role: u.role || "admin",
-      avatar: u.avatar || null,
+      name: user.name || "Admin User",
+      username: user.username || "admin",
+      email: user.email || store.email || "",
+      phone: user.phone || store.phone || "",
+      role: user.role || "admin",
+      avatar: user.avatar || null,
       memberSince:
-        u.createdAt || u.created_at
-          ? new Date(u.createdAt || u.created_at).toLocaleDateString("en-US", {
+        user.createdAt || user.created_at
+          ? new Date(user.createdAt || user.created_at).toLocaleDateString("en-US", {
               year: "numeric",
               month: "long",
               day: "numeric",
             })
           : "N/A",
       joinDate:
-        u.createdAt || u.created_at
-          ? new Date(u.createdAt || u.created_at).toLocaleDateString("en-US", {
+        user.createdAt || user.created_at
+          ? new Date(user.createdAt || user.created_at).toLocaleDateString("en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
             })
           : "N/A",
-      lastLogin: u.last_login || u.lastLogin || "Today",
-      storeName: store.store_name || u.store_name || "My Store",
-      website: u.website || store.website || "",
-      address: u.address || store.address || "",
+      lastLogin: user.last_login || user.lastLogin || "Today",
+      storeName: store.store_name || user.store_name || "My Store",
+      address: user.address || store.address || "",
       storeStatus: store.store_status || "Active",
       primaryColor: store.primary_color || "#10b981",
+      // ✅ CHANGE 1 continued: Extract permissions
+      permissions: user.permissions || {},
     };
   }, []);
 
   /* ── fetch profile via socket ── */
   const fetchProfile = useCallback(() => {
     if (!socket || !isConnected) return;
-    console.log("🔄 Emitting getProfile...");
     socket.emit("getProfile");
   }, [socket, isConnected]);
 
   /* ── socket listeners ── */
   useEffect(() => {
     if (!socket || !isConnected) {
-      if (!isConnected) {
-        setLoading(false);
-        setError("Socket not connected. Please refresh the page.");
-      }
+      setLoading(false);
       return;
     }
 
     fetchProfile();
 
     const handleProfileData = (res) => {
-      console.log("📥 profileData RAW:", JSON.stringify(res));
       if (!res) {
-        setError("Empty response from server.");
         setLoading(false);
         return;
       }
@@ -216,32 +216,34 @@ export default function ProfilePage() {
       }
       const userData = res.data || res.user || res;
       if (userData && (userData.name || userData._id || userData.email)) {
-        const d = buildData(userData);
-        if (d) {
-          setProfile(d);
-          setEditForm(d);
+        const data = buildData(userData);
+        if (data) {
+          setProfile(data);
+          setEditForm(data);
+          // ✅ CHANGE 1 continued: Set permission state
+          const perms = userData.permissions || data.permissions || {};
+          const role = userData.role || data.role || "";
+          // Admin always has permission, staff needs permissions.profile
+          if (role === "admin") {
+            setHasProfilePermission(true);
+          } else {
+            setHasProfilePermission(perms.profile !== false);
+          }
           setLoading(false);
           setError("");
-          console.log("✅ Profile loaded:", d.name, "| Store:", d.storeName);
-        } else {
-          setError("Failed to parse profile data.");
-          setLoading(false);
+          return;
         }
-      } else {
-        console.warn("⚠️ Unexpected profile data format:", res);
-        setError("Unexpected data format. Check console for details.");
-        setLoading(false);
       }
+      setLoading(false);
     };
 
     const handleProfileUpdated = (res) => {
-      console.log("📥 profileUpdated RAW:", JSON.stringify(res));
       const userData = res?.data || res?.user || res;
       if (userData && (userData.name || userData._id)) {
-        const d = buildData(userData);
-        if (d) {
-          setProfile(d);
-          setEditForm(d);
+        const data = buildData(userData);
+        if (data) {
+          setProfile(data);
+          setEditForm(data);
           toast.success("Profile synced!");
         }
       }
@@ -251,95 +253,98 @@ export default function ProfilePage() {
     };
 
     const handleStoreInfoChanged = (storeData) => {
-      console.log("📥 storeInfoChangedForProfile:", storeData);
       if (!storeData) return;
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              storeName: storeData.store_name || prev.storeName,
-              address: storeData.address || prev.address,
-              email: storeData.email || prev.email,
-              phone: storeData.phone || prev.phone,
-              website: storeData.website || prev.website,
-              storeStatus: storeData.store_status || prev.storeStatus,
-              primaryColor: storeData.primary_color || prev.primaryColor,
-            }
-          : prev
-      );
-      setEditForm((prev) =>
-        prev
-          ? {
-              ...prev,
-              storeName: storeData.store_name || prev.storeName,
-              address: storeData.address || prev.address,
-              email: storeData.email || prev.email,
-              phone: storeData.phone || prev.phone,
-              website: storeData.website || prev.website,
-            }
-          : prev
-      );
+      setProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          storeName: storeData.store_name || prev.storeName,
+          address: storeData.address || prev.address,
+          email: storeData.email || prev.email,
+          phone: storeData.phone || prev.phone,
+          storeStatus: storeData.store_status || prev.storeStatus,
+          primaryColor: storeData.primary_color || prev.primaryColor,
+        };
+      });
+      setEditForm((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          storeName: storeData.store_name || prev.storeName,
+          address: storeData.address || prev.address,
+          email: storeData.email || prev.email,
+          phone: storeData.phone || prev.phone,
+        };
+      });
       toast.info("Store info synced from Store page!");
     };
 
-    const handleStoreUpdated = (storeData) => {
-      if (storeData) {
-        window.dispatchEvent(new CustomEvent("storeUpdated", { detail: storeData }));
-      }
-    };
-
     const handleProfileError = (err) => {
-      console.error("❌ profileError:", err);
-      setError(err?.message || "Something went wrong.");
       setLoading(false);
     };
 
     socket.on("profileData", handleProfileData);
     socket.on("profileUpdated", handleProfileUpdated);
     socket.on("storeInfoChangedForProfile", handleStoreInfoChanged);
-    socket.on("storeUpdated", handleStoreUpdated);
     socket.on("profileError", handleProfileError);
 
     return () => {
       socket.off("profileData", handleProfileData);
       socket.off("profileUpdated", handleProfileUpdated);
       socket.off("storeInfoChangedForProfile", handleStoreInfoChanged);
-      socket.off("storeUpdated", handleStoreUpdated);
       socket.off("profileError", handleProfileError);
     };
   }, [socket, isConnected, buildData, fetchProfile]);
 
   /* ── SAVE PROFILE ── */
   const handleSaveProfile = () => {
-    if (!socket || !isConnected) return toast.error("Server connection lost.");
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    // ✅ CHANGE 2: Permission check before save
+    if (!hasProfilePermission) {
+      toast.error("You don't have permission to edit profile.", {
+        duration: 6000,
+        description: "Contact an administrator to grant you profile access.",
+      });
+      return;
+    }
+
     setIsSaving(true);
     const payload = {
-      name: editForm.name,
-      email: editForm.email,
-      phone: editForm.phone,
-      address: editForm.address,
-      website: editForm.website,
-      store_name: editForm.storeName,
+      name: editForm.name || "",
+      email: editForm.email || "",
+      phone: editForm.phone || "",
+      address: editForm.address || "",
+      store_name: editForm.storeName || "",
     };
-    console.log("📤 Saving profile + store:", payload);
     socket.emit("updateProfile", payload, (res) => {
-      console.log("📥 Save callback RAW:", JSON.stringify(res));
       if (res?.success) {
         toast.success("Profile updated successfully!");
         setIsEditing(false);
         const userData = res.data || res.user || res;
         if (userData && (userData.name || userData._id)) {
-          const d = buildData(userData);
-          if (d) {
-            setProfile(d);
-            setEditForm(d);
+          const data = buildData(userData);
+          if (data) {
+            setProfile(data);
+            setEditForm(data);
           }
         }
         if (res.store) {
           window.dispatchEvent(new CustomEvent("storeUpdated", { detail: res.store }));
         }
       } else {
-        toast.error(res?.message || "Failed to update profile");
+        // ✅ Permission error from server
+        const msg = res?.message || "Failed to update profile";
+        if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+          toast.error(msg, {
+            duration: 6000,
+            description: "Contact an administrator to grant you profile access.",
+          });
+        } else {
+          toast.error(msg);
+        }
       }
       setIsSaving(false);
     });
@@ -350,13 +355,32 @@ export default function ProfilePage() {
 
   /* ── CHANGE PASSWORD ── */
   const handleChangePassword = () => {
-    if (!socket || !isConnected) return toast.error("Server connection lost.");
-    if (!passwords.current || !passwords.new || !passwords.confirm)
-      return toast.error("Please fill all password fields");
-    if (passwords.new !== passwords.confirm)
-      return toast.error("New passwords do not match");
-    if (passwords.current === passwords.new)
-      return toast.error("New password must differ from current");
+    if (!socket || !isConnected) {
+      toast.error("Server connection lost.");
+      return;
+    }
+
+    // ✅ CHANGE 3: Permission check before password change
+    if (!hasProfilePermission) {
+      toast.error("You don't have permission to change password.", {
+        duration: 6000,
+        description: "Contact an administrator to grant you profile access.",
+      });
+      return;
+    }
+
+    if (!passwords.current || !passwords.new || !passwords.confirm) {
+      toast.error("Please fill all password fields");
+      return;
+    }
+    if (passwords.new !== passwords.confirm) {
+      toast.error("New passwords do not match");
+      return;
+    }
+    if (passwords.current === passwords.new) {
+      toast.error("New password must differ from current");
+      return;
+    }
     setIsChangingPassword(true);
     socket.emit(
       "changePassword",
@@ -366,7 +390,15 @@ export default function ProfilePage() {
           toast.success("Password changed successfully!");
           setPasswords({ current: "", new: "", confirm: "" });
         } else {
-          toast.error(res?.message || "Failed to change password");
+          const msg = res?.message || "Failed to change password";
+          if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+            toast.error(msg, {
+              duration: 6000,
+              description: "Contact an administrator to grant you profile access.",
+            });
+          } else {
+            toast.error(msg);
+          }
         }
         setIsChangingPassword(false);
       }
@@ -384,8 +416,10 @@ export default function ProfilePage() {
     }
   };
 
-  /* ── LOADING STATE ── */
-  if (loading)
+  /* ═══════════════════════════════════════════════
+     RENDER — LOADING
+  ═══════════════════════════════════════════════ */
+  if (loading) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
@@ -399,40 +433,51 @@ export default function ProfilePage() {
         </div>
       </div>
     );
+  }
 
-  /* ── ERROR STATE ── */
-  if (error || !profile)
+  /* ═══════════════════════════════════════════════
+     RENDER — ERROR
+  ═══════════════════════════════════════════════ */
+  if (error) {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center gap-4"
+        className="min-h-screen flex items-center justify-center"
         style={{ backgroundColor: "var(--bg-main)" }}
       >
-        <AlertCircle className="h-10 w-10" style={{ color: "rgba(239,68,68,0.7)" }} />
-        <p
-          className="text-[13px] font-medium text-center px-4"
-          style={{ color: "var(--text-primary)" }}
+        <div
+          className="max-w-md w-full rounded-lg p-6 text-center"
+          style={cardStyle}
         >
-          {error || "Error Loading Profile"}
-        </p>
-        <button
-          onClick={handleRetry}
-          disabled={!isConnected}
-          className="flex items-center gap-2 h-9 px-4 rounded-lg text-[13px] font-medium transition hover:opacity-80 disabled:opacity-40"
-          style={{
-            backgroundColor: "var(--bg-tertiary)",
-            border: "1px solid var(--border-color)",
-            color: "var(--text-primary)",
-          }}
-        >
-          <RefreshCw size={14} /> Retry
-        </button>
-        {!isConnected && (
-          <p className="text-[12px]" style={{ color: "#f87171" }}>
-            Socket disconnected — refresh the page
+          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "#ef4444" }} />
+          <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {error}
           </p>
-        )}
+          <button
+            onClick={handleRetry}
+            className="mt-4 inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-semibold transition hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+          >
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
       </div>
     );
+  }
+
+  /* ═══════════════════════════════════════════════
+     RENDER — NO PROFILE DATA (fallback)
+  ═══════════════════════════════════════════════ */
+  if (!profile) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "var(--bg-main)" }}
+      >
+        <div></div>
+      </div>
+    );
+  }
 
   /* ═══════════════════════════════════════════════
      RENDER — FULL PROFILE PAGE
@@ -461,7 +506,7 @@ export default function ProfilePage() {
                     className="text-3xl sm:text-4xl font-bold select-none"
                     style={{ color: "rgba(255,255,255,0.85)" }}
                   >
-                    {profile.name.charAt(0).toUpperCase()}
+                    {profile.name?.charAt(0).toUpperCase() || "U"}
                   </span>
                 )}
               </div>
@@ -547,6 +592,15 @@ export default function ProfilePage() {
                   Security
                 </h3>
               </div>
+
+              {/* ✅ CHANGE 3: Show permission warning if no access */}
+              {!hasProfilePermission && (
+                <div className="mb-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                  <AlertCircle size={14} style={{ color: "#f87171" }} />
+                  <p className="text-[11px]" style={{ color: "#f87171" }}>You don't have permission to change password</p>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <PasswordField
                   label="Current Password"
@@ -554,6 +608,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
                   show={showPwd.current}
                   toggle={() => setShowPwd({ ...showPwd, current: !showPwd.current })}
+                  disabled={!hasProfilePermission}
                 />
                 <PasswordField
                   label="New Password"
@@ -561,6 +616,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
                   show={showPwd.new}
                   toggle={() => setShowPwd({ ...showPwd, new: !showPwd.new })}
+                  disabled={!hasProfilePermission}
                 />
                 <PasswordField
                   label="Confirm Password"
@@ -568,11 +624,12 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
                   show={showPwd.confirm}
                   toggle={() => setShowPwd({ ...showPwd, confirm: !showPwd.confirm })}
+                  disabled={!hasProfilePermission}
                 />
                 <div className="flex justify-end pt-1">
                   <button
                     onClick={handleChangePassword}
-                    disabled={isChangingPassword || !isConnected}
+                    disabled={isChangingPassword || !isConnected || !hasProfilePermission}
                     className="flex items-center gap-2 h-9 px-4 rounded-md text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
                     style={{ backgroundColor: "var(--accent)" }}
                   >
@@ -609,17 +666,33 @@ export default function ProfilePage() {
 
                 <div className="flex items-center gap-2">
                   {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium transition hover:opacity-80"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        border: "1px solid var(--border-color)",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      <Edit3 size={13} /> Edit
-                    </button>
+                    // ✅ CHANGE 2: Disable Edit button if no permission
+                    hasProfilePermission ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium transition hover:opacity-80"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        <Edit3 size={13} /> Edit
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium opacity-40 cursor-not-allowed"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-muted)",
+                        }}
+                        title="You don't have permission to edit profile"
+                      >
+                        <Edit3 size={13} /> Edit
+                      </button>
+                    )
                   ) : (
                     <>
                       <button
@@ -639,7 +712,7 @@ export default function ProfilePage() {
                       </button>
                       <button
                         onClick={handleSaveProfile}
-                        disabled={isSaving || !isConnected}
+                        disabled={isSaving || !isConnected || !hasProfilePermission}
                         className="flex items-center gap-1.5 h-9 px-4 rounded-md text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
                         style={{ backgroundColor: "var(--accent)" }}
                       >
@@ -671,37 +744,31 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                         <InputField
                           label="Full Name"
-                          value={editForm.name}
+                          value={editForm.name || ""}
                           onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                           icon={User}
                         />
                         <InputField
                           label="Store Name"
-                          value={editForm.storeName}
+                          value={editForm.storeName || ""}
                           onChange={(e) => setEditForm({ ...editForm, storeName: e.target.value })}
                           icon={Store}
                         />
                         <InputField
                           label="Email"
-                          value={editForm.email}
+                          value={editForm.email || ""}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                           icon={Mail}
                         />
                         <InputField
                           label="Phone"
-                          value={editForm.phone}
+                          value={editForm.phone || ""}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                           icon={Phone}
                         />
                         <InputField
-                          label="Website"
-                          value={editForm.website}
-                          onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                          icon={Globe}
-                        />
-                        <InputField
                           label="Store Address"
-                          value={editForm.address}
+                          value={editForm.address || ""}
                           onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                           icon={MapPin}
                         />
@@ -711,7 +778,6 @@ export default function ProfilePage() {
                         <InfoRow icon={Phone} label="Phone:" value={profile.phone} accent />
                         <InfoRow icon={MapPin} label="Address:" value={profile.address} />
                         <InfoRow icon={Mail} label="E-mail:" value={profile.email} isLink accent />
-                        <InfoRow icon={Globe} label="Website:" value={profile.website} isLink accent />
                         <InfoRow icon={Store} label="Store:" value={profile.storeName} accent />
                       </div>
                     )}
