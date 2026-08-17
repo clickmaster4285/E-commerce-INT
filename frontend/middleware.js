@@ -2,37 +2,41 @@ import { NextResponse } from 'next/server';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
+  const hasToken = !!request.cookies.get('accessToken');
 
-  // ✅ ADMIN routes ko protect karein
-  if (pathname.startsWith('/admin')) {
-    const accessToken = request.cookies.get('accessToken');
-    
-    // Agar cookie nahi hai, toh login page par redirect kar do
-    if (!accessToken) {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
+  // Static files ignore karein
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api')) {
+    return NextResponse.next();
   }
 
-  // ✅ Agar user logged in hai aur /login ya /register par jaye
-  if (pathname === '/login' || pathname === '/register') {
-    const accessToken = request.cookies.get('accessToken');
-    if (accessToken) {
-      // Logged in user ko admin dashboard par bhej do
+  // ✅ Admin Login — public page
+  if (pathname === '/admin/login') {
+    if (hasToken) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
+    return NextResponse.next();
   }
 
-  // ✅ Baqi sab routes (user pages) - koi check nahi, seedha access
+  // ✅ User Login — public page
+  if (pathname === '/login') {
+    if (hasToken) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // ✅ Baqi sab ADMIN pages — protected
+  if (pathname.startsWith('/admin')) {
+    if (!hasToken) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
-// ✅ Ye middleware sirf in routes par chalega (Performance ke liye)
 export const config = {
   matcher: [
-    '/admin/:path*',    // Saare admin routes (protected)
-    '/login',           // Login page (redirect if logged in)
-    '/register',        // Register page (redirect if logged in)
-    // ⚠️ User pages (/product, /category, /brand) ismein nahi hain
-    // Isliye middleware un par chalega hi nahi - bilkul PUBLIC rahenge
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

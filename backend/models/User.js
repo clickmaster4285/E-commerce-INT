@@ -2,25 +2,58 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    username: { type: String, unique: true, sparse: true, trim: true },
-    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    password: { type: String, required: true, minlength: 6 },
-    phone: { type: String, default: "" },
-    role: { type: String, default: "staff", enum: ["admin", "manager", "staff", "user"] },
-    department: { type: String, default: "", trim: true },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
-    storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
-    avatar: { type: String, default: null },
-    twoFactorEnabled: { type: Boolean, default: false },
-   permissions: {
-  employees: { type: Boolean, default: true },
-  products: { type: Boolean, default: true },
-  brands: { type: Boolean, default: true },
-  categories: { type: Boolean, default: true },
-  profile: { type: Boolean, default: true },
-  store: { type: Boolean, default: false },
-},
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+    },
+    phone: {
+      type: String,
+      default: "",
+    },
+    role: {
+      type: String,
+      default: "user",
+      enum: ["user", "admin", "staff"],
+    },
+    storeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      default: null,
+    },
+    avatar: 
+    { type: String, default: "" },
+
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    permissions: {
+      products: { type: Boolean, default: true },
+      brands: { type: Boolean, default: true },
+      categories: { type: Boolean, default: true },
+      users: { type: Boolean, default: false },
+      orders: { type: Boolean, default: true },
+      settings: { type: Boolean, default: true },
+    },
     preferences: {
       darkMode: { type: Boolean, default: true },
       notifications: {

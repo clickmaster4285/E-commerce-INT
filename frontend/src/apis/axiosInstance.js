@@ -14,22 +14,20 @@ const redirectToLogin = () => {
   const path = window.location.pathname;
 
   // ✅ Agar user already /login par hai, toh kuch mat karo (infinite loop se bachao)
-  if (path === "/login" || path === "/register") {
-    return;
-  }
+  if (path === "/login" || path === "/register" || path === "/admin/login") {
+  return;
+}
 
   // ✅ Agar admin page par hai, toh login par bhejo
-  if (path.startsWith("/admin")) {
-    localStorage.clear();
-    window.location.href = "/login";
-    return;
-  }
-  
-  // ✅ Staff dashboard ya other protected routes ke liye bhi redirect
-  if (path.startsWith("/dashboard")) {
-     window.location.href = "/login";
-     return;
-  }
+ // ✅ Agar admin page par hai, toh ADMIN login par bhejo
+if (path.startsWith("/admin")) {
+  localStorage.clear();
+  window.location.href = "/admin/login";   // ❌ purana: "/login"
+  return;
+}
+
+  // ❌ Agar user page par hai (/, /product, /category, /brand) toh REDIRECT MAT KARO
+  // Sirf error silently reject hoga, user page waise hi kaam karega
 };
 
 // ==========================================

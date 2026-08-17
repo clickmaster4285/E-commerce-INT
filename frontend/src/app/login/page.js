@@ -1,362 +1,346 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { GoogleLogin } from "@react-oauth/google";
+import { Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck } from "lucide-react";
 import axiosInstance from "@/apis/axiosInstance";
-import { Eye, EyeOff, Shield, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
+import { storeApi } from "@/apis/storeApi";
+import { categoryApi } from "@/apis/categoryApi";
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [mounted, setMounted] = useState(false);
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+// ✅ Store Logo — dynamic + fallback letter
+function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
+  const logoUrl = store?.logo?.img_url
+    ? store.logo.img_url.startsWith("http")
+      ? store.logo.img_url
+      : `${API_ORIGIN}/${store.logo.img_url}`
+    : null;
+  const letter = (store?.store_name || "C").charAt(0).toUpperCase();
+
+  if (!logoUrl) {
+    return (
+      <div
+        className={`${sizeClass} rounded-lg bg-[var(--user-accent)] flex items-center justify-center shrink-0`}
+      >
+        <span className="text-[var(--user-accent-text)] font-black text-lg lg:text-xl">
+          {letter}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={logoUrl}
+      alt={store?.store_name || "Store"}
+      className={`${sizeClass} rounded-lg object-cover shrink-0`}
+    />
+  );
+}
+
+// ✅ Category Badge — dynamic
+function CategoryBadge({ icon, label }) {
+  return (
+    <div className="flex items-center gap-2 px-4 lg:px-5 py-2.5 lg:py-3 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl text-[var(--user-text-secondary)] text-xs lg:text-sm">
+      <span className="text-[var(--user-accent)]">{icon}</span>
+      {label}
+    </div>
+  );
+}
+
+export default function UserLoginPage() {
   const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
-  const loginMutation = useMutation({
-    mutationFn: async (userData) => {
-      const response = await axiosInstance.post("/users/login", userData);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      const allowedRoles = ['admin', 'staff', 'manager'];
-
-      if (!allowedRoles.includes(data.user?.role)) {
-        toast.error('Access Denied', {
-          description: 'Your account does not have permission to access this portal.',
-          duration: 4000,
-        });
-        axiosInstance.post("/users/logout");
-        return;
-      }
-
-      const name = data.user?.name || '';
-      const firstName = name.split(' ')[0];
-      toast.success(`Welcome back${firstName ? `, ${firstName}` : ''}!`, {
-        description: 'Redirecting you to the dashboard...',
-        duration: 3000,
-      });
-
-      setTimeout(() => {
-        router.push('/admin/dashboard');
-      }, 1200);
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || 'Login failed. Please try again.';
-      toast.error('Authentication Failed', {
-        description: message,
-        duration: 4000,
-      });
-    }
+  // ✅ Store info (public)
+  const { data: store = null } = useQuery({
+    queryKey: ["storeInfo"],
+    queryFn: storeApi.getPublic,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const handleLogin = (e) => {
+  // ✅ Top 3 categories (branding ke liye)
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: categoryApi.getAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const storeName = store?.store_name || "ClickMasters";
+  const tagline =
+    store?.tagline ||
+    "Mobiles · Laptops · Watches · Accessories\nShop everything from one trusted store.";
+  const topCategories = categories.slice(0, 3);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const endpoint = isLogin ? "/users/login" : "/users/register";
+      const payload = isLogin
+        ? { email, password }
+        : { name, username, phone, email, password };
 
-    if (!email.trim()) {
-      toast.warning('Email Required', {
-        description: 'Please enter your email address.',
-        duration: 3000,
-      });
-      return;
+      await axiosInstance.post(endpoint, payload);
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.response?.data?.message || `${isLogin ? "Login" : "Registration"} failed.`);
+      setLoading(false);
     }
-    if (!password.trim()) {
-      toast.warning('Password Required', {
-        description: 'Please enter your password.',
-        duration: 3000,
-      });
-      return;
-    }
+  };
 
-    loginMutation.mutate({ email, password });
+  const handleGoogleLogin = async (credential) => {
+    setError("");
+    setLoading(true);
+    try {
+      await axiosInstance.post("/users/google-login", { credential });
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.response?.data?.message || "Google login failed.");
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: '#0a0c14' }}>
-      
-      {/* ===== LEFT SIDE — Branding ===== */}
-      <div 
-        className="hidden lg:flex lg:w-[55%] flex-col justify-between p-10 xl:p-14 relative overflow-hidden"
-        style={{ backgroundColor: '#060810' }}
-      >
-        {/* Subtle gradient overlay */}
-        <div 
-          className="absolute inset-0 opacity-30"
-          style={{ 
-            background: 'radial-gradient(ellipse at 30% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 70%)' 
-          }} 
-        />
-        
-        {/* Grid pattern */}
-        <div 
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-            backgroundSize: '60px 60px'
-          }}
-        />
+    <main className="user-theme min-h-screen flex bg-[var(--user-bg)]">
+      {/* ==========================================
+          LEFT SIDE — BRANDING (Desktop only)
+      ========================================== */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-[var(--user-bg-elevated)] relative overflow-hidden border-r border-[var(--user-border)]">
+        {/* Subtle glows */}
+        <div className="absolute top-[-120px] left-[-120px] w-[400px] h-[400px] rounded-full bg-[var(--user-accent)]/5 blur-3xl" />
+        <div className="absolute bottom-[-120px] right-[-120px] w-[400px] h-[400px] rounded-full bg-[var(--user-accent)]/5 blur-3xl" />
 
-        {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div 
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: '#10b981' }}
-          >
-            <span className="text-white font-bold text-base">C</span>
-          </div>
-          <span className="text-white font-semibold text-lg tracking-tight">ClickMasters</span>
+        {/* TOP: Logo */}
+        <div className="flex items-center gap-3 relative">
+          <StoreLogo store={store} />
+          <span className="text-[var(--user-text)] font-black text-xl tracking-wide">
+            {storeName}
+          </span>
         </div>
 
-        {/* Center content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center -mt-16 max-w-lg">
-          <div 
-            className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-          >
-            <div className="flex items-center gap-2 mb-6">
-              <div 
-                className="h-px w-8"
-                style={{ backgroundColor: '#10b981' }}
-              />
-              <span 
-                className="text-[11px] font-semibold uppercase tracking-[0.2em]"
-                style={{ color: '#10b981' }}
-              >
-                Inventory Management
-              </span>
-            </div>
-            
-            <h1 className="text-[2.5rem] xl:text-[2.75rem] font-bold text-white mb-5 leading-[1.15] tracking-tight">
-              E-Commerce<br />
-              Inventory<br />
-              <span style={{ color: '#10b981' }}>Operating System</span>
-            </h1>
-            
-            <p className="text-[15px] leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Restricted Access Portal.<br />
-              Authorized Administrators & Staff Only.
-            </p>
+        {/* MIDDLE: Content */}
+        <div className="flex-1 flex flex-col justify-center -mt-20 relative">
+          <h1 className="text-5xl font-black text-[var(--user-text)] mb-4 leading-tight">
+            Premium Shopping
+            <br />
+            <span className="text-[var(--user-accent)]">Experience</span>
+          </h1>
 
-            {/* Stats row */}
-            <div className="flex items-center gap-8">
-              {[
-                { value: '99.9%', label: 'Uptime' },
-                { value: '256-bit', label: 'Encrypted' },
-                { value: '24/7', label: 'Monitored' },
-              ].map((stat, i) => (
-                <div key={i}>
-                  <p className="text-white font-bold text-lg">{stat.value}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{stat.label}</p>
-                </div>
+          <p className="text-[var(--user-text-muted)] text-lg mb-8 max-w-md leading-relaxed whitespace-pre-line">
+            {tagline}
+          </p>
+
+          {topCategories.length > 0 && (
+            <div className="flex gap-3 flex-wrap">
+              {topCategories.map((cat) => (
+                <CategoryBadge
+                  key={cat._id}
+                  icon={<span className="font-black">{cat.name.charAt(0)}</span>}
+                  label={cat.name}
+                />
               ))}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="relative z-10 flex items-center justify-between">
-          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.2)' }}>© 2026 ClickMasters</p>
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#10b981' }} />
-            <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>All systems operational</span>
-          </div>
+        {/* BOTTOM: Footer */}
+        <div className="text-[var(--user-text-subtle)] text-sm relative">
+          © {new Date().getFullYear()} {storeName}. All rights reserved.
         </div>
       </div>
 
-      {/* ===== RIGHT SIDE — Login Form ===== */}
-      <div 
-        className="w-full lg:w-[45%] flex items-center justify-center p-6 sm:p-8 relative"
-        style={{ backgroundColor: '#0a0c14' }}
-      >
-        {/* Subtle glow */}
-        <div 
-          className="absolute top-1/4 right-0 w-64 h-64 rounded-full blur-[100px] opacity-20 pointer-events-none"
-          style={{ backgroundColor: '#10b981' }}
-        />
-
-        <div 
-          className={`w-full max-w-[400px] transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-        >
-          {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-2.5 mb-8 justify-center">
-            <div 
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: '#10b981' }}
-            >
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <span className="text-white font-semibold text-base">ClickMasters</span>
-          </div>
-
-          {/* Secure badge */}
-          <div className="flex items-center gap-2 mb-6">
-            <div 
-              className="w-7 h-7 rounded-md flex items-center justify-center"
-              style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.15)' }}
-            >
-              <Shield size={14} style={{ color: '#10b981' }} />
-            </div>
-            <span 
-              className="text-[11px] font-semibold uppercase tracking-[0.15em]"
-              style={{ color: '#10b981' }}
-            >
-              Secure Sign-In
+      {/* ==========================================
+          RIGHT SIDE — FORM
+      ========================================== */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-5 sm:p-6 lg:p-8 bg-[var(--user-bg)]">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-6 lg:mb-8">
+            <StoreLogo store={store} sizeClass="w-9 h-9 lg:w-10 lg:h-10" />
+            <span className="text-[var(--user-text)] font-black text-lg lg:text-xl tracking-wide">
+              {storeName}
             </span>
           </div>
 
-          {/* Heading */}
-          <h2 className="text-[1.6rem] font-bold text-white mb-1.5 tracking-tight">
-            Welcome back
-          </h2>
-          <p className="text-[13px] mb-8" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            Sign in to your admin or staff account
-          </p>
+          <div className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
+            {/* Badge */}
+            <div className="flex items-center gap-2 mb-3 lg:mb-4">
+              <ShieldCheck size={16} className="text-[var(--user-accent)] lg:w-[18px] lg:h-[18px]" />
+              <span className="text-[var(--user-accent)] text-[10px] lg:text-xs font-bold uppercase tracking-wider">
+                {isLogin ? "User Sign-In" : "Create Account"}
+              </span>
+            </div>
 
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
-            
-            {/* Email */}
-            <div className="space-y-2">
-              <label 
-                className="block text-[12px] font-medium"
-                style={{ color: 'rgba(255,255,255,0.5)' }}
-              >
-                Email Address
-              </label>
+            <h2 className="text-xl lg:text-2xl font-black text-[var(--user-text)] mb-1">
+              {isLogin ? "Welcome Back" : "Create Account"}
+            </h2>
+            <p className="text-[var(--user-text-muted)] text-sm mb-5 lg:mb-6">
+              {isLogin
+                ? "Continue shopping with your account."
+                : "Create your account in just 30 seconds."}
+            </p>
+
+            {/* Error */}
+            {error && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Google Button — Sirf Login */}
+            {isLogin && (
+              <>
+                <div className="flex justify-center">
+                  {googleClientId ? (
+                    <GoogleLogin
+                      onSuccess={(res) => handleGoogleLogin(res.credential)}
+                      onError={() => setError("Google login failed. Try again.")}
+                      theme="filled_black"
+                      shape="pill"
+                      size="large"
+                      width={320}
+                      text="continue_with"
+                    />
+                  ) : (
+                    <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
+                      Google login unavailable
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 my-5 lg:my-6">
+                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                  <span className="text-[var(--user-text-subtle)] text-[10px] lg:text-xs uppercase tracking-widest">
+                    or with email
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                </div>
+              </>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-3 lg:space-y-4">
+              {!isLogin && (
+                <div className="relative">
+                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full name"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="relative">
+                  <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="relative">
+                  <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Phone number (03001234567)"
+                    className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+                  />
+                </div>
+              )}
+
               <div className="relative">
-                <Mail 
-                  size={16} 
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: 'rgba(255,255,255,0.2)' }}
-                />
+                <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
                 <input
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 rounded-lg text-[13px] outline-none transition-all duration-200 placeholder-transparent"
-                  style={{ 
-                    backgroundColor: 'rgba(255,255,255,0.04)', 
-                    border: '1px solid rgba(255,255,255,0.08)', 
-                    color: '#fff',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.08)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255,255,255,0.08)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                  placeholder="you@example.com"
-                  required
+                  placeholder="Email address"
+                  className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
                 />
               </div>
-            </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <label 
-                className="block text-[12px] font-medium"
-                style={{ color: 'rgba(255,255,255,0.5)' }}
-              >
-                Password
-              </label>
               <div className="relative">
-                <Lock 
-                  size={16} 
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: 'rgba(255,255,255,0.2)' }}
-                />
+                <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)] lg:w-4 lg:h-4" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type="password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 pl-10 pr-11 rounded-lg text-[13px] outline-none transition-all duration-200 placeholder-transparent"
-                  style={{ 
-                    backgroundColor: 'rgba(255,255,255,0.04)', 
-                    border: '1px solid rgba(255,255,255,0.08)', 
-                    color: '#fff',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.08)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(255,255,255,0.08)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                  placeholder="••••••••"
-                  required
+                  placeholder="Password"
+                  minLength={6}
+                  className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
                 />
-                {/* ✅ Eye Icon Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors duration-150"
-                  style={{ color: 'rgba(255,255,255,0.25)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
               </div>
-            </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="w-full h-11 rounded-lg text-[13px] font-semibold transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 group"
-              style={{ 
-                backgroundColor: '#10b981', 
-                color: '#fff',
-              }}
-              onMouseEnter={(e) => {
-                if (!loginMutation.isPending) {
-                  e.currentTarget.style.backgroundColor = '#059669';
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(16, 185, 129, 0.3)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#10b981';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {loginMutation.isPending ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign in
-                  <ArrowRight size={15} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 lg:h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <LogIn size={18} />
+                )}
+                {loading
+                  ? isLogin
+                    ? "Logging in..."
+                    : "Creating account..."
+                  : isLogin
+                  ? "Login"
+                  : "Create Account"}
+              </button>
+            </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
-            <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>Protected</span>
-            <div className="flex-1 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
-          </div>
-
-          {/* Footer note */}
-          <div className="flex items-center justify-center gap-2">
-            <Lock size={11} style={{ color: 'rgba(255,255,255,0.15)' }} />
-            <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
-              Unauthorized access is strictly prohibited
+            {/* Toggle — clean text link */}
+            <p className="text-center mt-5 lg:mt-6 text-[var(--user-text-muted)] text-sm">
+              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError("");
+                }}
+                className="text-[var(--user-accent)] hover:underline font-semibold bg-transparent border-0 p-0 outline-none focus:outline-none"
+              >
+                {isLogin ? "Register" : "Login"}
+              </button>
             </p>
           </div>
+
+          <p className="text-center mt-5 text-[11px] text-[var(--user-text-subtle)]">
+            By continuing, you agree to our Terms & Privacy Policy.
+          </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

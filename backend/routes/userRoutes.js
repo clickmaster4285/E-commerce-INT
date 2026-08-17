@@ -10,6 +10,7 @@ const {
   updateProfile,
   changePassword,
   toggle2FA,
+  googleLogin
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
@@ -23,7 +24,7 @@ router.post("/register", createUser);
 router.post("/login", loginUser);
 router.post("/refresh-token", refreshAccessToken);
 router.post("/logout", logoutUser);
-
+router.post("/google-login", googleLogin);  
 // ==========================================
 // 🔒 PROTECTED ROUTES (Auth Required)
 // ==========================================

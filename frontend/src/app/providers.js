@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 import { Provider as ReduxProvider } from "react-redux";
 import { store } from "@/redux/store";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 export default function Providers({ children }) {
   const [queryClient] = useState(
@@ -21,8 +22,10 @@ export default function Providers({ children }) {
   return (
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position="top-right" richColors closeButton />
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
+          {children}
+          <Toaster position="top-right" richColors closeButton />
+        </GoogleOAuthProvider>
       </QueryClientProvider>
     </ReduxProvider>
   );

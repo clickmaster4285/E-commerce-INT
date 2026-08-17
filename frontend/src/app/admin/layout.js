@@ -43,6 +43,7 @@ export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
+  // const [isAuthenticated, setIsAuthenticated] = useState(null);
   const [storeData, setStoreData] = useState(null);
   const [userData, setUserData] = useState(null);
   const [permissionCheckDone, setPermissionCheckDone] = useState(false);
@@ -54,11 +55,10 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useStoreSocketSync();
+  // ✅ Login page par layout apply NAHI karna
+  const isLoginPage = pathname === '/admin/login';
 
-  // ✅ Active permissions: prefer live socket data over API data
-  const activePermissions = livePermissions || userData?.permissions || null;
-  const activeRole = liveRole || userData?.role || null;
+  useStoreSocketSync();
 
   // Theme
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }) {
     document.documentElement.classList.toggle('light', saved === 'light');
   }, []);
 
-  // Cached store data
+  // Store data cache
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = Cookies.get('storeData');
@@ -79,20 +79,24 @@ export default function AdminLayout({ children }) {
     }
   }, []);
 
-  // Store update event
+  // Socket listener
   useEffect(() => {
     const handleStoreUpdate = (e) => {
+      if (e.detail) setStoreData(e.detail);
       if (e.detail) setStoreData(e.detail);
     };
     window.addEventListener('storeUpdated', handleStoreUpdate);
     return () => window.removeEventListener('storeUpdated', handleStoreUpdate);
   }, []);
 
-  // ==========================================
-  // ✅ STEP 1: FETCH USER DATA (Initial Auth)
-  // ==========================================
+  // ✅ Authentication Check — SIRF login page ke ilawa
   useEffect(() => {
-    const checkAuthAndFetchUser = async () => {
+    if (isLoginPage) {
+      setIsAuthenticated(true); // Login page ko bypass karo
+      return;
+    }
+
+    const checkAuth = async () => {
       try {
         const response = await axiosInstance.get('/users/profile');
         console.log('🔍 RAW API RESPONSE:', response.data);
@@ -142,145 +146,21 @@ export default function AdminLayout({ children }) {
       } catch (error) {
         console.error('❌ Auth failed:', error.message);
         setIsAuthenticated(false);
-        setPermissionCheckDone(true);
-        router.push('/login');
+        // ✅ Admin login par bhejo (user login par nahi)
+        router.push('/admin/login');
       }
     };
 
-    checkAuthAndFetchUser();
-  }, []);
+    checkAuth();
+  }, [router, pathname, isLoginPage]);
 
-  // ==========================================
-  // ✅ STEP 2: SOCKET — REAL-TIME PERMISSION LISTENER
-  // ==========================================
-  useEffect(() => {
-    const socket = getLayoutPermSocket();
+  // ✅ Login page — bina Sidebar/Navbar ke sirf children
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
-    const handleConnect = () => {
-      console.log('🟢 Layout perm socket connected:', socket.id);
-      socket.emit('getProfile');
-    };
-
-    // Receive initial profile data
-    const handleProfileData = (res) => {
-      if (!res) return;
-      const data = res.data || res.user || res;
-      if (data?.permissions) {
-        console.log('📥 Layout socket → profileData permissions:', data.permissions);
-        setLivePermissions(data.permissions);
-        setLiveRole(data.role || '');
-      }
-    };
-
-    // ✅ CRITICAL: Real-time permission update from admin
-    const handlePermissionsUpdated = (data) => {
-      console.log('⚡ permissionsUpdated received:', data);
-
-      const currentUserId = localStorage.getItem('current_staff_id');
-      if (!data?.userId || !currentUserId || data.userId !== currentUserId) {
-        console.log('   → Not for current user, ignoring');
-        return;
-      }
-
-      const newPerms = data.permissions || {};
-      console.log('🔄 Updating live permissions:', newPerms);
-
-      // Update state immediately
-      setLivePermissions(newPerms);
-      if (data.role) setLiveRole(data.role);
-
-      // ✅ INSTANT CHECK: All permissions revoked?
-      const hasAnyTrue = Object.values(newPerms).some((v) => v === true);
-
-      if (!hasAnyTrue) {
-        console.log('🚫 ALL PERMISSIONS REVOKED — INSTANT REDIRECT!');
-        router.replace('/admin/access-denied');
-        return;
-      }
-
-      // ✅ INSTANT CHECK: Current route still allowed?
-      const currentPath = window.location.pathname;
-      const matched = Object.entries(ROUTE_PERMISSIONS).find(
-        ([route]) => currentPath === route || currentPath.startsWith(route + '/')
-      );
-
-      if (matched && newPerms[matched[1]] === false) {
-        console.log(`🚫 Route ${currentPath} REVOKED — INSTANT REDIRECT!`);
-        router.replace('/admin/access-denied');
-        return;
-      }
-
-      // ✅ If on access-denied page but now has permissions → go to dashboard
-      if (hasAnyTrue && currentPath === '/admin/access-denied') {
-        console.log('✅ Permissions GRANTED — redirecting to dashboard!');
-        router.replace('/admin/dashboard');
-      }
-    };
-
-    // Also handle profileUpdated
-    const handleProfileUpdated = (res) => {
-      const data = res?.data || res?.user || res;
-      if (!data) return;
-
-      const currentUserId = localStorage.getItem('current_staff_id');
-      if (data._id && currentUserId && data._id === currentUserId && data.permissions) {
-        console.log('🔄 profileUpdated → updating live permissions:', data.permissions);
-        setLivePermissions(data.permissions);
-        setLiveRole(data.role || '');
-
-        const hasAnyTrue = Object.values(data.permissions).some((v) => v === true);
-        if (!hasAnyTrue && window.location.pathname !== '/admin/access-denied') {
-          router.replace('/admin/access-denied');
-        }
-      }
-    };
-
-    if (socket.connected) {
-      socket.emit('getProfile');
-    } else {
-      socket.on('connect', handleConnect);
-    }
-
-    socket.on('profileData', handleProfileData);
-    socket.on('permissionsUpdated', handlePermissionsUpdated);
-    socket.on('profileUpdated', handleProfileUpdated);
-
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off('profileData', handleProfileData);
-      socket.off('permissionsUpdated', handlePermissionsUpdated);
-      socket.off('profileUpdated', handleProfileUpdated);
-    };
-  }, []);
-
-  // ==========================================
-  // ✅ STEP 3: RE-CHECK ON ROUTE CHANGE
-  // ==========================================
-  useEffect(() => {
-    if (!permissionCheckDone || !activePermissions) return;
-    if (pathname === '/admin/access-denied') return;
-
-    const role = activeRole?.toLowerCase();
-    if (role === 'admin') return;
-
-    const hasAnyTrue = Object.values(activePermissions).some((v) => v === true);
-    if (!hasAnyTrue) {
-      router.replace('/admin/access-denied');
-      return;
-    }
-
-    const matched = Object.entries(ROUTE_PERMISSIONS).find(
-      ([route]) => pathname === route || pathname.startsWith(route + '/')
-    );
-    if (matched && activePermissions[matched[1]] === false) {
-      router.replace('/admin/access-denied');
-    }
-  }, [pathname, permissionCheckDone, activePermissions, activeRole, router]);
-
-  // ==========================================
-  // ✅ LOADING SCREEN
-  // ==========================================
-  if (!permissionCheckDone) {
+  // Loading state
+  if (isAuthenticated === null) {
     return (
       <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#0a0c14' }}>
         <div className="flex flex-col items-center gap-4">
@@ -291,7 +171,9 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -310,12 +192,23 @@ export default function AdminLayout({ children }) {
       {sidebarOpen && (
         <div onClick={closeSidebar} className="fixed inset-0 bg-black/50 z-40 md:hidden" aria-hidden="true" />
       )}
-      <div className={`sidebar-wrapper shrink-0 h-screen z-50 fixed md:relative top-0 left-0 transition-transform duration-300 ease-in-out md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <Sidebar onNavigate={closeSidebar} storeData={storeData} userData={userData} />
+      
+      <div
+        className={`
+          sidebar-wrapper shrink-0 h-screen z-50
+          fixed md:relative top-0 left-0
+          transition-transform duration-300 ease-in-out
+          md:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        <Sidebar onNavigate={closeSidebar} storeData={storeData} />
       </div>
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} userData={userData} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">{children}</main>
+        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );
