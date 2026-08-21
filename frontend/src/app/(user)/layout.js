@@ -4,12 +4,13 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import Header from "../Component/user/Header";
-import Footer from "../Component/user/Footer";
-import CartDrawer from "../Component/user/CartDrawer";
-import { CartProvider, useCart } from "../Component/user/CartContext";
+import Header from "../../components/user/Header";
+import Footer from "../../components/user/Footer";
+import CartDrawer from "../../components/user/CartDrawer";
+import { CartProvider, useCart } from "../../components/user/CartContext";
 import { storeApi } from "@/apis/storeApi";
 import { Home, Search, ShoppingCart, User } from "lucide-react";
+import { WishlistProvider } from "@/components/user/WishlistContext";
 
 // ✅ MOBILE BOTTOM NAVIGATION
 function MobileNav() {
@@ -97,6 +98,7 @@ export default function UserLayout({ children }) {
   }, [store]);
 
   return (
+    <WishlistProvider>
     <CartProvider>
       {/* ✅ SIRF YE LINE CHANGE KI — baqi sab same */}
       <div
@@ -110,5 +112,6 @@ export default function UserLayout({ children }) {
         <MobileNav />
       </div>
     </CartProvider>
+    </WishlistProvider>
   );
 }

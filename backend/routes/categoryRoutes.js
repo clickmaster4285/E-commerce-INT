@@ -3,6 +3,8 @@ const {
   getNextCode,
   createCategory,
   getCategories,
+  getCategoriesPublic,
+  getCategoriesAdmin,
   getCategoryById,
   updateCategory,
   deleteCategory,
@@ -11,22 +13,19 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 
-// ✅ GET next code — No permission (just generates a code)
+// ==========================================
+// 🌐 PUBLIC ROUTES — bina token (User GUI)
+// ==========================================
+router.get("/", getCategoriesPublic);
+router.get("/:id", getCategoryById);
+
+// ==========================================
+// 🛡️ ADMIN ROUTES — token + permission
+// ==========================================
+router.get("/admin/all", authMiddleware, checkPermission("categories"), getCategoriesAdmin);
 router.get("/next-code", authMiddleware, getNextCode);
-
-// ✅ CREATE — Permission required
 router.post("/", authMiddleware, checkPermission("categories"), createCategory);
-
-// ✅ UPDATE — Permission required
 router.put("/:id", authMiddleware, checkPermission("categories"), updateCategory);
-
-// ✅ DELETE — Permission required
 router.delete("/:id", authMiddleware, checkPermission("categories"), deleteCategory);
-
-// ✅ GET all — No permission (read-only, sab dekh saken)
-router.get("/", authMiddleware, getCategories);
-
-// ✅ GET by id — No permission (read-only)
-router.get("/:id", authMiddleware, getCategoryById);
 
 module.exports = router;

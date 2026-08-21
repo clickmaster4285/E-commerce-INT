@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { X, Plus, Minus, Trash2, ShoppingBag, Package, Truck } from "lucide-react";
 import { useCart } from "./CartContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 export default function CartDrawer() {
+  const router = useRouter();
   const { cart, isCartOpen, setIsCartOpen, updateQty, removeFromCart, total, count } = useCart();
 
   // ✅ Image URL helper
@@ -17,7 +19,7 @@ export default function CartDrawer() {
     return `${API_ORIGIN}${path}`;
   };
 
-  const shipping = total >= 5000 ? 0 : 250;
+  const shipping = total >= 5000 ? 0 : 200; // ✅ 250 se 200 kar diya
   const grandTotal = total + shipping;
   const freeShippingLeft = Math.max(0, 5000 - total);
 
@@ -230,8 +232,11 @@ export default function CartDrawer() {
                 </span>
               </div>
 
-              {/* Checkout Button */}
-              <button className="w-full bg-[var(--user-accent)] text-[var(--user-accent-text)] py-3.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-[var(--user-accent-hover)] active:scale-[0.98] transition">
+              {/* Checkout Button — ✅ onClick add kiya */}
+              <button
+                onClick={() => { setIsCartOpen(false); router.push("/checkout"); }}
+                className="w-full bg-[var(--user-accent)] text-[var(--user-accent-text)] py-3.5 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-[var(--user-accent-hover)] active:scale-[0.98] transition"
+              >
                 Proceed to Checkout
               </button>
 

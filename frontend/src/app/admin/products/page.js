@@ -31,7 +31,8 @@ import {
 
 import { toast } from "sonner";
 
-import { productApi } from "@/apis/productApi";
+// ✅ CHANGE 1: adminProductApi use karein (admin endpoints)
+import { adminProductApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { variantApi } from "@/apis/variantApi";
@@ -184,7 +185,6 @@ const getFlagEmoji = (isoCode) => {
   return isoCode.toUpperCase().split("").map((char) => String.fromCodePoint(127397 + char.charCodeAt(0))).join("");
 };
 
-// ✅ HELPER: Permission error check
 const handlePermissionError = (error, fallbackMsg, accessType) => {
   const msg = error.response?.data?.message || error.message || fallbackMsg;
   if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
@@ -212,7 +212,6 @@ export default function ProductsPage() {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
 
-  // Modals
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({
     category_code: "",
@@ -257,12 +256,10 @@ export default function ProductsPage() {
     }));
   }, []);
 
-  // ==========================================
-  // ✅ QUERIES — retry: false + permission error handling
-  // ==========================================
+  // ✅ CHANGE 2: adminProducts queryKey + adminProductApi
   const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+    queryKey: ["adminProducts"],
+    queryFn: adminProductApi.getAll,
     retry: false,
   });
 
@@ -278,7 +275,6 @@ export default function ProductsPage() {
     retry: false,
   });
 
-  // ✅ Permission error toast for products fetch
   useEffect(() => {
     if (productsError && productsErrorMsg) {
       const msg = productsErrorMsg.message || "";
@@ -291,33 +287,33 @@ export default function ProductsPage() {
     }
   }, [productsError, productsErrorMsg]);
 
-  // ==========================================
-  // ✅ MUTATIONS — All with permission error check
-  // ==========================================
+  // ✅ CHANGE 3: createMutation
   const createMutation = useMutation({
-    mutationFn: productApi.create,
+    mutationFn: adminProductApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
       toast.success("Product created successfully");
       closeProductModal();
     },
     onError: (error) => handlePermissionError(error, "Product creation failed", "product"),
   });
 
+  // ✅ CHANGE 4: updateMutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => productApi.update(id, data),
+    mutationFn: ({ id, data }) => adminProductApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
       toast.success("Product updated successfully");
       closeProductModal();
     },
     onError: (error) => handlePermissionError(error, "Product update failed", "product"),
   });
 
+  // ✅ CHANGE 5: deleteMutation
   const deleteMutation = useMutation({
-    mutationFn: productApi.delete,
+    mutationFn: adminProductApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
       toast.success("Product deleted successfully");
       setShowDeleteModal(false);
       setProductToDelete(null);
@@ -325,10 +321,11 @@ export default function ProductsPage() {
     onError: (error) => handlePermissionError(error, "Product delete failed", "product"),
   });
 
+  // ✅ CHANGE 6: toggleStatusMutation
   const toggleStatusMutation = useMutation({
-    mutationFn: productApi.toggleStatus,
+    mutationFn: adminProductApi.toggleStatus,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
       toast.success("Product status updated");
     },
     onError: (error) => handlePermissionError(error, "Status update failed", "product"),
@@ -363,9 +360,6 @@ export default function ProductsPage() {
     onError: (error) => handlePermissionError(error, "Failed to create brand", "brand"),
   });
 
-  // ==========================================
-  // HANDLERS
-  // ==========================================
   const openProductDetails = (product) => router.push(`/admin/products/${product._id}`);
 
   const handleToggleStatus = (product) => {
@@ -654,9 +648,6 @@ export default function ProductsPage() {
     else createMutation.mutate(data);
   };
 
-  // ==========================================
-  // CATEGORY MODAL LOGIC
-  // ==========================================
   const resetCategoryForm = () => {
     setCategoryFormData({ category_code: "", name: "", description: "" });
     setLoadingCategoryCode(false);
@@ -709,9 +700,6 @@ export default function ProductsPage() {
     createCategoryMutation.mutate(categoryFormData);
   };
 
-  // ==========================================
-  // BRAND MODAL LOGIC
-  // ==========================================
   const resetBrandForm = () => {
     setBrandFormData({ brand_code: "", name: "", description: "", country: "", is_active: true });
     setBrandLogoFile(null);
@@ -770,9 +758,6 @@ export default function ProductsPage() {
     createBrandMutation.mutate(fd);
   };
 
-  // ==========================================
-  // HELPERS & FILTERS
-  // ==========================================
   const getCategoryName = (product) => product.category_id?.name || categories.find((c) => c._id === product.category_id)?.name || "Unknown";
   const getBrandName = (product) => product.brand_id?.name || brands.find((b) => b._id === product.brand_id)?.name || "Unknown";
 
@@ -821,7 +806,6 @@ export default function ProductsPage() {
 
   return (
     <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-[24px] leading-7 font-bold tracking-tight">Product Management</h1>
@@ -838,7 +822,6 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Products</p><p className="text-[20px] font-bold mt-1">{products.length}</p></div>
         <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Active</p><p className="text-[20px] font-bold mt-1 text-emerald-500">{activeProducts}</p></div>
@@ -846,13 +829,11 @@ export default function ProductsPage() {
         <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Units in Stock</p><p className="text-[20px] font-bold mt-1">{totalStock}</p></div>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search className="w-4 h-4" /></span>
         <input type="text" placeholder="Search by product name or SKU..." value={search} onChange={(e) => changeSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <select value={filterCategory} onChange={(e) => changeCategory(e.target.value)} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
@@ -878,7 +859,6 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Table View */}
       {viewMode === "list" && (
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="overflow-x-auto">
@@ -946,7 +926,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Grid View */}
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {paginatedProducts.map((product) => {
@@ -982,7 +961,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {filteredProducts.length > ITEMS_PER_PAGE && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products</p>
@@ -994,7 +972,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Delete Modal */}
       {showDeleteModal && productToDelete && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
@@ -1014,7 +991,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Product Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl shadow-2xl" style={cardStyle}>
@@ -1215,7 +1191,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Category Modal */}
       {showNewCategoryModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-xl overflow-visible shadow-2xl" style={cardStyle}>
@@ -1305,7 +1280,6 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Brand Modal */}
       {showNewBrandModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-xl overflow-visible shadow-2xl" style={cardStyle}>
@@ -1374,9 +1348,6 @@ export default function ProductsPage() {
   );
 }
 
-// ==========================================
-// HELPER COMPONENTS
-// ==========================================
 function Field({ label, children }) {
   return (
     <div className="space-y-1">

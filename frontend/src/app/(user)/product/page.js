@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/productApi";
-import ProductCard from "../../Component/user/ProductCard";
+import ProductCard from "../../../components/user/ProductCard";
 import { Package, SearchX, SlidersHorizontal } from "lucide-react";
 
 export default function ProductsPage() {

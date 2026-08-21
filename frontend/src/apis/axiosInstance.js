@@ -1,9 +1,32 @@
 import axios from "axios";
 
+// ==========================================
+// 🔥 DYNAMIC BASE URL — Current hostname use karta hai
+// ==========================================
+const getBaseURL = () => {
+  if (typeof window === "undefined") {
+    // SSR (server-side render) — env se lo
+    return process.env.NEXT_PUBLIC_SERVERURL ;
+  }
+  // Client — jis host par frontend khula hai, wahi use karo
+  const hostname = window.location.hostname;
+  return `http://${hostname}:5000/api`;
+};
+
 const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_SERVERURL,
   withCredentials: true, // 🔥 Cookies bhejne ke liye zaroori
 });
+
+// ==========================================
+// 📤 Request Interceptor — baseURL dynamically set karo
+// ==========================================
+axiosInstance.interceptors.request.use(
+  (config) => {
+    config.baseURL = getBaseURL(); // ✅ Har request mein current host use hoga
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // ==========================================
 // 🔐 HELPER: Sirf Admin pages par redirect kare
@@ -13,35 +36,19 @@ const redirectToLogin = () => {
 
   const path = window.location.pathname;
 
-  // ✅ Agar user already /login par hai, toh kuch mat karo (infinite loop se bachao)
   if (path === "/login" || path === "/register" || path === "/admin/login") {
-  return;
-}
+    return;
+  }
 
-  // ✅ Agar admin page par hai, toh login par bhejo
- // ✅ Agar admin page par hai, toh ADMIN login par bhejo
-if (path.startsWith("/admin")) {
-  localStorage.clear();
-  window.location.href = "/admin/login";   // ❌ purana: "/login"
-  return;
-}
-
-  // ❌ Agar user page par hai (/, /product, /category, /brand) toh REDIRECT MAT KARO
-  // Sirf error silently reject hoga, user page waise hi kaam karega
+  if (path.startsWith("/admin")) {
+    localStorage.clear();
+    window.location.href = "/admin/login";
+    return;
+  }
 };
 
 // ==========================================
-// 📤 Request Interceptor
-// ==========================================
-axiosInstance.interceptors.request.use(
-  (config) => {
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// ==========================================
-// 📥 Response Interceptor (SMART - Fixed for Login)
+// 📥 Response Interceptor
 // ==========================================
 axiosInstance.interceptors.response.use(
   (response) => response,
@@ -49,34 +56,30 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // 🛑 FIX: Agar request LOGIN endpoint ki hai, toh Refresh Token logic SKIP karo.
-    // Kyunke login ke waqt token hota hi nahi hai, refresh try karna error deta hai.
-    const isLoginRequest = originalRequest.url?.includes("/users/login");
-    
+    // 🛑 Login request par refresh token logic skip karo
+    const isLoginRequest =
+      originalRequest.url?.includes("/users/login") ||
+      originalRequest.url?.includes("/users/admin/login") ||
+      originalRequest.url?.includes("/users/register");
+
     if (isLoginRequest) {
-      return Promise.reject(error); // Seedha error frontend ko bhej do (e.g., Wrong Password)
+      return Promise.reject(error);
     }
 
-    // Agar 401 Unauthorized hai aur humne abhi tak retry nahi kiya
+    // 401 Unauthorized — refresh token try karo
     if (error.response?.status === 401 && !originalRequest._retry) {
-      
-      // Refresh token call karte waqt khud ko call karne se roko
       if (originalRequest.url === "/users/refresh-token") {
-        redirectToLogin(); 
+        redirectToLogin();
         return Promise.reject(error);
       }
 
       originalRequest._retry = true;
 
       try {
-        // Chupke se backend ko bolo naya Access Token generate kare
         await axiosInstance.post("/users/refresh-token");
-        
-        // Refresh successful hone ke baad, original request dobara bhej do
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        // Agar Refresh Token bhi expire ho gaya
-        redirectToLogin(); 
+        redirectToLogin();
         return Promise.reject(refreshError);
       }
     }

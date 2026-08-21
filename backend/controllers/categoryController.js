@@ -160,11 +160,41 @@ const deleteCategory = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// ==========================================
+// 🌐 GET CATEGORIES — PUBLIC (light, bina populate)
+// ==========================================
+const getCategoriesPublic = async (req, res) => {
+  try {
+    const categories = await Category.find({ is_deleted: false })
+      .select("category_code name description")
+      .lean()
+      .exec();
+    res.status(200).json(categories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
+// ==========================================
+// 🛡️ GET CATEGORIES — ADMIN (full, with populate)
+// ==========================================
+const getCategoriesAdmin = async (req, res) => {
+  try {
+    const categories = await Category.find({ is_deleted: false })
+      .select("-__v")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email");
+    res.status(200).json(categories);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
   getNextCode,
   createCategory,
   getCategories,
+  getCategoriesPublic,
+  getCategoriesAdmin,
   getCategoryById,
   updateCategory,
   deleteCategory,

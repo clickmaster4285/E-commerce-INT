@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Heart, Plus, Check, Package } from "lucide-react";
 import { useCart } from "./CartContext";
+import { useWishlist } from "./WishlistContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -14,9 +15,12 @@ const getImageUrl = (url) => {
 };
 
 export default function ProductCard({ product }) {
-  const [liked, setLiked] = useState(false);
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+
+  const productId = product._id || product.id;
+  const liked = isWishlisted(productId);
 
   const variants = product.variants || [];
   const firstVariant = variants[0];
@@ -43,7 +47,7 @@ export default function ProductCard({ product }) {
 
   return (
     <Link
-      href={`/product/${product._id || product.id}`}
+      href={`/product/${productId}`}
       className="group relative block bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
     >
       {/* ==========================================
@@ -83,12 +87,12 @@ export default function ProductCard({ product }) {
           ) : null}
         </div>
 
-        {/* HEART — top right */}
+        {/* ✅ HEART — wishlist (database linked) */}
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setLiked(!liked);
+            toggleWishlist(productId);
           }}
           aria-label="Add to wishlist"
           className="absolute top-2.5 right-2.5 z-10 w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/60 transition"
@@ -125,9 +129,9 @@ export default function ProductCard({ product }) {
       ========================================== */}
       <div className="p-3 lg:p-4">
         {/* Brand */}
-        <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">
-          {brandName || "ClickMasters"}
-        </p>
+       <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">
+  {brandName || ""}
+</p>
 
         {/* Title */}
         <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/productApi";
 import { brandApi } from "@/apis/brandApi";
-import ProductCard from "@/app/Component/user/ProductCard";
+import ProductCard from "@/components/user/ProductCard";
 import { Package, ChevronRight, Star } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -48,10 +48,7 @@ export default function BrandPage() {
           <Link href="/" className="hover:text-[var(--user-accent)] transition">
             Home
           </Link>
-          <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
-          <Link href="/products" className="hover:text-[var(--user-accent)] transition">
-            Brands
-          </Link>
+         
           <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
           <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[180px] sm:max-w-[220px]">
             {brand?.name || "Brand"}

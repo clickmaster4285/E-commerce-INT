@@ -1,8 +1,8 @@
 "use client";
 
-import { CategoryShowcase, BrandShowcase } from "../Component/user/Showcase";
-import CategoryBar from "../Component/user/CategoryBar";
-import BrandSection from "../Component/user/BrandSection";
+import { CategoryShowcase, BrandShowcase } from "../../components/user/Showcase";
+import CategoryBar from "../../components/user/CategoryBar";
+import BrandSection from "../../components/user/BrandSection";
 
 export default function Home() {
   return (

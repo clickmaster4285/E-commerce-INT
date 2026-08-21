@@ -312,10 +312,97 @@ const toggleProductStatus = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
+// ==========================================
+// 🌐 GET ALL PRODUCTS — PUBLIC (User GUI)
+// Sirf ACTIVE + NON-DELETED
+// ==========================================
+const getProductsPublic = async (req, res) => {
+  try {
+    const products = await Product.find({
+      is_deleted: false,
+      status: "active",
+    })
+      .populate("category_id", "name")
+      .populate("brand_id", "name")
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
 
+    if (!products || products.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    const productIds = products.map((p) => p._id);
+    const allVariants = await Variant.find({ product_id: { $in: productIds } })
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec();
+
+    const variantsMap = {};
+    allVariants.forEach((v) => {
+      const key = String(v.product_id);
+      if (!variantsMap[key]) variantsMap[key] = [];
+      variantsMap[key].push(v);
+    });
+
+    const result = products.map((product) => ({
+      ...product,
+      variants: variantsMap[String(product._id)] || [],
+    }));
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("❌ [getProductsPublic] Error:", error);
+    return res.status(500).json({ message: error.message || "Failed to fetch products" });
+  }
+};
+
+// ==========================================
+// 🛡️ GET ALL PRODUCTS — ADMIN
+// NON-DELETED (active + inactive dono)
+// ==========================================
+const getProductsAdmin = async (req, res) => {
+  try {
+    const products = await Product.find({ is_deleted: false })
+      .populate("category_id", "name")
+      .populate("brand_id", "name")
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    if (!products || products.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    const productIds = products.map((p) => p._id);
+    const allVariants = await Variant.find({ product_id: { $in: productIds } })
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec();
+
+    const variantsMap = {};
+    allVariants.forEach((v) => {
+      const key = String(v.product_id);
+      if (!variantsMap[key]) variantsMap[key] = [];
+      variantsMap[key].push(v);
+    });
+
+    const result = products.map((product) => ({
+      ...product,
+      variants: variantsMap[String(product._id)] || [],
+    }));
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("❌ [getProductsAdmin] Error:", error);
+    return res.status(500).json({ message: error.message || "Failed to fetch products" });
+  }
+};
 module.exports = {
   createProduct,
   getProducts,
+  getProductsPublic,
+  getProductsAdmin,
   getProductById,
   updateProduct,
   deleteProduct,

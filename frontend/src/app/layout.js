@@ -3,8 +3,8 @@ import "./user.css";
 import Providers from "./providers";
 
 export const metadata = {
-  title: "Inventory App",
-  description: "Inventory Management System",
+  title: "Store",
+  description: "Online Shopping Store",
 };
 
 export default function RootLayout({ children }) {

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Sidebar from '../Component/Sidebar';
-import Navbar from '../Component/Navbar';
+import Sidebar from '../../components/Sidebar';
+import Navbar from '../../components/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';

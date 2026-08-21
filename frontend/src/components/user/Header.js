@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
+import { useWishlist } from "./WishlistContext";
 import axiosInstance from "@/apis/axiosInstance";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
@@ -34,6 +35,7 @@ import {
   Store,
   Sun,
   Moon,
+  Heart,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -139,6 +141,7 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState("dark");
   const { count, setIsCartOpen } = useCart();
+  const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
 
   // ✅ BODY SCROLL LOCK
@@ -261,7 +264,7 @@ export default function Header() {
     return `${API_ORIGIN}${path}`;
   };
 
-  const storeName = store?.store_name || "ClickMasters";
+  const storeName = store?.store_name || "";
 
   return (
     <>
@@ -306,7 +309,7 @@ export default function Header() {
               />
             </div>
 
-            {/* RIGHT — Theme | Account/Login | Orders | Cart */}
+            {/* RIGHT — Theme | Wishlist | Account/Login | Orders | Cart */}
             <div className="flex items-center gap-1.5 lg:gap-4 ml-auto shrink-0">
               {/* ✅ THEME TOGGLE */}
               <button
@@ -320,6 +323,23 @@ export default function Header() {
                   <Moon size={17} className="text-[var(--user-text)]" />
                 )}
               </button>
+
+              {/* ✅ WISHLIST — heart icon + count badge */}
+                           {/* ✅ WISHLIST — heart icon + count badge */}
+              <Link
+                href="/wishlist"
+                title="My Wishlist"
+                className="flex items-center gap-1.5 lg:gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] active:scale-95 transition relative"
+              >
+                <span className="relative">
+                  <Heart size={20} className="text-[var(--user-text)]" />
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-[var(--user-danger)] text-white text-[9px] lg:text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </span>
+              </Link>
 
               {/* ✅ ACCOUNT / LOGIN — Smart conditional */}
               {user ? (
@@ -382,7 +402,7 @@ export default function Header() {
               {/* ORDERS (desktop only, logged-in only) */}
               {user && (
                 <Link
-                  href="/account"
+                  href="/orders"
                   className="hidden lg:block px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] transition leading-tight"
                 >
                   <span className="block text-[10px] text-[var(--user-text-muted)]">My</span>

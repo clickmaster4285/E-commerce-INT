@@ -2,17 +2,8 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
+    name: { type: String, required: true, trim: true },
+    username: { type: String, required: true, unique: true, trim: true },
     email: {
       type: String,
       required: true,
@@ -20,32 +11,19 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-    },
-    phone: {
-      type: String,
-      default: "",
-    },
-    role: {
-      type: String,
-      default: "user",
-      enum: ["user", "admin", "staff"],
-    },
+    password: { type: String, required: true, minlength: 6 },
+    phone: { type: String, default: "" },
+    role: { type: String, default: "user", enum: ["user", "admin", "staff"] },
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
       default: null,
     },
-    avatar: 
-    { type: String, default: "" },
+    avatar: { type: String, default: "" },
 
-    twoFactorEnabled: {
-      type: Boolean,
-      default: false,
-    },
+     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+
+    twoFactorEnabled: { type: Boolean, default: false },
     permissions: {
       products: { type: Boolean, default: true },
       brands: { type: Boolean, default: true },
@@ -63,6 +41,19 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    // ✅ NEW: Checkout Draft (step/choices refresh par yaad rahein)
+      // ✅ MULTIPLE DRAFTS (array of drafts)
+    checkout_drafts: [{
+      step: { type: Number, default: 1 },
+      selectedKeys: [{ type: String }],
+      selectedAddressId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      shippingMethod: { type: String, default: "standard" },
+      paymentMethod: { type: String, default: "cod" },
+      saved: { type: Boolean, default: false },
+      items: { type: mongoose.Schema.Types.Mixed, default: [] },
+      updatedAt: { type: Date, default: Date.now },
+    }],
+    
     activities: [
       {
         action: { type: String, required: true },
@@ -82,7 +73,11 @@ const userSchema = new mongoose.Schema(
           ],
           default: "System",
         },
-        performedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        performedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          default: null,
+        },
         performedByName: { type: String, default: "System" },
         details: { type: mongoose.Schema.Types.Mixed, default: {} },
         timestamp: { type: Date, default: Date.now },
@@ -97,15 +92,25 @@ const userSchema = new mongoose.Schema(
     address: { type: String, default: "" },
     employeeId: { type: String, default: "" },
 
-    createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    deletedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    createdby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    updatedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    deletedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
   },
-  {
-    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
-  }
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
 
 userSchema.index({ "activities.timestamp": -1 });
@@ -115,7 +120,6 @@ userSchema.methods.softDelete = function (userId) {
   this.deleted_at = new Date();
   this.deletedby = userId;
   return this.save();
-  
 };
 
 module.exports = mongoose.model("User", userSchema);

@@ -61,13 +61,11 @@ export default function Footer() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const storeName = store?.store_name || "ClickMasters";
-  const tagline =
-    store?.tagline ||
-    "Premium electronics marketplace bringing latest smartphones, laptops, accessories and gadgets at the best prices.";
-  const supportEmail = store?.support_email || store?.email || "support@clickmasters.com";
-  const supportPhone = store?.support_phone || store?.phone || "+92 300 0000000";
-  const country = store?.country || "Pakistan";
+  const storeName = store?.store_name || "";
+const tagline = store?.tagline || "";
+const supportEmail = store?.support_email || store?.email || "";
+const supportPhone = store?.support_phone || store?.phone || "";
+const country = store?.country || "";
   const address = store?.address || "";
 
   // ✅ Active social links filter karein
@@ -174,7 +172,7 @@ export default function Footer() {
                 ))
               ) : (
                 <>
-                  <FooterLink href="/products" label="All Products" />
+                
                 </>
               )}
             </ul>

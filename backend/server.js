@@ -28,9 +28,9 @@ const server = http.createServer(app);
 // ==========================================
 // CONSTANTS
 // ==========================================
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 const CLIENT_URL = process.env.CLIENT_URL;
-const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
+const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS);
 
 if (!CLIENT_URL) {
   console.error("❌ CRITICAL: CLIENT_URL is missing in .env file!");
@@ -91,7 +91,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/variants", variantRoutes);
 app.use("/api/store", storeRoutes);
 app.use("/api/employees", employeeRoutes);
-
+app.use("/api/addresses", require("./routes/addressRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
 app.get("/", (req, res) => {
   res.send("Backend server is running 🚀");
 });
