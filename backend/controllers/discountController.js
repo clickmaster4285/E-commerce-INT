@@ -98,10 +98,10 @@ exports.createDiscount = async (req, res) => {
       return res.status(400).json({ message: "Discount value is required" });
     }
 
-    // ✅ UPDATED: Percentage validation (Max 50%)
-    if (value_type === "percentage" && Number(value) > 50) {
+    // ✅ FIXED: Percentage validation updated to allow up to 100%
+    if (value_type === "percentage" && (Number(value) < 0 || Number(value) > 100)) {
       return res.status(400).json({
-        message: "Percentage discount cannot be greater than 50",
+        message: "Percentage discount must be between 0 and 100",
       });
     }
 
@@ -175,7 +175,7 @@ exports.createDiscount = async (req, res) => {
       isStackable: Boolean(is_stackable),
       status: finalStatus,
       isActive,
-      createdBy: req.user?._id || req.user?.id, // Auth middleware se aayega
+      createdBy: req.user?._id || req.user?.id,
     };
 
     // ===================================================
@@ -232,7 +232,8 @@ exports.getDiscounts = async (req, res) => {
       .populate("selectedBrands", "name")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json(discounts);
+    // ✅ FIXED: Returning raw array so frontend can display it immediately
+    return res.status(200).json(discounts); 
   } catch (error) {
     console.error("Get Discounts Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -331,10 +332,10 @@ exports.updateDiscount = async (req, res) => {
       discount.value = Number(value);
     }
 
-    // ✅ UPDATED: Percentage validation for Update (Max 50%)
-    if (discount.type === "percentage" && discount.value > 50) {
+    // ✅ FIXED: Percentage validation for Update also updated to 100%
+    if (discount.type === "percentage" && (discount.value < 0 || discount.value > 100)) {
       return res.status(400).json({
-        message: "Percentage discount cannot be greater than 50",
+        message: "Percentage discount must be between 0 and 100",
       });
     }
 

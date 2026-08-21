@@ -9,7 +9,7 @@ import {
   Truck, RotateCcw, Sparkles,
 } from "lucide-react";
 import axiosInstance from "@/apis/axiosInstance";
-import { storeApi } from "@/apis/storeApi";
+import { storeApi } from "@/apis/admin/storeApi";
 import { categoryApi } from "@/apis/categoryApi";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");

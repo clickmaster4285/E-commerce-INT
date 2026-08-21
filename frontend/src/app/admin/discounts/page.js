@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { discountApi } from "../../../apis/discountApi";
 import { productApi } from "../../../apis/productApi";
+import { discountApi } from "../../../apis/admin/discountApi";
 import { categoryApi } from "../../../apis/categoryApi";
 import { brandApi } from "../../../apis/brandApi";
 import { toast } from "sonner";

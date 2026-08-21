@@ -1,4 +1,4 @@
-import axiosInstance from "./axiosInstance";
+import axiosInstance from "../axiosInstance";
 
 export const tagApi = {
   getAll: () => axiosInstance.get("/tags").then((res) => res.data),

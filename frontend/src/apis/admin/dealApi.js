@@ -1,4 +1,4 @@
-import axiosInstance from "./axiosInstance"; // Same instance as other APIs
+import axiosInstance from "../axiosInstance"; // Same instance as other APIs
 
 export const dealApi = {
   // ==========================================

@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
-import { variantApi } from "@/apis/variantApi";
+import { variantApi } from "@/apis/admin/variantApi";
 
 const ITEMS_PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";

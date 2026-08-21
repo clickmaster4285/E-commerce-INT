@@ -43,7 +43,7 @@ import {
   Percent,
 } from "lucide-react";
 
-import { employeeApi } from "@/apis/employeeApi";
+import { employeeApi } from "@/apis/admin/employeeApi";
 import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 // ==========================================
