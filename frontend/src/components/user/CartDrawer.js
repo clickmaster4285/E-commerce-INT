@@ -1,14 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { X, Plus, Minus, Trash2, ShoppingBag, Package, Truck } from "lucide-react";
+import { X, Plus, Minus, Trash2, ShoppingBag, Package, Truck, Tag } from "lucide-react";
 import { useCart } from "./CartContext";
+import { useDiscounts } from "./DiscountContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+
 
 export default function CartDrawer() {
   const router = useRouter();
   const { cart, isCartOpen, setIsCartOpen, updateQty, removeFromCart, total, count } = useCart();
+  const { calculateProductDiscount } = useDiscounts();
 
   // ✅ Image URL helper
   const getImgUrl = (img) => {
@@ -19,9 +23,38 @@ export default function CartDrawer() {
     return `${API_ORIGIN}${path}`;
   };
 
-  const shipping = total >= 5000 ? 0 : 200; // ✅ 250 se 200 kar diya
-  const grandTotal = total + shipping;
-  const freeShippingLeft = Math.max(0, 5000 - total);
+  // ✅ Har item ka discounted price calculate karo
+  const cartWithDiscounts = cart.map((item) => {
+    const fakeProduct = {
+      _id: item.productId || item.id,
+      category_id: item.categoryId || null,
+      brand_id: item.brandId || null,
+      discount: item.productDiscountPct || 0,
+    };
+    const disc = calculateProductDiscount(fakeProduct, item.price);
+    return {
+      ...item,
+      displayPrice: disc.discountedPrice,
+      originalPrice: disc.originalPrice,
+      hasDiscount: disc.hasDiscount,
+      discountName: disc.discountName,
+      savings: disc.savings,
+    };
+  });
+
+  const subtotal = cartWithDiscounts.reduce(
+    (s, i) => s + i.displayPrice * i.qty,
+    0,
+  );
+  const totalSavings = cartWithDiscounts.reduce(
+    (s, i) => s + i.savings * i.qty,
+    0,
+  );
+  const shipping = subtotal >= 5000 ? 0 : 200;
+  const grandTotal = subtotal + shipping;
+  const freeShippingLeft = Math.max(0, 5000 - subtotal);
+
+
 
   return (
     <>
@@ -107,15 +140,16 @@ export default function CartDrawer() {
               </button>
             </div>
           ) : (
-            cart.map((item) => {
+                      cartWithDiscounts.map((item) => {
               const imgUrl = getImgUrl(item.image);
-              const lineTotal = item.price * item.qty;
+              const lineTotal = item.displayPrice * item.qty;
 
               return (
                 <div
                   key={item.key}
                   className="flex gap-3 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl p-3 group hover:border-[var(--user-accent)]/40 transition"
                 >
+
                   {/* REAL IMAGE */}
                   <div className="w-20 h-20 sm:w-[88px] sm:h-[88px] rounded-lg bg-[var(--user-bg-hover)] overflow-hidden shrink-0 flex items-center justify-center border border-[var(--user-border)]">
                     {imgUrl ? (
@@ -178,14 +212,30 @@ export default function CartDrawer() {
                         </button>
                       </div>
 
+
                       <div className="text-right">
-                        <p className="text-[10px] sm:text-xs text-[var(--user-text-subtle)]">
-                          Rs. {item.price.toLocaleString()} each
+                        {item.hasDiscount && (
+                          <p className="text-[9px] text-[var(--user-text-subtle)] line-through">
+                            Rs. {item.originalPrice.toLocaleString()}
+                          </p>
+                        )}
+                        <p className="text-[10px] sm:text-xs text-[var(--user-text-subtle)] flex items-center justify-end gap-1">
+                          Rs. {item.displayPrice.toLocaleString()} each
+                          {item.hasDiscount && (
+                            <Tag size={9} className="text-[var(--user-accent)]" />
+                          )}
                         </p>
                         <p className="text-[var(--user-accent)] text-sm font-bold">
                           Rs. {lineTotal.toLocaleString()}
                         </p>
+                        {item.hasDiscount && (
+                          <p className="text-[9px] font-bold text-[var(--user-success)] mt-0.5">
+                            Save Rs. {(item.savings * item.qty).toLocaleString()}
+                          </p>
+                        )}
                       </div>
+
+
                     </div>
                   </div>
                 </div>
@@ -198,13 +248,28 @@ export default function CartDrawer() {
         {cart.length > 0 && (
           <div className="border-t border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0 pb-[env(safe-area-inset-bottom)]">
             <div className="px-5 sm:px-6 py-4 sm:py-5 space-y-3">
-              {/* Subtotal */}
+              
+              
+                          {/* Subtotal */}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--user-text-muted)]">Subtotal</span>
                 <span className="text-[var(--user-text)] font-semibold">
-                  Rs. {total.toLocaleString()}
+                  Rs. {subtotal.toLocaleString()}
                 </span>
               </div>
+
+              {/* ✅ Discount Savings */}
+              {totalSavings > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--user-success)] flex items-center gap-1.5">
+                    <Tag size={13} />
+                    Discount Savings
+                  </span>
+                  <span className="text-[var(--user-success)] font-semibold">
+                    -Rs. {totalSavings.toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               {/* Shipping */}
               <div className="flex items-center justify-between text-sm">
@@ -220,6 +285,8 @@ export default function CartDrawer() {
                   {shipping === 0 ? "Rs. 0" : `Rs. ${shipping}`}
                 </span>
               </div>
+
+
 
               {/* Divider */}
               <div className="h-px bg-[var(--user-border)]" />

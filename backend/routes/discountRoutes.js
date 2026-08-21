@@ -8,16 +8,19 @@ const {
   getDiscounts,
   getDiscountById,
   updateDiscount,
-  deleteDiscount
+  deleteDiscount,
+   getPublicDiscounts  
 } = require('../controllers/discountController');
 
-// ✅ STATIC ROUTE (Pehle likho)
-router.get('/admin/all', authMiddleware, checkPermission("discounts"), getDiscounts);
+// ✅ Har route ke beech mein 'authMiddleware' lagana lazmi hai
+// ✅ PUBLIC ROUTE (no auth) - for user GUI
+router.get('/public', getPublicDiscounts);
 
-// ✅ DYNAMIC ROUTES (Baad mein likho)
-router.post('/', authMiddleware, checkPermission("discounts"), createDiscount);
-router.get('/:id', authMiddleware, checkPermission("discounts"), getDiscountById);
-router.put('/:id', authMiddleware, checkPermission("discounts"), updateDiscount);
-router.delete('/:id', authMiddleware, checkPermission("discounts"), deleteDiscount);
+// ✅ ADMIN ROUTES (auth required)
+router.post('/', authMiddleware, createDiscount);
+router.get('/', authMiddleware, getDiscounts);
+router.get('/:id', authMiddleware, getDiscountById);
+router.put('/:id', authMiddleware, updateDiscount);
+router.delete('/:id', authMiddleware, deleteDiscount);
 
 module.exports = router;

@@ -29,6 +29,8 @@ import {
 import { productApi } from "@/apis/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { useCart } from "@/components/user/CartContext";
+import { useDiscounts } from "@/components/user/DiscountContext";
+import { Tag } from "lucide-react";
 
 // ============================================================
 // 2. HELPERS & CONSTANTS
@@ -515,9 +517,18 @@ export default function ProductDetailPage({ params }) {
     setIsCartOpen(true);
   }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen]);
 
-  const price = toNum(currentVariant?.selling_price);
-  const oldPrice = toNum(currentVariant?.price);
-  const discount = product?.discount || getDiscount(oldPrice, price);
+  const { calculateProductDiscount } = useDiscounts();
+
+  const variantPrice = toNum(currentVariant?.selling_price);
+  const variantOldPrice = toNum(currentVariant?.price);
+
+  // ✅ Admin + product discount — best one
+  const disc = calculateProductDiscount(product, variantPrice);
+  const price = disc.discountedPrice;
+  const oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
+  const discount = disc.hasDiscount
+    ? Math.round(((disc.originalPrice - disc.discountedPrice) / disc.originalPrice) * 100)
+    : 0;
 
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
@@ -580,17 +591,22 @@ export default function ProductDetailPage({ params }) {
 
           <Description text={product.description} />
 
-          <div className="mt-5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
+
+
+                <div className="mt-5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
             <h2 className="text-lg lg:text-xl font-extrabold text-[var(--user-text)]">Rs. {price.toLocaleString()}</h2>
-            {oldPrice > price && (
-              <span className="text-xs lg:text-sm text-[var(--user-text-subtle)] line-through">Rs. {oldPrice.toLocaleString()}</span>
+            {disc.hasDiscount && (
+              <span className="text-xs lg:text-sm text-[var(--user-text-subtle)] line-through">Rs. {disc.originalPrice.toLocaleString()}</span>
             )}
-            {discount > 0 && (
-              <span className="ml-auto text-[10px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/25 px-2 py-0.5 rounded-full">
-                You save {discount}%
+            {disc.hasDiscount && (
+              <span className="ml-auto text-[10px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/25 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Tag size={10} />
+                Save Rs. {disc.savings.toLocaleString()} · {disc.discountName}
               </span>
             )}
           </div>
+
+
 
           <Divider />
 

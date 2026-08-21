@@ -8,12 +8,17 @@ import { Country, State, City } from "country-state-city";
 import axiosInstance from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/addressApi";
 import { orderApi } from "@/apis/orderApi";
+
+
 import { useCart } from "@/components/user/CartContext";
+import { useDiscounts } from "@/components/user/DiscountContext";
 import {
   ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
-  Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2,
+  Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2, Tag,
 } from "lucide-react";
+
+
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getImgUrl = (img) => {
@@ -83,7 +88,8 @@ function CheckoutContent() {
   const [currentDraftId, setCurrentDraftId] = useState(null);
 
 
-  const { cart, removeItems, updateQty, restoreItems } = useCart();
+   const { cart, removeItems, updateQty, restoreItems } = useCart();
+  const { calculateProductDiscount } = useDiscounts();
 
   const [step, setStep] = useState(1);
   const [draftReady, setDraftReady] = useState(false);
@@ -355,9 +361,39 @@ function CheckoutContent() {
   const allSelected = cart.length > 0 && (selectedKeys || []).length === cart.length;
   const toggleAll = () => setSelectedKeys(allSelected ? [] : cart.map((i) => i.key));
 
-  const subtotal = activeItems.reduce((s, i) => s + i.price * i.qty, 0);
+  // ✅ Active items with discounts applied
+  const itemsWithDiscounts = activeItems.map((i) => {
+    const fakeProduct = {
+      _id: i.productId || i.id,
+      category_id: i.categoryId || null,
+      brand_id: i.brandId || null,
+      discount: i.productDiscountPct || 0,
+    };
+    const disc = calculateProductDiscount(fakeProduct, i.price);
+    return {
+      ...i,
+      displayPrice: disc.discountedPrice,
+      originalPrice: disc.originalPrice,
+      hasDiscount: disc.hasDiscount,
+      savings: disc.savings,
+    };
+  });
+
+  const subtotal = itemsWithDiscounts.reduce(
+    (s, i) => s + i.displayPrice * i.qty,
+    0,
+  );
+  const totalSavings = itemsWithDiscounts.reduce(
+    (s, i) => s + i.savings * i.qty,
+    0,
+  );
   const shipping = getShippingFee(shippingMethod, subtotal);
-  const tax = Math.round(activeItems.reduce((s, i) => s + i.price * i.qty * (Number(i.tax || 0) / 100), 0));
+  const tax = Math.round(
+    itemsWithDiscounts.reduce(
+      (s, i) => s + i.displayPrice * i.qty * (Number(i.tax || 0) / 100),
+      0,
+    ),
+  );
   const grandTotal = Math.round(subtotal + shipping + tax);
   const freeLeft = Math.max(0, 5000 - subtotal);
 
@@ -514,28 +550,52 @@ function CheckoutContent() {
     </div>
   );
 
-  const SummaryPanel = ({ footer }) => (
+   const SummaryPanel = ({ footer }) => (
     <div className={`${cardCls} p-4 sm:p-5 lg:sticky lg:top-24`}>
       <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
         <PackageCheck size={16} className="text-[var(--user-accent)]" /> Order Summary
       </h2>
       <div className="space-y-2.5 sm:space-y-3 max-h-[250px] sm:max-h-[300px] overflow-y-auto pr-1 mb-3 sm:mb-4">
-        {activeItems.map((i) => (
+        {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-center gap-2.5 sm:gap-3">
             <ItemThumb item={i} size="w-10 h-10 sm:w-12 sm:h-12" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] sm:text-xs font-semibold text-[var(--user-text)] truncate">{i.name}</p>
               <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)]">Qty: {i.qty}</p>
+              {i.hasDiscount && (
+                <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
+                  <Tag size={8} /> Save Rs. {(i.savings * i.qty).toLocaleString()}
+                </p>
+              )}
             </div>
-            <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)]">Rs. {(i.price * i.qty).toLocaleString()}</p>
+            <div className="text-right">
+              {i.hasDiscount && (
+                <p className="text-[9px] text-[var(--user-text-subtle)] line-through">
+                  Rs. {(i.originalPrice * i.qty).toLocaleString()}
+                </p>
+              )}
+              <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)]">
+                Rs. {(i.displayPrice * i.qty).toLocaleString()}
+              </p>
+            </div>
           </div>
         ))}
       </div>
       <div className="space-y-2 pt-3 border-t border-[var(--user-border)] text-sm">
         <div className="flex justify-between text-[var(--user-text-muted)] text-xs sm:text-sm">
-          <span>Subtotal ({activeItems.length})</span>
+          <span>Subtotal ({itemsWithDiscounts.length})</span>
           <span className="text-[var(--user-text)] font-semibold">Rs. {subtotal.toLocaleString()}</span>
         </div>
+        {totalSavings > 0 && (
+          <div className="flex justify-between text-xs sm:text-sm">
+            <span className="text-[var(--user-success)] flex items-center gap-1">
+              <Tag size={12} /> Discount Savings
+            </span>
+            <span className="text-[var(--user-success)] font-semibold">
+              -Rs. {totalSavings.toLocaleString()}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-[var(--user-text-muted)] text-xs sm:text-sm">
           <span className="flex items-center gap-1">Shipping {shipping === 0 && <span className="text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>}</span>
           <span className="text-[var(--user-text)] font-semibold">{shipping === 0 ? "Rs. 0" : `Rs. ${shipping}`}</span>
@@ -549,6 +609,7 @@ function CheckoutContent() {
       <div className="mt-4">{footer}</div>
     </div>
   );
+
 
   return (
     <main className="max-w-[1200px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-10">
@@ -597,8 +658,11 @@ function CheckoutContent() {
                     <span className="hidden sm:inline">Select All</span><span className="sm:hidden">All</span>
                   </label>
                 </div>
-                <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[320px] sm:max-h-[380px] lg:max-h-[calc(100vh-240px)]">
-                  {cart.map((item) => {
+
+
+
+                               <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[320px] sm:max-h-[380px] lg:max-h-[calc(100vh-240px)]">
+                  {itemsWithDiscounts.map((item) => {
                     const checked = (selectedKeys || []).includes(item.key);
                     return (
                       <label key={item.key} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg sm:rounded-xl border cursor-pointer transition ${
@@ -609,7 +673,17 @@ function CheckoutContent() {
                         <div className="flex-1 min-w-0">
                           <p className="text-[11px] sm:text-xs font-semibold text-[var(--user-text)] truncate">{item.name}</p>
                           {item.variantTitle && <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
-                          <p className="text-[9px] sm:text-[10px] text-[var(--user-text-subtle)]">Rs. {item.price.toLocaleString()}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
+                            {item.hasDiscount && (
+                              <p className="text-[9px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
+                            )}
+                          </div>
+                          {item.hasDiscount && (
+                            <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
+                              <Tag size={8} /> Save Rs. {(item.savings * item.qty).toLocaleString()}
+                            </p>
+                          )}
                         </div>
                         <div className="shrink-0 flex flex-col items-end gap-1">
                           <div className="flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
@@ -621,13 +695,20 @@ function CheckoutContent() {
                               <Plus size={11} className="sm:w-3 sm:h-3" />
                             </button>
                           </div>
-                          <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-text-muted)]">Rs. {(item.price * item.qty).toLocaleString()}</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-accent)]">Rs. {(item.displayPrice * item.qty).toLocaleString()}</p>
                         </div>
                       </label>
                     );
                   })}
                 </div>
+
+
+
               </div>
+
+
+
+
 
               <div className={`${cardCls} lg:sticky lg:top-24 flex flex-col`}>
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3 sm:py-3.5 border-b border-[var(--user-border)] shrink-0">
@@ -644,18 +725,28 @@ function CheckoutContent() {
                       <p className="text-xs sm:text-sm font-semibold text-[var(--user-text)] mb-1">No items selected</p>
                       <p className="text-[10px] sm:text-xs text-[var(--user-text-muted)]">Select items from the list on the left.</p>
                     </div>
-                  ) : (
+                                 ) : (
                     <div className="divide-y divide-[var(--user-border)]">
-                      {selectedCartItems.map((item) => (
+                      {itemsWithDiscounts.filter((i) => (selectedKeys || []).includes(i.key)).map((item) => (
                         <div key={item.key} className="flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 first:pt-0 last:pb-0">
                           <ItemThumb item={item} size="w-12 h-12 sm:w-14 sm:h-14" />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm font-semibold text-[var(--user-text)] truncate">{item.name}</p>
                             {item.variantTitle && <p className="text-[10px] sm:text-[11px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
-                            <p className="text-[10px] sm:text-[11px] text-[var(--user-text-subtle)] mt-0.5">Qty: {item.qty} × Rs. {item.price.toLocaleString()}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-[10px] sm:text-[11px] text-[var(--user-text-subtle)]">Qty: {item.qty} × Rs. {item.displayPrice.toLocaleString()}</p>
+                              {item.hasDiscount && (
+                                <p className="text-[9px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
+                              )}
+                            </div>
+                            {item.hasDiscount && (
+                              <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
+                                <Tag size={8} /> Save Rs. {(item.savings * item.qty).toLocaleString()}
+                              </p>
+                            )}
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-xs sm:text-sm font-black text-[var(--user-accent)]">Rs. {(item.price * item.qty).toLocaleString()}</p>
+                            <p className="text-xs sm:text-sm font-black text-[var(--user-accent)]">Rs. {(item.displayPrice * item.qty).toLocaleString()}</p>
                             <button onClick={() => toggleKey(item.key)} className="mt-1 inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-bold text-[var(--user-text-subtle)] hover:text-[var(--user-danger)] transition">
                               <X size={9} className="sm:w-2.5 sm:h-2.5" /> Remove
                             </button>
@@ -664,6 +755,9 @@ function CheckoutContent() {
                       ))}
                     </div>
                   )}
+
+
+                  
                 </div>
                 <div className="px-3 sm:px-5 py-3 sm:py-4 border-t border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 rounded-b-xl sm:rounded-b-2xl shrink-0">
                   {freeLeft > 0 && selectedCartItems.length > 0 && (
