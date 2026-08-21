@@ -451,3 +451,142 @@ exports.deleteDiscount = async (req, res) => {
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
+// =====================================================
+// GET ACTIVE DISCOUNTS (PUBLIC - NO AUTH)
+// =====================================================
+
+exports.getPublicDiscounts = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const discounts = await Discount.find({
+      is_deleted: false,
+      isActive: true,
+      status: "active",
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    })
+      .populate("selectedProducts", "_id name selling_price")
+      .populate("selectedCategories", "_id name")
+      .populate("selectedBrands", "_id name")
+      .select("-createdBy -usageCount -__v")
+      .sort({ priority: -1, createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: discounts,
+    });
+  } catch (error) {
+    console.error("Get Public Discounts Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Server error",
+    });
+  }
+};
+
+// =====================================================
+// HELPER: Calculate Discounted Price for a Product
+// =====================================================
+
+const calculateDiscountedPrice = (product, discounts) => {
+  if (!discounts || !Array.isArray(discounts) || discounts.length === 0) {
+    return {
+      hasDiscount: false,
+      originalPrice: product.selling_price || product.price || 0,
+      discountedPrice: product.selling_price || product.price || 0,
+      discountValue: 0,
+      discountType: null,
+      discountName: null,
+    };
+  }
+
+  const originalPrice = Number(product.selling_price || product.price || 0);
+  let bestDiscount = null;
+  let bestFinalPrice = originalPrice;
+
+  for (const discount of discounts) {
+    if (!discount.isActive) continue;
+
+    // Check if discount applies to this product
+    let applies = false;
+
+    if (discount.applyTo === "all") {
+      applies = true;
+    } else if (discount.applyTo === "specific_products") {
+      applies = discount.selectedProducts.some(
+        (p) => String(p._id || p) === String(product._id || product.id)
+      );
+    } else if (discount.applyTo === "specific_categories") {
+      const productCategoryId = String(
+        product.category?._id || product.category || product.categoryId
+      );
+      applies = discount.selectedCategories.some(
+        (c) => String(c._id || c) === productCategoryId
+      );
+    } else if (discount.applyTo === "specific_brands") {
+      const productBrandId = String(
+        product.brand?._id || product.brand || product.brandId
+      );
+      applies = discount.selectedBrands.some(
+        (b) => String(b._id || b) === productBrandId
+      );
+    } else if (discount.applyTo === "price_range") {
+      applies =
+        discount.priceMin !== null &&
+        discount.priceMax !== null &&
+        originalPrice >= discount.priceMin &&
+        originalPrice <= discount.priceMax;
+    }
+
+    if (!applies) continue;
+
+    // Calculate final price for this discount
+    let finalPrice = originalPrice;
+
+    if (discount.type === "percentage") {
+      finalPrice = originalPrice * (1 - discount.value / 100);
+      if (
+        discount.maxDiscountAmount &&
+        originalPrice - finalPrice > discount.maxDiscountAmount
+      ) {
+        finalPrice = originalPrice - discount.maxDiscountAmount;
+      }
+    } else if (discount.type === "fixed") {
+      finalPrice = Math.max(0, originalPrice - discount.value);
+    } else if (discount.type === "fixed_price") {
+      finalPrice = discount.value;
+    }
+
+    // Pick the best discount (lowest final price)
+    if (finalPrice < bestFinalPrice) {
+      bestFinalPrice = finalPrice;
+      bestDiscount = discount;
+    }
+  }
+
+  if (!bestDiscount) {
+    return {
+      hasDiscount: false,
+      originalPrice,
+      discountedPrice: originalPrice,
+      discountValue: 0,
+      discountType: null,
+      discountName: null,
+    };
+  }
+
+  return {
+    hasDiscount: true,
+    originalPrice,
+    discountedPrice: Math.round(bestFinalPrice * 100) / 100,
+    discountValue: bestDiscount.value,
+    discountType: bestDiscount.type,
+    discountName: bestDiscount.name,
+    discountCode: bestDiscount.code,
+    savings: Math.round((originalPrice - bestFinalPrice) * 100) / 100,
+  };
+};
+
+// Export helper for use in other controllers
+exports.calculateDiscountedPrice = calculateDiscountedPrice;

@@ -20,4 +20,6 @@ export const discountApi = {
   // Optional: Get single discount by ID
   getById: (id) =>
     axiosInstance.get(`/discounts/${id}`).then((res) => res.data),
+   getPublic: () => axiosInstance.get("/discounts/public").then((res) => res.data?.data || []),
+
 };

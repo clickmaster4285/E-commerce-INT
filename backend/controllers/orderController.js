@@ -2,6 +2,9 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const Address = require("../models/Address");
+const Discount = require("../models/Discount");
+const discountController = require("./discountController");
+const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const FREE_DELIVERY_THRESHOLD = 5000;
 const DELIVERY_FEE = 200;
@@ -25,26 +28,66 @@ const placeOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Address not found" });
     }
 
+    // ✅ Active discounts fetch karo (price calculation ke liye)
+    const now = new Date();
+    let activeDiscounts = [];
+    try {
+      activeDiscounts = await Discount.find({
+        is_deleted: false,
+        isActive: true,
+        status: "active",
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      }).sort({ priority: -1 });
+    } catch (e) {
+      activeDiscounts = [];
+    }
+
     // ✅ DB se price verify + stock check (tampering se bachao)
     let subtotal = 0;
     let taxTotal = 0;
     const orderItems = [];
 
-    for (const item of items) {
-      const product = await Product.findOne({ _id: item.id, is_deleted: false });
-      if (!product) {
-        return res.status(400).json({ success: false, message: "Product not found or removed" });
+
+
+
+       for (const item of items) {
+      // ✅ ID fallback: cart key se product/variant id parse karo
+      // key format: "productId__variantId"
+      const keyParts = String(item.key || "").split("__");
+      const rawId = item.id || item.productId || item._id || keyParts[0] || null;
+      const rawVariantId = item.variant_id || (keyParts[1] !== "default" ? keyParts[1] : null);
+
+      let product = null;
+      try {
+        product = await Product.findById(rawId);
+      } catch (e) {
+        product = null;
+      }
+      if (!product || product.is_deleted) {
+        console.error("❌ [placeOrder] Product not found | id:", rawId, "| item:", item.name);
+        return res.status(400).json({
+          success: false,
+          message: `Product not found or removed (${item.name || "unknown"})`,
+        });
       }
 
       let variant = null;
-      if (item.variant_id) {
-        variant = await Variant.findById(item.variant_id);
-      } else {
+      if (rawVariantId) {
+        try {
+          variant = await Variant.findById(rawVariantId);
+        } catch (e) {
+          variant = null;
+        }
+      }
+      if (!variant) {
         variant = await Variant.findOne({ product_id: product._id });
       }
       if (!variant) {
         return res.status(400).json({ success: false, message: "Variant not found" });
       }
+
+
 
       const qty = Math.max(1, Number(item.qty || 1));
       if (Number(variant.quantity) < qty) {
@@ -54,7 +97,29 @@ const placeOrder = async (req, res) => {
         });
       }
 
-      const price = Number(variant.selling_price || 0);
+      const originalPrice = Number(variant.selling_price || 0);
+
+      // ✅ Discount apply karo (agar helper available hai)
+      let price = originalPrice;
+      let discountName = "";
+      let savings = 0;
+      if (typeof calculateDiscountedPrice === "function") {
+        const disc = calculateDiscountedPrice(
+          {
+            _id: product._id,
+            id: product._id,
+            category: product.category_id,
+            brand: product.brand_id,
+            selling_price: originalPrice,
+            price: originalPrice,
+          },
+          activeDiscounts,
+        );
+        price = disc.discountedPrice;
+        discountName = disc.discountName || "";
+        savings = disc.savings || 0;
+      }
+
       subtotal += price * qty;
       taxTotal += price * qty * (Number(product.tax || 0) / 100);
 
@@ -66,6 +131,9 @@ const placeOrder = async (req, res) => {
         variantTitle: variant.title || "",
         image: variant.images?.[0]?.img_url || "",
         price,
+        original_price: originalPrice,
+        discount_name: discountName,
+        savings,
         qty,
       });
     }
@@ -75,9 +143,9 @@ const placeOrder = async (req, res) => {
       await Variant.updateOne({ _id: oi.variant_id }, { $inc: { quantity: -oi.qty } });
     }
 
-       const shipping_method = req.body.shipping_method === "express" ? "express" : "standard";
+    const shipping_method = req.body.shipping_method === "express" ? "express" : "standard";
     const shipping = shipping_method === "express"
-      ? 500  // Express fee
+      ? 500
       : (subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE);
     const tax = Math.round(taxTotal);
     const total = subtotal + shipping + tax;
@@ -86,7 +154,7 @@ const placeOrder = async (req, res) => {
     const order_number = `ORD-${String(count + 1).padStart(5, "0")}`;
 
     const order = await Order.create({
-              shipping_method,
+      shipping_method,
       order_number,
       user_id: req.user._id,
       items: orderItems,

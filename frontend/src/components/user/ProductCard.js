@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, Plus, Check, Package } from "lucide-react";
+
+
+import { Heart, Plus, Check, Package, Tag } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
+import { useDiscounts } from "./DiscountContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -19,6 +22,9 @@ export default function ProductCard({ product }) {
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
+
+  const { calculateProductDiscount } = useDiscounts();
+
   const productId = product._id || product.id;
   const liked = isWishlisted(productId);
 
@@ -26,8 +32,18 @@ export default function ProductCard({ product }) {
   const firstVariant = variants[0];
   const image = firstVariant?.images?.[0]?.img_url;
 
-  const price = Number(firstVariant?.selling_price || product.price || 0);
-  const oldPrice = Number(firstVariant?.price || 0);
+  const variantPrice = Number(
+    firstVariant?.selling_price || product.price || 0,
+  );
+  const variantOldPrice = Number(firstVariant?.price || 0);
+
+  // ✅ Admin + product discount — best one pick karo
+  const disc = calculateProductDiscount(product, variantPrice);
+  const price = disc.discountedPrice;
+  const oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
+
+
+
   const totalStock = variants.length
     ? variants.reduce((s, v) => s + Number(v.quantity || 0), 0)
     : 99;
@@ -69,11 +85,18 @@ export default function ProductCard({ product }) {
         {/* Hover gradient — plus button ke peeche depth */}
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition pointer-events-none" />
 
-        {/* BADGES — top left */}
+
+
+                {/* BADGES — top left */}
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
-          {product.discount && (
-            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-bold px-2 py-0.5 rounded-full">
-              -{product.discount}%
+          {disc.hasDiscount && (
+            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Tag size={9} />
+              {disc.discountType === "percentage"
+                ? `-${disc.discountValue}%`
+                : disc.discountType === "fixed_price"
+                  ? `Fixed Rs.${disc.discountValue}`
+                  : `-Rs.${disc.discountValue}`}
             </span>
           )}
           {out ? (
@@ -86,6 +109,8 @@ export default function ProductCard({ product }) {
             </span>
           ) : null}
         </div>
+
+
 
         {/* ✅ HEART — wishlist (database linked) */}
         <button

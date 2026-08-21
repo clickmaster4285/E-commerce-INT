@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { useCart } from "@/components/user/CartContext";
+import { useDiscounts } from "@/components/user/DiscountContext";
 import {
   User,
   Package,
@@ -25,6 +26,7 @@ import {
   ArrowRight,
   Trash2,
   Play,
+  Tag,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -54,7 +56,6 @@ const getImgUrl = (img) => {
   return `${API_ORIGIN}${path}`;
 };
 
-// ✅ Progress tracker dots
 const OrderProgress = ({ status }) => {
   if (status === "cancelled") {
     return (
@@ -85,7 +86,6 @@ const OrderProgress = ({ status }) => {
   );
 };
 
-// ✅ Draft progress dots (step based)
 const DraftProgress = ({ step }) => (
   <div className="flex items-center gap-1.5">
     {[1, 2, 3].map((s, i) => (
@@ -104,9 +104,9 @@ export default function AccountPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { restoreItems } = useCart();
+  const { calculateProductDiscount } = useDiscounts();
   const [filter, setFilter] = useState("all");
 
-  // ✅ User query
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
@@ -117,7 +117,6 @@ export default function AccountPage() {
     retryDelay: 1000,
   });
 
-  // ✅ Orders query
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["myOrders"],
     queryFn: async () => {
@@ -128,7 +127,6 @@ export default function AccountPage() {
     retry: 1,
   });
 
-  // ✅ Fetch ALL drafts (multiple)
   const { data: drafts = [] } = useQuery({
     queryKey: ["checkoutDrafts"],
     queryFn: async () => {
@@ -142,7 +140,6 @@ export default function AccountPage() {
 
   const hasDrafts = drafts.length > 0;
 
-  // ✅ Delete single draft — items wapas cart mein
   const deleteDraft = async (draftId, items) => {
     try {
       if (items?.length) restoreItems(items);
@@ -156,7 +153,6 @@ export default function AccountPage() {
 
   const resumeDraft = (draftId) => router.push(`/checkout?draftId=${draftId}`);
 
-  // ✅ Loading state
   if (userLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -165,7 +161,6 @@ export default function AccountPage() {
     );
   }
 
-  // ✅ Not logged in
   if (!userLoading && !user) {
     return (
       <div className="max-w-7xl mx-auto px-4 lg:px-6 py-20 lg:py-28 text-center">
@@ -196,19 +191,41 @@ export default function AccountPage() {
   const filtered = filter === "all" ? orders : filter === "draft" ? [] : orders.filter((o) => o.status === filter);
   const activeCount = orders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
 
-  // ✅ Draft card — prop-based (multiple drafts support)
   const DraftCard = ({ draft }) => {
     const items = draft.items || [];
     const count = items.length || draft.selectedKeys?.length || 0;
-    const total = items.reduce(
-      (s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 1),
+
+    const discountedItems = items.map((i) => {
+      const disc = calculateProductDiscount(
+        {
+          _id: i.productId || i.id,
+          category_id: i.categoryId || null,
+          brand_id: i.brandId || null,
+          discount: i.productDiscountPct || 0,
+        },
+        i.price,
+      );
+      return {
+        ...i,
+        displayPrice: disc.discountedPrice,
+        originalPrice: disc.originalPrice,
+        hasDiscount: disc.hasDiscount,
+        savings: disc.savings,
+      };
+    });
+
+    const total = discountedItems.reduce(
+      (s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1),
+      0,
+    );
+    const totalSavings = discountedItems.reduce(
+      (s, i) => s + (Number(i.savings) || 0) * (Number(i.qty) || 1),
       0,
     );
     const pay = PAYMENT_LABEL[draft.paymentMethod] || PAYMENT_LABEL.cod;
 
     return (
       <div className="w-full text-left rounded-2xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5 p-4 lg:p-5 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-        {/* Row 1 */}
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
             <div>
@@ -224,7 +241,6 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Row 2: images + chips */}
         <div className="flex items-center gap-4 mb-4 flex-wrap">
           <div className="flex -space-x-3">
             {items.slice(0, 4).map((item, i) => {
@@ -254,16 +270,21 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Row 3: draft progress */}
         <div className="mb-4">
           <DraftProgress step={draft.step} />
         </div>
 
-        {/* Row 4: total + actions */}
         <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)] flex-wrap gap-3">
-          <p className="text-xs text-[var(--user-text-muted)]">
-            Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</span>
-          </p>
+          <div>
+            {totalSavings > 0 && (
+              <p className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 mb-0.5">
+                <Tag size={10} /> Save Rs. {totalSavings.toLocaleString()}
+              </p>
+            )}
+            <p className="text-xs text-[var(--user-text-muted)]">
+              Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</span>
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => resumeDraft(draft._id)}
@@ -285,7 +306,6 @@ export default function AccountPage() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-24 md:pb-10">
-      {/* ✅ MEMBER CARD */}
       <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-5 sm:p-6 lg:p-8 mb-6 lg:mb-8">
         <div className="absolute -right-6 -bottom-10 lg:-right-10 lg:-bottom-16 opacity-[0.04] pointer-events-none">
           <ShoppingBag size={180} className="lg:w-[220px] lg:h-[220px] text-[var(--user-accent)]" />
@@ -328,7 +348,6 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {/* ✅ MY ORDERS SECTION */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg lg:text-xl font-black text-[var(--user-text)]">My Orders</h2>
@@ -339,7 +358,6 @@ export default function AccountPage() {
           )}
         </div>
 
-        {/* ✅ Filter Tabs — All ke baad Draft (multiple) */}
         {(orders.length > 0 || hasDrafts) && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
             <button
@@ -390,7 +408,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* ✅ DRAFT CARDS — "all" aur "draft" dono mein (multiple) */}
         {hasDrafts && (filter === "all" || filter === "draft") && (
           <div className="space-y-4 mb-4">
             {drafts.map((draft) => (
@@ -399,7 +416,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Orders List */}
         {ordersLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />

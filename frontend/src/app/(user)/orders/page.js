@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/orderApi";
 import { useCart } from "@/components/user/CartContext";
+import { useDiscounts } from "@/components/user/DiscountContext";
 import {
   Package, Loader2, ShoppingBag, Calendar, MapPin, CreditCard,
-  CheckCircle2, Clock, Truck, XCircle, ArrowRight, Banknote, Landmark, Zap, Trash2, Play,
+  CheckCircle2, Clock, Truck, XCircle, ArrowRight, Banknote, Landmark, Zap, Trash2, Play, Tag,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -38,7 +39,6 @@ const PAYMENT_LABEL = {
   card: { label: "Card", icon: CreditCard },
 };
 
-// Progress tracker dots
 const OrderProgress = ({ status }) => {
   if (status === "cancelled") {
     return (
@@ -69,7 +69,6 @@ const OrderProgress = ({ status }) => {
   );
 };
 
-// ✅ Draft progress dots (step based)
 const DraftProgress = ({ step }) => (
   <div className="flex items-center gap-1.5">
     {[1, 2, 3].map((s, i) => (
@@ -88,6 +87,7 @@ export default function OrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { restoreItems } = useCart();
+  const { calculateProductDiscount } = useDiscounts();
   const [filter, setFilter] = useState("all");
 
   const { data: user = null, isLoading: userLoading } = useQuery({
@@ -105,9 +105,6 @@ export default function OrdersPage() {
     enabled: !!user,
   });
 
-
-
-  // ✅ Fetch ALL drafts
   const { data: drafts = [] } = useQuery({
     queryKey: ["checkoutDrafts"],
     queryFn: async () => {
@@ -132,9 +129,7 @@ export default function OrdersPage() {
     }
   };
 
-  const resumeDraft = (draftId) =>
-    router.push(`/checkout?draftId=${draftId}`);
-
+  const resumeDraft = (draftId) => router.push(`/checkout?draftId=${draftId}`);
 
   useEffect(() => {
     if (!userLoading && !user) router.replace("/login?redirect=/orders");
@@ -156,14 +151,35 @@ export default function OrdersPage() {
   const filtered = filter === "all" ? orders : filter === "draft" ? [] : orders.filter((o) => o.status === filter);
   const activeCount = orders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
 
-
-
-   // ✅ Draft card — "all" aur "draft" dono mein show hoga (multiple)
   const DraftCard = ({ draft }) => {
     const items = draft.items || [];
     const count = items.length || draft.selectedKeys?.length || 0;
-    const total = items.reduce(
-      (s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 1),
+
+    const discountedItems = items.map((i) => {
+      const disc = calculateProductDiscount(
+        {
+          _id: i.productId || i.id,
+          category_id: i.categoryId || null,
+          brand_id: i.brandId || null,
+          discount: i.productDiscountPct || 0,
+        },
+        i.price,
+      );
+      return {
+        ...i,
+        displayPrice: disc.discountedPrice,
+        originalPrice: disc.originalPrice,
+        hasDiscount: disc.hasDiscount,
+        savings: disc.savings,
+      };
+    });
+
+    const total = discountedItems.reduce(
+      (s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1),
+      0,
+    );
+    const totalSavings = discountedItems.reduce(
+      (s, i) => s + (Number(i.savings) || 0) * (Number(i.qty) || 1),
       0,
     );
     const pay = PAYMENT_LABEL[draft.paymentMethod] || PAYMENT_LABEL.cod;
@@ -173,26 +189,15 @@ export default function OrdersPage() {
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap">
             <div>
-              <p className="font-mono font-black text-sm text-[var(--user-accent)]">
-                DRAFT ORDER
-              </p>
+              <p className="font-mono font-black text-sm text-[var(--user-accent)]">DRAFT ORDER</p>
               <p className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1 mt-0.5">
-                <Calendar size={10} />{" "}
-                {draft.updatedAt
-                  ? new Date(draft.updatedAt).toLocaleDateString("en-US", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : "—"}
+                <Calendar size={10} /> {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-[var(--user-accent)]/10 border-[var(--user-accent)]/40">
             <ShoppingBag size={12} className="text-[var(--user-accent)]" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--user-accent)]">
-              Draft
-            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--user-accent)]">Draft</span>
           </div>
         </div>
 
@@ -201,29 +206,16 @@ export default function OrdersPage() {
             {items.slice(0, 4).map((item, i) => {
               const imgUrl = getImgUrl(item.image);
               return imgUrl ? (
-                <img
-                  key={i}
-                  src={imgUrl}
-                  alt={item.name}
-                  className="w-11 h-11 rounded-xl object-cover border-2 border-[var(--user-bg-card)] shadow-md"
-                />
+                <img key={i} src={imgUrl} alt={item.name} className="w-11 h-11 rounded-xl object-cover border-2 border-[var(--user-bg-card)] shadow-md" />
               ) : (
-                <div
-                  key={i}
-                  className="w-11 h-11 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-bg-card)] shadow-md flex items-center justify-center"
-                >
-                  <Package
-                    size={14}
-                    className="text-[var(--user-text-subtle)]"
-                  />
+                <div key={i} className="w-11 h-11 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-bg-card)] shadow-md flex items-center justify-center">
+                  <Package size={14} className="text-[var(--user-text-subtle)]" />
                 </div>
               );
             })}
             {items.length > 4 && (
               <div className="w-11 h-11 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-bg-card)] shadow-md flex items-center justify-center">
-                <span className="text-[10px] font-black text-[var(--user-text-muted)]">
-                  +{items.length - 4}
-                </span>
+                <span className="text-[10px] font-black text-[var(--user-text-muted)]">+{items.length - 4}</span>
               </div>
             )}
           </div>
@@ -243,12 +235,16 @@ export default function OrdersPage() {
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)] flex-wrap gap-3">
-          <p className="text-xs text-[var(--user-text-muted)]">
-            Total:{" "}
-            <span className="text-base font-black text-[var(--user-accent)]">
-              Rs. {total.toLocaleString()}
-            </span>
-          </p>
+          <div>
+            {totalSavings > 0 && (
+              <p className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 mb-0.5">
+                <Tag size={10} /> Save Rs. {totalSavings.toLocaleString()}
+              </p>
+            )}
+            <p className="text-xs text-[var(--user-text-muted)]">
+              Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</span>
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => resumeDraft(draft._id)}
@@ -268,12 +264,8 @@ export default function OrdersPage() {
     );
   };
 
-
-
-
   return (
     <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-24 md:pb-10">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl lg:text-2xl font-black text-[var(--user-text)]">My Orders</h1>
@@ -286,9 +278,6 @@ export default function OrdersPage() {
         </Link>
       </div>
 
-
-
-            {/* ✅ Filter Tabs — All ke baad Draft (multiple) */}
       {(orders.length > 0 || hasDrafts) && (
         <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
           <button
@@ -317,7 +306,6 @@ export default function OrdersPage() {
             </button>
           )}
 
-
           {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
             const Icon = cfg.icon;
             const isActive = filter === key;
@@ -340,7 +328,6 @@ export default function OrdersPage() {
         </div>
       )}
 
-          {/* ✅ DRAFT CARDS — "all" aur "draft" dono mein (multiple) */}
       {hasDrafts && (filter === "all" || filter === "draft") && (
         <div className="space-y-4 mb-4">
           {drafts.map((draft) => (
@@ -349,10 +336,7 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Empty State */}
-      {filter !== "draft" &&
-        filtered.length === 0 &&
-        !(filter === "all" && hasDrafts) && (
+      {filter !== "draft" && filtered.length === 0 && !(filter === "all" && hasDrafts) && (
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-12 text-center">
           <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
             <ShoppingBag size={32} className="text-[var(--user-text-subtle)]" />
@@ -369,7 +353,6 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Orders List */}
       {filter !== "draft" && filtered.length > 0 && (
         <div className="space-y-4">
           {filtered.map((order) => {

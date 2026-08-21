@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { orderApi } from "@/apis/orderApi";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
-  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck,
+  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck, Tag,
 } from "lucide-react";
 
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
@@ -34,7 +34,6 @@ const getImgUrl = (img) => {
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
 
-// ✅ Bada visual stepper
 const DetailStepper = ({ status }) => {
   if (status === "cancelled") {
     return (
@@ -119,9 +118,16 @@ export default function OrderDetailPage({ params }) {
   const PayIcon = pay.icon;
   const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
 
+  // ✅ Total savings calculate karo (discounted orders ke liye)
+  const totalSavings = order.items.reduce((sum, i) => {
+    const original = Number(i.original_price || 0);
+    const paid = Number(i.price || 0);
+    const saved = (original - paid) * (Number(i.qty) || 1);
+    return sum + (saved > 0 ? saved : 0);
+  }, 0);
+
   return (
     <main className="max-w-[1000px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-24 md:pb-10">
-      {/* Back */}
       <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition mb-5">
         <ArrowLeft size={14} /> Back to Orders
       </Link>
@@ -144,10 +150,14 @@ export default function OrderDetailPage({ params }) {
           <div className="text-right">
             <p className="text-[10px] text-[var(--user-text-muted)] uppercase tracking-wider">Total</p>
             <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</p>
+            {totalSavings > 0 && (
+              <p className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 justify-end mt-1">
+                <Tag size={10} /> You saved Rs. {totalSavings.toLocaleString()}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* ✅ Progress Stepper */}
         <div className="mt-6">
           <DetailStepper status={order.status} />
           {order.status !== "cancelled" && order.status !== "delivered" && (
@@ -172,21 +182,45 @@ export default function OrderDetailPage({ params }) {
             <Package size={15} className="text-[var(--user-accent)]" /> Items ({order.items.length})
           </h2>
           <div className="divide-y divide-[var(--user-border)]">
-            {order.items.map((i, idx) => (
-              <div key={idx} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                {getImgUrl(i.image) ? (
-                  <img src={getImgUrl(i.image)} alt="" className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-[var(--user-bg-hover)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[var(--user-text)] truncate">{i.name}</p>
-                  {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] truncate">{i.variantTitle}</p>}
-                  <p className="text-[11px] text-[var(--user-text-subtle)] mt-0.5">Qty: {i.qty} × Rs. {i.price.toLocaleString()}</p>
+            {order.items.map((i, idx) => {
+              const originalPrice = Number(i.original_price || 0);
+              const hasDiscount = originalPrice > 0 && originalPrice > Number(i.price);
+              const itemSavings = hasDiscount ? (originalPrice - Number(i.price)) * Number(i.qty) : 0;
+              
+              return (
+                <div key={idx} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  {getImgUrl(i.image) ? (
+                    <img src={getImgUrl(i.image)} alt="" className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-[var(--user-bg-hover)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--user-text)] truncate">{i.name}</p>
+                    {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] truncate">{i.variantTitle}</p>}
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <p className="text-[11px] text-[var(--user-text-subtle)]">Qty: {i.qty} × Rs. {Number(i.price).toLocaleString()}</p>
+                      {hasDiscount && (
+                        <p className="text-[10px] text-[var(--user-text-subtle)] line-through">Rs. {originalPrice.toLocaleString()}</p>
+                      )}
+                    </div>
+                    {hasDiscount && i.discount_name && (
+                      <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
+                        <Tag size={8} /> {i.discount_name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    {hasDiscount && (
+                      <p className="text-[10px] text-[var(--user-text-subtle)] line-through">Rs. {(originalPrice * i.qty).toLocaleString()}</p>
+                    )}
+                    <p className="text-sm font-black text-[var(--user-text)]">Rs. {(Number(i.price) * i.qty).toLocaleString()}</p>
+                    {itemSavings > 0 && (
+                      <p className="text-[9px] font-bold text-[var(--user-success)] mt-0.5">Save Rs. {itemSavings.toLocaleString()}</p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm font-black text-[var(--user-text)]">Rs. {(i.price * i.qty).toLocaleString()}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -239,7 +273,18 @@ export default function OrderDetailPage({ params }) {
             </div>
 
             <div className="mt-4 space-y-2 text-sm pt-3 border-t border-[var(--user-border)]">
-              <div className="flex justify-between text-[var(--user-text-muted)]"><span>Subtotal</span><span className="text-[var(--user-text)] font-semibold">Rs. {order.subtotal.toLocaleString()}</span></div>
+              <div className="flex justify-between text-[var(--user-text-muted)]">
+                <span>Subtotal</span>
+                <span className="text-[var(--user-text)] font-semibold">Rs. {order.subtotal.toLocaleString()}</span>
+              </div>
+              {totalSavings > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-[var(--user-success)] flex items-center gap-1">
+                    <Tag size={12} /> Discount Savings
+                  </span>
+                  <span className="text-[var(--user-success)] font-semibold">-Rs. {totalSavings.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between text-[var(--user-text-muted)]">
                 <span>Shipping</span>
                 <span className="text-[var(--user-text)] font-semibold">{order.shipping === 0 ? "FREE" : `Rs. ${order.shipping.toLocaleString()}`}</span>

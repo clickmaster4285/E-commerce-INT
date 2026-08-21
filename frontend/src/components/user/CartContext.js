@@ -27,13 +27,23 @@ const writeLocalCart = (items) => {
   } catch {}
 };
 
-// Server + current cart merge (same item ki qty add hoti hai)
 const mergeCarts = (server, current) => {
   const map = new Map();
   [...server, ...current].forEach((item) => {
     const existing = map.get(item.key);
-    if (existing) existing.qty += item.qty;
-    else map.set(item.key, { ...item });
+    if (existing) {
+      // ✅ Fields preserve karo (id wali item jeete), qty sum karo
+      const merged = {
+        ...existing,
+        ...item,
+        qty: (Number(existing.qty) || 0) + (Number(item.qty) || 0),
+      };
+      if (!merged.id && existing.id) merged.id = existing.id;
+      if (!merged.productId && existing.productId) merged.productId = existing.productId;
+      map.set(item.key, merged);
+    } else {
+      map.set(item.key, { ...item });
+    }
   });
   return [...map.values()];
 };
@@ -124,7 +134,9 @@ export function CartProvider({ children }) {
         )
       );
     } else {
-      save([
+
+
+          save([
         ...cartRef.current,
         {
           key,
@@ -137,8 +149,17 @@ export function CartProvider({ children }) {
           variantTitle: variant?.title || "",
           qty,
           tax: Number(product.tax || 0),
+          // ✅ Discount calculation ke liye IDs
+          productId: String(id),
+          categoryId: String(
+            product.category_id?._id || product.category_id || "",
+          ),
+          brandId: String(product.brand_id?._id || product.brand_id || ""),
+          productDiscountPct: Number(product.discount || 0),
         },
       ]);
+
+
     }
   };
 

@@ -9,10 +9,15 @@ const {
   getDiscounts,
   getDiscountById,
   updateDiscount,
-  deleteDiscount
+  deleteDiscount,
+   getPublicDiscounts  
 } = require('../controllers/discountController');
 
 // ✅ Har route ke beech mein 'authMiddleware' lagana lazmi hai
+// ✅ PUBLIC ROUTE (no auth) - for user GUI
+router.get('/public', getPublicDiscounts);
+
+// ✅ ADMIN ROUTES (auth required)
 router.post('/', authMiddleware, createDiscount);
 router.get('/', authMiddleware, getDiscounts);
 router.get('/:id', authMiddleware, getDiscountById);

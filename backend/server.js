@@ -29,7 +29,9 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const discountRoutes = require("./routes/discountRoutes");
 const dealRoutes = require("./routes/dealRoutes");
 const tagRoutes = require("./routes/tagRoutes"); // ✅ ADDED TAG ROUTES IMPORT
-
+const addressRoutes = require("./routes/addressRoutes"); // ✅ ADDRESS ROUTES
+const orderRoutes = require("./routes/orderRoutes"); // ✅ ORDER ROUTES
+const cartRoutes = require("./routes/cartRoutes"); // ✅ CART ROUTES
 // ==========================================
 // APP
 // ==========================================
@@ -302,6 +304,23 @@ app.use(
   tagRoutes
 );
 
+// ✅ REGISTER ADDRESS ROUTES
+app.use(
+  `${API_PREFIX}/addresses`,
+  addressRoutes
+);
+
+// ✅ REGISTER ORDER ROUTES
+app.use(
+  `${API_PREFIX}/orders`,
+  orderRoutes
+);
+
+// ✅ REGISTER CART ROUTES
+app.use(
+  `${API_PREFIX}/cart`,
+  cartRoutes
+);
 // ==========================================
 // ROOT ROUTE
 // ==========================================
