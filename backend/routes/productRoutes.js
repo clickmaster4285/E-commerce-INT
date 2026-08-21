@@ -3,8 +3,6 @@ const express = require("express");
 const {
   createProduct,
   getProducts,
-  getProductsPublic,
-  getProductsAdmin,
   getProductById,
   updateProduct,
   deleteProduct,
@@ -23,17 +21,7 @@ const saveProductImages = require("../middleware/saveProductImages");
 
 const router = express.Router();
 
-// ==========================================
-// 🌐 PUBLIC ROUTES — bina token (User GUI)
-// ==========================================
-router.get("/", getProductsPublic);
-router.get("/:id", getProductById);
-
-// ==========================================
-// 🛡️ ADMIN ROUTES — token + permission
-// ==========================================
-router.get("/admin/all", authMiddleware, checkPermission("products"), getProductsAdmin);
-
+// ✅ CREATE PRODUCT — Permission required
 router.post(
   "/",
   authMiddleware,
@@ -41,9 +29,10 @@ router.post(
   productImagesUpload,
   validateProductImages,
   saveProductImages,
-  createProduct
+  createProduct,
 );
 
+// ✅ UPDATE PRODUCT — Permission required
 router.put(
   "/:id",
   authMiddleware,
@@ -51,11 +40,19 @@ router.put(
   productImagesUpload,
   validateProductImages,
   saveProductImages,
-  updateProduct
+  updateProduct,
 );
 
+// ✅ DELETE PRODUCT — Permission required
 router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
 
+// ✅ TOGGLE STATUS — Permission required
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
+
+// ✅ GET ALL PRODUCTS — No permission (read-only, sab dekh saken)
+router.get("/", authMiddleware, getProducts);
+
+// ✅ GET SINGLE PRODUCT — No permission (read-only)
+router.get("/:id", authMiddleware, getProductById);
 
 module.exports = router;

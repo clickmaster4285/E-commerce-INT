@@ -1,68 +1,187 @@
 "use client";
+
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSocket } from "./useSocket";
-import Cookies from "js-cookie";
 
 export function useStoreSocketSync() {
   const queryClient = useQueryClient();
   const { socket, isConnected } = useSocket();
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    // Socket available nahi ya connected nahi hai
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    // =========================================================
+    // STORE UPDATED EVENT
+    // =========================================================
 
     const handleStoreUpdated = (data) => {
-      console.log("📥 useStoreSocketSync → storeUpdated received:", data?.store_name);
+      console.log(
+        "📥 useStoreSocketSync → storeUpdated received:",
+        data?.store_name
+      );
 
-      // ✅ TanStack Query cache invalidate
-      queryClient.invalidateQueries({ queryKey: ["storeInfo"] });
-      queryClient.invalidateQueries({ queryKey: ["store"] });
+      if (!data) {
+        console.warn(
+          "⚠️ useStoreSocketSync → storeUpdated received empty data"
+        );
+        return;
+      }
 
-      // ✅ Direct cache update (instant UI)
-      queryClient.setQueryData(["storeInfo"], (old) => {
-        if (old && old.success) {
-          return { ...old, data: { ...old.data, ...data } };
+      // ---------------------------------------------------------
+      // Update ["storeInfo"] cache immediately
+      // ---------------------------------------------------------
+
+      queryClient.setQueryData(["storeInfo"], (oldData) => {
+        // Existing TanStack Query data exists
+        if (oldData?.success && oldData?.data) {
+          return {
+            ...oldData,
+            data: {
+              ...oldData.data,
+              ...data,
+            },
+          };
         }
-        return { success: true, data };
+
+        // No previous cache
+        return {
+          success: true,
+          data,
+        };
       });
 
-      // ✅ FIXED: localStorage → Cookies
+      // ---------------------------------------------------------
+      // If application also uses ["store"] query,
+      // mark it stale so it can refetch when required.
+      // ---------------------------------------------------------
+
+      queryClient.invalidateQueries({
+        queryKey: ["store"],
+      });
+
+      // ---------------------------------------------------------
+      // Optional browser event
+      // Useful for components that directly listen to
+      // "storeUpdated".
+      // ---------------------------------------------------------
+
       if (typeof window !== "undefined") {
-        Cookies.set("storeName", data?.store_name || "", { expires: 365, path: "/" });
-        Cookies.set("storeData", JSON.stringify(data), { expires: 365, path: "/" });
-
-        // ✅ Custom event dispatch - Layout, Sidebar, Navbar sab sunenge
-        window.dispatchEvent(new CustomEvent("storeUpdated", { detail: data }));
+        window.dispatchEvent(
+          new CustomEvent("storeUpdated", {
+            detail: data,
+          })
+        );
       }
     };
 
-    const handleStoreInfo = (data) => {
-      console.log("📥 useStoreSocketSync → storeInfo received:", data?.data?.store_name);
-      if (data?.success && data?.data) {
-        queryClient.setQueryData(["storeInfo"], data);
+    // =========================================================
+    // STORE INFO EVENT
+    // =========================================================
 
-        // ✅ FIXED: localStorage → Cookies
-        if (typeof window !== "undefined") {
-          Cookies.set("storeName", data.data?.store_name || "", { expires: 365, path: "/" });
-          Cookies.set("storeData", JSON.stringify(data.data), { expires: 365, path: "/" });
-          window.dispatchEvent(new CustomEvent("storeUpdated", { detail: data.data }));
-        }
+    const handleStoreInfo = (response) => {
+      console.log(
+        "📥 useStoreSocketSync → storeInfo received:",
+        response?.data?.store_name
+      );
+
+      // Backend response expected:
+      //
+      // {
+      //   success: true,
+      //   data: {
+      //     store_name: "...",
+      //     ...
+      //   }
+      // }
+
+      if (!response?.success || !response?.data) {
+        console.warn(
+          "⚠️ useStoreSocketSync → Invalid storeInfo response:",
+          response
+        );
+        return;
+      }
+
+      // ---------------------------------------------------------
+      // Save complete response in TanStack Query cache
+      // ---------------------------------------------------------
+
+      queryClient.setQueryData(
+        ["storeInfo"],
+        response
+      );
+
+      // ---------------------------------------------------------
+      // Optional browser event
+      // ---------------------------------------------------------
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("storeUpdated", {
+            detail: response.data,
+          })
+        );
       }
     };
 
-    socket.on("storeUpdated", handleStoreUpdated);
-    socket.on("storeInfo", handleStoreInfo);
+    // =========================================================
+    // ATTACH SOCKET LISTENERS
+    // =========================================================
 
-    // ✅ Connect hote hi current store info maango
+    socket.on(
+      "storeUpdated",
+      handleStoreUpdated
+    );
+
+    socket.on(
+      "storeInfo",
+      handleStoreInfo
+    );
+
+    console.log(
+      "✅ useStoreSocketSync → Socket listeners attached"
+    );
+
+    // =========================================================
+    // REQUEST CURRENT STORE INFO
+    // =========================================================
+
     socket.emit("getStoreInfo");
 
-    console.log("✅ Store socket listeners attached in useStoreSocketSync");
+    console.log(
+      "📤 useStoreSocketSync → getStoreInfo emitted"
+    );
+
+    // =========================================================
+    // CLEANUP
+    // =========================================================
 
     return () => {
-      socket.off("storeUpdated", handleStoreUpdated);
-      socket.off("storeInfo", handleStoreInfo);
+      socket.off(
+        "storeUpdated",
+        handleStoreUpdated
+      );
+
+      socket.off(
+        "storeInfo",
+        handleStoreInfo
+      );
+
+      console.log(
+        "🧹 useStoreSocketSync → Socket listeners removed"
+      );
     };
   }, [socket, isConnected, queryClient]);
 
-  return { isConnected };
+  // =========================================================
+  // RETURN
+  // =========================================================
+
+  return {
+    isConnected,
+  };
 }

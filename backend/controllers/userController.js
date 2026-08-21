@@ -17,7 +17,7 @@ const generateTokens = (userId, role) => {
 
 const getCookieOptions = (maxAge) => ({
   httpOnly: true,
-  secure: false,
+  secure: false, 
   sameSite: "lax",
   maxAge,
 });
@@ -39,6 +39,7 @@ const createUser = async (req, res) => {
         .json({ success: false, message: "User already exists" });
     const hashedPassword = await bcrypt.hash(password, 10);
     const defaultStore = await Store.findOne();
+    
     const user = await User.create({
       name,
       username:
@@ -46,9 +47,11 @@ const createUser = async (req, res) => {
       phone,
       email,
       password: hashedPassword,
+      role: finalRole, // ✅ Explicitly setting role
       storeId: defaultStore?._id,
       role: "user",
     });
+
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie(
@@ -58,7 +61,7 @@ const createUser = async (req, res) => {
     );
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "Staff registered successfully",
       user: {
         id: user._id,
         name: user.name,
@@ -302,12 +305,8 @@ const getMe = async (req, res) => {
         avatar: user.avatar || null,
         twoFactorEnabled: user.twoFactorEnabled || false,
         permissions: user.permissions || {
-          products: true,
-          brands: true,
-          categories: true,
-          users: false,
-          orders: true,
-          settings: true,
+          products: true, brands: true, categories: true, 
+          employees: true, discounts: true, profile: true, store: false
         },
         preferences: user.preferences || {
           darkMode: true,
@@ -405,6 +404,7 @@ const toggle2FA = async (req, res) => {
     });
     res.json({ success: true, message: "✅ 2FA setting updated!" });
   } catch (error) {
+    console.error("toggle2FA error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -436,12 +436,8 @@ const getProfileInfo = async (req, res) => {
       address: user.address || store.address || "",
       twoFactorEnabled: user.twoFactorEnabled || false,
       permissions: user.permissions || {
-        products: true,
-        brands: true,
-        categories: true,
-        users: false,
-        orders: true,
-        settings: true,
+        products: true, brands: true, categories: true, 
+        employees: true, discounts: true, profile: true, store: false
       },
       preferences: user.preferences || {
         darkMode: true,
@@ -469,20 +465,8 @@ const updateProfileInfo = async (req, res) => {
     if (!userId || userId === "guest")
       return res.status(401).json({ success: false, message: "Unauthorized" });
     const {
-      name,
-      email,
-      phone,
-      website,
-      address,
-      store_name,
-      tagline,
-      primary_color,
-      currency,
-      country,
-      city,
-      state,
-      zip_code,
-      store_status,
+      name, email, phone, website, address,
+      store_name, tagline, primary_color, currency, country, city, state, zip_code, store_status
     } = req.body;
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
@@ -525,8 +509,10 @@ const updateProfileInfo = async (req, res) => {
         : null;
       if (!store) store = await Store.findOne();
       if (!store) store = await Store.create({});
+      
       Object.assign(store, storeUpdateFields);
       updatedStore = await store.save();
+      
       if (!updatedUser.storeId && updatedStore) {
         updatedUser.storeId = updatedStore._id;
         await updatedUser.save();
@@ -593,16 +579,18 @@ const googleLogin = async (req, res) => {
         .json({ message: "Google account mein email nahi mili" });
     let user = await User.findOne({ email });
     if (!user) {
-      const randomPassword = Math.random().toString(36).slice(2) + "A1!";
-      user = await User.create({
-        name: name || email.split("@")[0],
-        username:
-          email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") +
-          Math.floor(Math.random() * 9999),
-        email,
-        password: await bcrypt.hash(randomPassword, 10),
-        role: "user",
-        avatar: picture || "",
+      // ✅ SECURITY FIX: Naye Google users ko direct access NAHI milega
+      return res.status(403).json({ 
+        success: false, 
+        message: "Access Denied. Your email is not registered as Staff/Admin. Please contact administrator." 
+      });
+    }
+
+    // ✅ EXISTING USER ROLE CHECK
+    if (!["admin", "staff", "manager"].includes(user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only administrators, managers and staff members can log in.",
       });
     } else {
       if (user.role !== "user")

@@ -1,12 +1,9 @@
 "use client";
-
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
-
 import { useProductSocketSync } from "@/hooks/useProductSocketSync";
-
 import {
   AlertTriangle,
   Check,
@@ -20,183 +17,119 @@ import {
   Package,
   Pencil,
   Plus,
+  Power,
   Search,
   Sparkles,
   Trash2,
   Upload,
   X,
-  Globe,
-  Power,
 } from "lucide-react";
-
 import { toast } from "sonner";
-
-// ✅ CHANGE 1: adminProductApi use karein (admin endpoints)
-import { adminProductApi } from "@/apis/admin/productApi";
+import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { variantApi } from "@/apis/variantApi";
 
 const ITEMS_PER_PAGE = 20;
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 
 const ATTRIBUTE_PRESETS = [
-  {
-    name: "Color",
-    values: [
-      "Black", "White", "Gray", "Red", "Blue", "Green", "Yellow", "Brown",
-      "Pink", "Orange", "Purple", "Gold", "Silver",
-    ],
-  },
-  {
-    name: "Size",
-    values: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size"],
-  },
-  {
-    name: "Material",
-    values: ["Cotton", "Polyester", "Leather", "Denim", "Wool", "Silk", "Linen", "Nylon"],
-  },
-  {
-    name: "Fit",
-    values: ["Regular Fit", "Slim Fit", "Loose Fit", "Relaxed Fit", "Oversized", "Skinny", "Straight", "Tapered"],
-  },
-  {
-    name: "Pattern",
-    values: ["Solid", "Striped", "Checked", "Plaid", "Printed", "Floral", "Camouflage"],
-  },
-  {
-    name: "Sleeve",
-    values: ["Full Sleeve", "Half Sleeve", "Sleeveless", "3/4 Sleeve", "Long Sleeve", "Short Sleeve", "Cap Sleeve"],
-  },
-  {
-    name: "Collar",
-    values: ["Round Neck", "V-Neck", "Collared", "Mandarin Collar", "Polo Collar", "Turtleneck", "Hooded", "Boat Neck"],
-  },
-  {
-    name: "Occasion",
-    values: ["Casual", "Formal", "Party", "Wedding", "Sports", "Gym", "Office", "Outdoor", "Daily Wear", "Festive"],
-  },
-  {
-    name: "Gender",
-    values: ["Men", "Women", "Unisex", "Boys", "Girls", "Kids", "Teen"],
-  },
-  {
-    name: "Season",
-    values: ["Summer", "Winter", "Spring", "Autumn", "All Season", "Monsoon"],
-  },
-  {
-    name: "Care",
-    values: ["Machine Wash", "Hand Wash", "Dry Clean Only", "Do Not Bleach", "Iron Safe", "Wash Separately"],
-  },
-  {
-    name: "Style",
-    values: ["Casual", "Formal", "Sporty", "Classic", "Modern", "Vintage", "Bohemian", "Streetwear", "Ethnic", "Western"],
-  },
+  { name: "Color", values: ["Black", "White", "Gray", "Red", "Blue", "Green", "Yellow", "Brown", "Pink", "Orange", "Purple", "Gold", "Silver"] },
+  { name: "Size", values: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size"] },
+  { name: "Material", values: ["Cotton", "Polyester", "Leather", "Denim", "Wool", "Silk", "Linen", "Nylon"] },
+  { name: "Fit", values: ["Regular Fit", "Slim Fit", "Loose Fit", "Relaxed Fit", "Oversized", "Skinny", "Straight", "Tapered"] },
+  { name: "Pattern", values: ["Solid", "Striped", "Checked", "Plaid", "Printed", "Floral", "Camouflage"] },
+  { name: "Sleeve", values: ["Full Sleeve", "Half Sleeve", "Sleeveless", "3/4 Sleeve", "Long Sleeve", "Short Sleeve", "Cap Sleeve"] },
+  { name: "Collar", values: ["Round Neck", "V-Neck", "Collared", "Mandarin Collar", "Polo Collar", "Turtleneck", "Hooded", "Boat Neck"] },
+  { name: "Occasion", values: ["Casual", "Formal", "Party", "Wedding", "Sports", "Gym", "Office", "Outdoor", "Daily Wear", "Festive"] },
+  { name: "Gender", values: ["Men", "Women", "Unisex", "Boys", "Girls", "Kids", "Teen"] },
+  { name: "Season", values: ["Summer", "Winter", "Spring", "Autumn", "All Season", "Monsoon"] },
+  { name: "Care", values: ["Machine Wash", "Hand Wash", "Dry Clean Only", "Do Not Bleach", "Iron Safe", "Wash Separately"] },
+  { name: "Style", values: ["Casual", "Formal", "Sporty", "Classic", "Modern", "Vintage", "Bohemian", "Streetwear", "Ethnic", "Western"] },
 ];
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+/* =========================================================
+   HELPERS
+========================================================= */
+function createEmptyVariant(sku = "") {
+  return {
+    _id: null, sku, title: "", description: "", cost_price: "", selling_price: "",
+    quantity: "0", min_qnt: "0", max_qnt: "0", attributes: [], images: [],
+  };
+}
 
-const createEmptyVariant = (sku = "") => ({
-  _id: null,
-  sku,
-  title: "",
-  description: "",
-  cost_price: "",
-  selling_price: "",
-  quantity: "0",
-  min_qnt: "0",
-  max_qnt: "0",
-  attributes: [{ name: "Color", value: "black", isCustom: false }],
-  images: [],
-});
-
-const getSkuNumber = (sku) => {
-  const match = String(sku || "").match(/^sku_(\d+)$/i);
+function getSkuNumber(sku = "") {
+  const match = String(sku).match(/(\d+)\s*$/);
   return match ? Number(match[1]) : 0;
-};
+}
 
-const getImageUrl = (url) => {
+function getImageUrl(url) {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) {
-    return url;
-  }
-  return `${API_ORIGIN}${url}`;
-};
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) return url;
+  if (url.startsWith("/")) return `${API_ORIGIN}${url}`;
+  return `${API_ORIGIN}/${url}`;
+}
 
-const compressProductImage = (file) => {
+async function compressProductImage(file) {
+  const MAX_SIZE = 1600;
+  const QUALITY = 0.82;
+  if (!file.type.startsWith("image/")) throw new Error("Invalid image file");
+
   return new Promise((resolve, reject) => {
-    const image = new Image();
-    const imageUrl = URL.createObjectURL(file);
-
-    image.onload = () => {
-      const MIN_WIDTH = 800;
-      const MIN_HEIGHT = 800;
-
-      if (image.width < MIN_WIDTH || image.height < MIN_HEIGHT) {
-        URL.revokeObjectURL(imageUrl);
-        reject(new Error(`Image quality is too low. Minimum resolution required is ${MIN_WIDTH}x${MIN_HEIGHT}px.`));
-        return;
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        if (width >= height) {
+          height = Math.round((height * MAX_SIZE) / width);
+          width = MAX_SIZE;
+        } else {
+          width = Math.round((width * MAX_SIZE) / height);
+          height = MAX_SIZE;
+        }
       }
-
-      const MAX_SIDE = 2000;
-      let width = image.width;
-      let height = image.height;
-
-      if (width > MAX_SIDE || height > MAX_SIDE) {
-        const ratio = Math.min(MAX_SIDE / width, MAX_SIDE / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-      }
-
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-
       const ctx = canvas.getContext("2d");
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(image, 0, 0, width, height);
-
+      if (!ctx) { reject(new Error("Unable to process image")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
         (blob) => {
-          URL.revokeObjectURL(imageUrl);
-          if (!blob) {
-            reject(new Error("Image processing failed"));
-            return;
-          }
-          const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
-          resolve(new File([blob], newName, { type: "image/webp", lastModified: Date.now() }));
+          if (!blob) { reject(new Error("Image compression failed")); return; }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp", lastModified: Date.now() }));
         },
         "image/webp",
-        0.95
+        QUALITY
       );
     };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(imageUrl);
-      reject(new Error("Failed to load image"));
-    };
-
-    image.src = imageUrl;
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Unable to read image")); };
+    img.src = objectUrl;
   });
-};
+}
 
-const getFlagEmoji = (isoCode) => {
-  if (!isoCode || isoCode.length !== 2) return "🌍";
-  return isoCode.toUpperCase().split("").map((char) => String.fromCodePoint(127397 + char.charCodeAt(0))).join("");
-};
-
-const handlePermissionError = (error, fallbackMsg, accessType) => {
-  const msg = error.response?.data?.message || error.message || fallbackMsg;
-  if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
-    toast.error(msg, {
-      duration: 6000,
-      description: `Contact an administrator to grant you ${accessType} access.`,
-    });
-  } else {
-    toast.error(msg);
+function handlePermissionError(error, defaultMessage, resource = "resource") {
+  const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
+  const normalized = String(message).toLowerCase();
+  if (normalized.includes("permission") || normalized.includes("access denied") || normalized.includes("forbidden") || error?.response?.status === 403) {
+    toast.error(`You don't have permission to modify this ${resource}.`, { duration: 6000, description: "Contact an administrator to grant you access." });
+    return;
   }
-};
+  toast.error(message || defaultMessage);
+}
 
+function normalizeId(value) {
+  if (!value) return "";
+  if (typeof value === "object") return String(value._id || value.id || "");
+  return String(value);
+}
+
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
 export default function ProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -208,587 +141,402 @@ export default function ProductsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [viewMode, setViewMode] = useState("list");
   const [currentPage, setCurrentPage] = useState(1);
-  
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
 
+  // Category Modal State
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
-  const [categoryFormData, setCategoryFormData] = useState({
-    category_code: "",
-    name: "",
-    description: "",
-  });
+  const [categoryFormData, setCategoryFormData] = useState({ category_code: "", name: "", description: "" });
   const [loadingCategoryCode, setLoadingCategoryCode] = useState(false);
 
+  // Brand Modal State
   const [showNewBrandModal, setShowNewBrandModal] = useState(false);
-  const [brandFormData, setBrandFormData] = useState({
-    brand_code: "",
-    name: "",
-    description: "",
-    country: "",
-    is_active: true,
-  });
+  const [brandFormData, setBrandFormData] = useState({ brand_code: "", name: "", description: "", country: "", is_active: true });
   const [brandLogoFile, setBrandLogoFile] = useState(null);
   const [brandLogoPreview, setBrandLogoPreview] = useState("");
   const [loadingBrandCode, setLoadingBrandCode] = useState(false);
 
+  // Product Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [expandedVariant, setExpandedVariant] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-
+  
+  // ⭐ CHANGED: tag_ids -> tag_names (array of strings)
   const [formData, setFormData] = useState({
-    category_id: "",
-    brand_id: "",
-    name: "",
-    description: "",
-    tax: "0",
-    status: "active",
-    variants: [createEmptyVariant()],
+    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
   });
+  
+  const [tagInput, setTagInput] = useState("");
 
-  const allCountries = useMemo(() => {
-    return Country.getAllCountries().map((c) => ({
-      name: c.name,
-      isoCode: c.isoCode,
-    }));
-  }, []);
+  const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
-  // ✅ CHANGE 2: adminProducts queryKey + adminProductApi
-  const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({
-    queryKey: ["adminProducts"],
-    queryFn: adminProductApi.getAll,
-    retry: false,
-  });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: categoryApi.getAll,
-    retry: false,
-  });
-
-  const { data: brands = [] } = useQuery({
-    queryKey: ["brands"],
-    queryFn: brandApi.getAll,
-    retry: false,
-  });
+  /* Queries */
+  const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({ queryKey: ["products"], queryFn: productApi.getAll, retry: false });
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
+  const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
 
   useEffect(() => {
-    if (productsError && productsErrorMsg) {
-      const msg = productsErrorMsg.message || "";
-      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
-        toast.error("You don't have permission to view products.", {
-          duration: 6000,
-          description: "Contact an administrator to grant you access.",
-        });
-      }
+    if (!productsError || !productsErrorMsg) return;
+    const msg = String(productsErrorMsg?.message || "").toLowerCase();
+    if (msg.includes("permission") || msg.includes("access denied") || msg.includes("forbidden")) {
+      toast.error("You don't have permission to view products.", { duration: 6000, description: "Contact an administrator to grant you access." });
     }
   }, [productsError, productsErrorMsg]);
 
-  // ✅ CHANGE 3: createMutation
-  const createMutation = useMutation({
-    mutationFn: adminProductApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
-      toast.success("Product created successfully");
-      closeProductModal();
-    },
-    onError: (error) => handlePermissionError(error, "Product creation failed", "product"),
-  });
+  /* Mutations */
+  const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product created successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product creation failed", "product") });
+  const updateMutation = useMutation({ mutationFn: ({ id, data }) => productApi.update(id, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product updated successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product update failed", "product") });
+  const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
+  const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
+  const createCategoryMutation = useMutation({ mutationFn: (data) => categoryApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["categories"] }); const nc = res?.data || res; if (nc?._id) { setFormData((p) => ({ ...p, category_id: String(nc._id) })); toast.success("Category created and selected!"); } else { toast.success("Category created successfully"); } setShowNewCategoryModal(false); resetCategoryForm(); }, onError: (e) => handlePermissionError(e, "Failed to create category", "category") });
+  const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
 
-  // ✅ CHANGE 4: updateMutation
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => adminProductApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
-      toast.success("Product updated successfully");
-      closeProductModal();
-    },
-    onError: (error) => handlePermissionError(error, "Product update failed", "product"),
-  });
-
-  // ✅ CHANGE 5: deleteMutation
-  const deleteMutation = useMutation({
-    mutationFn: adminProductApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
-      toast.success("Product deleted successfully");
-      setShowDeleteModal(false);
-      setProductToDelete(null);
-    },
-    onError: (error) => handlePermissionError(error, "Product delete failed", "product"),
-  });
-
-  // ✅ CHANGE 6: toggleStatusMutation
-  const toggleStatusMutation = useMutation({
-    mutationFn: adminProductApi.toggleStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
-      toast.success("Product status updated");
-    },
-    onError: (error) => handlePermissionError(error, "Status update failed", "product"),
-  });
-
-  const createCategoryMutation = useMutation({
-    mutationFn: (data) => categoryApi.create(data),
-    onSuccess: (newCategory) => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      setFormData({ ...formData, category_id: newCategory._id });
-      setShowNewCategoryModal(false);
-      resetCategoryForm();
-      toast.success("Category created and selected!");
-    },
-    onError: (error) => handlePermissionError(error, "Failed to create category", "category"),
-  });
-
-  const createBrandMutation = useMutation({
-    mutationFn: (data) => brandApi.create(data),
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ["brands"] });
-      const newBrand = response.data || response;
-      if (newBrand && newBrand._id) {
-        setFormData((prev) => ({ ...prev, brand_id: newBrand._id }));
-        toast.success("Brand created and selected!");
-      } else {
-        toast.error("Brand created but could not auto-select.");
-      }
-      setShowNewBrandModal(false);
-      resetBrandForm();
-    },
-    onError: (error) => handlePermissionError(error, "Failed to create brand", "brand"),
-  });
-
-  const openProductDetails = (product) => router.push(`/admin/products/${product._id}`);
-
-  const handleToggleStatus = (product) => {
-    toggleStatusMutation.mutate(product._id);
-  };
+  /* Handlers */
+  const openProductDetails = (p) => router.push(`/admin/products/${p._id}`);
+  const handleToggleStatus = (p) => { if (p?._id) toggleStatusMutation.mutate(p._id); };
 
   const closeProductModal = () => {
-    formData.variants.forEach((variant) => {
-      variant.images.forEach((image) => {
-        if (image.preview?.startsWith("blob:")) URL.revokeObjectURL(image.preview);
-      });
-    });
-    setShowModal(false);
-    setEditingProduct(null);
-    setCurrentStep(1);
-    setExpandedVariant(0);
+    formData.variants.forEach((v) => v.images.forEach((i) => { if (i.preview?.startsWith("blob:")) URL.revokeObjectURL(i.preview); }));
+    setShowModal(false); setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
+    setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
   };
 
   const openNewProduct = async () => {
     try {
       const result = await variantApi.getNextSku();
-      setFormData({
-        category_id: "",
-        brand_id: "",
-        name: "",
-        description: "",
-        tax: "0",
-        status: "active",
-        variants: [createEmptyVariant(result.sku)],
-      });
-      setEditingProduct(null);
-      setCurrentStep(1);
-      setExpandedVariant(0);
+      const nextSku = result?.sku || result?.data?.sku || "";
+      setFormData({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant(nextSku)] });
+      setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
+      setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
       setShowModal(true);
-    } catch {
-      toast.error("Unable to generate next SKU");
-    }
+    } catch { toast.error("Unable to generate next SKU"); }
   };
 
   const getNextLocalSku = async () => {
     const result = await variantApi.getNextSku();
-    const databaseSku = getSkuNumber(result.sku);
-    const localSku = Math.max(0, ...formData.variants.map((variant) => getSkuNumber(variant.sku)));
-    const nextNumber = Math.max(databaseSku, localSku + 1);
-    return `sku_${nextNumber}`;
+    const databaseSku = getSkuNumber(result?.sku || result?.data?.sku || "");
+    const localSku = Math.max(0, ...formData.variants.map((v) => getSkuNumber(v.sku)));
+    return `sku_${Math.max(databaseSku, localSku + 1)}`;
   };
 
   const addVariant = async () => {
     try {
       const sku = await getNextLocalSku();
-      const newIndex = formData.variants.length;
-      setFormData((prev) => ({ ...prev, variants: [...prev.variants, createEmptyVariant(sku)] }));
-      setExpandedVariant(newIndex);
-    } catch {
-      toast.error("Unable to generate SKU");
-    }
+      setFormData((prev) => {
+        const newIndex = prev.variants.length;
+        setExpandedVariant(newIndex);
+        return { ...prev, variants: [...prev.variants, createEmptyVariant(sku)] };
+      });
+    } catch { toast.error("Unable to generate SKU"); }
   };
 
   const duplicateVariant = async (index) => {
     try {
       const sku = await getNextLocalSku();
-      const oldVariant = formData.variants[index];
-      const copiedVariant = {
-        ...oldVariant,
-        _id: null,
-        sku,
-        attributes: oldVariant.attributes.map((item) => ({ ...item })),
-        images: [],
-      };
+      const old = formData.variants[index];
+      if (!old) return;
+      const copy = { ...old, _id: null, sku, attributes: old.attributes.map((a) => ({ ...a })), images: [] };
       setFormData((prev) => {
-        const variants = [...prev.variants];
-        variants.splice(index + 1, 0, copiedVariant);
-        return { ...prev, variants };
+        const v = [...prev.variants]; v.splice(index + 1, 0, copy);
+        return { ...prev, variants: v };
       });
       setExpandedVariant(index + 1);
-    } catch {
-      toast.error("Unable to generate SKU");
-    }
+    } catch { toast.error("Unable to generate SKU"); }
   };
 
   const removeVariant = (index) => {
-    if (formData.variants.length === 1) {
-      toast.error("At least one variant is required");
-      return;
-    }
+    if (formData.variants.length === 1) { toast.error("At least one variant is required"); return; }
     setFormData((prev) => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
+    setExpandedVariant((curr) => curr === index ? Math.max(0, Math.min(index, formData.variants.length - 2)) : curr > index ? curr - 1 : curr);
   };
 
   const updateVariant = (index, field, value) => {
+    setFormData((prev) => { const v = [...prev.variants]; v[index] = { ...v[index], [field]: value }; return { ...prev, variants: v }; });
+  };
+
+  /* Attributes */
+  const addAttribute = (vi) => {
     setFormData((prev) => {
-      const variants = [...prev.variants];
-      variants[index] = { ...variants[index], [field]: value };
-      return { ...prev, variants };
+      const v = [...prev.variants];
+      v[vi] = { ...v[vi], attributes: [...v[vi].attributes, { name: ATTRIBUTE_PRESETS[0]?.name || "", value: "", isCustom: false }] };
+      return { ...prev, variants: v };
     });
   };
 
-  const addAttribute = (variantIndex) => {
+  const updateAttribute = (vi, ai, field, value) => {
     setFormData((prev) => {
-      const variants = [...prev.variants];
-      variants[variantIndex] = {
-        ...variants[variantIndex],
-        attributes: [...variants[variantIndex].attributes, { name: "", value: "", isCustom: false }],
-      };
-      return { ...prev, variants };
+      const v = [...prev.variants];
+      const attrs = [...v[vi].attributes];
+      attrs[ai] = { ...attrs[ai], [field]: value };
+      v[vi] = { ...v[vi], attributes: attrs };
+      return { ...prev, variants: v };
     });
   };
 
-  const updateAttribute = (variantIndex, attrIndex, field, value) => {
+  const removeAttribute = (vi, ai) => {
     setFormData((prev) => {
-      const variants = [...prev.variants];
-      const attributes = [...variants[variantIndex].attributes];
-      attributes[attrIndex] = { ...attributes[attrIndex], [field]: value };
-      variants[variantIndex] = { ...variants[variantIndex], attributes };
-      return { ...prev, variants };
+      const v = [...prev.variants];
+      v[vi] = { ...v[vi], attributes: v[vi].attributes.filter((_, i) => i !== ai) };
+      return { ...prev, variants: v };
     });
   };
 
-  const removeAttribute = (variantIndex, attrIndex) => {
-    setFormData((prev) => {
-      const variants = [...prev.variants];
-      variants[variantIndex] = {
-        ...variants[variantIndex],
-        attributes: variants[variantIndex].attributes.filter((_, i) => i !== attrIndex),
-      };
-      return { ...prev, variants };
-    });
+  const changeAttributeName = (vi, ai, name) => {
+    updateAttribute(vi, ai, "name", name);
+    updateAttribute(vi, ai, "value", "");
+    updateAttribute(vi, ai, "isCustom", false);
   };
 
-  const handleImageUpload = async (variantIndex, event) => {
-    const selectedFiles = Array.from(event.target.files || []);
-    if (!selectedFiles.length) return;
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    const validFiles = selectedFiles.filter((file) => validTypes.includes(file.type));
-    if (validFiles.length !== selectedFiles.length) {
-      toast.error("Only JPG, PNG and WebP images are allowed");
-      event.target.value = "";
-      return;
-    }
+  const changeAttributeValue = (vi, ai, value) => {
+    const attr = formData.variants[vi]?.attributes[ai];
+    if (attr) updateAttribute(vi, ai, "value", value);
+  };
+
+  /* Images */
+  const handleImageUpload = async (vi, event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const valid = files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
+    if (valid.length !== files.length) { toast.error("Only JPG, PNG and WebP images are allowed"); event.target.value = ""; return; }
     try {
-      const compressedFiles = await Promise.all(validFiles.map((file) => compressProductImage(file)));
-      const images = compressedFiles.map((file) => ({
-        file,
-        existing: false,
-        preview: URL.createObjectURL(file),
-      }));
+      const compressed = await Promise.all(valid.map(compressProductImage));
+      const images = compressed.map((f) => ({ file: f, existing: false, preview: URL.createObjectURL(f) }));
       setFormData((prev) => {
-        const variants = [...prev.variants];
-        variants[variantIndex] = {
-          ...variants[variantIndex],
-          images: [...variants[variantIndex].images, ...images],
-        };
-        return { ...prev, variants };
+        const v = [...prev.variants];
+        v[vi] = { ...v[vi], images: [...v[vi].images, ...images] };
+        return { ...prev, variants: v };
       });
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      toast.error(error.message || "Image processing failed");
-    }
+      toast.success(`${images.length} image${images.length > 1 ? "s" : ""} uploaded`);
+    } catch (e) { toast.error(e?.message || "Image processing failed"); }
     event.target.value = "";
   };
 
-  const removeImage = (variantIndex, imageIndex) => {
+  const removeImage = (vi, ii) => {
     setFormData((prev) => {
-      const variants = [...prev.variants];
-      const image = variants[variantIndex].images[imageIndex];
-      if (image.preview?.startsWith("blob:")) URL.revokeObjectURL(image.preview);
-      variants[variantIndex] = {
-        ...variants[variantIndex],
-        images: variants[variantIndex].images.filter((_, i) => i !== imageIndex),
-      };
-      return { ...prev, variants };
+      const v = [...prev.variants];
+      const img = v[vi].images[ii];
+      if (img?.preview?.startsWith("blob:")) URL.revokeObjectURL(img.preview);
+      v[vi] = { ...v[vi], images: v[vi].images.filter((_, i) => i !== ii) };
+      return { ...prev, variants: v };
     });
   };
 
+  /* Edit Product */
   const handleEdit = (product) => {
-    const variants = product.variants?.length
-      ? product.variants.map((variant) => ({
-          _id: variant._id,
-          sku: variant.sku || "",
-          title: variant.title || "",
-          description: variant.description || "",
-          cost_price: String(variant.cost_price ?? ""),
-          selling_price: String(variant.selling_price ?? ""),
-          quantity: String(variant.quantity ?? 0),
-          min_qnt: String(variant.min_qnt ?? 0),
-          max_qnt: String(variant.max_qnt ?? 0),
-          attributes: Object.entries(variant.attributes || {}).map(([name, value]) => ({ name, value: String(value) })),
-          images: (variant.images || []).map((image) => ({
-            existing: true,
-            metadata: image,
-            preview: getImageUrl(image.img_url),
-          })),
+    const variants = product?.variants?.length
+      ? product.variants.map((v) => ({
+          _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
+          cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
+          quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
+          attributes: Object.entries(v.attributes || {}).map(([n, val]) => ({ name: n, value: String(val ?? ""), isCustom: false })),
+          images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
         }))
       : [createEmptyVariant()];
 
+    // ⭐ Extract tag names from populated objects
+    const currentTagNames = (product.tag_ids || [])
+      .map(t => typeof t === 'object' ? t.name : t)
+      .filter(Boolean);
+
     setFormData({
-      category_id: product.category_id?._id || product.category_id || "",
-      brand_id: product.brand_id?._id || product.brand_id || "",
-      name: product.name || "",
-      description: product.description || "",
-      tax: String(product.tax ?? 0),
-      status: product.status || "active",
+      category_id: normalizeId(product?.category_id), brand_id: normalizeId(product?.brand_id),
+      name: product?.name || "", description: product?.description || "", tax: String(product?.tax ?? 0),
+      status: product?.status || "active", 
+      tag_names: currentTagNames, // ⭐ Use names
       variants,
     });
-    setEditingProduct(product);
-    setCurrentStep(1);
-    setExpandedVariant(0);
+    setTagInput("");
+    setEditingProduct(product); setCurrentStep(1); setExpandedVariant(0);
+    setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
     setShowModal(true);
   };
 
-  const handleDelete = (product) => {
-    setProductToDelete(product);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = () => {
-    if (!productToDelete) return;
-    deleteMutation.mutate(productToDelete._id);
-  };
+  const handleDelete = (p) => { setProductToDelete(p); setShowDeleteModal(true); };
+  const confirmDelete = () => { if (productToDelete?._id) deleteMutation.mutate(productToDelete._id); };
 
   const handleNextStep = () => {
-    if (!formData.category_id) return toast.error("Please select category");
-    if (!formData.brand_id) return toast.error("Please select brand");
-    if (!formData.name.trim()) return toast.error("Product name is required");
+    if (!formData.category_id) { toast.error("Please select category"); return; }
+    if (!formData.brand_id) { toast.error("Please select brand"); return; }
+    if (!formData.name.trim()) { toast.error("Product name is required"); return; }
     setCurrentStep(2);
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
     const skuSet = new Set();
-    for (const variant of formData.variants) {
-      const sku = variant.sku.trim();
-      if (!sku) return toast.error("SKU is required");
-      if (skuSet.has(sku)) return toast.error(`Duplicate SKU: ${sku}`);
-      skuSet.add(sku);
-      if (!variant.title.trim()) return toast.error("Variant title is required");
-      if (variant.cost_price === "" || variant.selling_price === "") return toast.error("Cost price and selling price are required");
-      const costPrice = Number(variant.cost_price);
-      const sellingPrice = Number(variant.selling_price);
-      if (sellingPrice <= costPrice) return toast.error(`Selling Price must be greater than Cost Price for variant "${variant.title || variant.sku}"`);
+    for (const v of formData.variants) {
+      const sku = v.sku.trim();
+      if (!sku) { toast.error("SKU is required"); return; }
+      if (skuSet.has(sku.toLowerCase())) { toast.error(`Duplicate SKU: ${sku}`); return; }
+      skuSet.add(sku.toLowerCase());
+      if (!v.title.trim()) { toast.error("Variant title is required"); return; }
+      if (v.cost_price === "" || v.selling_price === "") { toast.error("Cost price and selling price are required"); return; }
+      const cp = Number(v.cost_price); const sp = Number(v.selling_price);
+      if (!Number.isFinite(cp) || !Number.isFinite(sp)) { toast.error("Please enter valid prices"); return; }
+      if (sp <= cp) { toast.error(`Selling Price must be greater than Cost Price for "${v.title || v.sku}"`); return; }
+      const mn = Number(v.min_qnt || 0); const mx = Number(v.max_qnt || 0);
+      if (mx > 0 && mn > mx) { toast.error(`Min Qty cannot be greater than Max Qty for "${v.title}"`); return; }
     }
 
     const data = new FormData();
     data.append("category_id", formData.category_id);
     data.append("brand_id", formData.brand_id);
     data.append("name", formData.name.trim());
-    data.append("description", formData.description);
+    data.append("description", formData.description || "");
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
+    
+    // ⭐ Send tag_names (array of strings)
+    data.append("tag_names", JSON.stringify(formData.tag_names || []));
 
     const imageVariantIndexes = [];
-    const variants = formData.variants.map((variant, index) => {
-      const attributes = {};
-      variant.attributes.forEach((attribute) => {
-        const name = attribute.name.trim();
-        if (name) attributes[name] = attribute.value;
+    const variantsPayload = formData.variants.map((v, idx) => {
+      const attrs = {};
+      v.attributes.forEach((a) => { if (a.name.trim()) attrs[a.name] = a.value ?? ""; });
+      const existingImgs = v.images.filter((i) => i.existing).map((i) => i.metadata);
+      v.images.filter((i) => !i.existing && i.file).forEach((i) => {
+        if (i.file) { data.append("images", i.file); imageVariantIndexes.push(idx); }
       });
-      const existingImages = variant.images.filter((image) => image.existing).map((image) => image.metadata);
-      variant.images.filter((image) => !image.existing && image.file).forEach((image) => {
-        data.append("images", image.file);
-        imageVariantIndexes.push(index);
-      });
-      let finalSku = variant.sku.trim();
+      let finalSku = v.sku.trim();
       if (editingProduct) {
-        const originalVariant = editingProduct.variants?.find((v) => v._id && String(v._id) === String(variant._id));
-        if (originalVariant) finalSku = originalVariant.sku;
+        const orig = editingProduct.variants?.find((ov) => ov._id && String(ov._id) === String(v._id));
+        if (orig) finalSku = orig.sku;
       }
       return {
-        _id: variant._id || undefined,
-        sku: finalSku,
-        title: variant.title.trim(),
-        description: variant.description,
-        cost_price: Number(variant.cost_price || 0),
-        selling_price: Number(variant.selling_price || 0),
-        quantity: Number(variant.quantity || 0),
-        min_qnt: Number(variant.min_qnt || 0),
-        max_qnt: Number(variant.max_qnt || 0),
-        attributes,
-        existing_images: existingImages,
+        _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description || "",
+        cost_price: Number(v.cost_price || 0), selling_price: Number(v.selling_price || 0),
+        quantity: Number(v.quantity || 0), min_qnt: Number(v.min_qnt || 0), max_qnt: Number(v.max_qnt || 0),
+        attributes: attrs, existing_images: existingImgs,
       };
     });
 
-    data.append("variants", JSON.stringify(variants));
+    data.append("variants", JSON.stringify(variantsPayload));
     data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
-    if (editingProduct) updateMutation.mutate({ id: editingProduct._id, data });
+    if (editingProduct?._id) updateMutation.mutate({ id: editingProduct._id, data });
     else createMutation.mutate(data);
   };
 
-  const resetCategoryForm = () => {
-    setCategoryFormData({ category_code: "", name: "", description: "" });
-    setLoadingCategoryCode(false);
+  /* ⭐ SIMPLIFIED TAG HANDLERS */
+  const addTag = (e) => {
+    e?.preventDefault();
+    const val = tagInput.trim().toLowerCase();
+    if (!val) return;
+    
+    if (formData.tag_names.includes(val)) {
+      toast.info("Tag already added");
+      setTagInput("");
+      return;
+    }
+    
+    setFormData(prev => ({ ...prev, tag_names: [...prev.tag_names, val] }));
+    setTagInput("");
   };
 
+  const removeTag = (tagName) => {
+    setFormData(prev => ({ ...prev, tag_names: prev.tag_names.filter(t => t !== tagName) }));
+  };
+
+  /* Category Logic */
+  const resetCategoryForm = () => { setCategoryFormData({ category_code: "", name: "", description: "" }); setLoadingCategoryCode(false); };
   const fetchNextCategoryCode = async () => {
     try {
       setLoadingCategoryCode(true);
-      const response = await categoryApi.getNextCode();
-      const nextCode = response?.nextCode || response?.data?.nextCode;
-      if (nextCode && typeof nextCode === "string") {
-        setCategoryFormData((prev) => ({ ...prev, category_code: nextCode }));
-      } else {
-        throw new Error("Invalid code format");
+      const res = await categoryApi.getNextCode();
+      const code = res?.nextCode || res?.data?.nextCode;
+      if (code && typeof code === "string") { setCategoryFormData((p) => ({ ...p, category_code: code })); return; }
+      throw new Error("Invalid code format");
+    } catch (e) {
+      const coded = categories.filter((c) => c?.category_code && /^CAT-\d+$/i.test(c.category_code));
+      let next = 1;
+      if (coded.length) {
+        const nums = coded.map((c) => parseInt(c.category_code.split("-")[1], 10)).filter(Number.isFinite);
+        if (nums.length) next = Math.max(...nums) + 1;
       }
-    } catch (error) {
-      if (error.message?.toLowerCase().includes("permission") || error.message?.toLowerCase().includes("access denied")) {
-        console.log("⚠️ No categories permission — using local fallback code");
-      } else {
-        console.error("Failed to fetch next category code:", error);
-      }
-      const codedCategories = categories.filter((c) => c.category_code && /^CAT-\d+$/i.test(c.category_code));
-      let nextNum = 1;
-      if (codedCategories.length > 0) {
-        const sorted = codedCategories.sort((a, b) => {
-          const numA = parseInt(a.category_code.split("-")[1], 10);
-          const numB = parseInt(b.category_code.split("-")[1], 10);
-          return numB - numA;
-        });
-        const lastNum = parseInt(sorted[0].category_code.split("-")[1], 10);
-        nextNum = lastNum + 1;
-      }
-      const fallbackCode = `CAT-${String(nextNum).padStart(3, "0")}`;
-      setCategoryFormData((prev) => ({ ...prev, category_code: fallbackCode }));
-    } finally {
-      setLoadingCategoryCode(false);
-    }
+      setCategoryFormData((p) => ({ ...p, category_code: `CAT-${String(next).padStart(3, "0")}` }));
+    } finally { setLoadingCategoryCode(false); }
   };
-
-  const handleOpenCategoryModal = () => {
-    resetCategoryForm();
-    setShowNewCategoryModal(true);
-    fetchNextCategoryCode();
-  };
-
+  const handleOpenCategoryModal = () => { resetCategoryForm(); setShowNewCategoryModal(true); fetchNextCategoryCode(); };
   const handleCategorySubmit = (e) => {
     e.preventDefault();
-    if (!categoryFormData.category_code.trim()) return toast.error("Category code is required");
-    if (!categoryFormData.name.trim()) return toast.error("Category name is required");
-    createCategoryMutation.mutate(categoryFormData);
+    if (!categoryFormData.category_code.trim()) { toast.error("Category code is required"); return; }
+    if (!categoryFormData.name.trim()) { toast.error("Category name is required"); return; }
+    createCategoryMutation.mutate({ ...categoryFormData, category_code: categoryFormData.category_code.trim(), name: categoryFormData.name.trim(), description: categoryFormData.description.trim() });
   };
 
+  /* Brand Logic */
   const resetBrandForm = () => {
+    if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
     setBrandFormData({ brand_code: "", name: "", description: "", country: "", is_active: true });
-    setBrandLogoFile(null);
-    setBrandLogoPreview("");
+    setBrandLogoFile(null); setBrandLogoPreview("");
   };
-
   const fetchNextBrandCode = async () => {
     try {
       setLoadingBrandCode(true);
-      const nextCode = await brandApi.getNextCode();
-      setBrandFormData((prev) => ({ ...prev, brand_code: nextCode }));
-    } catch (err) {
-      if (err.message?.toLowerCase().includes("permission") || err.message?.toLowerCase().includes("access denied")) {
-        console.log("⚠️ No brands permission — using local fallback code");
-      } else {
-        console.error("Failed to fetch next brand code:", err);
-      }
-      const lastBrand = brands.filter((b) => b.brand_code && /^BRD-\d+$/.test(b.brand_code)).sort((a, b) => {
-        const numA = parseInt(a.brand_code.split("-")[1], 10);
-        const numB = parseInt(b.brand_code.split("-")[1], 10);
-        return numB - numA;
-      })[0];
-      let nextNum = 1;
-      if (lastBrand) nextNum = parseInt(lastBrand.brand_code.split("-")[1], 10) + 1;
-      const fallbackCode = `BRD-${String(nextNum).padStart(3, "0")}`;
-      setBrandFormData((prev) => ({ ...prev, brand_code: fallbackCode }));
-    } finally {
-      setLoadingBrandCode(false);
-    }
+      const res = await brandApi.getNextCode();
+      const code = res?.nextCode || res?.data?.nextCode || res;
+      if (typeof code === "string" && code.trim()) { setBrandFormData((p) => ({ ...p, brand_code: code })); return; }
+      throw new Error("Invalid brand code");
+    } catch (e) {
+      const nums = brands.filter((b) => b?.brand_code && /^BRD-\d+$/i.test(b.brand_code)).map((b) => parseInt(b.brand_code.split("-")[1], 10)).filter(Number.isFinite);
+      const next = nums.length ? Math.max(...nums) + 1 : 1;
+      setBrandFormData((p) => ({ ...p, brand_code: `BRD-${String(next).padStart(3, "0")}` }));
+    } finally { setLoadingBrandCode(false); }
   };
-
-  const handleOpenBrandModal = () => {
-    resetBrandForm();
-    setShowNewBrandModal(true);
-    fetchNextBrandCode();
-  };
-
+  const handleOpenBrandModal = () => { resetBrandForm(); setShowNewBrandModal(true); fetchNextBrandCode(); };
   const handleBrandLogoChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) return toast.error("Logo must be less than 10MB");
-      setBrandLogoFile(file);
-      setBrandLogoPreview(URL.createObjectURL(file));
-    }
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Logo must be less than 10MB"); e.target.value = ""; return; }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Only PNG, JPG and WebP logos are allowed"); e.target.value = ""; return; }
+    if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
+    setBrandLogoFile(file); setBrandLogoPreview(URL.createObjectURL(file));
   };
-
   const handleBrandSubmit = (e) => {
     e.preventDefault();
+    if (!brandFormData.brand_code.trim()) { toast.error("Brand code is required"); return; }
+    if (!brandFormData.name.trim()) { toast.error("Brand name is required"); return; }
     const fd = new FormData();
-    fd.append("brand_code", brandFormData.brand_code);
-    fd.append("name", brandFormData.name);
-    fd.append("description", brandFormData.description || "");
+    fd.append("brand_code", brandFormData.brand_code.trim());
+    fd.append("name", brandFormData.name.trim());
+    fd.append("description", brandFormData.description.trim());
     fd.append("country", brandFormData.country || "");
-    fd.append("is_active", brandFormData.is_active.toString());
+    fd.append("is_active", String(brandFormData.is_active));
     if (brandLogoFile) fd.append("logo", brandLogoFile);
     createBrandMutation.mutate(fd);
   };
 
-  const getCategoryName = (product) => product.category_id?.name || categories.find((c) => c._id === product.category_id)?.name || "Unknown";
-  const getBrandName = (product) => product.brand_id?.name || brands.find((b) => b._id === product.brand_id)?.name || "Unknown";
+  /* Filters & Stats */
+  const getCategoryName = (p) => {
+    const cid = normalizeId(p?.category_id);
+    return p?.category_id?.name || categories.find((c) => String(c._id) === cid)?.name || "Unknown";
+  };
+  const getBrandName = (p) => {
+    const bid = normalizeId(p?.brand_id);
+    return p?.brand_id?.name || brands.find((b) => String(b._id) === bid)?.name || "Unknown";
+  };
 
-  const filteredProducts = products.filter((product) => {
-    const keyword = search.trim().toLowerCase();
-    const skuMatch = (product.variants || []).some((variant) => variant.sku?.toLowerCase().includes(keyword));
-    const matchSearch = !keyword || product.name?.toLowerCase().includes(keyword) || skuMatch;
-    const categoryId = product.category_id?._id || product.category_id;
-    const brandId = product.brand_id?._id || product.brand_id;
-    const matchCategory = filterCategory === "all" || categoryId === filterCategory;
-    const matchBrand = filterBrand === "all" || brandId === filterBrand;
-    const matchStatus = filterStatus === "all" || product.status === filterStatus;
-    return matchSearch && matchCategory && matchBrand && matchStatus;
+  const filteredProducts = products.filter((p) => {
+    const kw = search.trim().toLowerCase();
+    const skuMatch = (p?.variants || []).some((v) => String(v?.sku || "").toLowerCase().includes(kw));
+    const nameMatch = String(p?.name || "").toLowerCase().includes(kw);
+    const matchSearch = !kw || nameMatch || skuMatch;
+    const cid = normalizeId(p?.category_id);
+    const bid = normalizeId(p?.brand_id);
+    return matchSearch && (filterCategory === "all" || cid === String(filterCategory)) && (filterBrand === "all" || bid === String(filterBrand)) && (filterStatus === "all" || p?.status === filterStatus);
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  const changeSearch = (value) => { setSearch(value); setCurrentPage(1); };
-  const changeCategory = (value) => { setFilterCategory(value); setCurrentPage(1); };
-  const changeBrand = (value) => { setFilterBrand(value); setCurrentPage(1); };
-  const changeStatus = (value) => { setFilterStatus(value); setCurrentPage(1); };
-
-  const activeProducts = products.filter((p) => p.status === "active").length;
-  const totalVariants = products.reduce((total, p) => total + (p.variants || []).length, 0);
-  const totalStock = products.reduce((total, p) => total + (p.variants || []).reduce((vTotal, v) => vTotal + Number(v.quantity || 0), 0), 0);
-
+  const activeProducts = products.filter((p) => p?.status === "active").length;
+  const totalVariants = products.reduce((t, p) => t + (p?.variants?.length || 0), 0);
+  const totalStock = products.reduce((t, p) => t + (p?.variants || []).reduce((vt, v) => vt + Number(v?.quantity || 0), 0), 0);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isToggling = toggleStatusMutation.isPending;
@@ -796,164 +544,119 @@ export default function ProductsPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex h-[60vh] items-center justify-center"><div className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></div>;
 
   return (
     <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* HEADER */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-[24px] leading-7 font-bold tracking-tight">Product Management</h1>
-          <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage products, variants, stock and pricing</p>
+          <h1 className="text-[24px] font-bold leading-7 tracking-tight">Product Management</h1>
+          <p className="mt-1 text-[13px]" style={{ color: "var(--text-muted)" }}>Manage products, variants, stock and pricing</p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-1">
-            <button onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><List className="w-4 h-4" /></button>
-            <button onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><Grid3x3 className="w-4 h-4" /></button>
+            <button type="button" onClick={() => setViewMode("list")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><List className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setViewMode("grid")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><Grid3x3 className="h-4 w-4" /></button>
           </div>
-          <button onClick={openNewProduct} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-            <Plus className="w-4 h-4" /> Add Product
-          </button>
+          <button type="button" onClick={openNewProduct} className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-4 w-4" /> Add Product</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Products</p><p className="text-[20px] font-bold mt-1">{products.length}</p></div>
-        <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Active</p><p className="text-[20px] font-bold mt-1 text-emerald-500">{activeProducts}</p></div>
-        <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Variants</p><p className="text-[20px] font-bold mt-1 text-blue-500">{totalVariants}</p></div>
-        <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Units in Stock</p><p className="text-[20px] font-bold mt-1">{totalStock}</p></div>
+      {/* STATS */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[{ l: "Total Products", v: products.length }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
+          <div key={i} className="rounded-lg p-4" style={cardStyle}>
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
+            <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
+          </div>
+        ))}
       </div>
 
+      {/* SEARCH */}
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search className="w-4 h-4" /></span>
-        <input type="text" placeholder="Search by product name or SKU..." value={search} onChange={(e) => changeSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+        <input type="text" placeholder="Search by product name or SKU..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} className="h-10 w-full rounded-lg pl-9 pr-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
       </div>
 
+      {/* FILTERS */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <select value={filterCategory} onChange={(e) => changeCategory(e.target.value)} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
-            <option value="all">All Categories</option>
-            {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-          </select>
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDown className="w-3.5 h-3.5" /></span>
-        </div>
-        <div className="relative">
-          <select value={filterBrand} onChange={(e) => changeBrand(e.target.value)} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
-            <option value="all">All Brands</option>
-            {brands.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
-          </select>
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDown className="w-3.5 h-3.5" /></span>
-        </div>
-        <div className="relative">
-          <select value={filterStatus} onChange={(e) => changeStatus(e.target.value)} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDown className="w-3.5 h-3.5" /></span>
-        </div>
+        <SelectFilter value={filterCategory} onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }} options={categories.map((c) => ({ value: String(c._id), label: c.name }))} placeholder="All Categories" />
+        <SelectFilter value={filterBrand} onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }} options={brands.map((b) => ({ value: String(b._id), label: b.name }))} placeholder="All Brands" />
+        <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
       </div>
 
+      {/* LIST VIEW */}
       {viewMode === "list" && (
-        <div className="rounded-lg overflow-hidden" style={cardStyle}>
+        <div className="overflow-hidden rounded-lg" style={cardStyle}>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                <tr>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Brand</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Stock</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
-                </tr>
+                <tr>{["Product", "Category", "Brand", "Tags", "Price", "Stock", "Status", "Actions"].map((h) => (
+                  <th key={h} className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`} style={{ color: "var(--text-muted)" }}>{h}</th>
+                ))}</tr>
               </thead>
               <tbody>
                 {paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" />No products found</td></tr>
-                ) : (
-                  paginatedProducts.map((product) => {
-                    const firstVariant = product.variants?.[0];
-                    const quantity = Number(firstVariant?.quantity || 0);
-                    const minimum = Number(firstVariant?.min_qnt || 0);
-                    const lowStock = quantity <= minimum;
-                    const image = firstVariant?.images?.[0]?.img_url;
-                    return (
-                      <tr key={product._id} onClick={() => openProductDetails(product)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2.5">
-                            {image ? <img src={getImageUrl(image)} alt={product.name} className="h-8 w-8 rounded-full object-cover shrink-0" /> : <div className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{product.name?.charAt(0).toUpperCase()}</div>}
-                            <div className="min-w-0">
-                              <p className="font-medium text-[13px] truncate max-w-[140px]">{product.name}</p>
-                              <p className="text-[11px] font-mono truncate" style={{ color: "var(--text-muted)" }}>{firstVariant?.sku || "—"}</p>
-                            </div>
+                  <tr><td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
+                ) : paginatedProducts.map((p) => {
+                  const fv = p?.variants?.[0];
+                  const qty = Number(fv?.quantity || 0);
+                  const min = Number(fv?.min_qnt || 0);
+                  const low = qty <= min;
+                  const img = fv?.images?.[0]?.img_url;
+                  
+                  // ⭐ Get tag names directly from populated object
+                  const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
+                  
+                  return (
+                    <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                          <div className="min-w-0">
+                            <p className="max-w-[140px] truncate text-[13px] font-medium">{p.name}</p>
+                            <p className="max-w-[140px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{fv?.sku || "---"}</p>
                           </div>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(product)}</td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(product)}</td>
-                        <td className="px-4 py-2.5 font-semibold text-emerald-500 text-[13px]">Rs. {Number(firstVariant?.selling_price || 0).toLocaleString()}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-[13px] font-medium ${lowStock ? "text-red-500" : "text-emerald-500"}`}>{quantity}</span>
-                            {lowStock && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5"><StatusBadge status={product.status} /></td>
-                        <td className="px-4 py-2.5 whitespace-nowrap w-1" onClick={(e) => e.stopPropagation()}>
-                          <ActionButtons 
-                            product={product} 
-                            onView={openProductDetails} 
-                            onEdit={handleEdit} 
-                            onDelete={handleDelete} 
-                            onToggle={handleToggleStatus}
-                            isDeleting={isDeleting} 
-                            isToggling={isToggling}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
+                      <td className="px-4 py-2.5"><TagList names={tnames} /></td>
+                      <td className="px-4 py-2.5 text-[13px] font-semibold text-emerald-500">Rs. {Number(fv?.selling_price || 0).toLocaleString()}</td>
+                      <td className="px-4 py-2.5"><div className="flex items-center gap-1.5"><span className={`text-[13px] font-medium ${low ? "text-red-500" : "text-emerald-500"}`}>{qty}</span>{low && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}</div></td>
+                      <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                      <td className="w-1 whitespace-nowrap px-4 py-2.5" onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* GRID VIEW */}
       {viewMode === "grid" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {paginatedProducts.map((product) => {
-            const variant = product.variants?.[0];
-            const image = variant?.images?.[0]?.img_url;
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {paginatedProducts.map((p) => {
+            const v = p?.variants?.[0];
+            const img = v?.images?.[0]?.img_url;
+            const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
             return (
-              <div key={product._id} onClick={() => openProductDetails(product)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
+              <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  {image ? <img src={getImageUrl(image)} alt={product.name} className="h-10 w-10 rounded-full object-cover shrink-0" /> : <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{product.name?.charAt(0).toUpperCase()}</div>}
-                  <StatusBadge status={product.status} />
+                  {img ? <img src={getImageUrl(img)} alt={p.name} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                  <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{product.name}</p>
-                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
+                  <p className="truncate text-[13px] font-semibold">{p.name}</p>
+                  <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{v?.sku || "---"}</p>
+                  {tnames.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{tnames.slice(0, 2).map((n, i) => <span key={`${n}-${i}`} className="inline-flex rounded px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{n}</span>)}{tnames.length > 2 && <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>+{tnames.length - 2}</span>}</div>}
                 </div>
-                <div className="flex items-center justify-between mt-auto pt-2">
-                  <span className="text-[13px] font-bold text-emerald-500">Rs. {Number(variant?.selling_price || 0).toLocaleString()}</span>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <ActionButtons 
-                      product={product} 
-                      onView={openProductDetails} 
-                      onEdit={handleEdit} 
-                      onDelete={handleDelete} 
-                      onToggle={handleToggleStatus}
-                      isDeleting={isDeleting}
-                      isToggling={isToggling}
-                    />
-                  </div>
+                <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>
+                  <span className="text-[13px] font-bold text-emerald-500">Rs. {Number(v?.selling_price || 0).toLocaleString()}</span>
+                  <div onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></div>
                 </div>
               </div>
             );
@@ -961,45 +664,48 @@ export default function ProductsPage() {
         </div>
       )}
 
+      {/* PAGINATION */}
       {filteredProducts.length > ITEMS_PER_PAGE && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
+        <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products</p>
           <div className="flex items-center gap-2">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeft className="w-4 h-4" /></button>
+            <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeft className="h-4 w-4" /></button>
             <span className="px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>Page {currentPage} of {totalPages}</span>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRight className="w-4 h-4" /></button>
+            <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRight className="h-4 w-4" /></button>
           </div>
         </div>
       )}
 
+      {/* DELETE MODAL */}
       {showDeleteModal && productToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <ModalOverlay zIndex="z-[100]">
           <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><AlertTriangle className="w-5 h-5 text-red-500" /></div>
-              <div className="flex-1 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><AlertTriangle className="h-5 w-5 text-red-500" /></div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold">Delete "{productToDelete.name}"?</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => { setShowDeleteModal(false); setProductToDelete(null); }} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button disabled={deleteMutation.isPending} onClick={confirmDelete} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{deleteMutation.isPending ? "Deleting..." : "Delete"}</button>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => { setShowDeleteModal(false); setProductToDelete(null); }} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button type="button" disabled={deleteMutation.isPending} onClick={confirmDelete} className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "var(--danger)" }}>{deleteMutation.isPending ? "Deleting..." : "Delete"}</button>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
+      {/* PRODUCT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <ModalOverlay zIndex="z-50">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl shadow-2xl" style={cardStyle}>
-            <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-4 rounded-t-xl" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
+            <div className="sticky top-0 z-20 flex items-center justify-between rounded-t-xl px-5 py-4" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
               <div>
                 <h3 className="text-base font-semibold">{editingProduct ? "Edit Product" : "New Product"}</h3>
                 <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>Add product and variant information</p>
               </div>
-              <button onClick={closeProductModal} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
+              <button type="button" onClick={closeProductModal} className="rounded p-1 transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
             </div>
             <div className="flex items-center gap-4 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="flex items-center gap-2">
@@ -1018,46 +724,69 @@ export default function ProductsPage() {
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field label="Category *">
                       <div className="relative">
-                        <button type="button" onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)} className="input-field w-full flex justify-between items-center text-left h-9 px-3 rounded-md text-sm" style={inputStyle}>
-                          <span className="truncate">{formData.category_id ? categories.find((c) => c._id === formData.category_id)?.name : "Select product category"}</span>
+                        <button type="button" onClick={() => { setIsCategoryDropdownOpen(o => !o); setIsBrandDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
+                          <span className="truncate">{formData.category_id ? categories.find(c => String(c._id) === String(formData.category_id))?.name || "Selected category" : "Select product category"}</span>
                           <ChevronDown className="h-4 w-4 shrink-0" />
                         </button>
                         {isCategoryDropdownOpen && (
-                          <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg max-h-48 overflow-y-auto" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-                            {categories.map((cat) => (
-                              <div key={cat._id} onClick={() => { setFormData({ ...formData, category_id: cat._id }); setIsCategoryDropdownOpen(false); }} className="px-3 py-2 text-sm cursor-pointer hover:bg-black/5" style={{ color: formData.category_id === cat._id ? "var(--accent)" : "var(--text-primary)" }}>{cat.name}</div>
-                            ))}
-                            <div onClick={() => { setIsCategoryDropdownOpen(false); handleOpenCategoryModal(); }} className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Category</div>
-                          </div>
+                          <Dropdown>
+                            {categories.map(c => <button type="button" key={c._id} onClick={() => { setFormData(p => ({ ...p, category_id: String(c._id) })); setIsCategoryDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.category_id) === String(c._id) ? "var(--accent)" : "var(--text-primary)" }}>{c.name}</button>)}
+                            <button type="button" onClick={() => { setIsCategoryDropdownOpen(false); handleOpenCategoryModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Category</button>
+                          </Dropdown>
                         )}
                       </div>
                     </Field>
                     <Field label="Brand *">
                       <div className="relative">
-                        <button type="button" onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)} className="input-field w-full flex justify-between items-center text-left h-9 px-3 rounded-md text-sm" style={inputStyle}>
-                          <span className="truncate">{formData.brand_id ? brands.find((b) => b._id === formData.brand_id)?.name : "Select product brand"}</span>
+                        <button type="button" onClick={() => { setIsBrandDropdownOpen(o => !o); setIsCategoryDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
+                          <span className="truncate">{formData.brand_id ? brands.find(b => String(b._id) === String(formData.brand_id))?.name || "Selected brand" : "Select product brand"}</span>
                           <ChevronDown className="h-4 w-4 shrink-0" />
                         </button>
                         {isBrandDropdownOpen && (
-                          <div className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg max-h-48 overflow-y-auto" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-                            {brands.map((brand) => (
-                              <div key={brand._id} onClick={() => { setFormData({ ...formData, brand_id: brand._id }); setIsBrandDropdownOpen(false); }} className="px-3 py-2 text-sm cursor-pointer hover:bg-black/5" style={{ color: formData.brand_id === brand._id ? "var(--accent)" : "var(--text-primary)" }}>{brand.name}</div>
-                            ))}
-                            <div onClick={() => { setIsBrandDropdownOpen(false); handleOpenBrandModal(); }} className="px-3 py-2 text-sm font-semibold cursor-pointer border-t flex items-center gap-2 hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Brand</div>
-                          </div>
+                          <Dropdown>
+                            {brands.map(b => <button type="button" key={b._id} onClick={() => { setFormData(p => ({ ...p, brand_id: String(b._id) })); setIsBrandDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.brand_id) === String(b._id) ? "var(--accent)" : "var(--text-primary)" }}>{b.name}</button>)}
+                            <button type="button" onClick={() => { setIsBrandDropdownOpen(false); handleOpenBrandModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Brand</button>
+                          </Dropdown>
                         )}
                       </div>
                     </Field>
                   </div>
-                  <Field label="Product Name *">
-                    <input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input-field w-full h-9 px-3 rounded-md text-sm" style={inputStyle} />
+                  
+                  {/* ⭐ SIMPLIFIED TAG INPUT */}
+                  <Field label="Tags">
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addTag()}
+                        placeholder="Type tag name & press Enter"
+                        className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
+                        style={inputStyle}
+                      />
+                      <button type="button" onClick={addTag} className="flex h-9 w-9 items-center justify-center rounded-md transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Selected Tags Display */}
+                    {formData.tag_names.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {formData.tag_names.map(tag => (
+                          <span key={tag} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                            {tag}
+                            <button type="button" onClick={() => removeTag(tag)} className="ml-0.5 rounded-full p-0.5 transition hover:bg-black/10"><X className="h-2.5 w-2.5" /></button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </Field>
-                  <Field label="Description">
-                    <textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="input-field w-full px-3 py-2 rounded-md text-sm resize-none" style={inputStyle} />
-                  </Field>
+
+                  <Field label="Product Name *"><input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
+                  <Field label="Description"><textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field label="Tax (%)">
-                      <input type="number" min="0" max="100" placeholder="%" value={formData.tax} onChange={(e) => { let val = e.target.value; if (val === "") setFormData({ ...formData, tax: "" }); else { let num = Number(val); if (num < 0) num = 0; if (num > 100) num = 100; setFormData({ ...formData, tax: String(num) }); } }} className="input-field w-full h-9 px-3 rounded-md text-sm" style={inputStyle} />
+                      <input type="number" min="0" max="100" step="0.01" placeholder="%" value={formData.tax} onChange={e => { const v = e.target.value; if (v === "") { setFormData(p => ({ ...p, tax: "" })); return; } let n = Number(v); if (!Number.isFinite(n)) n = 0; n = Math.min(100, Math.max(0, n)); setFormData(p => ({ ...p, tax: String(n) })); }} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} />
                     </Field>
                   </div>
                   <div className="flex justify-end pt-2">
@@ -1065,6 +794,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
               )}
+
               {currentStep === 2 && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
@@ -1076,15 +806,15 @@ export default function ProductsPage() {
                   </div>
                   <div className="space-y-3">
                     {formData.variants.map((variant, index) => (
-                      <div key={variant._id || index} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
+                      <div key={variant._id || `new-${index}`} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
                         <div className="flex cursor-pointer items-center justify-between px-4 py-3 transition hover:bg-black/[0.02]" style={{ backgroundColor: "var(--bg-tertiary)" }} onClick={() => setExpandedVariant(expandedVariant === index ? -1 : index)}>
                           <div>
                             <p className="text-sm font-semibold">{variant.sku || `Variant ${index + 1}`}</p>
                             <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{variant.title || `Variant #${index + 1}`}</p>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <IconButton title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateVariant(index); }}><Copy className="h-3.5 w-3.5" /></IconButton>
-                            <IconButton title="Delete" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={(e) => { e.stopPropagation(); removeVariant(index); }}><Trash2 className="h-3.5 w-3.5" /></IconButton>
+                            <IconButton title="Duplicate" onClick={e => { e.stopPropagation(); duplicateVariant(index); }}><Copy className="h-3.5 w-3.5" /></IconButton>
+                            <IconButton title="Delete" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={e => { e.stopPropagation(); removeVariant(index); }}><Trash2 className="h-3.5 w-3.5" /></IconButton>
                             <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
                           </div>
                         </div>
@@ -1093,19 +823,19 @@ export default function ProductsPage() {
                             <div>
                               <SectionTitle>Identification</SectionTitle>
                               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <Field label="SKU *"><input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={(e) => updateVariant(index, "sku", e.target.value)} className={`input-field w-full h-9 px-3 rounded-md text-sm ${editingProduct && variant._id ? "opacity-60 cursor-not-allowed" : ""}`} style={inputStyle} /></Field>
-                                <Field label="Variant Title *"><input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={(e) => updateVariant(index, "title", e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm" style={inputStyle} /></Field>
+                                <Field label="SKU *"><input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={e => updateVariant(index, "sku", e.target.value)} className={`h-9 w-full rounded-md px-3 text-sm ${editingProduct && variant._id ? "cursor-not-allowed opacity-60" : ""}`} style={inputStyle} /></Field>
+                                <Field label="Variant Title *"><input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={e => updateVariant(index, "title", e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
                               </div>
-                              <div className="mt-3"><Field label="Variant Description"><textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={(e) => updateVariant(index, "description", e.target.value)} className="input-field w-full px-3 py-2 rounded-md text-sm resize-none" style={inputStyle} /></Field></div>
+                              <div className="mt-3"><Field label="Variant Description"><textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={e => updateVariant(index, "description", e.target.value)} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field></div>
                             </div>
                             <div>
                               <SectionTitle>Pricing & Stock</SectionTitle>
                               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                                <NumberField label="Cost Price *" placeholder="1000" value={variant.cost_price} onChange={(v) => updateVariant(index, "cost_price", v)} />
-                                <NumberField label="Selling Price *" placeholder="1500" value={variant.selling_price} onChange={(v) => updateVariant(index, "selling_price", v)} />
-                                <NumberField label="Quantity" placeholder="50" value={variant.quantity} onChange={(v) => updateVariant(index, "quantity", v)} />
-                                <NumberField label="Min Qty" placeholder="5" value={variant.min_qnt} onChange={(v) => updateVariant(index, "min_qnt", v)} />
-                                <NumberField label="Max Qty" placeholder="100" value={variant.max_qnt} onChange={(v) => updateVariant(index, "max_qnt", v)} />
+                                <NumberField label="Cost Price *" placeholder="1000" value={variant.cost_price} onChange={v => updateVariant(index, "cost_price", v)} />
+                                <NumberField label="Selling Price *" placeholder="1500" value={variant.selling_price} onChange={v => updateVariant(index, "selling_price", v)} />
+                                <NumberField label="Quantity" placeholder="50" value={variant.quantity} onChange={v => updateVariant(index, "quantity", v)} />
+                                <NumberField label="Min Qty" placeholder="5" value={variant.min_qnt} onChange={v => updateVariant(index, "min_qnt", v)} />
+                                <NumberField label="Max Qty" placeholder="100" value={variant.max_qnt} onChange={v => updateVariant(index, "max_qnt", v)} />
                               </div>
                               {variant.cost_price !== "" && variant.selling_price !== "" && Number(variant.selling_price) <= Number(variant.cost_price) && (
                                 <div className="mt-2 flex items-center gap-2 rounded border border-red-500/30 bg-red-500/10 px-3 py-2">
@@ -1118,36 +848,37 @@ export default function ProductsPage() {
                               <SectionTitle>Attributes</SectionTitle>
                               <div className="space-y-2">
                                 {variant.attributes.map((attribute, attrIndex) => {
-                                  const preset = ATTRIBUTE_PRESETS.find((p) => p.name === attribute.name);
+                                  const preset = ATTRIBUTE_PRESETS.find(item => item.name === attribute.name);
                                   const isCustom = !!attribute.isCustom;
                                   return (
                                     <div key={attrIndex} className="flex flex-wrap items-center gap-2">
                                       <div className="relative min-w-[140px] flex-1">
-                                        <select value={attribute.name} onChange={(e) => { const variants = [...formData.variants]; const attributes = [...variants[index].attributes]; attributes[attrIndex] = { ...attributes[attrIndex], name: e.target.value, value: "", isCustom: false }; variants[index] = { ...variants[index], attributes }; setFormData({ ...formData, variants }); }} className="input-field w-full appearance-none pr-8 h-9 pl-3 rounded-md text-sm cursor-pointer" style={inputStyle}>
-                                          {ATTRIBUTE_PRESETS.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
+                                        <select value={attribute.name} onChange={e => changeAttributeName(index, attrIndex, e.target.value)} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm" style={inputStyle}>
+                                          {ATTRIBUTE_PRESETS.map(pi => <option key={pi.name} value={pi.name}>{pi.name}</option>)}
                                         </select>
-                                        <ChevronDown className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
                                       </div>
                                       {preset ? (
                                         <>
                                           <div className="relative min-w-[140px] flex-1">
-                                            <select value={isCustom ? "__custom__" : attribute.value} onChange={(e) => { const val = e.target.value; const variants = [...formData.variants]; const attributes = [...variants[index].attributes]; attributes[attrIndex] = { ...attributes[attrIndex], isCustom: val === "__custom__", value: val === "__custom__" ? (preset.name === "Color" ? "#000000" : "") : val }; variants[index] = { ...variants[index], attributes }; setFormData({ ...formData, variants }); }} className="input-field w-full appearance-none pr-8 h-9 pl-3 rounded-md text-sm cursor-pointer" style={inputStyle}>
-                                              {preset.values.map((v) => (<option key={v} value={v}>{v}</option>))}
+                                            <select value={isCustom ? "__custom__" : attribute.value} onChange={e => { const val = e.target.value; if (val === "__custom__") { updateAttribute(index, attrIndex, "isCustom", true); updateAttribute(index, attrIndex, "value", preset.name === "Color" ? "#000000" : ""); } else { updateAttribute(index, attrIndex, "isCustom", false); updateAttribute(index, attrIndex, "value", val); } }} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm" style={inputStyle}>
+                                              <option value="">Select value</option>
+                                              {preset.values.map(val => <option key={val} value={val}>{val}</option>)}
                                               <option value="__custom__">+ Custom</option>
                                             </select>
-                                            <ChevronDown className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }} />
+                                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
                                           </div>
                                           {isCustom && (preset.name === "Color" ? (
-                                            <div className="flex items-center gap-2 flex-1">
-                                              <input type="color" value={attribute.value || "#000000"} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="h-9 w-10 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
+                                            <div className="flex flex-1 items-center gap-2">
+                                              <input type="color" value={attribute.value || "#000000"} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 w-10 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
                                               <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{attribute.value || "#000000"}</span>
                                             </div>
                                           ) : (
-                                            <input type="text" placeholder="Custom value..." value={attribute.value} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="input-field flex-1 h-9 px-3 rounded-md text-sm" style={inputStyle} />
+                                            <input type="text" placeholder="Custom value..." value={attribute.value} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 flex-1 rounded-md px-3 text-sm" style={inputStyle} />
                                           ))}
                                         </>
                                       ) : (
-                                        <input type="text" placeholder="Value e.g. Black" value={attribute.value} onChange={(e) => updateAttribute(index, attrIndex, "value", e.target.value)} className="input-field flex-1 h-9 px-3 rounded-md text-sm" style={inputStyle} />
+                                        <input type="text" placeholder="Value e.g. Black" value={attribute.value} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 flex-1 rounded-md px-3 text-sm" style={inputStyle} />
                                       )}
                                       <IconButton title="Remove" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={() => removeAttribute(index, attrIndex)}><Trash2 className="h-3.5 w-3.5" /></IconButton>
                                     </div>
@@ -1159,7 +890,7 @@ export default function ProductsPage() {
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
                               <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
-                                <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleImageUpload(index, e)} />
+                                <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handleImageUpload(index, e)} />
                                 <Upload className="mx-auto mb-2 h-6 w-6" style={{ color: "var(--text-muted)" }} />
                                 <p className="text-xs font-medium">Click to select images</p>
                                 <p className="mt-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>JPG, PNG or WebP • Auto optimized</p>
@@ -1170,6 +901,7 @@ export default function ProductsPage() {
                                     <div key={imageIndex} className="group relative">
                                       <img src={image.preview} alt="" className="h-16 w-16 rounded border object-cover" style={{ borderColor: "var(--border-color)" }} />
                                       <button type="button" onClick={() => removeImage(index, imageIndex)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-600"><X className="h-3 w-3" /></button>
+                                      {image.existing && <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[8px] text-white">Saved</span>}
                                     </div>
                                   ))}
                                 </div>
@@ -1180,189 +912,114 @@ export default function ProductsPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
-                    <button type="button" onClick={() => setCurrentStep(1)} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><ChevronLeft className="h-4 w-4" /> Back</button>
-                    <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"} <Check className="h-4 w-4" /></button>
-                  </div>
                 </div>
               )}
+
+              <div className="flex justify-between border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={() => setCurrentStep(1)} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><ChevronLeft className="h-4 w-4" /> Back</button>
+                <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}<Check className="h-4 w-4" /></button>
+              </div>
             </form>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
+      {/* CATEGORY MODAL */}
       {showNewCategoryModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl overflow-visible shadow-2xl" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+        <ModalOverlay zIndex="z-[60]">
+          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
+            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <h3 className="text-base font-semibold">Create New Category</h3>
-              <button
-                onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }}
-                disabled={createCategoryMutation.isPending || loadingCategoryCode}
-                className="p-1 rounded transition disabled:opacity-50 hover:opacity-70"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button type="button" onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }} disabled={createCategoryMutation.isPending || loadingCategoryCode} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
             </div>
-            <form onSubmit={handleCategorySubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto overflow-x-visible" style={{ overflowClipMargin: "200px" }}>
+            <form onSubmit={handleCategorySubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Category Code *</label>
+                <Field label="Category Code *">
                   <div className="relative">
-                    <input
-                      type="text"
-                      value={categoryFormData.category_code}
-                      onChange={(e) => setCategoryFormData({ ...categoryFormData, category_code: e.target.value })}
-                      required
-                      disabled={createCategoryMutation.isPending || loadingCategoryCode}
-                      className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                      placeholder={loadingCategoryCode ? "Generating..." : "CAT-001"}
-                    />
-                    {loadingCategoryCode && (
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-                      </span>
-                    )}
+                    <input type="text" value={categoryFormData.category_code} onChange={e => setCategoryFormData(p => ({ ...p, category_code: e.target.value }))} required disabled={createCategoryMutation.isPending || loadingCategoryCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingCategoryCode ? "Generating..." : "CAT-001"} />
+                    {loadingCategoryCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
                   </div>
-                  {!loadingCategoryCode && categoryFormData.category_code && (
-                    <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>Auto-generated • You can change it</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Category Name *</label>
-                  <input
-                    type="text"
-                    value={categoryFormData.name}
-                    onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
-                    required
-                    disabled={createCategoryMutation.isPending}
-                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50"
-                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                    placeholder="Electronics"
-                  />
-                </div>
+                  {!loadingCategoryCode && categoryFormData.category_code && <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Auto-generated • You can change it</p>}
+                </Field>
+                <Field label="Category Name *"><input type="text" value={categoryFormData.name} onChange={e => setCategoryFormData(p => ({ ...p, name: e.target.value }))} required disabled={createCategoryMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Electronics" /></Field>
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
-                <textarea
-                  value={categoryFormData.description}
-                  onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
-                  rows="3"
-                  disabled={createCategoryMutation.isPending}
-                  className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none"
-                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                  placeholder="Category details..."
-                />
-              </div>
-              <div className="flex gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button
-                  type="button"
-                  onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }}
-                  disabled={createCategoryMutation.isPending}
-                  className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
-                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createCategoryMutation.isPending || loadingCategoryCode}
-                  className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
-                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-                >
-                  {createCategoryMutation.isPending ? "Creating..." : "Create & Select"}
-                </button>
+              <Field label="Description"><textarea value={categoryFormData.description} onChange={e => setCategoryFormData(p => ({ ...p, description: e.target.value }))} rows={3} disabled={createCategoryMutation.isPending} className="w-full resize-none rounded-md px-3 py-2 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Category details..." /></Field>
+              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }} disabled={createCategoryMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={createCategoryMutation.isPending || loadingCategoryCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createCategoryMutation.isPending ? "Creating..." : "Create & Select"}</button>
               </div>
             </form>
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
+      {/* BRAND MODAL */}
       {showNewBrandModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl overflow-visible shadow-2xl" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+        <ModalOverlay zIndex="z-[60]">
+          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
+            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <h3 className="text-base font-semibold">Create New Brand</h3>
-              <button onClick={() => { setShowNewBrandModal(false); resetBrandForm(); }} disabled={createBrandMutation.isPending} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><X className="w-5 h-5" /></button>
+              <button type="button" onClick={() => { setShowNewBrandModal(false); resetBrandForm(); }} disabled={createBrandMutation.isPending} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
             </div>
-            <form onSubmit={handleBrandSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto overflow-x-visible" style={{ overflowClipMargin: "200px" }}>
+            <form onSubmit={handleBrandSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code *</label>
+                <Field label="Brand Code *">
                   <div className="relative">
-                    <input type="text" value={brandFormData.brand_code} onChange={(e) => setBrandFormData({ ...brandFormData, brand_code: e.target.value })} required disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingBrandCode ? "Generating..." : "BRD-001"} />
+                    <input type="text" value={brandFormData.brand_code} onChange={e => setBrandFormData(p => ({ ...p, brand_code: e.target.value }))} required disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingBrandCode ? "Generating..." : "BRD-001"} />
                     {loadingBrandCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Name *</label>
-                  <input type="text" value={brandFormData.name} onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value })} required disabled={createBrandMutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Nike" />
-                </div>
+                </Field>
+                <Field label="Brand Name *"><input type="text" value={brandFormData.name} onChange={e => setBrandFormData(p => ({ ...p, name: e.target.value }))} required disabled={createBrandMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Nike" /></Field>
               </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
-                <textarea value={brandFormData.description} onChange={(e) => setBrandFormData({ ...brandFormData, description: e.target.value })} rows="2" disabled={createBrandMutation.isPending} className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Brand details..." />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+              <Field label="Description"><textarea value={brandFormData.description} onChange={e => setBrandFormData(p => ({ ...p, description: e.target.value }))} rows={2} disabled={createBrandMutation.isPending} className="w-full resize-none rounded-md px-3 py-2 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Brand details..." /></Field>
+              <Field label="Brand Logo">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                    {brandLogoPreview ? <img src={brandLogoPreview} alt="Preview" className="w-full h-full object-cover" /> : <Upload className="w-6 h-6" style={{ color: "var(--text-muted)" }} />}
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                    {brandLogoPreview ? <img src={brandLogoPreview} alt="Preview" className="h-full w-full object-cover" /> : <Upload className="h-6 w-6" style={{ color: "var(--text-muted)" }} />}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="brand-logo-upload" className="cursor-pointer h-8 px-3 rounded-md text-xs font-medium flex items-center gap-2 transition hover:opacity-80 w-fit" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                      <Upload className="w-3.5 h-3.5" /> {brandLogoPreview ? "Change Image" : "Upload Image"}
-                    </label>
+                    <label htmlFor="brand-logo-upload" className="flex h-8 w-fit cursor-pointer items-center gap-2 rounded-md px-3 text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><Upload className="h-3.5 w-3.5" />{brandLogoPreview ? "Change Image" : "Upload Image"}</label>
                     <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
                   </div>
-                  <input id="brand-logo-upload" type="file" accept="image/png, image/jpeg, image/webp" className="hidden" onChange={handleBrandLogoChange} disabled={createBrandMutation.isPending} />
+                  <input id="brand-logo-upload" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBrandLogoChange} disabled={createBrandMutation.isPending} />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+              </Field>
+              <div className="grid grid-cols-2 items-end gap-3">
+                <Field label="Country">
                   <div className="relative">
-                    <select value={brandFormData.country} onChange={(e) => setBrandFormData({ ...brandFormData, country: e.target.value })} disabled={createBrandMutation.isPending} className="appearance-none h-9 w-full pl-3 pr-8 rounded-md text-sm outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                    <select value={brandFormData.country} onChange={e => setBrandFormData(p => ({ ...p, country: e.target.value }))} disabled={createBrandMutation.isPending} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                       <option value="">Select Country</option>
-                      {allCountries.map((c) => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
+                      {allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
                     </select>
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDown className="w-3.5 h-3.5" /></span>
+                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
                   </div>
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer h-9">
-                  <input type="checkbox" checked={brandFormData.is_active} onChange={(e) => setBrandFormData({ ...brandFormData, is_active: e.target.checked })} disabled={createBrandMutation.isPending} className="w-4 h-4 rounded disabled:opacity-50" style={{ accentColor: "var(--accent)" }} />
+                </Field>
+                <label className="flex h-9 cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked={brandFormData.is_active} onChange={e => setBrandFormData(p => ({ ...p, is_active: e.target.checked }))} disabled={createBrandMutation.isPending} className="h-4 w-4 rounded" style={{ accentColor: "var(--accent)" }} />
                   <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Active</span>
                 </label>
               </div>
-              <div className="flex gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowNewBrandModal(false); resetBrandForm(); }} disabled={createBrandMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={createBrandMutation.isPending || loadingBrandCode} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createBrandMutation.isPending ? "Creating..." : "Create & Select"}</button>
+              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowNewBrandModal(false); resetBrandForm(); }} disabled={createBrandMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createBrandMutation.isPending ? "Creating..." : "Create & Select"}</button>
               </div>
             </form>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );
 }
 
+/* =========================================================
+   SUB-COMPONENTS
+========================================================= */
 function Field({ label, children }) {
-  return (
-    <div className="space-y-1">
-      <label className="block text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>
-      {children}
-    </div>
-  );
+  return <div className="space-y-1"><label className="block text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>{children}</div>;
 }
 
 function NumberField({ label, value, placeholder, onChange }) {
-  return (
-    <Field label={label}>
-      <input type="number" min="0" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="input-field w-full h-9 px-3 rounded-md text-sm" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-    </Field>
-  );
+  return <Field label={label}><input type="number" min="0" step="0.01" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} /></Field>;
 }
 
 function SectionTitle({ children }) {
@@ -1371,41 +1028,54 @@ function SectionTitle({ children }) {
 
 function StatusBadge({ status }) {
   const active = status === "active";
-  return (
-    <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
-      {active ? "Active" : "Inactive"}
-    </span>
-  );
+  return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>{active ? "Active" : "Inactive"}</span>;
 }
 
 function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
-  return (
-    <button type="button" title={title} onClick={onClick} className="rounded p-1.5 transition hover:bg-black/5 flex items-center justify-center" style={{ color, backgroundColor: background }}>
-      {children}
-    </button>
-  );
+  return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
 }
 
 function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting, isToggling }) {
-  const isActive = product.status === "active";
-  
+  const isActive = product?.status === "active";
   return (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button 
-        onClick={(e) => { e.stopPropagation(); onToggle(product); }} 
-        disabled={isToggling}
-        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center disabled:opacity-50" 
-        style={{ color: isActive ? "#f87171" : "#34d399" }} 
-        title={isActive ? "Deactivate" : "Activate"}
-      >
-        <Power className="w-4 h-4" />
-      </button>
+      <button type="button" onClick={e => { e.stopPropagation(); onToggle(product); }} disabled={isToggling} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-white/5 disabled:opacity-50" style={{ color: isActive ? "#f87171" : "#34d399" }} title={isActive ? "Deactivate" : "Activate"}><Power className="h-4 w-4" /></button>
+      <button type="button" onClick={e => { e.stopPropagation(); onView(product); }} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-emerald-500/10" style={{ color: "#34d399" }} title="View Details"><Eye className="h-4 w-4" /></button>
+      <button type="button" onClick={e => { e.stopPropagation(); onEdit(product); }} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-white/5" style={{ color: "var(--text-secondary)" }} title="Edit"><Pencil className="h-4 w-4" /></button>
+      <button type="button" onClick={e => { e.stopPropagation(); onDelete(product); }} disabled={isDeleting} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 text-red-500 transition hover:bg-red-500/10 disabled:opacity-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+    </div>
+  );
+}
 
-      <button onClick={(e) => { e.stopPropagation(); onView(product); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><Eye className="w-4 h-4" /></button>
-      
-      <button onClick={(e) => { e.stopPropagation(); onEdit(product); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><Pencil className="w-4 h-4" /></button>
-      
-      <button onClick={(e) => { e.stopPropagation(); onDelete(product); }} disabled={isDeleting} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete"><Trash2 className="w-4 h-4" /></button>
+function SelectFilter({ value, onChange, options, placeholder }) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full appearance-none rounded-lg pl-3 pr-8 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+        <option value="all">{placeholder}</option>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+    </div>
+  );
+}
+
+function Dropdown({ children, maxHeight = "max-h-48" }) {
+  return <div className={`absolute z-[100] mt-1 w-full overflow-y-auto rounded-lg border shadow-lg ${maxHeight}`} style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>{children}</div>;
+}
+
+function ModalOverlay({ children, zIndex }) {
+  return <div className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm`}>{children}</div>;
+}
+
+function TagList({ names }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {names.length > 0 ? (
+        <>
+          {names.slice(0, 2).map((name, index) => <span key={`${name}-${index}`} className="inline-flex rounded px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{name}</span>)}
+          {names.length > 2 && <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>+{names.length - 2}</span>}
+        </>
+      ) : <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>—</span>}
     </div>
   );
 }

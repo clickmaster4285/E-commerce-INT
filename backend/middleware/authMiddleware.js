@@ -20,16 +20,36 @@ const authMiddleware = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId)
+      .select("-password")
+      .lean();
 
-    if (!user) {
-      return res.status(401).json({ success: false, message: "User not found" });
+    if (!user || user.is_deleted) {
+      return res.status(401).json({ success: false, message: "User not found or deleted" });
+    }
+
+    if (user.status === "inactive") {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Your account is inactive. Please contact admin." 
+      });
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+    if (process.env.NODE_ENV !== "production") {
+      console.error(" Auth Middleware Error:", error.message);
+    }
+
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Token expired. Please login again." });
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+
+    return res.status(500).json({ success: false, message: "Authentication failed" });
   }
 };
 

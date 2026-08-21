@@ -1,84 +1,255 @@
 import axiosInstance from "./axiosInstance";
 
-// ✅ Helper: Unwrap API response — { success, data } se actual data nikalo
+// ============================================================
+// HELPER: UNWRAP API RESPONSE
+// Backend response:
+// {
+//   success: true,
+//   data: {...}
+// }
+// ============================================================
+
 const unwrap = (response) => {
   if (!response) return null;
-  // Backend returns: { success: true, data: {...} }
-  // response.data from axios = { success: true, data: {...} }
-  if (response.success !== undefined && response.data !== undefined) {
+
+  if (
+    response.success !== undefined &&
+    response.data !== undefined
+  ) {
     return response.data;
   }
-  // Already unwrapped
+
   return response;
 };
 
-// ✅ Helper: Get current user ID from cookie (not localStorage)
-const getCurrentUserId = () => {
-  if (typeof window === "undefined") return null;
-  
-  // Try reading from cookie first
-  const cookies = document.cookie.split(";").reduce((acc, cookie) => {
-    const [key, ...val] = cookie.trim().split("=");
-    if (key) acc[key] = val.join("=");
-    return acc;
-  }, {});
-  
-  // Check common cookie names for user ID
-  const userId = cookies.current_staff_id || cookies.userId || cookies.user_id;
-  if (userId) return userId;
-  
-  // Fallback: try localStorage (for backward compatibility during transition)
-  const stored = localStorage.getItem("current_staff_id");
-  if (stored) return stored;
-  
-  return null;
-};
+// ============================================================
+// EMPLOYEE API
+// ============================================================
 
 export const employeeApi = {
+  // ==========================================================
+  // GET ALL EMPLOYEES
+  // ==========================================================
+
   getAll: async () => {
-    const response = await axiosInstance.get("/employees");
-    return unwrap(response.data);
+    try {
+      const response = await axiosInstance.get("/employees");
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        "❌ getAllEmployees error:",
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to fetch employees"
+      );
+    }
   },
+
+  // ==========================================================
+  // GET EMPLOYEE BY ID
+  // ==========================================================
 
   getById: async (id) => {
-    const response = await axiosInstance.get(`/employees/${id}`);
-    return unwrap(response.data);
+    if (!id) {
+      throw new Error("Employee ID is required");
+    }
+
+    try {
+      const response = await axiosInstance.get(
+        `/employees/${id}`
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        `❌ getEmployeeById (${id}) error:`,
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to fetch employee details"
+      );
+    }
   },
+
+  // ==========================================================
+  // CREATE EMPLOYEE
+  // ==========================================================
 
   create: async (data) => {
-    const response = await axiosInstance.post("/employees", data);
-    return unwrap(response.data);
-  },
-
-  update: async (id, data) => {
-    const currentUserId = getCurrentUserId();
-
-    // 🛑 SECURITY CHECK: Block self-permission edits
-    if (currentUserId && currentUserId === id && data.permissions) {
+    if (!data?.name || !data?.email || !data?.password) {
       throw new Error(
-        "SECURITY_RESTRICTION: You cannot modify your own permissions. Please contact an administrator."
+        "Name, email and password are required"
       );
     }
 
     try {
-      const response = await axiosInstance.put(`/employees/${id}`, data);
+      const response = await axiosInstance.post(
+        "/employees",
+        data
+      );
+
       return unwrap(response.data);
     } catch (error) {
-      const message =
+      console.error(
+        "❌ createEmployee error:",
+        error.message
+      );
+
+      throw new Error(
         error.response?.data?.message ||
-        error.message ||
-        "Failed to update employee";
-      throw new Error(message);
+          "Failed to create employee"
+      );
     }
   },
 
-  delete: async (id) => {
-    const response = await axiosInstance.delete(`/employees/${id}`);
-    return unwrap(response.data);
+  // ==========================================================
+  // UPDATE EMPLOYEE
+  // ==========================================================
+
+  update: async (id, data) => {
+    if (!id) {
+      throw new Error("Employee ID is required");
+    }
+
+    try {
+      const response = await axiosInstance.put(
+        `/employees/${id}`,
+        data
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        `❌ updateEmployee (${id}) error:`,
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update employee"
+      );
+    }
   },
 
+  // ==========================================================
+  // DELETE EMPLOYEE
+  // ==========================================================
+
+  delete: async (id) => {
+    if (!id) {
+      throw new Error("Employee ID is required");
+    }
+
+    try {
+      const response = await axiosInstance.delete(
+        `/employees/${id}`
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        `❌ deleteEmployee (${id}) error:`,
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to delete employee"
+      );
+    }
+  },
+
+  // ==========================================================
+  // TOGGLE EMPLOYEE STATUS
+  // ==========================================================
+
   toggleStatus: async (id) => {
-    const response = await axiosInstance.patch(`/employees/${id}/toggle-status`);
-    return unwrap(response.data);
+    if (!id) {
+      throw new Error("Employee ID is required");
+    }
+
+    try {
+      const response = await axiosInstance.patch(
+        `/employees/${id}/toggle-status`
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        `❌ toggleStatus (${id}) error:`,
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to toggle employee status"
+      );
+    }
+  },
+
+  // ==========================================================
+  // GET EMPLOYEE BY USER ID
+  // ==========================================================
+
+  getByUserId: async (userId) => {
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
+    try {
+      const response = await axiosInstance.get(
+        `/employees/by-user/${userId}`
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        `❌ getEmployeeByUserId (${userId}) error:`,
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to fetch employee by user ID"
+      );
+    }
+  },
+
+  // ==========================================================
+  // BULK DELETE
+  // ==========================================================
+
+  bulkDelete: async (ids) => {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error(
+        "At least one employee ID is required"
+      );
+    }
+
+    try {
+      const response = await axiosInstance.post(
+        "/employees/bulk-delete",
+        { ids }
+      );
+
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(
+        "❌ bulkDelete error:",
+        error.message
+      );
+
+      throw new Error(
+        error.response?.data?.message ||
+          "Failed to delete employees"
+      );
+    }
   },
 };

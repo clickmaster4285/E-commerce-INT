@@ -1,4 +1,4 @@
-import axiosInstance from "./axiosInstance"; // Apne axios instance ka path sahi rakho
+import axiosInstance from "./axiosInstance";
 
 export const categoryApi = {
   getNextCode: () =>

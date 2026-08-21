@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Sidebar from '../../components/Sidebar';
-import Navbar from '../../components/Navbar';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import Sidebar from '../../components/ui/adminComponents/Sidebar';
+import Navbar from '../../components/ui/adminComponents/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 import { io } from 'socket.io-client';
 
 // ==========================================
-// ✅ ROUTE → PERMISSION MAPPING
+// ROUTE → PERMISSION MAPPING
 // ==========================================
 const ROUTE_PERMISSIONS = {
   '/admin/brands': 'brands',
@@ -19,15 +20,21 @@ const ROUTE_PERMISSIONS = {
   '/admin/store-info': 'store',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',
+  '/admin/discounts': 'discounts',
 };
 
-// ✅ Singleton socket for layout permission listener
+// ==========================================
+// SINGLETON SOCKET
+// ==========================================
 let layoutPermSocket = null;
 
 function getLayoutPermSocket() {
-  if (layoutPermSocket && layoutPermSocket.connected) return layoutPermSocket;
+  if (layoutPermSocket && layoutPermSocket.connected) {
+    return layoutPermSocket;
+  }
 
   const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+
   layoutPermSocket = io(SOCKET_URL, {
     withCredentials: true,
     transports: ['websocket', 'polling'],
@@ -39,176 +46,476 @@ function getLayoutPermSocket() {
   return layoutPermSocket;
 }
 
+// ==========================================
+// USER PROFILE API
+// ==========================================
+const getProfile = async () => {
+  const response = await axiosInstance.get('/users/profile');
+
+  console.log('🔍 RAW API RESPONSE:', response.data);
+
+  let extractedUser = null;
+
+  if (response.data?.user) {
+    extractedUser = response.data.user;
+  } else if (response.data?.data?.user) {
+    extractedUser = response.data.data.user;
+  } else if (response.data?.role) {
+    extractedUser = response.data;
+  } else if (response.data?.data?.role) {
+    extractedUser = response.data.data;
+  }
+
+  return extractedUser;
+};
+
+// ==========================================
+// STORE DATA API
+// ==========================================
+// Agar tumhare backend ka store endpoint different hai
+// to sirf yahan endpoint change karna hoga.
+const getStoreData = async () => {
+  const response = await axiosInstance.get('/store');
+
+  return (
+    response.data?.store ||
+    response.data?.data?.store ||
+    response.data?.data ||
+    response.data
+  );
+};
+
+// ==========================================
+// ADMIN LAYOUT
+// ==========================================
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(null);
-  // const [isAuthenticated, setIsAuthenticated] = useState(null);
-  const [storeData, setStoreData] = useState(null);
-  const [userData, setUserData] = useState(null);
   const [permissionCheckDone, setPermissionCheckDone] = useState(false);
-
-  // ✅ LIVE permissions from socket — updates in real-time
-  const [livePermissions, setLivePermissions] = useState(null);
-  const [liveRole, setLiveRole] = useState(null);
 
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
-  // ✅ Login page par layout apply NAHI karna
+  // ==========================================
+  // LOGIN PAGE
+  // ==========================================
   const isLoginPage = pathname === '/admin/login';
 
+  // ==========================================
+  // STORE SOCKET SYNC
+  // ==========================================
   useStoreSocketSync();
 
-  // Theme
+  // ==========================================
+  // USER QUERY
+  // ==========================================
+  const {
+    data: userData,
+    isLoading: userLoading,
+    isError: userError,
+    error: userQueryError,
+  } = useQuery({
+    queryKey: ['admin-user-profile'],
+    queryFn: getProfile,
+    enabled: !isLoginPage,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // ==========================================
+  // STORE QUERY
+  // ==========================================
+  const {
+    data: storeData,
+    isLoading: storeLoading,
+  } = useQuery({
+    queryKey: ['store'],
+    queryFn: getStoreData,
+    enabled: !isLoginPage && isAuthenticated === true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  // ==========================================
+  // THEME
+  // ==========================================
   useEffect(() => {
     const saved = Cookies.get('theme') || 'dark';
+
     setTheme(saved);
-    document.documentElement.classList.toggle('light', saved === 'light');
+
+    document.documentElement.classList.toggle(
+      'light',
+      saved === 'light'
+    );
   }, []);
 
-  // Store data cache
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const cached = Cookies.get('storeData');
-      if (cached) {
-        try {
-          setStoreData(JSON.parse(cached));
-        } catch (e) {}
-      }
-    }
-  }, []);
-
-  // Socket listener
-  useEffect(() => {
-    const handleStoreUpdate = (e) => {
-      if (e.detail) setStoreData(e.detail);
-      if (e.detail) setStoreData(e.detail);
-    };
-    window.addEventListener('storeUpdated', handleStoreUpdate);
-    return () => window.removeEventListener('storeUpdated', handleStoreUpdate);
-  }, []);
-
-  // ✅ Authentication Check — SIRF login page ke ilawa
+  // ==========================================
+  // AUTHENTICATION
+  // ==========================================
   useEffect(() => {
     if (isLoginPage) {
-      setIsAuthenticated(true); // Login page ko bypass karo
+      setIsAuthenticated(true);
+      setPermissionCheckDone(true);
       return;
     }
 
-    const checkAuth = async () => {
-      try {
-        const response = await axiosInstance.get('/users/profile');
-        console.log('🔍 RAW API RESPONSE:', response.data);
+    if (userLoading) {
+      setIsAuthenticated(null);
+      return;
+    }
 
-        setIsAuthenticated(true);
+    if (userError) {
+      console.error(
+        '❌ Auth failed:',
+        userQueryError?.message || 'Authentication failed'
+      );
 
-        let extractedUser = null;
-        if (response.data?.user) extractedUser = response.data.user;
-        else if (response.data?.data?.user) extractedUser = response.data.data.user;
-        else if (response.data?.role) extractedUser = response.data;
-        else if (response.data?.data?.role) extractedUser = response.data.data;
+      setIsAuthenticated(false);
+      setPermissionCheckDone(true);
 
-        setUserData(extractedUser);
+      router.push('/admin/login');
 
-        if (extractedUser?._id) {
-          localStorage.setItem('current_staff_id', extractedUser._id);
-        }
+      return;
+    }
 
-        console.log('✅ USER:', extractedUser?.name, '| ROLE:', extractedUser?.role, '| PERMS:', extractedUser?.permissions);
+    if (!userData) {
+      setIsAuthenticated(false);
+      setPermissionCheckDone(true);
 
-        // Initial permission check
-        const role = extractedUser?.role?.toLowerCase();
-        const perms = extractedUser?.permissions;
+      router.push('/admin/login');
 
-        if (role === 'admin') {
-          setPermissionCheckDone(true);
-          return;
-        }
+      return;
+    }
 
-        if (!perms || typeof perms !== 'object' || !Object.values(perms).some((v) => v === true)) {
-          setPermissionCheckDone(true);
-          router.replace('/admin/access-denied');
-          return;
-        }
+    setIsAuthenticated(true);
 
-        // Check current route
-        const matched = Object.entries(ROUTE_PERMISSIONS).find(
-          ([route]) => pathname === route || pathname.startsWith(route + '/')
-        );
-        if (matched && perms[matched[1]] === false) {
-          setPermissionCheckDone(true);
-          router.replace('/admin/access-denied');
-          return;
-        }
+    console.log(
+      '✅ USER:',
+      userData?.name,
+      '| ROLE:',
+      userData?.role,
+      '| PERMS:',
+      userData?.permissions
+    );
 
-        setPermissionCheckDone(true);
-      } catch (error) {
-        console.error('❌ Auth failed:', error.message);
-        setIsAuthenticated(false);
-        // ✅ Admin login par bhejo (user login par nahi)
-        router.push('/admin/login');
-      }
+    // ==========================================
+    // ADMIN HAS FULL ACCESS
+    // ==========================================
+    const role = userData?.role?.toLowerCase();
+
+    if (role === 'admin') {
+      setPermissionCheckDone(true);
+      return;
+    }
+
+    // ==========================================
+    // USER PERMISSIONS
+    // ==========================================
+    const perms = userData?.permissions;
+
+    if (
+      !perms ||
+      typeof perms !== 'object' ||
+      !Object.values(perms).some((value) => value === true)
+    ) {
+      setPermissionCheckDone(true);
+
+      router.replace('/admin/access-denied');
+
+      return;
+    }
+
+    // ==========================================
+    // CURRENT ROUTE PERMISSION
+    // ==========================================
+    const matched = Object.entries(ROUTE_PERMISSIONS).find(
+      ([route]) =>
+        pathname === route ||
+        pathname.startsWith(route + '/')
+    );
+
+    if (matched && perms[matched[1]] === false) {
+      setPermissionCheckDone(true);
+
+      router.replace('/admin/access-denied');
+
+      return;
+    }
+
+    setPermissionCheckDone(true);
+  }, [
+    userData,
+    userLoading,
+    userError,
+    userQueryError,
+    router,
+    pathname,
+    isLoginPage,
+  ]);
+
+  // ==========================================
+  // LIVE STORE SOCKET UPDATE
+  // ==========================================
+  useEffect(() => {
+    const handleStoreUpdate = (event) => {
+      if (!event.detail) return;
+
+      console.log('🔄 Store updated from socket');
+
+      queryClient.setQueryData(
+        ['store'],
+        event.detail
+      );
     };
 
-    checkAuth();
-  }, [router, pathname, isLoginPage]);
+    window.addEventListener(
+      'storeUpdated',
+      handleStoreUpdate
+    );
 
-  // ✅ Login page — bina Sidebar/Navbar ke sirf children
+    return () => {
+      window.removeEventListener(
+        'storeUpdated',
+        handleStoreUpdate
+      );
+    };
+  }, [queryClient]);
+
+  // ==========================================
+  // LIVE PERMISSION SOCKET
+  // ==========================================
+  useEffect(() => {
+    if (
+      isLoginPage ||
+      !userData?._id ||
+      userData?.role?.toLowerCase() === 'admin'
+    ) {
+      return;
+    }
+
+    const socket = getLayoutPermSocket();
+
+    const handlePermissionUpdate = (updatedData) => {
+      console.log(
+        '🔄 Permission update received:',
+        updatedData
+      );
+
+      const updatedUser =
+        updatedData?.user ||
+        updatedData?.employee ||
+        updatedData;
+
+      if (!updatedUser) return;
+
+      // ==========================================
+      // UPDATE TANSTACK USER CACHE
+      // ==========================================
+      queryClient.setQueryData(
+        ['admin-user-profile'],
+        (oldUser) => {
+          if (!oldUser) return oldUser;
+
+          return {
+            ...oldUser,
+            ...updatedUser,
+            permissions:
+              updatedUser.permissions ??
+              oldUser.permissions,
+            role:
+              updatedUser.role ??
+              oldUser.role,
+          };
+        }
+      );
+    };
+
+    socket.on(
+      'permissionsUpdated',
+      handlePermissionUpdate
+    );
+
+    socket.on(
+      'employeeUpdated',
+      handlePermissionUpdate
+    );
+
+    return () => {
+      socket.off(
+        'permissionsUpdated',
+        handlePermissionUpdate
+      );
+
+      socket.off(
+        'employeeUpdated',
+        handlePermissionUpdate
+      );
+    };
+  }, [
+    isLoginPage,
+    userData?._id,
+    userData?.role,
+    queryClient,
+  ]);
+
+  // ==========================================
+  // LOGIN PAGE
+  // ==========================================
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  // Loading state
-  if (isAuthenticated === null) {
+  // ==========================================
+  // AUTH LOADING
+  // ==========================================
+  if (isAuthenticated === null || !permissionCheckDone) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#0a0c14' }}>
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{
+          backgroundColor: '#0a0c14',
+        }}
+      >
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: '#10b981', borderTopColor: 'transparent' }} />
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Verifying access...</p>
+          <div
+            className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+            style={{
+              borderColor: '#10b981',
+              borderTopColor: 'transparent',
+            }}
+          />
+
+          <p
+            className="text-sm"
+            style={{
+              color: 'rgba(255,255,255,0.4)',
+            }}
+          >
+            Verifying access...
+          </p>
         </div>
       </div>
     );
   }
 
+  // ==========================================
+  // NOT AUTHENTICATED
+  // ==========================================
   if (!isAuthenticated) {
     return null;
   }
 
+  // ==========================================
+  // THEME
+  // ==========================================
   const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    const newTheme =
+      theme === 'dark'
+        ? 'light'
+        : 'dark';
+
     setTheme(newTheme);
-    Cookies.set('theme', newTheme, { expires: 365, path: '/' });
-    document.documentElement.classList.toggle('light', newTheme === 'light');
+
+    Cookies.set(
+      'theme',
+      newTheme,
+      {
+        expires: 365,
+        path: '/',
+      }
+    );
+
+    document.documentElement.classList.toggle(
+      'light',
+      newTheme === 'light'
+    );
   };
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
-  const closeSidebar = () => setSidebarOpen(false);
+  // ==========================================
+  // SIDEBAR
+  // ==========================================
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => !prev);
+  };
 
-  if (pathname === '/admin/access-denied') return <>{children}</>;
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
 
+  // ==========================================
+  // ACCESS DENIED
+  // ==========================================
+  if (pathname === '/admin/access-denied') {
+    return <>{children}</>;
+  }
+
+  // ==========================================
+  // MAIN LAYOUT
+  // ==========================================
   return (
     <div className="flex h-screen overflow-hidden">
+
+      {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div onClick={closeSidebar} className="fixed inset-0 bg-black/50 z-40 md:hidden" aria-hidden="true" />
+        <div
+          onClick={closeSidebar}
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-hidden="true"
+        />
       )}
-      
+
+      {/* Sidebar */}
       <div
         className={`
-          sidebar-wrapper shrink-0 h-screen z-50
-          fixed md:relative top-0 left-0
-          transition-transform duration-300 ease-in-out
+          sidebar-wrapper
+          shrink-0
+          h-screen
+          z-50
+          fixed
+          md:relative
+          top-0
+          left-0
+          transition-transform
+          duration-300
+          ease-in-out
           md:translate-x-0
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${
+            sidebarOpen
+              ? 'translate-x-0'
+              : '-translate-x-full'
+          }
         `}
       >
-        <Sidebar onNavigate={closeSidebar} storeData={storeData} />
+        <Sidebar
+          onNavigate={closeSidebar}
+          storeData={storeData}
+          userData={userData}
+        />
       </div>
+
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Navbar theme={theme} toggleTheme={toggleTheme} onMenuClick={toggleSidebar} storeData={storeData} />
+
+        {/* Navbar */}
+        <Navbar
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onMenuClick={toggleSidebar}
+          storeData={storeData}
+        />
+
+        {/* Page */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
           {children}
         </main>
+
       </div>
     </div>
   );

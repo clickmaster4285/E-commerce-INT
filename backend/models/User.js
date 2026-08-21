@@ -31,7 +31,12 @@ const userSchema = new mongoose.Schema(
       users: { type: Boolean, default: false },
       orders: { type: Boolean, default: true },
       settings: { type: Boolean, default: true },
+      profile: { type: Boolean, default: true },       // ✅ Added
+      employees: { type: Boolean, default: true },     // ✅ Added
+      discounts: { type: Boolean, default: true },     // ✅ Added
+      store: { type: Boolean, default: false },        // ✅ Added
     },
+    
     preferences: {
       darkMode: { type: Boolean, default: true },
       notifications: {

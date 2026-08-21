@@ -19,13 +19,15 @@ export default function AdminLoginPage() {
       return response.data;
     },
     onSuccess: (data) => {
-      // ✅ Sirf admin ko allow karein
-      if (data.user.role === 'admin') {
+      // ✅ FIX: Ab admin, staff, aur manager teeno ko allow karein
+      const allowedRoles = ['admin', 'staff', 'manager'];
+      
+      if (allowedRoles.includes(data.user.role)) {
         router.push('/admin/dashboard');
       } else {
-        // Agar user role ho, to logout karwa dein aur error dikhayein
+        // Agar user ka role allowed nahi hai to logout aur error
         axiosInstance.post('/users/logout').catch(() => {});
-        setError('Only admins can access this page. Please use user login instead.');
+        setError('Access denied. Only administrators, managers and staff members can log in.');
       }
     },
     onError: (error) => {
