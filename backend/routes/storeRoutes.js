@@ -43,9 +43,11 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // Max 5MB limit
 });
 
-// ✅ Routes with Auth Middleware + Permission Check
-router.route("/")
-  .get(authMiddleware, getStoreInfo) // Everyone can view
-  .put(authMiddleware, checkPermission("store"), upload.single('logo'), updateStoreInfo); // ✅ NEED STORE PERMISSION
+// ✅ PUBLIC ROUTE — No auth required (for frontend store info)
+router.get("/public", getStoreInfo);
 
+// ✅ PROTECTED ROUTES — Admin only
+router.route("/")
+  .get(authMiddleware, getStoreInfo)
+  .put(authMiddleware, checkPermission("store"), upload.single('logo'), updateStoreInfo);
 module.exports = router;

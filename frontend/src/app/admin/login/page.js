@@ -15,7 +15,7 @@ export default function AdminLoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await axiosInstance.post("/users/login", userData);
+      const response = await axiosInstance.post("/users/admin/login", userData);
       return response.data;
     },
     onSuccess: (data) => {

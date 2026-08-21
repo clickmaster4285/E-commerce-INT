@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
-import ProductCard from "@/components/ui/user/ProductCard";
+import ProductCard from "@/components/user/ProductCard";
 import { ChevronRight, Package, SlidersHorizontal } from "lucide-react";
 
 export default function CategoryPage({ params }) {
@@ -65,10 +65,7 @@ export default function CategoryPage({ params }) {
         <Link href="/" className="hover:text-[var(--user-accent)] transition">
           Home
         </Link>
-        <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
-        <Link href="/products" className="hover:text-[var(--user-accent)] transition">
-          All Products
-        </Link>
+
         <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
         <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[180px] sm:max-w-[220px]">
           {category?.name || "Category"}

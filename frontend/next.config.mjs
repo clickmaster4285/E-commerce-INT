@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
-    '192.168.88.64',
+    '192.168.88.69',
     'localhost',
     '127.0.0.1',
   ],
@@ -10,11 +10,11 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://192.168.88.64:5000/api/:path*',
+        destination: 'http://192.168.88.69:5000/api/:path*',
       },
       {
         source: '/uploads/:path*',
-        destination: 'http://192.168.88.64:5000/uploads/:path*',
+        destination: 'http://192.168.88.69:5000/uploads/:path*',
       },
     ];
   },

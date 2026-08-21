@@ -3,6 +3,8 @@ const {
   getNextCode,
   createCategory,
   getCategories,
+  getCategoriesPublic,
+  getCategoriesAdmin,
   getCategoryById,
   updateCategory,
   deleteCategory,

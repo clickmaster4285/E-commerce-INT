@@ -325,13 +325,53 @@ const deleteBrand = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+// ==========================================
+// 🌐 GET BRANDS — PUBLIC (light)
+// ==========================================
+const getBrandsPublic = async (req, res) => {
+  try {
+    const brands = await Brand.find({ is_deleted: false })
+      .select("brand_code name logo country is_active")
+      .sort({ created_at: -1 })
+      .lean()
+      .exec();
+    res.status(200).json({ success: true, data: brands });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 
+// ==========================================
+// 🛡️ GET BRANDS — ADMIN (full with products)
+// ==========================================
+const getBrandsAdmin = async (req, res) => {
+  try {
+    const brands = await Brand.find({ is_deleted: false })
+      .sort({ created_at: -1 })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email");
+
+    const brandsWithProducts = await Promise.all(
+      brands.map(async (brand) => {
+        const products = await Product.find({ brand_id: brand._id })
+          .populate("category_id", "name")
+          .select("name brand_id category_id status created_at");
+        return { ...brand.toObject(), products };
+      })
+    );
+    res.status(200).json({ success: true, data: brandsWithProducts });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 module.exports = {
   getNextBrandCode,
   createBrand,
   getBrands,
+  getBrandsPublic,
+  getBrandsAdmin,
   getBrandById,
   getBrandWithProducts,
   updateBrand,
   deleteBrand,
-};
+};  

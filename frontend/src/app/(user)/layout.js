@@ -4,24 +4,13 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-
-import Header from "../../components/ui/user/Header";
-import Footer from "../../components/ui/user/Footer";
-import CartDrawer from "../../components/ui/user/CartDrawer";
-
-import {
-  CartProvider,
-  useCart,
-} from "../../components/ui/user/CartContext";
-
+import Header from "../../components/user/Header";
+import Footer from "../../components/user/Footer";
+import CartDrawer from "../../components/user/CartDrawer";
+import { CartProvider, useCart } from "../../components/user/CartContext";
 import { storeApi } from "@/apis/storeApi";
-
-import {
-  Home,
-  Search,
-  ShoppingCart,
-  User,
-} from "lucide-react";
+import { Home, Search, ShoppingCart, User } from "lucide-react";
+import { WishlistProvider } from "@/components/user/WishlistContext";
 
 /* =========================================================
    COOKIE HELPERS
@@ -245,6 +234,7 @@ export default function UserLayout({ children }) {
   ======================================================= */
 
   return (
+    <WishlistProvider>
     <CartProvider>
 
       <div
@@ -282,5 +272,6 @@ export default function UserLayout({ children }) {
       </div>
 
     </CartProvider>
+    </WishlistProvider>
   );
 }

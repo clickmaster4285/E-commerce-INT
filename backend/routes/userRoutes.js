@@ -1,8 +1,8 @@
-// backend/routes/userRoutes.js
 const express = require("express");
 const {
   createUser,
   loginUser,
+  loginAdmin,
   refreshAccessToken,
   logoutUser,
   getProfile,
@@ -10,7 +10,15 @@ const {
   updateProfile,
   changePassword,
   toggle2FA,
-  googleLogin
+  googleLogin,
+  updatePhone,
+  createCheckoutDraft,
+  getCheckoutDrafts,
+  getCheckoutDraft,
+  updateCheckoutDraft,
+  deleteCheckoutDraft,
+  getWishlist,
+  toggleWishlist,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
@@ -18,40 +26,54 @@ const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 
 // ==========================================
-//  PUBLIC ROUTES (No Auth Required)
+//  PUBLIC ROUTES
 // ==========================================
 router.post("/register", createUser);
 router.post("/login", loginUser);
+router.post("/admin/login", loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
 router.post("/logout", logoutUser);
-router.post("/google-login", googleLogin);  
-// ==========================================
-// 🔒 PROTECTED ROUTES (Auth Required)
-// ==========================================
+router.post("/google-login", googleLogin);
 
-// ✅ GET /api/users/me — Har logged-in user apna data dekh sake (NO permission)
+// ==========================================
+// 🔒 PROTECTED ROUTES
+// ==========================================
 router.get("/me", authMiddleware, getMe);
-
-// ✅ GET /api/users/profile — Har logged-in user apna profile dekh sake (NO permission)
 router.get("/profile", authMiddleware, getProfile);
-
-// ✅ PUT /api/users/profile — Permission required
-router.put("/profile", authMiddleware, checkPermission("profile"), updateProfile);
-
-// ✅ PUT /api/users/password — Permission required
-router.put("/password", authMiddleware, checkPermission("profile"), changePassword);
-
-// ✅ PUT /api/users/2fa — Permission required
+router.put(
+  "/profile",
+  authMiddleware,
+  checkPermission("profile"),
+  updateProfile,
+);
+router.put(
+  "/password",
+  authMiddleware,
+  checkPermission("profile"),
+  changePassword,
+);
 router.put("/2fa", authMiddleware, checkPermission("profile"), toggle2FA);
+router.put("/phone", authMiddleware, updatePhone);
 
+// ✅ MULTIPLE CHECKOUT DRAFTS
+router.post("/checkout-drafts", authMiddleware, createCheckoutDraft);
+router.get("/checkout-drafts", authMiddleware, getCheckoutDrafts);
+router.get("/checkout-drafts/:id", authMiddleware, getCheckoutDraft);
+router.put("/checkout-drafts/:id", authMiddleware, updateCheckoutDraft);
+router.delete("/checkout-drafts/:id", authMiddleware, deleteCheckoutDraft);
+// ✅ NEW: Wishlist routes
+router.get("/wishlist", authMiddleware, getWishlist);
+router.put("/wishlist/toggle", authMiddleware, toggleWishlist);
 // ==========================================
 // 🛡️ 404 HANDLER
 // ==========================================
 router.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `User API endpoint not found: ${req.method} ${req.originalUrl}`,
-  });
+  res
+    .status(404)
+    .json({
+      success: false,
+      message: `User API endpoint not found: ${req.method} ${req.originalUrl}`,
+    });
 });
 
 module.exports = router;
