@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { dealApi } from "../../../apis/dealApi";
+import { dealApi } from "../../../apis/admin/dealApi";
 import { productApi } from "../../../apis/productApi";
 import { categoryApi } from "../../../apis/categoryApi";
 import { brandApi } from "../../../apis/brandApi";

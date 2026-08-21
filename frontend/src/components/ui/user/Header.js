@@ -10,7 +10,7 @@ import axiosInstance from "@/apis/axiosInstance";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { productApi } from "@/apis/productApi";
-import { storeApi } from "@/apis/storeApi";
+import { storeApi } from "@/apis/admin/storeApi";
 import Cookies from "js-cookie"; // ✅ Cookies library import
 
 import {

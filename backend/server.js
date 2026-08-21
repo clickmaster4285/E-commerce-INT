@@ -30,8 +30,8 @@ const discountRoutes = require("./routes/discountRoutes");
 const dealRoutes = require("./routes/dealRoutes");
 const tagRoutes = require("./routes/tagRoutes"); // ✅ ADDED TAG ROUTES IMPORT
 const addressRoutes = require("./routes/addressRoutes"); // ✅ ADDRESS ROUTES
-const orderRoutes = require("./routes/orderRoutes"); // ✅ ORDER ROUTES
-const cartRoutes = require("./routes/cartRoutes"); // ✅ CART ROUTES
+const bannerRoutes = require("./routes/bannerRoutes");
+const bannerScheduler = require("./utils/bannerScheduler"); // ✅ Ye line add karo
 // ==========================================
 // APP
 // ==========================================
@@ -305,21 +305,16 @@ app.use(
 );
 
 // ✅ REGISTER ADDRESS ROUTES
+// ✅ REGISTER ADDRESS ROUTES
 app.use(
   `${API_PREFIX}/addresses`,
   addressRoutes
 );
 
-// ✅ REGISTER ORDER ROUTES
+// ✅ REGISTER BANNER ROUTES
 app.use(
-  `${API_PREFIX}/orders`,
-  orderRoutes
-);
-
-// ✅ REGISTER CART ROUTES
-app.use(
-  `${API_PREFIX}/cart`,
-  cartRoutes
+  `${API_PREFIX}/banners`,
+  bannerRoutes
 );
 // ==========================================
 // ROOT ROUTE
@@ -541,7 +536,9 @@ const startServer = async () => {
     await connectDB();
     createUploadDirectories();
     await seedDefaultData();
-
+    createUploadDirectories();
+    bannerScheduler; // ✅ Ye line add karo (scheduler start karne ke liye)
+    await seedDefaultData();
     server.listen(
       PORT,
       HOST,

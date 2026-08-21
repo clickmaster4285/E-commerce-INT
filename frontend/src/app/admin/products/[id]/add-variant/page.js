@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/productApi";
-import { variantApi } from "@/apis/variantApi";
+import { variantApi } from "@/apis/admin/variantApi";
 
 const API_ORIGIN =
   process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");

@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-
-// ✅ Yeh line sab se zaroori hai (apne path ke hisaab se adjust karein)
 const authMiddleware = require('../middleware/authMiddleware'); 
+const { checkPermission } = require("../middleware/checkPermission");
 
 const {
   createDiscount,
