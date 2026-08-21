@@ -11,9 +11,8 @@ import {
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
-import { useQueryClient } from "@tanstack/react-query";
-
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   FolderOpen,
@@ -25,6 +24,7 @@ import {
   User,
   Users,
   Gift,
+  Image as ImageIcon, // Added Icon for Banners
 } from "lucide-react";
 
 // ============================================================
@@ -38,108 +38,61 @@ const allMenuItems = [
     path: "/admin/dashboard",
     permissionKey: null,
   },
-
   {
     name: "Brands",
     icon: Tag,
     path: "/admin/brands",
     permissionKey: "brands",
   },
-
   {
     name: "Categories",
     icon: FolderOpen,
     path: "/admin/categories",
     permissionKey: "categories",
   },
-
   {
     name: "Products",
     icon: Package,
     path: "/admin/products",
     permissionKey: "products",
   },
-
   {
     name: "Store Info",
     icon: Store,
     path: "/admin/store-info",
     permissionKey: "store",
   },
-
   {
     name: "Profile",
     icon: User,
     path: "/admin/profile",
     permissionKey: "profile",
   },
-
   {
     name: "Employees",
     icon: Users,
     path: "/admin/employees",
     permissionKey: "employees",
   },
-
   {
     name: "Discounts",
     icon: Tag,
     path: "/admin/discounts",
     permissionKey: "discounts",
   },
-
   {
     name: "Deals",
     icon: Gift,
     path: "/admin/deals",
     permissionKey: "deals",
   },
+  {
+    name: "Banners",
+    icon: ImageIcon,
+    path: "/admin/banners",
+    permissionKey: "banners",
+  },
 ];
-
-// ============================================================
-// DEFAULT PERMISSIONS
-// ============================================================
-
-const DEFAULT_PERMISSIONS = {
-  employees: false,
-  products: false,
-  brands: false,
-  categories: false,
-  profile: false,
-  store: false,
-  discounts: false,
-  deals: false,
-};
-
-// ============================================================
-// NORMALIZE PERMISSIONS
-// ============================================================
-
-function normalizePermissions(value) {
-  if (!value || typeof value !== "object") {
-    return {
-      ...DEFAULT_PERMISSIONS,
-    };
-  }
-
-  const normalized = {
-    ...DEFAULT_PERMISSIONS,
-  };
-
-  Object.keys(DEFAULT_PERMISSIONS).forEach((key) => {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        value,
-        key
-      )
-    ) {
-      normalized[key] =
-        value[key] === true;
-    }
-  });
-
-  return normalized;
-}
 
 // ============================================================
 // GLOBAL SOCKET
@@ -152,13 +105,6 @@ function getSidebarSocket() {
     process.env.NEXT_PUBLIC_SOCKET_URL ||
     "http://localhost:5000";
 
-  if (
-    sidebarSocket &&
-    sidebarSocket.connected
-  ) {
-    return sidebarSocket;
-  }
-
   if (sidebarSocket) {
     return sidebarSocket;
   }
@@ -166,26 +112,34 @@ function getSidebarSocket() {
   sidebarSocket = io(SOCKET_URL, {
     withCredentials: true,
 
-    transports: [
-      "websocket",
-      "polling",
-    ],
+    transports: ["websocket", "polling"],
 
     reconnection: true,
-
     reconnectionAttempts: Infinity,
-
     reconnectionDelay: 500,
+    reconnectionDelayMax: 3000,
 
     autoConnect: true,
+
+    forceNew: false,
+  });
+
+  sidebarSocket.on("connect_error", (error) => {
+    console.error(
+      "❌ Sidebar socket connection error:",
+      error?.message || error
+    );
+  });
+
+  sidebarSocket.on("disconnect", (reason) => {
+    console.log(
+      "🔴 Sidebar socket disconnected:",
+      reason
+    );
   });
 
   return sidebarSocket;
 }
-
-// ============================================================
-// DISCONNECT SOCKET
-// ============================================================
 
 export function disconnectSidebarSocket() {
   if (sidebarSocket) {
@@ -204,188 +158,143 @@ export default function Sidebar({
   userData,
 }) {
   const pathname = usePathname();
-
   const dispatch = useDispatch();
-
-  const queryClient =
-    useQueryClient();
+  const queryClient = useQueryClient();
 
   const storeName = useSelector(
-    (state) =>
-      state.storeInfo.storeName
+    (state) => state.storeInfo.storeName
   );
 
-  const primaryColor =
-    useSelector(
-      (state) =>
-        state.storeInfo.primaryColor
-    );
+  const primaryColor = useSelector(
+    (state) => state.storeInfo.primaryColor
+  );
 
-  const isLoaded =
-    useSelector(
-      (state) =>
-        state.storeInfo.isLoaded
-    );
+  const isLoaded = useSelector(
+    (state) => state.storeInfo.isLoaded
+  );
 
-  const isSelfDispatching =
-    useRef(false);
+  const isSelfDispatching = useRef(false);
 
   // ============================================================
-  // SOCKET PERMISSIONS
+  // IMPORTANT
+  // Empty object means:
+  // "Do NOT trust old userData permissions"
   // ============================================================
 
-  const [
-    socketPermissions,
-    setSocketPermissions,
-  ] = useState(null);
+  const [socketPermissions, setSocketPermissions] =
+    useState({});
 
-  const [
-    socketRole,
-    setSocketRole,
-  ] = useState(null);
+  const [socketRole, setSocketRole] =
+    useState("");
+
+  const [socketProfileLoaded, setSocketProfileLoaded] =
+    useState(false);
 
   // ============================================================
   // APPLY PROFILE
   // ============================================================
 
-  const applyProfileData =
-    useCallback(
-      (response) => {
-        if (!response) {
-          return;
-        }
-
-        const data =
-          response?.data ||
-          response?.user ||
-          response;
-
-        if (!data) {
-          return;
-        }
-
-        const permissions =
-          normalizePermissions(
-            data.permissions
-          );
-
-        const role =
-          String(
-            data.role || ""
-          ).toLowerCase();
-
-        console.log(
-          "======================================"
-        );
-
-        console.log(
-          "📥 SIDEBAR PROFILE RECEIVED"
-        );
-
-        console.log(
-          "👤 Role:",
-          role
-        );
-
-        console.log(
-          "🔐 Permissions:",
-          permissions
-        );
-
-        console.log(
-          "🎁 Deals permission:",
-          permissions.deals
-        );
-
-        console.log(
-          "======================================"
-        );
-
-        // --------------------------------------------------------
-        // IMPORTANT
-        // --------------------------------------------------------
-
-        setSocketPermissions(
-          permissions
-        );
-
-        setSocketRole(role);
-
-        // --------------------------------------------------------
-        // React Query cache
-        // --------------------------------------------------------
-
-        queryClient.setQueryData(
-          ["profile"],
-          (old) => {
-            if (!old) {
-              return {
-                ...data,
-                permissions,
-                role,
-              };
-            }
-
-            return {
-              ...old,
-              ...data,
-              permissions,
-              role,
-            };
-          }
-        );
-      },
-      [queryClient]
-    );
-
-  // ============================================================
-  // REQUEST FRESH PROFILE
-  // ============================================================
-
-  const requestFreshProfile =
-    useCallback(() => {
-      const socket =
-        getSidebarSocket();
-
-      if (!socket) {
+  const applyProfile = useCallback(
+    (response) => {
+      if (!response) {
         return;
       }
 
-      if (socket.connected) {
-        console.log(
-          "🔄 Sidebar requesting fresh profile..."
+      if (response.success === false) {
+        console.warn(
+          "⚠️ Sidebar profile request failed:",
+          response.message
         );
 
-        socket.emit(
-          "getProfile"
-        );
+        return;
       }
-    }, []);
+
+      const data =
+        response?.data ||
+        response?.user ||
+        response;
+
+      if (!data) {
+        return;
+      }
+
+      const freshPermissions = {
+        ...(data.permissions || {}),
+      };
+
+      const freshRole =
+        data.role || "";
+
+      console.log(
+        "📥 Sidebar fresh profile:",
+        {
+          role: freshRole,
+          permissions: freshPermissions,
+        }
+      );
+
+      setSocketPermissions(
+        freshPermissions
+      );
+
+      setSocketRole(
+        freshRole
+      );
+
+      setSocketProfileLoaded(true);
+
+      // ========================================================
+      // UPDATE REACT QUERY CACHE
+      // ========================================================
+
+      queryClient.setQueryData(
+        ["profile"],
+        (old) => {
+          if (!old) {
+            return {
+              ...data,
+              permissions:
+                freshPermissions,
+              role: freshRole,
+            };
+          }
+
+          return {
+            ...old,
+            ...data,
+            permissions:
+              freshPermissions,
+            role: freshRole,
+          };
+        }
+      );
+    },
+    [queryClient]
+  );
 
   // ============================================================
   // SOCKET CONNECT
   // ============================================================
 
-  const handleConnect =
-    useCallback(() => {
-      const socket =
-        sidebarSocket;
+  const handleConnect = useCallback(() => {
+    const socket =
+      sidebarSocket;
 
-      console.log(
-        "🟢 Sidebar socket connected:",
-        socket?.id
+    console.log(
+      "🟢 Sidebar socket connected:",
+      socket?.id
+    );
+
+    if (
+      socket &&
+      socket.connected
+    ) {
+      // ALWAYS get fresh DB permissions
+      socket.emit(
+        "getProfile"
       );
-
-      if (socket) {
-        socket.emit(
-          "getProfile"
-        );
-
-        socket.emit(
-          "getStoreInfo"
-        );
-      }
-    }, []);
+    }
+  }, []);
 
   // ============================================================
   // PROFILE DATA
@@ -395,26 +304,15 @@ export default function Sidebar({
     useCallback(
       (response) => {
         console.log(
-          "📥 Sidebar profileData:",
+          "📥 Sidebar profileData received:",
           response
         );
 
-        if (
-          response?.success === false
-        ) {
-          console.warn(
-            "⚠️ Sidebar profile request failed:",
-            response?.message
-          );
-
-          return;
-        }
-
-        applyProfileData(
+        applyProfile(
           response
         );
       },
-      [applyProfileData]
+      [applyProfile]
     );
 
   // ============================================================
@@ -429,28 +327,11 @@ export default function Sidebar({
           response
         );
 
-        if (
-          response?.success === false
-        ) {
-          return;
-        }
-
-        applyProfileData(
+        applyProfile(
           response
         );
-
-        // ------------------------------------------------------
-        // Extra fresh DB request
-        // ------------------------------------------------------
-
-        setTimeout(() => {
-          requestFreshProfile();
-        }, 100);
       },
-      [
-        applyProfileData,
-        requestFreshProfile,
-      ]
+      [applyProfile]
     );
 
   // ============================================================
@@ -459,130 +340,106 @@ export default function Sidebar({
 
   const handlePermissionsUpdated =
     useCallback(
-      (response) => {
+      (data) => {
         console.log(
-          "🔔 ======================================"
+          "🔔 Sidebar permissionsUpdated:",
+          data
         );
-
-        console.log(
-          "🔔 SIDEBAR permissionsUpdated:"
-        );
-
-        console.log(
-          response
-        );
-
-        console.log(
-          "🔔 ======================================"
-        );
-
-        // ------------------------------------------------------
-        // Sometimes backend sends:
-        //
-        // {
-        //   permissions: {...}
-        // }
-        //
-        // Sometimes:
-        //
-        // {
-        //   data: {
-        //      permissions: {...}
-        //   }
-        // }
-        // ------------------------------------------------------
-
-        const incomingPermissions =
-          response?.permissions ||
-          response?.data?.permissions ||
-          response?.user?.permissions;
 
         if (
-          !incomingPermissions
+          !data ||
+          !data.permissions
         ) {
           console.warn(
-            "⚠️ permissionsUpdated has no permissions"
+            "⚠️ permissionsUpdated without permissions"
           );
 
-          requestFreshProfile();
+          if (
+            sidebarSocket?.connected
+          ) {
+            sidebarSocket.emit(
+              "getProfile"
+            );
+          }
 
           return;
         }
 
-        const permissions =
-          normalizePermissions(
-            incomingPermissions
-          );
+        const freshPermissions = {
+          ...data.permissions,
+        };
 
         console.log(
-          "✅ Sidebar NEW permissions:",
-          permissions
+          "✅ Applying NEW permissions:",
+          freshPermissions
         );
 
-        console.log(
-          "🎁 Sidebar Deals:",
-          permissions.deals
-        );
-
-        // ------------------------------------------------------
-        // IMMEDIATE UI UPDATE
-        // ------------------------------------------------------
+        // ======================================================
+        // IMMEDIATE SIDEBAR UPDATE
+        // ======================================================
 
         setSocketPermissions(
-          permissions
+          freshPermissions
         );
 
         if (
-          response?.role !==
-          undefined
+          data.role !== undefined
         ) {
           setSocketRole(
-            String(
-              response.role
-            ).toLowerCase()
+            data.role || ""
           );
         }
 
-        // ------------------------------------------------------
-        // Update React Query
-        // ------------------------------------------------------
+        setSocketProfileLoaded(
+          true
+        );
+
+        // ======================================================
+        // UPDATE QUERY CACHE
+        // ======================================================
 
         queryClient.setQueryData(
           ["profile"],
           (old) => {
             if (!old) {
               return {
-                permissions,
+                permissions:
+                  freshPermissions,
                 role:
-                  response?.role ||
-                  "",
+                  data.role || "",
               };
             }
 
             return {
               ...old,
-
-              permissions,
-
+              permissions:
+                freshPermissions,
               role:
-                response?.role ??
+                data.role ??
                 old.role,
             };
           }
         );
 
-        // ------------------------------------------------------
-        // Ask DB again
-        // ------------------------------------------------------
+        // ======================================================
+        // GET ABSOLUTE LATEST DB VALUE
+        // ======================================================
 
         setTimeout(() => {
-          requestFreshProfile();
+          if (
+            sidebarSocket?.connected
+          ) {
+            console.log(
+              "🔄 Requesting latest DB profile..."
+            );
+
+            sidebarSocket.emit(
+              "getProfile"
+            );
+          }
         }, 150);
       },
-      [
-        queryClient,
-        requestFreshProfile,
-      ]
+      [queryClient]
     );
 
   // ============================================================
@@ -592,10 +449,6 @@ export default function Sidebar({
   useEffect(() => {
     const socket =
       getSidebarSocket();
-
-    // ----------------------------------------------------------
-    // FIRST REGISTER LISTENERS
-    // ----------------------------------------------------------
 
     socket.on(
       "connect",
@@ -617,10 +470,7 @@ export default function Sidebar({
       handlePermissionsUpdated
     );
 
-    // ----------------------------------------------------------
-    // ALREADY CONNECTED
-    // ----------------------------------------------------------
-
+    // Already connected
     if (socket.connected) {
       console.log(
         "🟢 Sidebar socket already connected:",
@@ -630,15 +480,7 @@ export default function Sidebar({
       socket.emit(
         "getProfile"
       );
-
-      socket.emit(
-        "getStoreInfo"
-      );
     }
-
-    // ----------------------------------------------------------
-    // CLEANUP
-    // ----------------------------------------------------------
 
     return () => {
       socket.off(
@@ -669,87 +511,38 @@ export default function Sidebar({
   ]);
 
   // ============================================================
-  // FALLBACK FROM REACT QUERY
-  // ============================================================
-
-  const cachedProfile =
-    queryClient.getQueryData(
-      ["profile"]
-    );
-
-  // ============================================================
-  // VISIBLE MENU ITEMS
+  // PERMISSION BASED MENU
   // ============================================================
 
   const visibleMenuItems =
     useMemo(() => {
-      // --------------------------------------------------------
-      // SOCKET DATA FIRST
-      // --------------------------------------------------------
+      // IMPORTANT:
+      // Once socket profile is available,
+      // ONLY socket permissions are used.
 
-      let permissions =
-        socketPermissions;
+      const permissions =
+        socketProfileLoaded
+          ? socketPermissions
+          : {};
 
-      let role =
-        socketRole;
-
-      // --------------------------------------------------------
-      // React Query fallback
-      // --------------------------------------------------------
-
-      if (
-        permissions === null
-      ) {
-        permissions =
-          cachedProfile?.permissions ||
-          userData?.permissions ||
-          {};
-      }
-
-      if (
-        role === null
-      ) {
-        role =
-          cachedProfile?.role ||
-          userData?.role ||
-          "";
-      }
-
-      permissions =
-        normalizePermissions(
-          permissions
-        );
+      const role =
+        socketProfileLoaded
+          ? socketRole
+          : "";
 
       const normalizedRole =
         String(
-          role || ""
+          role
         ).toLowerCase();
 
       console.log(
-        "🔍 ======================================"
-      );
-
-      console.log(
-        "🔍 SIDEBAR MENU CHECK"
-      );
-
-      console.log(
-        "👤 Role:",
-        normalizedRole
-      );
-
-      console.log(
-        "🔐 Permissions:",
-        permissions
-      );
-
-      console.log(
-        "🎁 DEALS:",
-        permissions.deals
-      );
-
-      console.log(
-        "🔍 ======================================"
+        "🔍 Sidebar permission check:",
+        {
+          role:
+            normalizedRole,
+          permissions,
+          socketProfileLoaded,
+        }
       );
 
       // ========================================================
@@ -758,59 +551,38 @@ export default function Sidebar({
 
       if (
         normalizedRole ===
-          "admin" ||
-        normalizedRole ===
-          "administrator"
+        "admin"
       ) {
         return allMenuItems;
       }
 
       // ========================================================
-      // STAFF / EMPLOYEE
+      // STAFF / MANAGER
       // ========================================================
 
       return allMenuItems.filter(
         (item) => {
           // Dashboard always visible
           if (
-            item.permissionKey ===
-            null
+            !item.permissionKey
           ) {
             return true;
           }
 
-          const allowed =
+          const value =
             permissions[
               item.permissionKey
-            ] === true;
+            ];
 
-          if (!allowed) {
-            console.log(
-              `🚫 Sidebar hiding ${item.name}`,
-              {
-                permissionKey:
-                  item.permissionKey,
-
-                value:
-                  permissions[
-                    item.permissionKey
-                  ],
-              }
-            );
-          } else {
-            console.log(
-              `✅ Sidebar showing ${item.name}`
-            );
-          }
-
-          return allowed;
+          // ONLY explicit true
+          // gets access
+          return value === true;
         }
       );
     }, [
       socketPermissions,
       socketRole,
-      cachedProfile,
-      userData,
+      socketProfileLoaded,
     ]);
 
   // ============================================================
@@ -834,10 +606,6 @@ export default function Sidebar({
     const socket =
       getSidebarSocket();
 
-    // ----------------------------------------------------------
-    // STORE DATA
-    // ----------------------------------------------------------
-
     const handleStoreData =
       (data) => {
         if (
@@ -848,7 +616,7 @@ export default function Sidebar({
         }
 
         console.log(
-          "📥 Sidebar store data:",
+          "📥 Sidebar store:",
           data.store_name
         );
 
@@ -865,10 +633,6 @@ export default function Sidebar({
         }, 100);
       };
 
-    // ----------------------------------------------------------
-    // STORE INFO
-    // ----------------------------------------------------------
-
     const handleStoreInfo =
       (response) => {
         if (
@@ -881,10 +645,6 @@ export default function Sidebar({
         }
       };
 
-    // ----------------------------------------------------------
-    // STORE UPDATED
-    // ----------------------------------------------------------
-
     const handleStoreUpdated =
       (data) => {
         if (
@@ -895,10 +655,6 @@ export default function Sidebar({
           );
         }
       };
-
-    // ----------------------------------------------------------
-    // CONNECT
-    // ----------------------------------------------------------
 
     const handleConnectStore =
       () => {
@@ -969,11 +725,6 @@ export default function Sidebar({
         if (
           event.detail?.store_name
         ) {
-          console.log(
-            "📥 Sidebar custom store event:",
-            event.detail.store_name
-          );
-
           isSelfDispatching.current =
             true;
 
@@ -1011,10 +762,6 @@ export default function Sidebar({
     const timer =
       setTimeout(() => {
         if (!isLoaded) {
-          console.log(
-            "⚠️ Sidebar store failsafe..."
-          );
-
           const socket =
             getSidebarSocket();
 
@@ -1029,7 +776,9 @@ export default function Sidebar({
       }, 3000);
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(
+        timer
+      );
     };
   }, [isLoaded]);
 
@@ -1066,9 +815,7 @@ export default function Sidebar({
         shadow-sm
       "
     >
-      {/* ================================================== */}
       {/* HEADER */}
-      {/* ================================================== */}
 
       <div
         className="
@@ -1100,7 +847,11 @@ export default function Sidebar({
                 displayColor,
             }}
           >
-            <span className="text-sm font-bold text-white">
+            <span
+              className="
+                text-sm font-bold text-white
+              "
+            >
               {firstLetter}
             </span>
           </div>
@@ -1134,9 +885,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* ================================================== */}
       {/* NAVIGATION */}
-      {/* ================================================== */}
 
       <nav
         aria-label="Main navigation"
@@ -1146,7 +895,9 @@ export default function Sidebar({
           px-2 py-2
         "
       >
-        <div className="space-y-0.5">
+        <div
+          className="space-y-0.5"
+        >
           {visibleMenuItems.map(
             (item) => {
               const Icon =
@@ -1167,7 +918,9 @@ export default function Sidebar({
 
               return (
                 <Link
-                  key={item.name}
+                  key={
+                    item.name
+                  }
                   href={
                     item.path
                   }
@@ -1184,7 +937,6 @@ export default function Sidebar({
                     gap-2 rounded-md px-2.5
                     text-xs font-medium
                     transition-colors
-
                     ${
                       active
                         ? "bg-[var(--bg-sidebar-hover)] text-[var(--text-primary)]"
@@ -1196,7 +948,6 @@ export default function Sidebar({
                     size={16}
                     className={`
                       shrink-0
-
                       ${
                         active
                           ? "text-emerald-500"
@@ -1205,10 +956,10 @@ export default function Sidebar({
                     `}
                   />
 
-                  <span className="truncate">
-                    {
-                      item.name
-                    }
+                  <span
+                    className="truncate"
+                  >
+                    {item.name}
                   </span>
                 </Link>
               );
@@ -1217,9 +968,7 @@ export default function Sidebar({
         </div>
       </nav>
 
-      {/* ================================================== */}
       {/* FOOTER */}
-      {/* ================================================== */}
 
       <div
         className="

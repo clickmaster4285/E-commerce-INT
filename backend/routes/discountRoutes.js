@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-
-// ✅ Yeh line sab se zaroori hai (apne path ke hisaab se adjust karein)
 const authMiddleware = require('../middleware/authMiddleware'); 
+const { checkPermission } = require("../middleware/checkPermission");
 
 const {
   createDiscount,
@@ -12,11 +11,13 @@ const {
   deleteDiscount
 } = require('../controllers/discountController');
 
-// ✅ Har route ke beech mein 'authMiddleware' lagana lazmi hai
-router.post('/', authMiddleware, createDiscount);
-router.get('/', authMiddleware, getDiscounts);
-router.get('/:id', authMiddleware, getDiscountById);
-router.put('/:id', authMiddleware, updateDiscount);
-router.delete('/:id', authMiddleware, deleteDiscount);
+// ✅ STATIC ROUTE (Pehle likho)
+router.get('/admin/all', authMiddleware, checkPermission("discounts"), getDiscounts);
+
+// ✅ DYNAMIC ROUTES (Baad mein likho)
+router.post('/', authMiddleware, checkPermission("discounts"), createDiscount);
+router.get('/:id', authMiddleware, checkPermission("discounts"), getDiscountById);
+router.put('/:id', authMiddleware, checkPermission("discounts"), updateDiscount);
+router.delete('/:id', authMiddleware, checkPermission("discounts"), deleteDiscount);
 
 module.exports = router;

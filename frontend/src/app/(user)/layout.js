@@ -8,7 +8,7 @@ import Header from "../../components/user/Header";
 import Footer from "../../components/user/Footer";
 import CartDrawer from "../../components/user/CartDrawer";
 import { CartProvider, useCart } from "../../components/user/CartContext";
-import { storeApi } from "@/apis/storeApi";
+import { storeApi } from "@/apis/admin/storeApi";
 import { Home, Search, ShoppingCart, User } from "lucide-react";
 import { WishlistProvider } from "@/components/user/WishlistContext";
 

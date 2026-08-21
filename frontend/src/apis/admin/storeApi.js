@@ -1,4 +1,4 @@
-import axiosInstance from "./axiosInstance";
+import axiosInstance from "../axiosInstance";
 
 export const storeApi = {
   // ✅ Public store info (bina login ke — user GUI ke liye)

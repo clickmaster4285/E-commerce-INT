@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { employeeApi } from "@/apis/employeeApi";
+import { employeeApi } from "@/apis/admin/employeeApi";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 const ITEMS_PER_PAGE = 20;

@@ -14,8 +14,8 @@ import { toast } from "sonner";
 import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
-import { variantApi } from "@/apis/variantApi";
-import { tagApi } from "@/apis/tagApi";
+import { variantApi } from "@/apis/admin/variantApi";
+import { tagApi } from "@/apis/admin/tagApi";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
