@@ -19,6 +19,12 @@ const productSchema = new mongoose.Schema(
       ref: "Brand",
       required: true,
     },
+    tag_ids: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Tag",
+  },
+],
 
     description: {
       type: String,

@@ -138,38 +138,30 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
 
   useEffect(() => { setIsOpen(false); }, [pathname]);
 
+  // ✅ FIXED LOGOUT FUNCTION - NO CONFIRMATION DIALOG
   const handleLogout = async () => {
     setIsOpen(false);
     
-    toast.warning("Are you sure you want to logout?", {
-      description: "You will need to login again to access your account.",
-      duration: 5000,
-      action: {
-        label: "Yes, Logout",
-        onClick: async () => {
-          try {
-            await axiosInstance.post("/users/logout");
-            toast.success("Logged out successfully!");
-          } catch (e) {
-            console.error("Logout error:", e);
-            toast.error("Logout failed. Please try again.");
-          } finally {
-            // ✅ Dono sockets disconnect karo taake next login pe fresh connection ho
-            if (navbarSocket) {
-              navbarSocket.disconnect();
-              navbarSocket = null;
-            }
-            disconnectSidebarSocket();
-            setLiveUser(null);
-            router.push('/login');
-          }
-        },
-      },
-      cancel: {
-        label: "Cancel",
-        onClick: () => {},
-      },
-    });
+    try {
+      await axiosInstance.post("/users/logout");
+      toast.success("Logged out successfully!");
+    } catch (e) {
+      console.error("Logout error:", e);
+      toast.error("Logout failed. Please try again.");
+    } finally {
+      // ✅ Step 1: Dono sockets disconnect karo
+      if (navbarSocket) {
+        navbarSocket.disconnect();
+        navbarSocket = null;
+      }
+      disconnectSidebarSocket();
+      
+      // ✅ Step 2: Live user state clear karo
+      setLiveUser(null);
+      
+      // ✅ Step 3: ADMIN LOGIN PAGE par redirect karo
+      router.push('/admin/login');
+    }
   };
 
   const isProfileActive = pathname.startsWith("/admin/profile");

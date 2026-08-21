@@ -7,26 +7,41 @@ const {
   updateCategory,
   deleteCategory,
 } = require("../controllers/categoryController");
-const authMiddleware = require("../middleware/authMiddleware");
-const { checkPermission } = require("../middleware/checkPermission");
+const authMiddleware = require("../middleware/authMiddleware"); // ✅ Auth middleware import
+const { checkPermission } = require("../middleware/checkPermission"); // ✅ Permission middleware import
+
 const router = express.Router();
 
-// ✅ GET next code — No permission (just generates a code)
+// ==========================================
+// CATEGORY ROUTES (Protected with Permissions)
+// ==========================================
+
+// ✅ GET next code — No permission required (just generates a code)
 router.get("/next-code", authMiddleware, getNextCode);
 
-// ✅ CREATE — Permission required
+// ✅ CREATE category — Requires 'categories' permission
 router.post("/", authMiddleware, checkPermission("categories"), createCategory);
 
-// ✅ UPDATE — Permission required
+// ✅ UPDATE category — Requires 'categories' permission
 router.put("/:id", authMiddleware, checkPermission("categories"), updateCategory);
 
-// ✅ DELETE — Permission required
+// ✅ DELETE category — Requires 'categories' permission
 router.delete("/:id", authMiddleware, checkPermission("categories"), deleteCategory);
 
-// ✅ GET all — No permission (read-only, sab dekh saken)
-router.get("/", authMiddleware, getCategories);
+// ✅ GET all categories — Requires 'categories' permission
+router.get("/", authMiddleware, checkPermission("categories"), getCategories);
 
-// ✅ GET by id — No permission (read-only)
-router.get("/:id", authMiddleware, getCategoryById);
+// ✅ GET by id — Requires 'categories' permission
+router.get("/:id", authMiddleware, checkPermission("categories"), getCategoryById);
+
+// ==========================================
+// ️ 404 HANDLER
+// ==========================================
+router.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Category API endpoint not found: ${req.method} ${req.originalUrl}`,
+  });
+});
 
 module.exports = router;

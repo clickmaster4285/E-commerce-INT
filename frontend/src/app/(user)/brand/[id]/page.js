@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/productApi";
 import { brandApi } from "@/apis/brandApi";
-import ProductCard from "@/app/Component/user/ProductCard";
+import ProductCard from "@/components/ui/user/ProductCard";
 import { Package, ChevronRight, Star } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");

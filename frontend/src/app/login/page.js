@@ -90,14 +90,38 @@ export default function UserLoginPage() {
     setLoading(true);
     try {
       const endpoint = isLogin ? "/users/login" : "/users/register";
+      
+      // ✅ FIX: Register karte waqt role 'staff' set karna zaroori hai
+      //        taake woh customer na bane aur admin panel access kar sake
       const payload = isLogin
         ? { email, password }
-        : { name, username, phone, email, password };
+        : { 
+            name, 
+            username, 
+            phone, 
+            email, 
+            password,
+            role: "staff" // ✅ Explicitly setting role for new registrations
+          };
 
-      await axiosInstance.post(endpoint, payload);
-      window.location.href = "/";
+      const response = await axiosInstance.post(endpoint, payload);
+      
+      // ✅ ROLE VALIDATION CHECK
+      // Backend se jo response aaya hai usme role check karo
+      const userData = response.data?.user || response.data?.data || {};
+      const userRole = userData.role?.toLowerCase();
+
+      if (userRole !== "admin" && userRole !== "staff") {
+        throw new Error("Access Denied: Only Admin and Staff members are allowed to login.");
+      }
+
+      // Agar role sahi hai to redirect karo
+      window.location.href = "/"; 
+      
     } catch (err) {
-      setError(err.response?.data?.message || `${isLogin ? "Login" : "Registration"} failed.`);
+      // Custom error handling for role restriction
+      const msg = err.response?.data?.message || err.message || `${isLogin ? "Login" : "Registration"} failed.`;
+      setError(msg);
       setLoading(false);
     }
   };
@@ -106,10 +130,19 @@ export default function UserLoginPage() {
     setError("");
     setLoading(true);
     try {
-      await axiosInstance.post("/users/google-login", { credential });
+      const response = await axiosInstance.post("/users/google-login", { credential });
+      
+      // ✅ GOOGLE LOGIN MEIN BHI ROLE CHECK
+      const userData = response.data?.user || response.data?.data || {};
+      const userRole = userData.role?.toLowerCase();
+
+      if (userRole !== "admin" && userRole !== "staff") {
+        throw new Error("Access Denied: Your Google account is not authorized as Staff/Admin.");
+      }
+
       window.location.href = "/";
     } catch (err) {
-      setError(err.response?.data?.message || "Google login failed.");
+      setError(err.response?.data?.message || err.message || "Google login failed.");
       setLoading(false);
     }
   };
@@ -181,17 +214,17 @@ export default function UserLoginPage() {
             <div className="flex items-center gap-2 mb-3 lg:mb-4">
               <ShieldCheck size={16} className="text-[var(--user-accent)] lg:w-[18px] lg:h-[18px]" />
               <span className="text-[var(--user-accent)] text-[10px] lg:text-xs font-bold uppercase tracking-wider">
-                {isLogin ? "User Sign-In" : "Create Account"}
+                {isLogin ? "Staff Sign-In" : "Create Staff Account"}
               </span>
             </div>
 
             <h2 className="text-xl lg:text-2xl font-black text-[var(--user-text)] mb-1">
-              {isLogin ? "Welcome Back" : "Create Account"}
+              {isLogin ? "Welcome Back" : "Join the Team"}
             </h2>
             <p className="text-[var(--user-text-muted)] text-sm mb-5 lg:mb-6">
               {isLogin
-                ? "Continue shopping with your account."
-                : "Create your account in just 30 seconds."}
+                ? "Access your admin dashboard securely."
+                : "Register as a staff member to manage the store."}
             </p>
 
             {/* Error */}
@@ -313,8 +346,8 @@ export default function UserLoginPage() {
                 )}
                 {loading
                   ? isLogin
-                    ? "Logging in..."
-                    : "Creating account..."
+                    ? "Verifying Access..."
+                    : "Creating Account..."
                   : isLogin
                   ? "Login"
                   : "Create Account"}

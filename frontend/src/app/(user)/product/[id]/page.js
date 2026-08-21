@@ -27,8 +27,8 @@ import {
 } from "lucide-react";
 
 import { productApi } from "@/apis/productApi";
-import ProductCard from "@/app/Component/user/ProductCard";
-import { useCart } from "@/app/Component/user/CartContext";
+import ProductCard from "@/components/ui/user/ProductCard";
+import { useCart } from "@/components/ui/user/CartContext";
 
 // ============================================================
 // 2. HELPERS & CONSTANTS

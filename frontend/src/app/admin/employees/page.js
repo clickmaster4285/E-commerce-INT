@@ -4,39 +4,16 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
-  Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Trash2,
-  AlertTriangle,
-  X,
-  Users,
-  Loader2,
-  Power,
-  SortAsc,
-  SortDesc,
-  Eye,
-  EyeOff,
-  ChevronDown,
+  Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2, AlertTriangle, X,
+  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// ✅ Real-time socket hooks aur API import
+import { employeeApi } from "@/apis/employeeApi";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 const ITEMS_PER_PAGE = 20;
-
-// ✅ Sirf wahi departments jo aapke data mein valid hain
-const PREDEFINED_DEPARTMENTS = [
-  "HR",
-  "Manager",
-  "IT",
-  "Finance",
-  "Marketing",
-  "Customer Service",
-];
+const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
 
 // ==========================================
 // DEPARTMENT DROPDOWN COMPONENT
@@ -48,27 +25,14 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
+  useEffect(() => { if (value !== undefined) setInputValue(value || ""); }, [value]);
   useEffect(() => {
-    if (value !== undefined) setInputValue(value || "");
-  }, [value]);
-
-  useEffect(() => {
-    if (!inputValue.trim()) {
-      setFilteredOptions(PREDEFINED_DEPARTMENTS);
-    } else {
-      const lower = inputValue.toLowerCase();
-      setFilteredOptions(
-        PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(lower))
-      );
-    }
+    if (!inputValue.trim()) setFilteredOptions(PREDEFINED_DEPARTMENTS);
+    else setFilteredOptions(PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(inputValue.toLowerCase())));
   }, [inputValue]);
-
-  // Bahar click karne par dropdown band karne ka logic
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
+      if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -136,7 +100,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
             boxShadow: "0 -10px 40px rgba(0,0,0,0.3)",
-            bottom: "100%", // Dropdown upar ki taraf khulega
+            bottom: "100%",
           }}
         >
           {filteredOptions.length === 0 ? (
@@ -165,7 +129,6 @@ function DepartmentDropdown({ value, onChange, disabled }) {
               </button>
             ))
           )}
-          {/* Agar user custom department likhe jo list mein nahi hai */}
           {inputValue.trim() && !PREDEFINED_DEPARTMENTS.includes(inputValue.trim()) && (
             <div
               className="px-3 py-1.5 text-[11px] border-t"
@@ -186,11 +149,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
 export default function EmployeesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  
-  // ✅ Real-time sync hook: Jab dusra user change kare to list auto update ho
-  const { markSelfAction } = useEmployeeSocketSync();
-
-  // Local State
+useEmployeeSocketSync();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -198,18 +157,14 @@ export default function EmployeesPage() {
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Modals State
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
-
-  // Password Visibility State
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Form Data
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -220,7 +175,6 @@ export default function EmployeesPage() {
     confirmPassword: "",
   });
 
-  // Search Debounce Logic
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -229,7 +183,7 @@ export default function EmployeesPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // ✅ Data Fetching via Socket/API (Real-time capable)
+  // ✅ FIX: employeeApi.getAll use karein instead of employeeSocketApi.getAll
   const {
     data: employees = [],
     isLoading,
@@ -238,47 +192,52 @@ export default function EmployeesPage() {
     refetch,
   } = useQuery({
     queryKey: ["employees"],
-    queryFn: employeeSocketApi.getAll,
-    staleTime: 30000, 
+    queryFn: employeeApi.getAll, // ✅ Direct HTTP API - fresh data
+staleTime: 60 * 1000,
     retry: 2,
   });
 
-  // Sirf Staff members ko filter karna (Admins ko yahan nahi dikhana)
-  const staffEmployees = useMemo(
-    () => employees.filter((emp) => emp.role === "staff"),
-    [employees]
-  );
-
-  // --- MUTATIONS (Create, Update, Delete) ---
+  const staffEmployees = useMemo(() => {
+    return employees.filter((emp) => {
+      const role = emp.userId?.role || emp.role;
+      return role === "staff" || !emp.userId;
+    });
+  }, [employees]);
 
   const createMutation = useMutation({
-    mutationFn: employeeSocketApi.create,
-    onSuccess: () => {
-      markSelfAction(); // Khud ki action ko sync ignore karne ke liye mark karein
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee created successfully");
-      closeModal();
-    },
+  mutationFn: employeeSocketApi.create,
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["employees"],
+    });
+
+    toast.success("Employee created successfully");
+    closeModal();
+  },
     onError: (err) => toast.error(err.message || "Creation failed"),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: employeeSocketApi.update,
-    onSuccess: () => {
-      markSelfAction();
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee updated successfully");
-      closeModal();
-    },
+const updateMutation = useMutation({
+  mutationFn: employeeSocketApi.update,
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["employees"],
+    });
+
+    toast.success("Employee updated successfully");
+    closeModal();
+  },
     onError: (err) => toast.error(err.message || "Update failed"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: employeeSocketApi.delete,
-    onSuccess: () => {
-      markSelfAction();
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee deleted");
+onSuccess: async () => {
+  await queryClient.invalidateQueries({
+    queryKey: ["employees"],
+  });
+
+  toast.success("Employee deleted");
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
       setSelectedIds([]);
@@ -288,28 +247,45 @@ export default function EmployeesPage() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
-    onSuccess: () => {
-      markSelfAction();
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success(`${selectedIds.length} employees deleted`);
+   onSuccess: async () => {
+  await queryClient.invalidateQueries({
+    queryKey: ["employees"],
+  });
+
+  toast.success(`${selectedIds.length} employees deleted`);
       setSelectedIds([]);
       setShowBulkDeleteModal(false);
     },
     onError: (err) => toast.error(err.message || "Bulk delete failed"),
   });
 
-  const toggleStatusMutation = useMutation({
-    mutationFn: employeeSocketApi.toggleStatus,
-    onSuccess: () => {
-      markSelfAction();
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Status updated");
-    },
-    onError: (err) => toast.error(err.message || "Status update failed"),
-  });
+  // ✅ BULLETPROOF TOGGLE STATUS MUTATION
+const toggleStatusMutation = useMutation({
+  mutationFn: employeeSocketApi.toggleStatus,
 
-  // --- HELPER FUNCTIONS ---
+  onSuccess: async (updatedEmployee) => {
+    queryClient.setQueryData(["employees"], (oldData) => {
+      if (!Array.isArray(oldData)) return oldData;
 
+      return oldData.map((emp) =>
+        emp._id === updatedEmployee._id
+          ? updatedEmployee
+          : emp
+      );
+    });
+
+    await queryClient.invalidateQueries({
+      queryKey: ["employees"],
+    });
+
+    toast.success("Status updated successfully");
+  },
+
+  onError: (err) => {
+    console.error("❌ Toggle Status Error:", err);
+    toast.error(err.message || "Status update failed");
+  },
+});
   const closeModal = () => {
     setShowModal(false);
     setEditingEmployee(null);
@@ -345,11 +321,11 @@ export default function EmployeesPage() {
   const openEditModal = (emp) => {
     setEditingEmployee(emp);
     setFormData({
-      name: emp.name,
-      email: emp.email,
-      phone: emp.phone || "",
+      name: emp.userId?.name || emp.name || "",
+      email: emp.userId?.email || emp.email || "",
+      phone: emp.userId?.phone || emp.phone || "",
       department: emp.department || "",
-      status: emp.status,
+      status: emp.userId?.status || emp.status || "active",
       password: "",
       confirmPassword: "",
     });
@@ -364,7 +340,6 @@ export default function EmployeesPage() {
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!formData.department.trim()) return toast.error("Department is required");
 
-    // Validation sirf naye employee ke liye
     if (!editingEmployee) {
       if (!formData.password) return toast.error("Password is required");
       if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
@@ -383,7 +358,6 @@ export default function EmployeesPage() {
       password: formData.password,
     };
     
-    // Edit karte waqt agar password khali hai to usay payload se nikaal dein
     if (!payload.password) delete payload.password;
 
     if (editingEmployee) {
@@ -394,6 +368,7 @@ export default function EmployeesPage() {
   };
 
   const handleToggleStatus = (employee) => {
+    console.log("🔄 Clicked toggle for Employee ID:", employee._id, "Current Status:", employee.userId?.status || employee.status);
     toggleStatusMutation.mutate(employee._id);
   };
 
@@ -422,20 +397,23 @@ export default function EmployeesPage() {
     );
   };
 
-  // Filtering, Sorting aur Pagination Logic
   const filteredEmployees = useMemo(() => {
     let result = staffEmployees.filter((emp) => {
+      const name = emp.userId?.name || emp.name || "";
+      const email = emp.userId?.email || emp.email || "";
+      const status = emp.userId?.status || emp.status || "active";
+      
       const matchSearch =
-        emp.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        emp.email?.toLowerCase().includes(debouncedSearch.toLowerCase());
-      const matchStatus = filterStatus === "all" || emp.status === filterStatus;
+        name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        email.toLowerCase().includes(debouncedSearch.toLowerCase());
+      const matchStatus = filterStatus === "all" || status === filterStatus;
       return matchSearch && matchStatus;
     });
 
     if (sortConfig.key) {
       result.sort((a, b) => {
-        let va = a[sortConfig.key] || "";
-        let vb = b[sortConfig.key] || "";
+        let va = a[sortConfig.key] || (a.userId ? a.userId[sortConfig.key] : "") || "";
+        let vb = b[sortConfig.key] || (b.userId ? b.userId[sortConfig.key] : "") || "";
         if (typeof va === "string") va = va.toLowerCase();
         if (typeof vb === "string") vb = vb.toLowerCase();
         if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
@@ -475,7 +453,6 @@ export default function EmployeesPage() {
     );
   };
 
-  // Common Styles
   const cardStyle = {
     backgroundColor: "var(--bg-card)",
     border: "1px solid var(--border-color)",
@@ -489,7 +466,6 @@ export default function EmployeesPage() {
   };
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
-  // --- LOADING STATE ---
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -506,7 +482,6 @@ export default function EmployeesPage() {
     );
   }
 
-  // --- ERROR STATE ---
   if (isError) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
@@ -530,7 +505,6 @@ export default function EmployeesPage() {
   return (
     <div className="w-full min-h-screen space-y-6" style={{ color: "var(--text-primary)" }}>
       
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight">Employee Management</h1>
@@ -547,7 +521,7 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Stats Cards */}
+      {/* ✅ SMART STATS */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="rounded-xl px-3 py-2" style={cardStyle}>
           <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
@@ -560,7 +534,7 @@ export default function EmployeesPage() {
             Active
           </p>
           <p className="text-[20px] font-bold mt-0.5" style={{ color: "#34d399" }}>
-            {staffEmployees.filter((e) => e.status === "active").length}
+            {staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length}
           </p>
         </div>
         <div className="rounded-xl px-3 py-2" style={cardStyle}>
@@ -568,12 +542,11 @@ export default function EmployeesPage() {
             Inactive
           </p>
           <p className="text-[20px] font-bold mt-0.5" style={{ color: "#f87171" }}>
-            {staffEmployees.filter((e) => e.status === "inactive").length}
+            {staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length}
           </p>
         </div>
       </div>
 
-      {/* Bulk Action Bar (Sirf tab dikhega jab selection ho) */}
       {selectedIds.length > 0 && (
         <div
           className="flex items-center justify-between rounded-xl px-4 h-11"
@@ -606,13 +579,9 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {/* Search & Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
-          <span
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
             <Search className="w-4 h-4" />
           </span>
           <input
@@ -639,16 +608,10 @@ export default function EmployeesPage() {
         </select>
       </div>
 
-      {/* Main Data Table */}
       <div className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
-            <thead
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                borderBottom: "1px solid var(--border-color)",
-              }}
-            >
+            <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
               <tr>
                 <th className="px-4 py-3 w-10">
                   <input
@@ -659,32 +622,16 @@ export default function EmployeesPage() {
                     style={{ accentColor: "var(--accent)" }}
                   />
                 </th>
-                <th
-                  className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleSort("name")}
-                >
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("name")}>
                   Employee {getSortIcon("name")}
                 </th>
-                <th
-                  className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleSort("email")}
-                >
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("email")}>
                   Email {getSortIcon("email")}
                 </th>
-                <th
-                  className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleSort("department")}
-                >
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("department")}>
                   Department {getSortIcon("department")}
                 </th>
-                <th
-                  className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleSort("status")}
-                >
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("status")}>
                   Status {getSortIcon("status")}
                 </th>
                 <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
@@ -703,6 +650,11 @@ export default function EmployeesPage() {
               ) : (
                 paginatedEmployees.map((emp) => {
                   const isSelected = selectedIds.includes(emp._id);
+                  const empName = emp.userId?.name || emp.name || "Unknown";
+                  const empEmail = emp.userId?.email || emp.email || "N/A";
+                  const empStatus = emp.userId?.status || emp.status || "active";
+                  const empAvatar = emp.userId?.avatar;
+
                   return (
                     <tr
                       key={emp._id}
@@ -712,7 +664,6 @@ export default function EmployeesPage() {
                         backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)",
                       }}
                       onClick={(e) => {
-                        // Checkbox ya button par click par row navigate na ho
                         if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
                         router.push(`/admin/employees/${emp._id}`);
                       }}
@@ -720,9 +671,7 @@ export default function EmployeesPage() {
                         if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = isSelected
-                          ? "var(--bg-tertiary)"
-                          : "var(--bg-card)";
+                        e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)";
                       }}
                     >
                       <td className="px-4 py-2.5">
@@ -736,31 +685,28 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {emp.avatar ? (
+                          {empAvatar ? (
                             <img
-                              src={emp.avatar}
-                              alt={emp.name}
+                              src={empAvatar}
+                              alt={empName}
                               className="h-8 w-8 rounded-full object-cover shrink-0 border"
                               style={{ borderColor: "var(--border-color)" }}
                             />
                           ) : (
                             <div
                               className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                              style={{
-                                backgroundColor: "rgba(16,185,129,0.12)",
-                                color: "#34d399",
-                              }}
+                              style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399" }}
                             >
-                              {emp.name?.charAt(0).toUpperCase()}
+                              {empName?.charAt(0).toUpperCase()}
                             </div>
                           )}
                           <span className="font-medium text-[13px] truncate max-w-[140px]">
-                            {emp.name}
+                            {empName}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        {emp.email}
+                        {empEmail}
                       </td>
                       <td className="px-4 py-2.5">
                         <span
@@ -778,35 +724,17 @@ export default function EmployeesPage() {
                          <span
                           className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide"
                           style={
-                            emp.status === "active"
-                              ? {
-                                  backgroundColor: "rgba(16,185,129,0.1)",
-                                  color: "#34d399",
-                                  border: "1px solid rgba(16,185,129,0.3)",
-                                }
-                              : {
-                                  backgroundColor: "rgba(239,68,68,0.1)",
-                                  color: "#f87171",
-                                  border: "1px solid rgba(239,68,68,0.3)",
-                                }
+                            empStatus === "active"
+                              ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
+                              : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }
                           }
                         >
-                          {emp.status === "active" ? "Active" : "Inactive"}
+                          {empStatus === "active" ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleToggleStatus(emp)}
-                            disabled={toggleStatusMutation.isPending}
-                            className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center disabled:opacity-50"
-                            style={{
-                              color: emp.status === "active" ? "#f87171" : "#34d399",
-                            }}
-                            title={emp.status === "active" ? "Deactivate" : "Activate"}
-                          >
-                            <Power className="w-4 h-4" />
-                          </button>
+                          {/* REMOVED: Active/Inactive Toggle Button */}
 
                           <button
                             onClick={(e) => {
@@ -850,12 +778,8 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Pagination Controls */}
       {filteredEmployees.length > ITEMS_PER_PAGE && (
-        <div
-          className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl p-4"
-          style={cardStyle}
-        >
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
             {Math.min(currentPage * ITEMS_PER_PAGE, filteredEmployees.length)} of {filteredEmployees.length}{" "}
@@ -866,10 +790,7 @@ export default function EmployeesPage() {
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                border: "1px solid var(--border-color)",
-              }}
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -880,10 +801,7 @@ export default function EmployeesPage() {
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                border: "1px solid var(--border-color)",
-              }}
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -894,31 +812,15 @@ export default function EmployeesPage() {
       {/* ===== ADD/EDIT MODAL ===== */}
       {showModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div
-            className="w-full max-w-lg rounded-xl shadow-xl max-h-[95vh] flex flex-col"
-            style={cardStyle}
-          >
-            <div
-              className="px-5 py-4 flex items-center justify-between rounded-t-xl shrink-0"
-              style={{
-                borderBottom: "1px solid var(--border-color)",
-                backgroundColor: "var(--bg-card)",
-              }}
-            >
+          <div className="w-full max-w-lg rounded-xl shadow-xl max-h-[95vh] flex flex-col" style={cardStyle}>
+            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <div>
-                <h3 className="text-base font-semibold">
-                  {editingEmployee ? "Edit Employee" : "Add New Employee"}
-                </h3>
+                <h3 className="text-base font-semibold">{editingEmployee ? "Edit Employee" : "Add New Employee"}</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                   {editingEmployee ? "Update employee details" : "Create a new team member"}
                 </p>
               </div>
-              <button
-                onClick={closeModal}
-                disabled={isSubmitting}
-                className="p-1 rounded transition disabled:opacity-50 hover:opacity-70"
-                style={{ color: "var(--text-muted)" }}
-              >
+              <button onClick={closeModal} disabled={isSubmitting} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -926,103 +828,36 @@ export default function EmployeesPage() {
             <form onSubmit={handleSubmit} className="p-5 space-y-3 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    disabled={isSubmitting}
-                    className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50"
-                    style={inputStyle}
-                    placeholder="John Doe"
-                  />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Full Name *</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                    disabled={isSubmitting}
-                    className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50"
-                    style={inputStyle}
-                    placeholder="john@example.com"
-                  />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                  Phone (optional)
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  disabled={isSubmitting}
-                  className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50"
-                  style={inputStyle}
-                  placeholder="+92 300 1234567"
-                />
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone (optional)</label>
+                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
               </div>
 
-              {/* Password Fields (Sirf Add karte waqt zaroori hain) */}
               {!editingEmployee && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                      Password *
-                    </label>
+                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password *</label>
                     <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required
-                        disabled={isSubmitting}
-                        className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50"
-                        style={inputStyle}
-                        placeholder="Min 6 chars"
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                        style={{ color: "var(--text-muted)" }}
-                      >
+                      <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="Min 6 chars" minLength={6} />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                         {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                      Confirm Password *
-                    </label>
+                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password *</label>
                     <div className="relative">
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={formData.confirmPassword}
-                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        required
-                        disabled={isSubmitting}
-                        className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50"
-                        style={inputStyle}
-                        placeholder="Confirm"
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                        style={{ color: "var(--text-muted)" }}
-                      >
+                      <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="Confirm" minLength={6} />
+                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                         {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
@@ -1032,59 +867,22 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    disabled={isSubmitting}
-                    className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50"
-                    style={inputStyle}
-                  >
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Status</label>
+                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle}>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
-                    Department *
-                  </label>
-                  <DepartmentDropdown
-                    value={formData.department}
-                    onChange={(val) => setFormData({ ...formData, department: val })}
-                    disabled={isSubmitting}
-                  />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Department *</label>
+                  <DepartmentDropdown value={formData.department} onChange={(val) => setFormData({ ...formData, department: val })} disabled={isSubmitting} />
                 </div>
               </div>
 
               <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSubmitting}
-                  className="flex-1 h-8 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    border: "1px solid var(--border-color)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 h-8 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
-                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                  ) : editingEmployee ? (
-                    "Update Employee"
-                  ) : (
-                    "Create Employee"
-                  )}
+                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-8 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 h-8 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : editingEmployee ? "Update Employee" : "Create Employee"}
                 </button>
               </div>
             </form>
@@ -1103,15 +901,12 @@ export default function EmployeesPage() {
               {`@keyframes modalScaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}`}
             </style>
             <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(239,68,68,0.1)" }}
-              >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">
-                  Delete "{employeeToDelete.name}"?
+                  Delete "{employeeToDelete.userId?.name || employeeToDelete.name}"?
                 </h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   This action cannot be undone. All employee data will be permanently removed.
@@ -1159,10 +954,7 @@ export default function EmployeesPage() {
             style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}
           >
             <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(239,68,68,0.1)" }}
-              >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">

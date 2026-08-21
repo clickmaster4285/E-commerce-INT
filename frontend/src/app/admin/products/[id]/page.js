@@ -7,13 +7,15 @@ import { useSocket } from "@/hooks/useSocket";
 import {
   Package, Layers3, Box, TrendingUp, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
-  Sparkles, AlertTriangle, DollarSign, FolderOpen, Store, Hash,
+  Sparkles, AlertTriangle, DollarSign, FolderOpen, Store, Hash, Tag as TagIcon,
+  Edit3, Save
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { variantApi } from "@/apis/variantApi";
+import { tagApi } from "@/apis/tagApi";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -43,6 +45,7 @@ const createEmptyVariant = (sku = "") => ({
   cost_price: "", selling_price: "", quantity: "0", min_qnt: "0", max_qnt: "0",
   attributes: [{ name: "Color", value: "Black", isCustom: false }],
   images: [],
+  tags: [],
 });
 
 function Ico(props) {
@@ -83,8 +86,10 @@ function InfoRow({ label, value, mono, green }) {
 
 function SecTitle({ children }) {
   return (
-    <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
-      style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>{children}</div>
+    <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+      style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+      {children}
+    </div>
   );
 }
 
@@ -183,129 +188,6 @@ function StatusPill({ active }) {
   );
 }
 
-// ==========================================
-// ✅ VARIANT CARD - PROFESSIONAL EDIT BUTTON
-// ==========================================
-function VariantCardCompact({ variant, number, productId }) {
-  const router = useRouter();
-  const attributes = Object.entries(variant.attributes || {});
-  const isLowStock = Number(variant.quantity) <= Number(variant.min_qnt);
-  const [editHov, setEditHov] = useState(false);
-
-  return (
-    <div className="rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
-        borderRadius: "12px",
-        boxShadow: editHov ? "0 0 20px rgba(52,211,153,0.08)" : "none",
-      }}>
-      {/* Card Top Bar */}
-      <div className="px-4 py-3 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--border-color)" }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: "rgba(52,211,153,0.1)" }}>
-            <Package className="w-4 h-4" style={{ color: "#34d399" }} />
-          </div>
-          <div>
-            <p className="text-[12px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
-              {variant.title || `Variant ${number}`}
-            </p>
-            <p className="text-[10px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{variant.sku}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-[14px] font-bold" style={{ color: "#34d399" }}>
-              Rs. {Number(variant.selling_price || 0).toLocaleString()}
-            </p>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{variant.quantity || 0} units</p>
-          </div>
-          {/* ✅ PROFESSIONAL EDIT BUTTON */}
-          <button type="button" title="Edit this variant"
-            onMouseEnter={() => setEditHov(true)} onMouseLeave={() => setEditHov(false)}
-            onClick={() => router.push(`/admin/products/${productId}/add-variant?edit=${variant._id}`)}
-            className="h-7 px-2.5 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer"
-            style={{
-              backgroundColor: editHov ? "#34d399" : "rgba(52,211,153,0.1)",
-              color: editHov ? "#fff" : "#34d399",
-              border: editHov ? "1px solid #34d399" : "1px solid rgba(52,211,153,0.3)",
-            }}>
-            <Pencil className="w-3 h-3" />
-            Edit
-          </button>
-        </div>
-      </div>
-
-      {/* Card Body */}
-      <div className="p-4 space-y-3">
-        {/* Cost & Stock Row */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-            <p className="text-[9px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "var(--text-muted)" }}>Cost Price</p>
-            <p className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-              Rs. {Number(variant.cost_price || 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-            <p className="text-[9px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "var(--text-muted)" }}>Stock</p>
-            <p className="text-[13px] font-bold" style={{ color: isLowStock ? "#f87171" : "var(--text-primary)" }}>
-              {variant.quantity || 0}
-              {isLowStock && <span className="text-[9px] ml-1 font-normal" style={{ color: "#f87171" }}>(Low)</span>}
-            </p>
-          </div>
-        </div>
-
-        {/* Attributes */}
-        {attributes.length > 0 && (
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>Attributes</p>
-            <div className="flex flex-wrap gap-1.5">
-              {attributes.slice(0, 4).map(([name, value]) => (
-                <span key={name}
-                  className="px-2 py-1 rounded-md text-[10px] font-medium"
-                  style={{
-                    backgroundColor: "rgba(52,211,153,0.06)",
-                    color: "var(--text-secondary)",
-                    border: "1px solid var(--border-color)",
-                  }}>
-                  <span style={{ color: "var(--text-muted)" }}>{name}:</span> {String(value).slice(0, 12)}
-                </span>
-              ))}
-              {attributes.length > 4 && (
-                <span className="px-2 py-1 rounded-md text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
-                  +{attributes.length - 4} more
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Images */}
-        {variant.images?.length > 0 && (
-          <div className="flex gap-1.5 pt-1">
-            {variant.images.slice(0, 4).map((image, index) => (
-              <img key={index} src={getImageUrl(image.img_url)} alt=""
-                className="w-10 h-10 rounded-lg object-cover"
-                style={{ border: "1px solid var(--border-color)" }} />
-            ))}
-            {variant.images.length > 4 && (
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-[9px] font-bold"
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
-                +{variant.images.length - 4}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// MAIN PAGE
-// ==========================================
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -328,21 +210,76 @@ export default function ProductDetailPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [expandedVariant, setExpandedVariant] = useState(0);
+  
   const [formData, setFormData] = useState({
-    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active",
+    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [],
     variants: [createEmptyVariant()],
   });
+  const [tagInput, setTagInput] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateTagModal, setShowCreateTagModal] = useState(false);
+  const [newTagModalValue, setNewTagModalValue] = useState("");
+  const [editingVariantForTags, setEditingVariantForTags] = useState(null);
+  const [showVariantTagsModal, setShowVariantTagsModal] = useState(false);
+  const [variantTagInput, setVariantTagInput] = useState("");
 
-  const { data: product, isLoading, isError } = useQuery({
+  const [newGlobalTag, setNewGlobalTag] = useState("");
+  const [editingGlobalTagId, setEditingGlobalTagId] = useState(null);
+  const [editingGlobalTagName, setEditingGlobalTagName] = useState("");
+
+  const { data: product, isLoading, isError, refetch: refetchProduct } = useQuery({
     queryKey: ["product", id], queryFn: () => productApi.getById(id), enabled: !!id,
   });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll });
 
+  const { data: globalTags = [], refetch: refetchTags } = useQuery({
+    queryKey: ["globalTags"],
+    queryFn: tagApi.getAll,
+  });
+
+  const createTagMutation = useMutation({
+    mutationFn: tagApi.create,
+    onSuccess: () => { refetchTags(); setNewGlobalTag(""); setNewTagModalValue(""); toast.success("Tag created successfully"); },
+    onError: (err) => toast.error(err.response?.data?.message || "Failed to create tag"),
+  });
+
+  const updateTagMutation = useMutation({
+    mutationFn: ({ id, data }) => tagApi.update(id, data),
+    onSuccess: () => { refetchTags(); setEditingGlobalTagId(null); toast.success("Tag updated successfully"); },
+    onError: (err) => toast.error(err.response?.data?.message || "Failed to update tag"),
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: tagApi.delete,
+    onSuccess: () => { refetchTags(); toast.success("Tag deleted successfully"); },
+    onError: (err) => toast.error(err.response?.data?.message || "Failed to delete tag"),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => productApi.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["product", id] }); toast.success("Product updated successfully"); closeProductModal(); },
+    onSuccess: async () => { 
+      toast.success("Product updated successfully"); 
+      await refetchProduct();
+      queryClient.invalidateQueries({ queryKey: ["product", id] });
+      
+      // Refresh modal data with fresh product data
+      if (showVariantTagsModal && editingVariantForTags) {
+        setTimeout(() => {
+          const freshProduct = queryClient.getQueryData(["product", id]);
+          if (freshProduct) {
+            const updatedVariant = freshProduct.variants?.find(v => String(v._id) === String(editingVariantForTags._id));
+            if (updatedVariant) {
+              setEditingVariantForTags({ ...updatedVariant, tags: updatedVariant.tags || [] });
+            }
+          }
+        }, 300);
+      }
+      
+      if (showModal) {
+        closeProductModal();
+      }
+    },
     onError: (error) => { toast.error(error.response?.data?.message || "Product update failed"); },
   });
 
@@ -363,13 +300,21 @@ export default function ProductDetailPage() {
           quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
           attributes: Object.entries(v.attributes || {}).map(([name, value]) => ({ name, value: String(value), isCustom: false })),
           images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img.img_url) })),
+          tags: v.tags || [],
         }))
       : [createEmptyVariant()];
+      
+    const currentTagNames = (prod.tag_ids || [])
+      .map(t => typeof t === 'object' ? t.name : t)
+      .filter(Boolean);
+
     return {
       category_id: prod.category_id?._id || prod.category_id || "",
       brand_id: prod.brand_id?._id || prod.brand_id || "",
       name: prod.name || "", description: prod.description || "",
-      tax: String(prod.tax ?? 0), status: prod.status || "active", variants,
+      tax: String(prod.tax ?? 0), status: prod.status || "active", 
+      tag_names: currentTagNames,
+      variants,
     };
   };
 
@@ -379,10 +324,10 @@ export default function ProductDetailPage() {
     setEditingProduct(product);
     setCurrentStep(1);
     setExpandedVariant(0);
+    setTagInput("");
     setShowModal(true);
   };
 
-  // ✅ ADD VARIANT → Separate page redirect
   const handleAddVariantFromTab = () => {
     if (!product) return;
     router.push(`/admin/products/${id}/add-variant`);
@@ -393,6 +338,7 @@ export default function ProductDetailPage() {
       v.images.forEach((img) => { if (img.preview?.startsWith("blob:")) URL.revokeObjectURL(img.preview); });
     });
     setShowModal(false); setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
+    setTagInput("");
   };
 
   const addVariant = async () => {
@@ -408,7 +354,7 @@ export default function ProductDetailPage() {
     try {
       const result = await variantApi.getNextSku();
       const old = formData.variants[index];
-      const copy = { ...old, _id: null, sku: result.sku, attributes: old.attributes.map(i => ({...i})), images: [] };
+      const copy = { ...old, _id: null, sku: result.sku, attributes: old.attributes.map(i => ({...i})), images: [], tags: [...old.tags] };
       setFormData((prev) => { const v = [...prev.variants]; v.splice(index+1, 0, copy); return {...prev, variants: v}; });
       setExpandedVariant(index + 1);
     } catch { toast.error("Unable to generate SKU"); }
@@ -433,6 +379,66 @@ export default function ProductDetailPage() {
 
   const removeAttribute = (vi, ai) => {
     setFormData((prev) => { const v = [...prev.variants]; v[vi] = {...v[vi], attributes: v[vi].attributes.filter((_,i) => i !== ai)}; return {...prev, variants: v}; });
+  };
+
+  const addVariantTag = (vi, e) => {
+    e?.preventDefault();
+    const val = formData.variants[vi].tagInput?.trim().toLowerCase();
+    if (!val) return;
+    if (formData.variants[vi].tags.includes(val)) {
+      toast.info("Tag already added to this variant");
+      return;
+    }
+    setFormData((prev) => {
+      const v = [...prev.variants];
+      v[vi] = { ...v[vi], tags: [...v[vi].tags, val], tagInput: "" };
+      return { ...prev, variants: v };
+    });
+  };
+
+  const removeVariantTag = (vi, tagName) => {
+    setFormData((prev) => {
+      const v = [...prev.variants];
+      v[vi] = { ...v[vi], tags: v[vi].tags.filter(t => t !== tagName) };
+      return { ...prev, variants: v };
+    });
+  };
+
+  const updateVariantTagInput = (vi, value) => {
+    setFormData((prev) => {
+      const v = [...prev.variants];
+      v[vi] = { ...v[vi], tagInput: value };
+      return { ...prev, variants: v };
+    });
+  };
+
+  const handleCreateGlobalTag = () => {
+    if (!newGlobalTag.trim()) return;
+    createTagMutation.mutate({ name: newGlobalTag.trim() });
+  };
+
+  const handleCreateTagFromModal = () => {
+    if (!newTagModalValue.trim()) return;
+    createTagMutation.mutate({ name: newTagModalValue.trim() }, {
+      onSuccess: () => {
+        setShowCreateTagModal(false);
+        setNewTagModalValue("");
+      }
+    });
+  };
+
+  const startEditGlobalTag = (tag) => {
+    setEditingGlobalTagId(tag._id);
+    setEditingGlobalTagName(tag.name);
+  };
+
+  const saveEditGlobalTag = (tagId) => {
+    if (!editingGlobalTagName.trim()) return;
+    updateTagMutation.mutate({ id: tagId, data: { name: editingGlobalTagName } });
+  };
+
+  const deleteGlobalTag = (tagId) => {
+    deleteTagMutation.mutate(tagId);
   };
 
   const compressProductImage = (file) => new Promise((resolve) => {
@@ -504,6 +510,9 @@ export default function ProductDetailPage() {
     data.append("description", formData.description);
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
+    
+    data.append("tag_names", JSON.stringify(formData.tag_names || []));
+    
     const imageVariantIndexes = [];
     const variants = formData.variants.map((v, idx) => {
       const attributes = {};
@@ -520,11 +529,70 @@ export default function ProductDetailPage() {
         cost_price: Number(v.cost_price||0), selling_price: Number(v.selling_price||0),
         quantity: Number(v.quantity||0), min_qnt: Number(v.min_qnt||0), max_qnt: Number(v.max_qnt||0),
         attributes, existing_images: existingImages,
+        tags: v.tags || [],
       };
     });
     data.append("variants", JSON.stringify(variants));
     data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
     if (editingProduct) updateMutation.mutate({ id: editingProduct._id, data });
+  };
+
+  const addTag = (e) => {
+    e?.preventDefault();
+    const val = tagInput.trim().toLowerCase();
+    if (!val) return;
+    if (formData.tag_names.includes(val)) {
+      toast.info("Tag already added");
+      setTagInput("");
+      return;
+    }
+    setFormData(prev => ({ ...prev, tag_names: [...prev.tag_names, val] }));
+    setTagInput("");
+  };
+
+  const removeTag = (tagName) => {
+    setFormData(prev => ({ ...prev, tag_names: prev.tag_names.filter(t => t !== tagName) }));
+  };
+
+  // ✅ FIXED: Update local state immediately so modal shows tags right away
+  const handleAddVariantTag = () => {
+    const val = variantTagInput.trim().toLowerCase();
+    if (!val) return;
+    const currentTags = editingVariantForTags?.tags || [];
+    if (currentTags.includes(val)) {
+      toast.info("Tag already added");
+      setVariantTagInput("");
+      return;
+    }
+    
+    // ✅ Update local state immediately
+    const newTags = [...currentTags, val];
+    setEditingVariantForTags({ ...editingVariantForTags, tags: newTags });
+    
+    const updatedVariants = product.variants.map(v => 
+      String(v._id) === String(editingVariantForTags._id)
+        ? { ...v, tags: newTags }
+        : v
+    );
+    const data = new FormData();
+    data.append("variants", JSON.stringify(updatedVariants));
+    updateMutation.mutate({ id: product._id, data });
+    setVariantTagInput("");
+  };
+
+  // ✅ FIXED: Update local state immediately when removing tag
+  const handleRemoveVariantTag = (tagToRemove) => {
+    const newTags = (editingVariantForTags?.tags || []).filter(t => t !== tagToRemove);
+    setEditingVariantForTags({ ...editingVariantForTags, tags: newTags });
+    
+    const updatedVariants = product.variants.map(v => 
+      String(v._id) === String(editingVariantForTags._id)
+        ? { ...v, tags: newTags }
+        : v
+    );
+    const data = new FormData();
+    data.append("variants", JSON.stringify(updatedVariants));
+    updateMutation.mutate({ id: product._id, data });
   };
 
   if (isLoading) return (
@@ -560,9 +628,12 @@ export default function ProductDetailPage() {
   const cs = { backgroundColor: "var(--bg-card)", borderRadius: "12px" };
   const is_ = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)", borderRadius: "8px" };
 
+  const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
+
   const tabList = [
     { id: "overview", label: "Overview" },
     { id: "variants", label: "Variants", badge: totalVariants > 0 ? String(totalVariants) : null },
+    { id: "tags", label: "Tags", badge: displayTagNames.length > 0 ? String(displayTagNames.length) : null },
     { id: "category", label: "Category" },
     { id: "brand", label: "Brand" },
     { id: "activity", label: "Activity", badge: wasUp ? "2" : "1" },
@@ -640,6 +711,22 @@ export default function ProductDetailPage() {
                     <InfoRow label="Status" value={product.status === "active" ? "Active" : "Inactive"} green={product.status === "active"} />
                     <InfoRow label="Tax Rate" value={`${product.tax || 0}%`} />
                     <InfoRow label="Price Range" value={priceRange} />
+                    
+                    <div className="py-2.5">
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Tags</span>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 justify-end">
+                        {displayTagNames.length > 0 ? (
+                          displayTagNames.map(tag => (
+                            <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium" 
+                              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No tags</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </InnerCard>
                 <InnerCard className="flex flex-col">
@@ -673,6 +760,79 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   </div>
+                </InnerCard>
+              </div>
+            )}
+
+            {/* TAGS TAB */}
+            {activeTab === "tags" && (
+              <div className="space-y-4">
+                <InnerCard>
+                  <SecTitle>Global Tags</SecTitle>
+                  <div className="flex justify-end">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowCreateTagModal(true)}
+                      className="h-9 px-4 rounded-lg text-[12px] font-medium inline-flex items-center gap-1"
+                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)", border: "none", cursor: "pointer" }}>
+                      <Plus className="w-3.5 h-3.5" /> Create Tag
+                    </button>
+                  </div>
+                </InnerCard>
+
+                <InnerCard>
+                  <SecTitle>Assigned Tags ({globalTags.length})</SecTitle>
+                  {globalTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {globalTags.map((tag) => (
+                        <div key={tag._id} className="flex items-center gap-2 px-3 py-2 rounded-lg group" 
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                          
+                          {editingGlobalTagId === tag._id ? (
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="text" 
+                                value={editingGlobalTagName}
+                                onChange={(e) => setEditingGlobalTagName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && saveEditGlobalTag(tag._id)}
+                                autoFocus
+                                className="h-6 px-2 rounded text-[11px] w-32 outline-none"
+                                style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--accent)", color: "var(--text-primary)" }}
+                              />
+                              <button onClick={() => saveEditGlobalTag(tag._id)} disabled={updateTagMutation.isPending} className="p-1 rounded hover:bg-green-500/20 text-green-500">
+                                <Save className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => setEditingGlobalTagId(null)} className="p-1 rounded hover:bg-red-500/20 text-red-500">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <TagIcon className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                              <span className="text-[12px] font-medium capitalize">{tag.name}</span>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                <button onClick={() => startEditGlobalTag(tag)} 
+                                  className="p-1 rounded hover:bg-blue-500/20 text-blue-400 transition-colors" title="Edit">
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
+                                <button onClick={() => deleteGlobalTag(tag._id)} disabled={deleteTagMutation.isPending}
+                                  className="p-1 rounded hover:bg-red-500/20 text-red-400 transition-colors" title="Delete">
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ border: "1px dashed var(--border-color)" }}>
+                        <TagIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+                      </div>
+                      <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>No tags assigned yet</p>
+                    </div>
+                  )}
                 </InnerCard>
               </div>
             )}
@@ -726,14 +886,95 @@ export default function ProductDetailPage() {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {variants.map((variant, index) => (
-                      <VariantCardCompact key={variant._id} variant={variant} number={index + 1} productId={id} />
+                      <div key={variant._id || index} className="rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg"
+                        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "12px" }}>
+                        
+                        {/* Variant Header */}
+                        <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(52,211,153,0.1)" }}>
+                              <Package className="w-4 h-4" style={{ color: "#34d399" }} />
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
+                                {variant.title || `Variant ${index + 1}`}
+                              </p>
+                              <p className="text-[10px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{variant.sku}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[14px] font-bold" style={{ color: "#34d399" }}>
+                              Rs. {Number(variant.selling_price || 0).toLocaleString()}
+                            </p>
+                            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{variant.quantity || 0} units</p>
+                          </div>
+                        </div>
+
+                        {/* Variant Body */}
+                        <div className="p-4 space-y-3">
+                           {/* Cost & Stock */}
+                           <div className="grid grid-cols-2 gap-2">
+                              <div className="p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                                <p className="text-[9px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "var(--text-muted)" }}>Cost Price</p>
+                                <p className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Rs. {Number(variant.cost_price || 0).toLocaleString()}</p>
+                              </div>
+                              <div className="p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                                <p className="text-[9px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "var(--text-muted)" }}>Stock</p>
+                                <p className="text-[13px] font-bold" style={{ color: Number(variant.quantity) <= Number(variant.min_qnt) ? "#f87171" : "var(--text-primary)" }}>
+                                  {variant.quantity || 0} {Number(variant.quantity) <= Number(variant.min_qnt) && <span className="text-[9px] ml-1 font-normal text-red-500">(Low)</span>}
+                                </p>
+                              </div>
+                           </div>
+
+                           {/* ✅ VARIANT TAGS DISPLAY */}
+                           {variant.tags && variant.tags.length > 0 && (
+                             <div>
+                               <p className="text-[9px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>Tags</p>
+                               <div className="flex flex-wrap gap-1.5">
+                                 {variant.tags.map((tag, idx) => (
+                                   <span key={`${tag}-${idx}`} 
+                                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium"
+                                     style={{ backgroundColor: "rgba(52,211,153,0.08)", color: "#34d399", border: "1px solid rgba(52,211,153,0.2)" }}>
+                                     <TagIcon className="w-2.5 h-2.5" />
+                                     {tag}
+                                   </span>
+                                 ))}
+                               </div>
+                             </div>
+                           )}
+
+                           {/* Action Buttons - Tags & Edit */}
+                           <div className="flex gap-2 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                              <button 
+                                onClick={() => {
+                                  router.push(`/admin/products/${id}/add-variant?edit=${variant._id}`);
+                                }}
+                                className="flex-1 h-7 px-2 rounded text-[11px] font-medium inline-flex items-center justify-center gap-1 transition-colors"
+                                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                              >
+                                <Edit3 className="w-3 h-3" /> Edit
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingVariantForTags({ ...variant, tags: variant.tags || [] });
+                                  setShowVariantTagsModal(true);
+                                  setVariantTagInput("");
+                                }}
+                                className="flex-1 h-7 px-2 rounded text-[11px] font-medium inline-flex items-center justify-center gap-1 transition-colors"
+                                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                              >
+                                <TagIcon className="w-3 h-3" /> Tags
+                              </button>
+                           </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* CATEGORY */}
+            {/* CATEGORY & BRAND TABS */}
             {activeTab === "category" && (
               <div>
                 {product.category_id ? (
@@ -775,7 +1016,6 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* BRAND */}
             {activeTab === "brand" && (
               <div>
                 {product.brand_id ? (
@@ -817,7 +1057,6 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* ACTIVITY */}
             {activeTab === "activity" && (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
                 <InnerCard>
@@ -904,6 +1143,40 @@ export default function ProductDetailPage() {
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                       className="h-8 px-2.5 rounded-lg text-[12px] w-full outline-none" style={is_} />
                   </div>
+                  
+                  <div>
+                    <label className="block text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>Tags</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addTag()}
+                        placeholder="Type tag name & press Enter"
+                        className="h-8 px-2.5 rounded-lg text-[12px] flex-1 outline-none"
+                        style={is_}
+                      />
+                      <button type="button" onClick={addTag} 
+                        className="h-8 px-2.5 rounded-lg text-[12px] font-medium inline-flex items-center justify-center gap-1"
+                        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)", cursor: "pointer" }}>
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {formData.tag_names.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {formData.tag_names.map(tag => (
+                          <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium" 
+                            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                            {tag}
+                            <button type="button" onClick={() => removeTag(tag)} className="ml-0.5 rounded-full p-0.5 transition hover:bg-black/10">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>Description</label>
                     <textarea rows={3} placeholder="Enter product description..." value={formData.description}
@@ -1014,6 +1287,40 @@ export default function ProductDetailPage() {
                                 </div>
                               )}
                             </div>
+                            
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Variant Tags</p>
+                              <div className="flex gap-2 mb-2">
+                                <input 
+                                  type="text" 
+                                  value={variant.tagInput || ""}
+                                  onChange={(e) => updateVariantTagInput(index, e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && addVariantTag(index, e)}
+                                  placeholder="Add specific tag for this variant..."
+                                  className="h-8 px-2.5 rounded-lg text-[12px] flex-1 outline-none"
+                                  style={is_}
+                                />
+                                <button type="button" onClick={(e) => addVariantTag(index, e)} 
+                                  className="h-8 px-2.5 rounded-lg text-[12px] font-medium inline-flex items-center justify-center gap-1"
+                                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)", cursor: "pointer" }}>
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                              {variant.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {variant.tags.map(tag => (
+                                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium" 
+                                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                                      {tag}
+                                      <button type="button" onClick={() => removeVariantTag(index, tag)} className="ml-0.5 rounded-full p-0.5 transition hover:bg-black/10">
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
                             <div>
                               <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Attributes</p>
                               <div className="space-y-2">
@@ -1100,6 +1407,119 @@ export default function ProductDetailPage() {
                 </div>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Tag Modal */}
+      {showCreateTagModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md rounded-xl p-5" style={{ ...cs, border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[13px] font-medium">Create New Tag</h3>
+              <button onClick={() => { setShowCreateTagModal(false); setNewTagModalValue(""); }} 
+                className="p-1 rounded hover:opacity-70" style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>Tag Name</label>
+                <input 
+                  type="text" 
+                  value={newTagModalValue}
+                  onChange={(e) => setNewTagModalValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateTagFromModal()}
+                  placeholder="Enter tag name..."
+                  autoFocus
+                  className="h-9 px-3 rounded-lg text-[12px] w-full outline-none"
+                  style={is_}
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button onClick={() => { setShowCreateTagModal(false); setNewTagModalValue(""); }}
+                  className="h-8 px-3 rounded-lg text-[12px] font-medium"
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)", cursor: "pointer" }}>
+                  Cancel
+                </button>
+                <button onClick={handleCreateTagFromModal} disabled={createTagMutation.isPending || !newTagModalValue.trim()}
+                  className="h-8 px-4 rounded-lg text-[12px] font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)", border: "none", cursor: "pointer" }}>
+                  <Plus className="w-3.5 h-3.5" /> {createTagMutation.isPending ? "Creating..." : "Create Tag"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variant Tags Modal */}
+      {showVariantTagsModal && editingVariantForTags && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md rounded-xl p-5" style={{ ...cs, border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-[13px] font-medium">Manage Variant Tags</h3>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {editingVariantForTags.title || editingVariantForTags.sku}
+                </p>
+              </div>
+              <button onClick={() => { setShowVariantTagsModal(false); setEditingVariantForTags(null); setVariantTagInput(""); }} 
+                className="p-1 rounded hover:opacity-70" style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={variantTagInput}
+                  onChange={(e) => setVariantTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddVariantTag();
+                    }
+                  }}
+                  placeholder="Type tag & press Enter..."
+                  autoFocus
+                  className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
+                  style={is_}
+                />
+                <button 
+                  onClick={handleAddVariantTag}
+                  disabled={!variantTagInput.trim()}
+                  className="h-9 px-3 rounded-lg text-[12px] font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)", border: "none", cursor: "pointer" }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add
+                </button>
+              </div>
+              
+              <div>
+                <p className="text-[11px] mb-2" style={{ color: "var(--text-muted)" }}>Current Tags:</p>
+                <div className="flex flex-wrap gap-2">
+                  {(editingVariantForTags.tags || []).length > 0 ? (
+                    (editingVariantForTags.tags || []).map((tag, idx) => (
+                      <span key={`${tag}-${idx}`} 
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium"
+                        style={{ backgroundColor: "rgba(52,211,153,0.08)", color: "#34d399", border: "1px solid rgba(52,211,153,0.2)" }}>
+                        <TagIcon className="w-2.5 h-2.5" />
+                        {tag}
+                        <button 
+                          onClick={() => handleRemoveVariantTag(tag)}
+                          className="ml-0.5 rounded-full p-0.5 hover:bg-black/20"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] italic" style={{ color: "var(--text-muted)" }}>No tags yet</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
