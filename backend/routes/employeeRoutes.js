@@ -10,13 +10,14 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 
+// ✅ Authentication required for all employee routes
 router.use(authMiddleware);
 
-// GET — no permission check (taake fixPermissions auto-run ho)
+// GET — no permission check (allows auto-migration of legacy permissions)
 router.get("/", getAllEmployees);
 router.get("/:id", getEmployeeById);
 
-// WRITE — employees permission required
+// WRITE operations — employees permission required
 router.post("/", checkPermission("employees"), createEmployee);
 router.put("/:id", checkPermission("employees"), updateEmployee);
 router.delete("/:id", checkPermission("employees"), deleteEmployee);

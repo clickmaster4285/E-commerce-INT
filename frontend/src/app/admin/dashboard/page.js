@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-import DashboardCard from '../../Component/DashboardCard';
+import DashboardCard from '../../../components/ui/adminComponents/DashboardCard';
 
 // ✅ Import store socket sync
 import { useStoreSocketSync } from '../../../hooks/useStoreSocketSync';

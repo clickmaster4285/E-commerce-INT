@@ -4,42 +4,139 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import Header from "../Component/user/Header";
-import Footer from "../Component/user/Footer";
-import CartDrawer from "../Component/user/CartDrawer";
-import { CartProvider, useCart } from "../Component/user/CartContext";
-import { storeApi } from "@/apis/storeApi";
-import { Home, Search, ShoppingCart, User } from "lucide-react";
 
-// ✅ MOBILE BOTTOM NAVIGATION
+import Header from "../../components/ui/user/Header";
+import Footer from "../../components/ui/user/Footer";
+import CartDrawer from "../../components/ui/user/CartDrawer";
+
+import {
+  CartProvider,
+  useCart,
+} from "../../components/ui/user/CartContext";
+
+import { storeApi } from "@/apis/storeApi";
+
+import {
+  Home,
+  Search,
+  ShoppingCart,
+  User,
+} from "lucide-react";
+
+/* =========================================================
+   COOKIE HELPERS
+========================================================= */
+
+// Theme cookie read karna
+function getThemeFromCookie() {
+  const cookies = document.cookie.split("; ");
+
+  const themeCookie = cookies.find((cookie) =>
+    cookie.startsWith("user-theme=")
+  );
+
+  if (!themeCookie) {
+    return "dark";
+  }
+
+  return themeCookie.split("=")[1];
+}
+
+// Theme cookie save karna
+export function setUserTheme(theme) {
+  document.cookie = `user-theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
+
+  const element = document.getElementById("user-theme");
+
+  if (element) {
+    element.classList.toggle("light", theme === "light");
+  }
+}
+
+/* =========================================================
+   MOBILE BOTTOM NAVIGATION
+========================================================= */
+
 function MobileNav() {
   const pathname = usePathname();
   const { count, setIsCartOpen } = useCart();
 
   const isActive = (href) => {
-    if (href === "/") return pathname === "/";
+    if (href === "/") {
+      return pathname === "/";
+    }
+
     return pathname.startsWith(href);
   };
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)] border-t border-[var(--user-border)] backdrop-blur-md"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="
+        fixed
+        bottom-0
+        left-0
+        right-0
+        z-40
+        md:hidden
+        bg-[var(--user-bg-elevated)]
+        border-t
+        border-[var(--user-border)]
+        backdrop-blur-md
+      "
+      style={{
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
     >
       <div className="grid grid-cols-4 h-16">
+
+        {/* HOME */}
         <Link href="/" className="h-full">
-          <NavItem icon={<Home size={20} />} label="Home" active={isActive("/")} />
+          <NavItem
+            icon={<Home size={20} />}
+            label="Home"
+            active={isActive("/")}
+          />
         </Link>
+
+        {/* SHOP */}
         <Link href="/products" className="h-full">
-          <NavItem icon={<Search size={20} />} label="Shop" active={isActive("/products")} />
+          <NavItem
+            icon={<Search size={20} />}
+            label="Shop"
+            active={isActive("/products")}
+          />
         </Link>
-        <button onClick={() => setIsCartOpen(true)} className="h-full w-full">
+
+        {/* CART */}
+        <button
+          onClick={() => setIsCartOpen(true)}
+          className="h-full w-full"
+          type="button"
+        >
           <NavItem
             icon={
               <span className="relative">
                 <ShoppingCart size={20} />
+
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                  <span
+                    className="
+                      absolute
+                      -top-1.5
+                      -right-2
+                      bg-[var(--user-accent)]
+                      text-[var(--user-accent-text)]
+                      text-[9px]
+                      font-bold
+                      min-w-[14px]
+                      h-3.5
+                      px-0.5
+                      rounded-full
+                      flex
+                      items-center
+                      justify-center
+                    "
+                  >
                     {count}
                   </span>
                 )}
@@ -49,66 +146,141 @@ function MobileNav() {
             active={false}
           />
         </button>
+
+        {/* ACCOUNT */}
         <Link href="/account" className="h-full">
-          <NavItem icon={<User size={20} />} label="Account" active={isActive("/account")} />
+          <NavItem
+            icon={<User size={20} />}
+            label="Account"
+            active={isActive("/account")}
+          />
         </Link>
+
       </div>
     </nav>
   );
 }
 
+/* =========================================================
+   MOBILE NAV ITEM
+========================================================= */
+
 function NavItem({ icon, label, active }) {
   return (
     <span className="flex flex-col items-center justify-center gap-1 w-full h-full">
-      <span className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}>
+
+      {/* ICON */}
+      <span
+        className={
+          active
+            ? "text-[var(--user-accent)]"
+            : "text-[var(--user-text-muted)]"
+        }
+      >
         {icon}
       </span>
+
+      {/* LABEL */}
       <span
         className={`text-[9px] font-semibold ${
-          active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"
+          active
+            ? "text-[var(--user-accent)]"
+            : "text-[var(--user-text-muted)]"
         }`}
       >
         {label}
       </span>
+
     </span>
   );
 }
 
+/* =========================================================
+   USER LAYOUT
+========================================================= */
+
 export default function UserLayout({ children }) {
-  // ✅ Store info — layout level par fetch karein (faster initial load)
+
+  /* =======================================================
+     STORE INFO
+  ======================================================= */
+
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
+
+    // 5 minutes tak cached data use karega
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Saved theme apply karein (reload par bhi)
+  /* =======================================================
+     APPLY SAVED THEME FROM COOKIE
+  ======================================================= */
+
   useEffect(() => {
-    const saved = localStorage.getItem("user-theme") || "dark";
-    const el = document.getElementById("user-theme");
-    if (el) el.classList.toggle("light", saved === "light");
+    const savedTheme = getThemeFromCookie();
+
+    const element = document.getElementById("user-theme");
+
+    if (element) {
+      element.classList.toggle(
+        "light",
+        savedTheme === "light"
+      );
+    }
   }, []);
 
-  // ✅ Dynamic page title
+  /* =======================================================
+     DYNAMIC PAGE TITLE
+  ======================================================= */
+
   useEffect(() => {
     if (store?.store_name) {
       document.title = store.store_name;
     }
   }, [store]);
 
+  /* =======================================================
+     UI
+  ======================================================= */
+
   return (
     <CartProvider>
-      {/* ✅ SIRF YE LINE CHANGE KI — baqi sab same */}
+
       <div
         id="user-theme"
-        className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
+        className="
+          user-theme
+          min-h-screen
+          w-full
+          min-w-0
+          flex
+          flex-col
+          overflow-x-clip
+          bg-[var(--user-bg)]
+          text-[var(--user-text)]
+        "
       >
+
+        {/* HEADER */}
         <Header />
-        <main className="flex-1 w-full min-w-0 pb-16 md:pb-0">{children}</main>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 w-full min-w-0 pb-16 md:pb-0">
+          {children}
+        </main>
+
+        {/* FOOTER */}
         <Footer />
+
+        {/* CART DRAWER */}
         <CartDrawer />
+
+        {/* MOBILE BOTTOM NAV */}
         <MobileNav />
+
       </div>
+
     </CartProvider>
   );
 }

@@ -9,7 +9,6 @@ const userSchema = new mongoose.Schema(
     },
     username: {
       type: String,
-      required: true,
       unique: true,
       trim: true,
     },
@@ -32,20 +31,23 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "user",
-      enum: ["user", "admin", "staff"],
+      enum: ["user", "admin", "staff", "manager"],
     },
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
       default: null,
     },
-    avatar: 
-    { type: String, default: "" },
-
+    avatar: { 
+      type: String, 
+      default: "" 
+    },
     twoFactorEnabled: {
       type: Boolean,
       default: false,
     },
+    
+    // ✅ FIX: Yahan missing permissions add kar di gayi hain
     permissions: {
       products: { type: Boolean, default: true },
       brands: { type: Boolean, default: true },
@@ -53,7 +55,12 @@ const userSchema = new mongoose.Schema(
       users: { type: Boolean, default: false },
       orders: { type: Boolean, default: true },
       settings: { type: Boolean, default: true },
+      profile: { type: Boolean, default: true },       // ✅ Added
+      employees: { type: Boolean, default: true },     // ✅ Added
+      discounts: { type: Boolean, default: true },     // ✅ Added
+      store: { type: Boolean, default: false },        // ✅ Added
     },
+    
     preferences: {
       darkMode: { type: Boolean, default: true },
       notifications: {
@@ -115,7 +122,6 @@ userSchema.methods.softDelete = function (userId) {
   this.deleted_at = new Date();
   this.deletedby = userId;
   return this.save();
-  
 };
 
 module.exports = mongoose.model("User", userSchema);

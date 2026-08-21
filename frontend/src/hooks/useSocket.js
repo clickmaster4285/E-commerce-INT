@@ -10,8 +10,7 @@ function getSocket() {
   // ✅ FIXED: 5000 (backend) not 3000 (frontend)
   const SOCKET_URL =
     process.env.NEXT_PUBLIC_SOCKET_URL ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
-    "http://localhost:5000";
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
 
   console.log("🔌 Creating socket connection to:", SOCKET_URL);
 

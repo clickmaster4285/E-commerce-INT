@@ -1,49 +1,69 @@
-let io;
 const path = require("path");
 const fs = require("fs");
 
-const { getStoreInfo, updateStoreInfo } = require("../controllers/storeController");
-const { getProfileInfo, updateProfileInfo, changePasswordSocket } = require("../controllers/userController");
-const {
-  getAllEmployees,
-  getEmployeeById,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  toggleStatus,
-} = require("../controllers/employeeController");
+// Lazy imports to avoid circular dependency warnings
+let io = null;
 
 const compressAndSaveLogo = async (base64Data, fileName) => {
   if (!base64Data || typeof base64Data !== "string") return null;
   const mimeMatch = base64Data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
   if (!mimeMatch) throw new Error("Invalid base64 image format");
+  
   const mimeType = mimeMatch[1];
   const rawBuffer = Buffer.from(mimeMatch[2], "base64");
   if (rawBuffer.length > 8 * 1024 * 1024) throw new Error("Image too large (max 8MB)");
 
   const storeDir = path.join(__dirname, "../uploads/store");
   if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
-  const safeName = (fileName || "logo").replace(/\s+/g, "-").replace(/[^a-zA-Z0-9.\-]/g, "").replace(/\.[^.]+$/, "");
+  
+  const safeName = (fileName || "logo")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9.\-]/g, "")
+    .replace(/\.[^.]+$/, "");
 
   if (mimeType.includes("svg")) {
     const finalName = `store-logo-${Date.now()}-${safeName}.svg`;
     const filePath = path.join(storeDir, finalName);
     fs.writeFileSync(filePath, rawBuffer);
-    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: `uploads/store/${finalName}` };
+    return { 
+      path: filePath, 
+      filename: finalName, 
+      mimetype: mimeType, 
+      size: rawBuffer.length, 
+      relativePath: `uploads/store/${finalName}` 
+    };
   }
 
   const finalName = `store-logo-${Date.now()}-${safeName}.jpg`;
   const filePath = path.join(storeDir, finalName);
+  
   try {
     const sharp = require("sharp");
-    await sharp(rawBuffer).resize(600, 600, { fit: "inside", withoutEnlargement: true }).rotate().jpeg({ quality: 78, mozjpeg: true, progressive: true }).toFile(filePath);
+    await sharp(rawBuffer)
+      .resize(600, 600, { fit: "inside", withoutEnlargement: true })
+      .rotate()
+      .jpeg({ quality: 78, mozjpeg: true, progressive: true })
+      .toFile(filePath);
+    
     const savedSize = fs.statSync(filePath).size;
-    return { path: filePath, filename: finalName, mimetype: "image/jpeg", size: savedSize, relativePath: `uploads/store/${finalName}` };
+    return { 
+      path: filePath, 
+      filename: finalName, 
+      mimetype: "image/jpeg", 
+      size: savedSize, 
+      relativePath: `uploads/store/${finalName}` 
+    };
   } catch (err) {
     const fallbackName = `store-logo-${Date.now()}-${safeName}-raw.jpg`;
     const fallbackPath = path.join(storeDir, fallbackName);
     fs.writeFileSync(fallbackPath, rawBuffer);
-    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: rawBuffer.length, relativePath: `uploads/store/${fallbackName}` };
+    return { 
+      path: fallbackPath, 
+      filename: fallbackName, 
+      mimetype: mimeType, 
+      size: rawBuffer.length, 
+      relativePath: `uploads/store/${fallbackName}` 
+    };
   }
 };
 
@@ -58,40 +78,42 @@ const deleteOldLogo = async () => {
         path.join(__dirname, "..", "uploads", imgUrl.replace(/^uploads\//, "")),
         imgUrl.startsWith("/") ? imgUrl : null,
       ].filter(Boolean);
+      
       for (const p of possiblePaths) {
-        if (fs.existsSync(p)) { fs.unlinkSync(p); break; }
+        if (fs.existsSync(p)) { 
+          fs.unlinkSync(p); 
+          break; 
+        }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error("️ deleteOldLogo error:", e.message);
+  }
 };
 
-// ✅ FIXED: Ensure all 6 permissions are always present and respect false values
-const fixPermissions = (oldPerms) => {
-  return {
-    employees: oldPerms.employees !== undefined ? oldPerms.employees : true,
-    products: oldPerms.products !== undefined ? oldPerms.products : true,
-    brands: oldPerms.brands !== undefined ? oldPerms.brands : true,
-    categories: oldPerms.categories !== undefined ? oldPerms.categories : true,
-    profile: oldPerms.profile !== undefined ? oldPerms.profile : true,
-    store: oldPerms.store !== undefined ? oldPerms.store : false,
-  };
-};
+// ✅ Permission helpers - FIXED: Added 'deals' permission
+const fixPermissions = (oldPerms) => ({
+  employees: oldPerms?.employees ?? true,
+  products: oldPerms?.products ?? true,
+  brands: oldPerms?.brands ?? true,
+  categories: oldPerms?.categories ?? true,
+  profile: oldPerms?.profile ?? true,
+  store: oldPerms?.store ?? false,
+  discounts: oldPerms?.discounts ?? true,
+  deals: oldPerms?.deals ?? true, // ✅ Deals permission added
+});
 
-// ✅ FIXED: Only check for truly deprecated keys
 const needsPermissionMigration = (perms) => {
   if (!perms) return true;
-  return (
-    perms.users !== undefined ||
-    perms.orders !== undefined ||
-    perms.settings !== undefined ||
-    perms.dashboard !== undefined
-  );
+  return ["users", "orders", "settings", "dashboard"].some((k) => perms[k] !== undefined);
 };
 
+// ✅ Socket initialization
 const initSocket = (server) => {
   const { Server } = require("socket.io");
   const jwt = require("jsonwebtoken");
 
+  // Ensure upload directories exist
   const uploadDir = path.join(__dirname, "../uploads");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   const storeUploadDir = path.join(uploadDir, "store");
@@ -101,10 +123,16 @@ const initSocket = (server) => {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        const allowed = ["http://localhost:3000", "http://127.0.0.1:3000", process.env.CLIENT_URL].filter(Boolean);
+        const allowed = [
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+          process.env.CLIENT_URL,
+        ].filter(Boolean);
+        
         if (allowed.includes(origin)) return callback(null, true);
         if (/^http:\/\/192\.168\.\d+\.\d+:3000$/.test(origin)) return callback(null, true);
         if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+        
         callback(new Error("CORS not allowed"));
       },
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -116,14 +144,37 @@ const initSocket = (server) => {
     transports: ["polling", "websocket"],
   });
 
-  console.log("🚀 Socket.IO ready | maxBuffer: 15MB | transports: polling → websocket");
+  console.log(" Socket.IO ready | maxBuffer: 15MB | transports: polling → websocket");
 
+  // ✅ Auth middleware for socket connections
   io.use((socket, next) => {
     const rawCookie = socket.handshake.headers.cookie;
-    if (!rawCookie) { socket.userId = "guest"; socket.userRole = "admin"; socket.userName = "Guest"; socket.userPermissions = {}; return next(); }
-    const cookies = Object.fromEntries(rawCookie.split("; ").map((c) => { const [k, ...v] = c.split("="); return [k.trim(), v.join("=")]; }));
+    
+    if (!rawCookie) {
+      socket.userId = "guest";
+      socket.userRole = "admin";
+      socket.userName = "Guest";
+      socket.userPermissions = {};
+      return next();
+    }
+
+    const cookies = Object.fromEntries(
+      rawCookie.split("; ").map((c) => {
+        const [k, ...v] = c.split("=");
+        return [k.trim(), v.join("=")];
+      })
+    );
+    
     const token = cookies.accessToken || cookies.auth_token || cookies.access_token;
-    if (!token) { socket.userId = "guest"; socket.userRole = "admin"; socket.userName = "Guest"; socket.userPermissions = {}; return next(); }
+    
+    if (!token) {
+      socket.userId = "guest";
+      socket.userRole = "admin";
+      socket.userName = "Guest";
+      socket.userPermissions = {};
+      return next();
+    }
+
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.userId = decoded.userId || decoded.id;
@@ -133,11 +184,16 @@ const initSocket = (server) => {
       socket.userPermissions = decoded.permissions || {};
       next();
     } catch (error) {
-      socket.userId = "guest"; socket.userRole = "admin"; socket.userName = "Guest"; socket.storeId = null; socket.userPermissions = {};
+      socket.userId = "guest";
+      socket.userRole = "admin";
+      socket.userName = "Guest";
+      socket.storeId = null;
+      socket.userPermissions = {};
       next();
     }
   });
 
+  // ✅ Helper functions
   function createReq(socket, body = {}, params = {}) {
     return {
       user: {
@@ -148,61 +204,108 @@ const initSocket = (server) => {
         permissions: socket.userPermissions || {},
       },
       storeId: socket.storeId,
-      body, params, io, socket,
+      body,
+      params,
+      io,
+      socket,
     };
   }
 
   function createRes(socket, eventName, callback) {
     return {
       statusCode: 200,
-      status: function (code) { this.statusCode = code; return this; },
-      json: function (data) {
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
         if (typeof callback === "function") callback(data);
         else socket.emit(eventName, data);
       },
     };
   }
 
+  // ✅ Connection handler
   io.on("connection", (socket) => {
-    console.log(`🟢 Connected: ${socket.id} (User: ${socket.userId}, Role: ${socket.userRole}, Perms: ${JSON.stringify(socket.userPermissions)})`);
+    console.log(`🟢 Connected: ${socket.id} (User: ${socket.userId}, Role: ${socket.userRole})`);
 
-    // ✅ AUTO-JOIN: User khud ki room mein join ho jaye taake targeted emit kaam kare
+    // Auto-join user's personal room
     if (socket.userId && socket.userId !== "guest") {
       socket.join(`employee:${socket.userId}`);
-      console.log(`   → Auto-joined room: employee:${socket.userId}`);
     }
 
     socket.on("join:employee", (employeeId) => {
       socket.join(`employee:${employeeId}`);
-      console.log(`   → Joined room: employee:${employeeId}`);
     });
+
     socket.on("leave:employee", (employeeId) => {
       socket.leave(`employee:${employeeId}`);
     });
 
-    // ========== STORE ==========
+    // ========== STORE EVENTS ==========
     socket.on("getStoreInfo", async () => {
       try {
+        const { getStoreInfo } = require("../controllers/storeController");
         const req = { user: { id: socket.userId, role: socket.userRole } };
-        const res = { status: () => ({ json: (d) => socket.emit("storeInfo", d) }), json: (d) => socket.emit("storeInfo", d) };
+        const res = { 
+          status: () => ({ json: (d) => socket.emit("storeInfo", d) }), 
+          json: (d) => socket.emit("storeInfo", d) 
+        };
         await getStoreInfo(req, res);
-      } catch (e) { socket.emit("storeInfo", { success: false, message: e.message }); }
+      } catch (e) { 
+        socket.emit("storeInfo", { success: false, message: e.message }); 
+      }
     });
 
     socket.on("updateStoreInfo", async (payload, callback) => {
       try {
+        const { updateStoreInfo } = require("../controllers/storeController");
         let logoFile = null;
+        
         if (payload?.logoBase64) {
-          try { await deleteOldLogo(); logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName); } catch (e) {}
+          try { 
+            await deleteOldLogo(); 
+            logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName); 
+          } catch (e) {
+            console.error("️ Logo processing error:", e.message);
+          }
         }
+        
         const { logoBase64, logoFileName, logoMimeType, ...bodyData } = payload || {};
-        const req = { user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} }, body: bodyData, file: logoFile, io };
+        const req = { 
+          user: { 
+            _id: socket.userId, 
+            id: socket.userId, 
+            role: socket.userRole, 
+            name: socket.userName, 
+            permissions: socket.userPermissions || {} 
+          }, 
+          body: bodyData, 
+          file: logoFile, 
+          io 
+        };
         const res = {
-          status: (c) => ({ json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("storeUpdated", d.data); io.emit("storeInfoChangedForProfile", d.data); } } }),
-          json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("storeUpdated", d.data); io.emit("storeInfoChangedForProfile", d.data); } },
+          status: (c) => ({ 
+            json: (d) => { 
+              if (callback) callback(d); 
+              if (d?.success) { 
+                io.emit("storeUpdated", d.data); 
+                io.emit("storeInfoChangedForProfile", d.data); 
+              } 
+            } 
+          }),
+          json: (d) => { 
+            if (callback) callback(d); 
+            if (d?.success) { 
+              io.emit("storeUpdated", d.data); 
+              io.emit("storeInfoChangedForProfile", d.data); 
+            } 
+          },
         };
         await updateStoreInfo(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+      } catch (e) { 
+        if (callback) callback({ success: false, message: e.message }); 
+      }
     });
 
     socket.on("deleteStoreLogo", async (_, callback) => {
@@ -210,6 +313,7 @@ const initSocket = (server) => {
         await deleteOldLogo();
         const Store = require("../models/Store");
         let store = await Store.findOne();
+        
         if (store) {
           store.logo = { img_url: "", public_id: "" };
           await store.save();
@@ -217,10 +321,12 @@ const initSocket = (server) => {
           if (callback) callback({ success: true, data: plain });
           io.emit("storeUpdated", plain);
         }
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+      } catch (e) { 
+        if (callback) callback({ success: false, message: e.message }); 
+      }
     });
 
-    // ========== PROFILE ==========
+    // ========== PROFILE EVENTS ==========
     socket.on("getProfile", async () => {
       try {
         const User = require("../models/User");
@@ -231,11 +337,10 @@ const initSocket = (server) => {
         }
 
         let permissions = user.permissions || {};
-
         if (needsPermissionMigration(permissions)) {
           permissions = fixPermissions(permissions);
           await User.findByIdAndUpdate(socket.userId, { permissions });
-          console.log(`✅ Auto-migrated permissions for socket user: ${user.name}`, permissions);
+          console.log(`✅ Auto-migrated permissions for: ${user.name}`);
         }
 
         const store = user.storeId || {};
@@ -251,7 +356,7 @@ const initSocket = (server) => {
           created_at: user.created_at || user.createdAt,
           address: user.address || store.address || "",
           twoFactorEnabled: user.twoFactorEnabled || false,
-          permissions: permissions,
+          permissions,
           preferences: user.preferences || {},
           store,
           store_name: store.store_name || "",
@@ -259,45 +364,90 @@ const initSocket = (server) => {
           stats: { logins: user.loginCount || 0, roles: 1, sessions: user.sessionCount || 0 },
         };
 
-        console.log(`📥 getProfile → User: ${user.name}, Role: ${user.role}, Permissions:`, profileData.permissions);
-
         socket.emit("profileData", { success: true, data: profileData, user: profileData });
       } catch (e) {
-        console.error("❌ Socket getProfile error:", e);
+        console.error("❌ Socket getProfile error:", e.message);
         socket.emit("profileData", { success: false, message: e.message });
       }
     });
 
     socket.on("updateProfile", async (payload, callback) => {
       try {
-        const req = { user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} }, body: payload, io };
+        const { updateProfileInfo } = require("../controllers/userController");
+        const req = { 
+          user: { 
+            _id: socket.userId, 
+            id: socket.userId, 
+            role: socket.userRole, 
+            name: socket.userName, 
+            permissions: socket.userPermissions || {} 
+          }, 
+          body: payload, 
+          io 
+        };
         const res = {
-          status: (c) => ({ json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("profileUpdated", d); if (d.store) io.emit("storeUpdated", d.store); } } }),
-          json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("profileUpdated", d); if (d.store) io.emit("storeUpdated", d.store); } },
+          status: (c) => ({ 
+            json: (d) => { 
+              if (callback) callback(d); 
+              if (d?.success) { 
+                io.emit("profileUpdated", d); 
+                if (d.store) io.emit("storeUpdated", d.store); 
+              } 
+            } 
+          }),
+          json: (d) => { 
+            if (callback) callback(d); 
+            if (d?.success) { 
+              io.emit("profileUpdated", d); 
+              if (d.store) io.emit("storeUpdated", d.store); 
+            } 
+          },
         };
         await updateProfileInfo(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+      } catch (e) { 
+        if (callback) callback({ success: false, message: e.message }); 
+      }
     });
 
     socket.on("changePassword", async (payload, callback) => {
       try {
-        const req = { user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} }, body: payload, io };
-        const res = { status: () => ({ json: (d) => { if (callback) callback(d); } }), json: (d) => { if (callback) callback(d); } };
+        const { changePasswordSocket } = require("../controllers/userController");
+        const req = { 
+          user: { 
+            _id: socket.userId, 
+            id: socket.userId, 
+            role: socket.userRole, 
+            name: socket.userName, 
+            permissions: socket.userPermissions || {} 
+          }, 
+          body: payload, 
+          io 
+        };
+        const res = { 
+          status: () => ({ json: (d) => { if (callback) callback(d); } }), 
+          json: (d) => { if (callback) callback(d); } 
+        };
         await changePasswordSocket(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+      } catch (e) { 
+        if (callback) callback({ success: false, message: e.message }); 
+      }
     });
 
-    // ========== EMPLOYEES ==========
+    // ========== EMPLOYEE EVENTS ==========
     socket.on("getEmployees", async () => {
       try {
+        const { getAllEmployees } = require("../controllers/employeeController");
         const req = createReq(socket);
         const res = createRes(socket, "employeesList");
         await getAllEmployees(req, res);
-      } catch (e) { socket.emit("employeesList", { success: false, message: e.message }); }
+      } catch (e) { 
+        socket.emit("employeesList", { success: false, message: e.message }); 
+      }
     });
 
     socket.on("getEmployeeById", async ({ id }, callback) => {
       try {
+        const { getEmployeeById } = require("../controllers/employeeController");
         const req = createReq(socket, {}, { id });
         const res = createRes(socket, "employeeDetails", callback);
         await getEmployeeById(req, res);
@@ -309,6 +459,7 @@ const initSocket = (server) => {
 
     socket.on("createEmployee", async (payload, callback) => {
       try {
+        const { createEmployee } = require("../controllers/employeeController");
         const req = createReq(socket, payload);
         const res = createRes(socket, "employeeCreated", callback);
         await createEmployee(req, res);
@@ -318,11 +469,15 @@ const initSocket = (server) => {
       }
     });
 
+    // ✅ FIXED: Removed duplicate permission emission here. Controller handles it now.
     socket.on("updateEmployee", async (payload, callback) => {
       try {
+        const { updateEmployee } = require("../controllers/employeeController");
         const { id, ...data } = payload || {};
+        
         const req = createReq(socket, data, { id });
         const res = createRes(socket, "employeeUpdated", callback);
+        
         await updateEmployee(req, res);
       } catch (e) {
         if (callback) callback({ success: false, message: e.message });
@@ -332,6 +487,7 @@ const initSocket = (server) => {
 
     socket.on("deleteEmployee", async ({ id }, callback) => {
       try {
+        const { deleteEmployee } = require("../controllers/employeeController");
         const req = createReq(socket, {}, { id });
         const res = createRes(socket, "employeeDeleted", callback);
         await deleteEmployee(req, res);
@@ -343,6 +499,7 @@ const initSocket = (server) => {
 
     socket.on("toggleEmployeeStatus", async ({ id }, callback) => {
       try {
+        const { toggleStatus } = require("../controllers/employeeController");
         const req = createReq(socket, {}, { id });
         const res = createRes(socket, "employeeStatusToggled", callback);
         await toggleStatus(req, res);
@@ -352,7 +509,150 @@ const initSocket = (server) => {
       }
     });
 
-    // ========== RELAYS ==========
+    // ========== PRODUCT EVENTS (FOR DISCOUNT DROPDOWN) ==========
+    socket.on("getProducts", async () => {
+      try {
+        const Product = require("../models/Product");
+        const products = await Product.find({ 
+          is_deleted: false, 
+          status: "active" 
+        })
+        .select("name variants")
+        .lean();
+        
+        socket.emit("productsList", products);
+      } catch (e) {
+        console.error(" Socket getProducts error:", e.message);
+        socket.emit("productsList", []);
+      }
+    });
+
+    // ========== DISCOUNT EVENTS ==========
+    socket.on("getDiscounts", async () => {
+      try {
+        const { getAllDiscounts } = require("../controllers/discountController");
+        const req = createReq(socket);
+        const res = createRes(socket, "discountsList");
+        await getAllDiscounts(req, res);
+      } catch (e) { 
+        socket.emit("discountsList", { success: false, message: e.message }); 
+      }
+    });
+
+    socket.on("createDiscount", async (payload, callback) => {
+      try {
+        const { createDiscount } = require("../controllers/discountController");
+        const req = createReq(socket, payload);
+        const res = createRes(socket, "discountCreated", callback);
+        await createDiscount(req, res);
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("discountCreated", { success: false, message: e.message });
+      }
+    });
+
+    socket.on("updateDiscount", async (payload, callback) => {
+      try {
+        const { updateDiscount } = require("../controllers/discountController");
+        const { id, ...data } = payload || {};
+        const req = createReq(socket, data, { id });
+        const res = createRes(socket, "discountUpdated", callback);
+        await updateDiscount(req, res);
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("discountUpdated", { success: false, message: e.message });
+      }
+    });
+
+    socket.on("deleteDiscount", async ({ id }, callback) => {
+      try {
+        const { deleteDiscount } = require("../controllers/discountController");
+        const req = createReq(socket, {}, { id });
+        const res = createRes(socket, "discountDeleted", callback);
+        await deleteDiscount(req, res);
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("discountDeleted", { success: false, message: e.message });
+      }
+    });
+
+    // ==========================================
+    // ✅ DEALS EVENTS (NEWLY ADDED)
+    // ==========================================
+    
+    socket.on("getDeals", async () => {
+      try {
+        const { getAllDeals } = require("../controllers/dealController");
+        const req = createReq(socket);
+        const res = createRes(socket, "dealsList");
+        await getAllDeals(req, res);
+      } catch (e) { 
+        socket.emit("dealsList", { success: false, message: e.message }); 
+      }
+    });
+
+    socket.on("createDeal", async (payload, callback) => {
+      try {
+        const { createDeal } = require("../controllers/dealController");
+        const req = createReq(socket, payload);
+        const res = createRes(socket, "dealCreated", callback);
+        await createDeal(req, res);
+        
+        // ✅ Broadcast to all clients to refresh their lists immediately
+        io.emit("deal:created"); 
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("dealCreated", { success: false, message: e.message });
+      }
+    });
+
+    socket.on("updateDeal", async (payload, callback) => {
+      try {
+        const { updateDeal } = require("../controllers/dealController");
+        const { id, ...data } = payload || {};
+        const req = createReq(socket, data, { id });
+        const res = createRes(socket, "dealUpdated", callback);
+        await updateDeal(req, res);
+
+        // ✅ Broadcast update event so other browsers refresh cache
+        io.emit("deal:updated", { id });
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("dealUpdated", { success: false, message: e.message });
+      }
+    });
+
+    socket.on("deleteDeal", async ({ id }, callback) => {
+      try {
+        const { deleteDeal } = require("../controllers/dealController");
+        const req = createReq(socket, {}, { id });
+        const res = createRes(socket, "dealDeleted", callback);
+        await deleteDeal(req, res);
+
+        // ✅ Broadcast delete event
+        io.emit("deal:deleted", { id });
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("dealDeleted", { success: false, message: e.message });
+      }
+    });
+
+    socket.on("toggleDealStatus", async ({ id }, callback) => {
+      try {
+        const { toggleDealStatus } = require("../controllers/dealController");
+        const req = createReq(socket, {}, { id });
+        const res = createRes(socket, "dealStatusToggled", callback);
+        await toggleDealStatus(req, res);
+        
+        // ✅ Broadcast status change
+        io.emit("deal:updated", { id });
+      } catch (e) {
+        if (callback) callback({ success: false, message: e.message });
+        else socket.emit("dealStatusToggled", { success: false, message: e.message });
+      }
+    });
+
+    // ========== RELAY EVENTS ==========
     socket.on("productCreated", (p) => socket.broadcast.emit("productCreated", p));
     socket.on("productUpdated", (p) => socket.broadcast.emit("productUpdated", p));
     socket.on("productDeleted", (id) => socket.broadcast.emit("productDeleted", id));
@@ -362,15 +662,18 @@ const initSocket = (server) => {
     socket.on("employeeRelayStatusToggled", (d) => socket.broadcast.emit("employeeStatusToggled", { success: true, data: d }));
 
     socket.on("disconnect", (reason) => {
-      console.log(`🔴 Disconnected: ${socket.id} (${reason})`);
+      console.log(` Disconnected: ${socket.id} (${reason})`);
     });
   });
 
   return io;
 };
 
+// ✅ Safe getter with clear error message
 const getIO = () => {
-  if (!io) throw new Error("Socket.io not initialized!");
+  if (!io) {
+    throw new Error("Socket.IO not initialized! Call initSocket(server) first.");
+  }
   return io;
 };
 

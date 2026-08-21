@@ -10,6 +10,7 @@ import { categoryApi } from "@/apis/categoryApi";
 import { brandApi } from "@/apis/brandApi";
 import { productApi } from "@/apis/productApi";
 import { storeApi } from "@/apis/storeApi";
+import Cookies from "js-cookie"; // ✅ Cookies library import
 
 import {
   Menu,
@@ -160,19 +161,24 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ✅ THEME: Saved load karein
+  // ✅ THEME: Cookies se load karein
   useEffect(() => {
-    const saved = localStorage.getItem("user-theme") || "dark";
+    const saved = Cookies.get("user-theme") || "dark";
     setTheme(saved);
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", saved === "light");
   }, []);
 
-  // ✅ THEME TOGGLE
+  // ✅ THEME TOGGLE - Cookies mein save karein
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    localStorage.setItem("user-theme", next);
+    Cookies.set("user-theme", next, { 
+      expires: 365, // 1 saal tak valid
+      path: "/",    // Pure site par accessible
+      secure: process.env.NODE_ENV === "production", // Production mein HTTPS
+      sameSite: "lax"
+    });
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", next === "light");
   };

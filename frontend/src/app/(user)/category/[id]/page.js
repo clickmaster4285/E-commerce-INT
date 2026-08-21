@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/productApi";
 import { categoryApi } from "@/apis/categoryApi";
-import ProductCard from "@/app/Component/user/ProductCard";
+import ProductCard from "@/components/ui/user/ProductCard";
 import { ChevronRight, Package, SlidersHorizontal } from "lucide-react";
 
 export default function CategoryPage({ params }) {
