@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productApi } from "../../../apis/productApi";
 import { discountApi } from "../../../apis/admin/discountApi";
@@ -8,6 +8,7 @@ import { categoryApi } from "../../../apis/categoryApi";
 import { brandApi } from "../../../apis/brandApi";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -82,6 +83,31 @@ const CheckIcon = ({ className = "w-4 h-4" }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
   </svg>
 );
+const BoxIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+const FolderIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+  </svg>
+);
+const AwardIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+  </svg>
+);
+const GlobeIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+const XIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
 
 /* ================= Helpers ================= */
 const getInitials = (name) => {
@@ -100,12 +126,7 @@ const normalizeArrayResponse = (response) => {
 };
 
 const getItemId = (item) => String(item?._id || item?.id || "");
-const getItemName = (item, type) => {
-  if (type === "product") return item?.name || item?.title || "Unnamed Product";
-  if (type === "category") return item?.name || item?.categoryName || "Unnamed Category";
-  if (type === "brand") return item?.name || item?.brandName || "Unnamed Brand";
-  return item?.name || "Unnamed";
-};
+const getItemName = (item) => item?.name || item?.title || item?.categoryName || item?.brandName || "Unnamed";
 
 const formatTarget = (value) => {
   const map = {
@@ -149,12 +170,6 @@ const dateInputToISO = (value) => {
   return date.toISOString();
 };
 
-const Avatar = ({ name, size = "w-8 h-8" }) => (
-  <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid var(--border-color)" }}>
-    {getInitials(name)}
-  </div>
-);
-
 const StatusBadge = ({ status }) => {
   const isActive = status === "active" || status === "scheduled";
   return (
@@ -168,23 +183,25 @@ const StatusBadge = ({ status }) => {
 export default function DiscountsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { markSelfAction } = useDiscountSocketSync();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTarget, setFilterTarget] = useState("all");
   const [viewMode, setViewMode] = useState("list");
   const [selectedIds, setSelectedIds] = useState([]);
-  const [showModal, setShowModal] = useState(false);
+  const [activeFormType, setActiveFormType] = useState(null); // 'product' | 'category' | 'brand' | 'all' | null
+  const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
+  const typeMenuRef = useRef(null);
   const [editingDiscount, setEditingDiscount] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selector, setSelector] = useState({ open: false, type: null });
   const itemsPerPage = 20;
 
   const initialForm = {
-    name: "", code: "", description: "", target_type: "all_products",
-    selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
-    price_min: "", price_max: "", value_type: "percentage", value: "",
-    start_at: "", end_at: "", status: "draft",
+    name: "", code: "", description: "",
+    selected_ids: [],
+    value_type: "percentage", value: "",
+    start_at: "", end_at: "", status: "active",
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -202,31 +219,32 @@ export default function DiscountsPage() {
 
   const mutation = useMutation({
     mutationFn: ({ id, data }) => {
-      console.log("Sending to API:", { id, data });
+      markSelfAction(id ? "update" : "create");
       return id ? discountApi.update(id, data) : discountApi.create(data);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       toast.success(variables.id ? "Discount updated successfully" : "Discount added successfully");
       resetForm();
-      setShowModal(false);
+      setActiveFormType(null);
     },
     onError: (error) => {
-      console.error("Discount mutation error:", error);
       const errorMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to save discount";
       toast.error(errorMsg);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map((id) => discountApi.delete(id))),
+    mutationFn: (ids) => {
+      markSelfAction("delete");
+      return Promise.all(ids.map((id) => discountApi.delete(id)));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       setSelectedIds([]);
       toast.success("Discount deleted successfully");
     },
     onError: (error) => {
-      console.error("Delete error:", error);
       toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount");
     },
   });
@@ -249,6 +267,16 @@ export default function DiscountsPage() {
 
   useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterTarget]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (typeMenuRef.current && !typeMenuRef.current.contains(event.target)) {
+        setIsTypeMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
   const stats = useMemo(() => {
     const total = discounts.length;
     const active = discounts.filter((d) => getDiscountStatus(d) === "active" || getDiscountStatus(d) === "scheduled").length;
@@ -258,9 +286,14 @@ export default function DiscountsPage() {
   }, [discounts]);
 
   const resetForm = () => {
-    setFormData({ ...initialForm, selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [] });
+    setFormData({ ...initialForm, selected_ids: [] });
     setEditingDiscount(null);
-    setSelector({ open: false, type: null });
+  };
+
+  const openForm = (type) => {
+    resetForm();
+    setIsTypeMenuOpen(false);
+    setActiveFormType(type);
   };
 
   const handleView = (discount) => {
@@ -269,67 +302,80 @@ export default function DiscountsPage() {
 
   const openEdit = (discount) => {
     const rawTarget = discount?.target_type || discount?.applyTo || "all_products";
-    let target = rawTarget;
-    if (target === "all") target = "all_products";
-    if (target === "specific_products" || target === "specific_product") target = "product";
-    if (target === "specific_categories") target = "category";
+    let type = "all";
+    if (rawTarget === "specific_products" || rawTarget === "product" || rawTarget === "specific_product") type = "product";
+    else if (rawTarget === "specific_categories" || rawTarget === "category") type = "category";
+    else if (rawTarget === "brand") type = "brand";
+
+    let selected_ids = [];
+    if (type === "product") selected_ids = (discount?.selected_product_ids || discount?.products?.map(getItemId) || []).map(String);
+    else if (type === "category") selected_ids = (discount?.selected_category_ids || discount?.categories?.map(getItemId) || []).map(String);
+    else if (type === "brand") selected_ids = (discount?.selected_brand_ids || discount?.brands?.map(getItemId) || []).map(String);
 
     setFormData({
       ...initialForm,
-      name: discount?.name || "", code: discount?.code || "", description: discount?.description || "",
-      target_type: target,
-      selected_product_ids: (discount?.selected_product_ids || discount?.products?.map(getItemId) || []).map(String),
-      selected_category_ids: (discount?.selected_category_ids || discount?.categories?.map(getItemId) || []).map(String),
-      selected_brand_ids: (discount?.selected_brand_ids || discount?.brands?.map(getItemId) || []).map(String),
-      price_min: discount?.price_min ?? "", price_max: discount?.price_max ?? "",
-      value_type: discount?.value_type || discount?.type === "fixed" ? "fixed_amount" : "percentage",
+      name: discount?.name || "",
+      code: discount?.code || "",
+      description: discount?.description || "",
+      selected_ids,
+      value_type: discount?.value_type || (discount?.type === "fixed" ? "fixed_amount" : "percentage"),
       value: discount?.value ?? "",
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
       status: discount?.status || (discount?.isActive ? "active" : "draft"),
     });
     setEditingDiscount(discount);
-    setShowModal(true);
+    setActiveFormType(type);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) return toast.error("Discount name is required");
     if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot be greater than 100");
-    
-    const productIds = formData.target_type === "product" && formData.selected_product_ids.length > 0 ? formData.selected_product_ids : undefined;
-    const categoryIds = formData.target_type === "category" && formData.selected_category_ids.length > 0 ? formData.selected_category_ids : undefined;
-    const brandIds = formData.target_type === "brand" && formData.selected_brand_ids.length > 0 ? formData.selected_brand_ids : undefined;
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+
+    let target_type = "all_products";
+    let applyTo = "all";
+    let payloadExtras = {};
+
+    if (activeFormType === "product") {
+      target_type = "specific_products";
+      applyTo = "specific_products";
+      if (formData.selected_ids.length === 0) return toast.error("Please select at least one product");
+      payloadExtras.selected_product_ids = formData.selected_ids;
+    } else if (activeFormType === "category") {
+      target_type = "specific_categories";
+      applyTo = "specific_categories";
+      if (formData.selected_ids.length === 0) return toast.error("Please select at least one category");
+      payloadExtras.selected_category_ids = formData.selected_ids;
+    } else if (activeFormType === "brand") {
+      target_type = "brand";
+      applyTo = "brand";
+      if (formData.selected_ids.length === 0) return toast.error("Please select at least one brand");
+      payloadExtras.selected_brand_ids = formData.selected_ids;
+    }
 
     const payload = {
       name: formData.name.trim(),
       code: formData.code.trim() ? formData.code.trim().toUpperCase() : undefined,
       description: formData.description.trim() || undefined,
-      target_type: formData.target_type,
-      selected_product_ids: productIds,
-      selected_category_ids: categoryIds,
-      selected_brand_ids: brandIds,
-      price_min: formData.target_type === "price_range" ? Number(formData.price_min) : undefined,
-      price_max: formData.target_type === "price_range" ? Number(formData.price_max) : undefined,
+      target_type,
+      applyTo,
       value_type: formData.value_type,
+      type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
       value: Number(formData.value),
       start_at: dateInputToISO(formData.start_at) || new Date().toISOString(),
       end_at: dateInputToISO(formData.end_at) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       status: formData.status,
-      applyTo: formData.target_type === "all_products" ? "all" : formData.target_type === "product" ? "specific_products" : formData.target_type === "category" ? "specific_categories" : formData.target_type,
-      type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
       isActive: formData.status === "active",
+      ...payloadExtras,
     };
 
     Object.keys(payload).forEach((key) => {
-      if (payload[key] === undefined || payload[key] === null || payload[key] === "") {
-        delete payload[key];
-      }
+      if (payload[key] === undefined || payload[key] === null || payload[key] === "") delete payload[key];
     });
 
-    console.log("Final Payload:", payload);
     mutation.mutate({ id: editingDiscount?._id || editingDiscount?.id, data: payload });
   };
 
@@ -338,14 +384,6 @@ export default function DiscountsPage() {
   const confirmDelete = () => {
     if (!deleteTarget) return;
     deleteMutation.mutate(deleteTarget.discounts.map((d) => d._id || d.id), { onSettled: () => setDeleteTarget(null) });
-  };
-
-  const getSelectedItems = (type) => {
-    let items = [], selectedIds = [];
-    if (type === "product") { items = products; selectedIds = formData.selected_product_ids; }
-    if (type === "category") { items = categories; selectedIds = formData.selected_category_ids; }
-    if (type === "brand") { items = brands; selectedIds = formData.selected_brand_ids; }
-    return items.filter((item) => selectedIds.includes(getItemId(item)));
   };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
@@ -362,6 +400,46 @@ export default function DiscountsPage() {
     return pages;
   };
 
+  // Discount type cards configuration
+  const discountTypes = [
+    {
+      key: "product",
+      title: "Product Discount",
+      desc: "Apply discount on specific products",
+      icon: BoxIcon,
+      gradient: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05))",
+      iconColor: "#60a5fa",
+      border: "rgba(59,130,246,0.3)",
+    },
+    {
+      key: "category",
+      title: "Category Discount",
+      desc: "Apply discount on entire categories",
+      icon: FolderIcon,
+      gradient: "linear-gradient(135deg, rgba(168,85,247,0.15), rgba(168,85,247,0.05))",
+      iconColor: "#c084fc",
+      border: "rgba(168,85,247,0.3)",
+    },
+    {
+      key: "brand",
+      title: "Brand Discount",
+      desc: "Apply discount on specific brands",
+      icon: AwardIcon,
+      gradient: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))",
+      iconColor: "#fbbf24",
+      border: "rgba(245,158,11,0.3)",
+    },
+    {
+      key: "all",
+      title: "All Products Discount",
+      desc: "Apply discount on all products",
+      icon: GlobeIcon,
+      gradient: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))",
+      iconColor: "#34d399",
+      border: "rgba(16,185,129,0.3)",
+    },
+  ];
+
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5 p-4 md:p-0">
@@ -369,16 +447,38 @@ export default function DiscountsPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Discount Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create, manage and control your promotional discounts.</p>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><GridIcon /></button>
-            </div>
-            <button onClick={() => { resetForm(); setShowModal(true); }} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <PlusIcon /> Add Discount
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><ListIcon /></button>
+            <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><GridIcon /></button>
+          </div>
+        </div>
+
+        {/* ===== Discount Type Action ===== */}
+        <div className="flex items-center justify-between gap-3 rounded-xl p-3 sm:p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div>
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Create a discount</p>
+            <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Choose where the discount should apply.</p>
+          </div>
+          <div className="relative shrink-0" ref={typeMenuRef}>
+            <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition hover:bg-[var(--accent-hover)]" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <PlusIcon className="h-3.5 w-3.5" /> New Discount
+              <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
             </button>
+            {isTypeMenuOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                {discountTypes.map((dt) => {
+                  const Icon = dt.icon;
+                  return (
+                    <button key={dt.key} type="button" onClick={() => openForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                      <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -424,7 +524,6 @@ export default function DiscountsPage() {
               <option value="product">Specific Products</option>
               <option value="category">Categories</option>
               <option value="brand">Brands</option>
-              <option value="price_range">Price Range</option>
             </select>
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
           </div>
@@ -448,7 +547,7 @@ export default function DiscountsPage() {
           </div>
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? "No discounts match your filters" : "No discounts yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? "No discounts match your filters" : "No discounts yet. Create one above!"}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -569,130 +668,19 @@ export default function DiscountsPage() {
         )}
       </div>
 
-      {/* ===== Add/Edit Modal ===== */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-2xl rounded-xl overflow-hidden" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">{editingDiscount ? "Edit Discount" : "Add New Discount"}</h3>
-              <button onClick={() => { setShowModal(false); resetForm(); }} disabled={mutation.isPending} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-              
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Name *</label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" style={inputStyle} placeholder="Summer Sale" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Code</label>
-                  <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 uppercase" style={inputStyle} placeholder="SUMMER20" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
-                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows="2" disabled={mutation.isPending} className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none" style={inputStyle} placeholder="Describe this discount..." />
-              </div>
-
-              {/* Target */}
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Applies To *</label>
-                <select value={formData.target_type} onChange={(e) => setFormData({ ...formData, target_type: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer" style={inputStyle}>
-                  <option value="all_products">All Products</option>
-                  <option value="product">Specific Products</option>
-                  <option value="category">Specific Categories</option>
-                  <option value="brand">Specific Brands</option>
-                  <option value="price_range">Price Range</option>
-                </select>
-              </div>
-
-              {/* Dynamic Target Selection */}
-              {formData.target_type === "product" && (
-                <SelectionField label="Products" items={getSelectedItems("product")} onClick={() => setSelector({ open: true, type: "product" })} onRemove={(id) => setFormData({ ...formData, selected_product_ids: formData.selected_product_ids.filter((x) => x !== id) })} inputStyle={inputStyle} />
-              )}
-              {formData.target_type === "category" && (
-                <SelectionField label="Categories" items={getSelectedItems("category")} onClick={() => setSelector({ open: true, type: "category" })} onRemove={(id) => setFormData({ ...formData, selected_category_ids: formData.selected_category_ids.filter((x) => x !== id) })} inputStyle={inputStyle} />
-              )}
-              {formData.target_type === "brand" && (
-                <SelectionField label="Brands" items={getSelectedItems("brand")} onClick={() => setSelector({ open: true, type: "brand" })} onRemove={(id) => setFormData({ ...formData, selected_brand_ids: formData.selected_brand_ids.filter((x) => x !== id) })} inputStyle={inputStyle} />
-              )}
-              {formData.target_type === "price_range" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Min Price *</label>
-                    <input type="number" value={formData.price_min} onChange={(e) => setFormData({ ...formData, price_min: e.target.value })} required className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="0" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Max Price *</label>
-                    <input type="number" value={formData.price_max} onChange={(e) => setFormData({ ...formData, price_max: e.target.value })} required className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="9999" />
-                  </div>
-                </div>
-              )}
-
-              {/* Value */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Method</label>
-                  <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer" style={inputStyle}>
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed_amount">Fixed Amount</option>
-                    <option value="fixed_price">Fixed Price</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Value *</label>
-                  <input type="number" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required min="0" step="0.01" disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" style={inputStyle} placeholder={formData.value_type === "percentage" ? "20" : "500"} />
-                </div>
-              </div>
-
-              {/* Schedule */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Start Date</label>
-                  <input type="datetime-local" value={formData.start_at} onChange={(e) => setFormData({ ...formData, start_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark]" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>End Date</label>
-                  <input type="datetime-local" value={formData.end_at} onChange={(e) => setFormData({ ...formData, end_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark]" style={inputStyle} />
-                </div>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer" style={inputStyle}>
-                  <option value="draft">Draft</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
-                </select>
-              </div>
-
-              <div className="flex gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={mutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={mutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {mutation.isPending ? "Saving..." : editingDiscount ? "Update" : "Save"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Selection Modal (Products/Categories/Brands) ===== */}
-      {selector.open && (
-        <SelectionModal
-          type={selector.type}
-          items={selector.type === "product" ? products : selector.type === "category" ? categories : brands}
-          selectedIds={selector.type === "product" ? formData.selected_product_ids : selector.type === "category" ? formData.selected_category_ids : formData.selected_brand_ids}
-          onClose={() => setSelector({ open: false, type: null })}
-          onApply={(ids) => {
-            if (selector.type === "product") setFormData({ ...formData, selected_product_ids: ids });
-            if (selector.type === "category") setFormData({ ...formData, selected_category_ids: ids });
-            if (selector.type === "brand") setFormData({ ...formData, selected_brand_ids: ids });
-            setSelector({ open: false, type: null });
-          }}
+      {/* ===== Add/Edit Discount Modal ===== */}
+      {activeFormType && (
+        <DiscountFormModal
+          type={activeFormType}
+          formData={formData}
+          setFormData={setFormData}
+          editingDiscount={editingDiscount}
+          products={products}
+          categories={categories}
+          brands={brands}
+          mutation={mutation}
+          onClose={() => { setActiveFormType(null); resetForm(); }}
+          onSubmit={handleSubmit}
           cardStyle={cardStyle}
           inputStyle={inputStyle}
         />
@@ -701,7 +689,7 @@ export default function DiscountsPage() {
       {/* ===== Delete Confirmation Modal ===== */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+          <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -724,85 +712,264 @@ export default function DiscountsPage() {
   );
 }
 
-/* ================= Sub-Components ================= */
+/* ================= Discount Form Modal ================= */
+function DiscountFormModal({ type, formData, setFormData, editingDiscount, products, categories, brands, mutation, onClose, onSubmit, cardStyle, inputStyle }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
-function SelectionField({ label, items, onClick, onRemove, inputStyle }) {
+  const config = {
+    product: {
+      title: editingDiscount ? "Edit Product Discount" : "Create Product Discount",
+      subtitle: "Apply discount on specific products",
+      items: products,
+      placeholder: "Search products...",
+      emptyMsg: "No products found",
+      selectedLabel: "Selected Products",
+      color: "var(--accent)",
+      border: "var(--border-color)",
+      bg: "var(--accent-soft)",
+    },
+    category: {
+      title: editingDiscount ? "Edit Category Discount" : "Create Category Discount",
+      subtitle: "Apply discount on entire categories",
+      items: categories,
+      placeholder: "Search categories...",
+      emptyMsg: "No categories found",
+      selectedLabel: "Selected Categories",
+      color: "var(--accent)",
+      border: "var(--border-color)",
+      bg: "var(--accent-soft)",
+    },
+    brand: {
+      title: editingDiscount ? "Edit Brand Discount" : "Create Brand Discount",
+      subtitle: "Apply discount on specific brands",
+      items: brands,
+      placeholder: "Search brands...",
+      emptyMsg: "No brands found",
+      selectedLabel: "Selected Brands",
+      color: "var(--accent)",
+      border: "var(--border-color)",
+      bg: "var(--accent-soft)",
+    },
+    all: {
+      title: editingDiscount ? "Edit All Products Discount" : "Create All Products Discount",
+      subtitle: "This discount will apply to all products in your store",
+      items: [],
+      placeholder: "",
+      emptyMsg: "",
+      selectedLabel: "",
+      color: "var(--accent)",
+      border: "var(--border-color)",
+      bg: "var(--accent-soft)",
+    },
+  };
+
+  const current = config[type];
+  const needsSelection = type !== "all";
+
+  const filteredItems = useMemo(() => {
+    if (!needsSelection) return [];
+    if (!searchQuery.trim()) return current.items;
+    const term = searchQuery.toLowerCase();
+    return current.items.filter((item) => getItemName(item).toLowerCase().includes(term));
+  }, [current.items, searchQuery, needsSelection]);
+
+  const toggleItem = (id) => {
+    const strId = String(id);
+    setFormData({
+      ...formData,
+      selected_ids: formData.selected_ids.includes(strId)
+        ? formData.selected_ids.filter((x) => x !== strId)
+        : [...formData.selected_ids, strId],
+    });
+  };
+
+  const removeItem = (id) => {
+    setFormData({ ...formData, selected_ids: formData.selected_ids.filter((x) => x !== String(id)) });
+  };
+
+  const selectedItems = needsSelection
+    ? current.items.filter((item) => formData.selected_ids.includes(getItemId(item)))
+    : [];
+
   return (
-    <div>
-      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{label}</label>
-      <div className="rounded-md p-3 flex flex-wrap gap-2 items-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-        {items.length === 0 ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>None selected</span>
-        ) : (
-          items.slice(0, 5).map((item) => (
-            <span key={getItemId(item)} className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-              {getItemName(item, label.toLowerCase().slice(0, -1))}
-              <button type="button" onClick={() => onRemove(getItemId(item))} className="text-red-500 hover:text-red-400"><CloseIcon className="w-3 h-3" /></button>
-            </span>
-          ))
-        )}
-        <button type="button" onClick={onClick} className="h-7 px-2.5 rounded text-[11px] font-medium flex items-center gap-1 transition hover:opacity-80" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-          <PlusIcon className="w-3 h-3" /> {items.length > 0 ? "Manage" : "Select"}
-        </button>
-        {items.length > 5 && <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>+{items.length - 5} more</span>}
-      </div>
-    </div>
-  );
-}
-
-function SelectionModal({ type, items, selectedIds, onClose, onApply, cardStyle, inputStyle }) {
-  const [search, setSearch] = useState("");
-  const [draftIds, setDraftIds] = useState(selectedIds.map(String));
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return items;
-    const term = search.toLowerCase();
-    return items.filter((item) => getItemName(item, type).toLowerCase().includes(term));
-  }, [items, search, type]);
-
-  const toggle = (id) => setDraftIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="w-full max-w-lg rounded-xl overflow-hidden" style={cardStyle}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-          <h3 className="text-base font-semibold">Select {type === "product" ? "Products" : type === "category" ? "Categories" : "Brands"}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
-        </div>
-        <div className="p-4">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
-            <input autoFocus type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="h-9 pl-9 pr-3 rounded-md text-sm w-full outline-none" style={inputStyle} />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl" style={{ ...cardStyle, boxShadow: "var(--shadow-lg)" }}>
+        {/* Header */}
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", background: current.bg }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: current.bg, border: `1px solid ${current.border}` }}>
+              <TagIcon className="w-5 h-5" style={{ color: current.color }} />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>{current.title}</h3>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{current.subtitle}</p>
+            </div>
           </div>
+          <button onClick={onClose} disabled={mutation.isPending} className="p-1.5 rounded-md transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
         </div>
-        <div className="max-h-[300px] overflow-y-auto px-4 pb-4 space-y-1">
-          {filtered.length === 0 ? (
-            <p className="text-center text-xs py-4" style={{ color: "var(--text-muted)" }}>No items found</p>
-          ) : (
-            filtered.map((item) => {
-              const id = getItemId(item);
-              const isSelected = draftIds.includes(id);
-              return (
-                <button key={id} type="button" onClick={() => toggle(id)} className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }}
-                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
-                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-600"}`}>
-                    {isSelected && <CheckIcon className="w-3 h-3" />}
+
+        {/* Form Body */}
+        <form onSubmit={onSubmit} className="flex-1 overflow-y-auto">
+          <div className="space-y-5 p-5 sm:p-6">
+
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Name *</label>
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="Summer Sale 2026" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Coupon Code</label>
+                <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 uppercase font-mono focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="SUMMER20" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
+              <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows="2" disabled={mutation.isPending} className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="Describe this discount..." />
+            </div>
+
+            {/* Selection Section (only for product/category/brand) */}
+            {needsSelection && (
+              <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                <button type="button" onClick={() => setIsSelectionOpen((open) => !open)} aria-expanded={isSelectionOpen} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[var(--bg-tertiary)]" style={{ borderBottom: isSelectionOpen ? "1px solid var(--border-color)" : "none" }}>
+                  <span>
+                    <span className="block text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Select {type === "product" ? "Products" : type === "category" ? "Categories" : "Brands"} *</span>
+                    <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>{formData.selected_ids.length} selected</span>
                   </span>
-                  <Avatar name={getItemName(item, type)} size="w-7 h-7" />
-                  <span className="text-[13px] truncate flex-1" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{getItemName(item, type)}</span>
+                  <span className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{isSelectionOpen ? "Close" : "Choose"}<ChevronDownIcon className={`h-4 w-4 transition-transform ${isSelectionOpen ? "rotate-180" : ""}`} /></span>
                 </button>
-              );
-            })
-          )}
-        </div>
-        <div className="px-4 py-3 flex items-center justify-between gap-2" style={{ borderTop: "1px solid var(--border-color)" }}>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{draftIds.length} selected</span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-            <button onClick={() => onApply(draftIds)} className="h-8 px-4 rounded-md text-xs font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Apply</button>
+
+                {isSelectionOpen && <>
+                {/* Search */}
+                <div className="p-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
+                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={current.placeholder} className="h-9 pl-9 pr-3 rounded-md text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* Selected Chips */}
+                {selectedItems.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-3 py-2.5" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                    {selectedItems.map((item) => {
+                      const id = getItemId(item);
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--bg-card)", border: `1px solid ${current.border}`, color: current.color }}>
+                          <span className="max-w-[120px] truncate">{getItemName(item)}</span>
+                          <button type="button" onClick={() => removeItem(id)} className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition">
+                            <XIcon className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Items List */}
+                <div className="max-h-[220px] overflow-y-auto">
+                  {filteredItems.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{current.emptyMsg}</p>
+                    </div>
+                  ) : (
+                    <div className="p-1.5 space-y-0.5">
+                      {filteredItems.map((item) => {
+                        const id = getItemId(item);
+                        const isSelected = formData.selected_ids.includes(id);
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleItem(id)}
+                            className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition"
+                            style={{ backgroundColor: isSelected ? current.bg : "transparent" }}
+                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }}
+                            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${isSelected ? "" : "border-slate-600"}`}
+                              style={isSelected ? { backgroundColor: current.color, borderColor: current.color, color: "#0a0a0a" } : {}}>
+                              {isSelected && <CheckIcon className="w-3 h-3" />}
+                            </span>
+                            <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: current.bg, color: current.color, border: `1px solid ${current.border}` }}>
+                              {getInitials(getItemName(item))}
+                            </div>
+                            <span className="text-[13px] truncate flex-1" style={{ color: isSelected ? current.color : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>
+                              {getItemName(item)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                </>}
+              </div>
+            )}
+
+            {/* Value Section */}
+            <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Discount Value</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Type</label>
+                  <div className="relative">
+                    <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} disabled={mutation.isPending} className="appearance-none h-9 px-3 pr-8 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle}>
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed_amount">Fixed Amount</option>
+                      <option value="fixed_price">Fixed Price</option>
+                    </select>
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Value *</label>
+                  <div className="relative">
+                    <input type="number" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required min="0" step="0.01" disabled={mutation.isPending} className="h-9 pl-3 pr-10 rounded-md text-sm w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder={formData.value_type === "percentage" ? "20" : "500"} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                      {formData.value_type === "percentage" ? "%" : "$"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Start Date</label>
+                <input type="datetime-local" value={formData.start_at} onChange={(e) => setFormData({ ...formData, start_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>End Date</label>
+                <input type="datetime-local" value={formData.end_at} onChange={(e) => setFormData({ ...formData, end_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
+              <div className="relative">
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={mutation.isPending} className="appearance-none h-9 px-3 pr-8 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Footer */}
+          <div className="px-5 py-4 flex gap-2" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+            <button type="button" onClick={onClose} disabled={mutation.isPending} className="flex-1 h-10 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+            <button type="submit" disabled={mutation.isPending} className="flex-1 h-10 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              {mutation.isPending ? <><Spinner className="w-4 h-4" /> Saving...</> : editingDiscount ? "Update Discount" : "Create Discount"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

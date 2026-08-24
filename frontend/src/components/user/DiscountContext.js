@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { discountApi } from "@/apis/discountApi";
+import { discountApi } from "@/apis/admin/discountApi";
 
 // ✅ Fetch active public discounts (no auth)
 export function useDiscounts() {

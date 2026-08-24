@@ -1,4 +1,12 @@
 const Discount = require("../models/Discount");
+const { getIO } = require("../utils/socket");
+
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (_) {}
+};
 
 // =====================================================
 // HELPER
@@ -195,10 +203,8 @@ exports.createDiscount = async (req, res) => {
     // ===================================================
     // SOCKET
     // ===================================================
-    if (req.io) {
-      req.io.emit("discount:created", newDiscount);
-      req.io.emit("discountCreated", newDiscount);
-    }
+    emitSocketEvent("discount:created", newDiscount);
+    emitSocketEvent("discountCreated", newDiscount);
 
     return res.status(201).json({
       message: "Discount created successfully",
@@ -400,10 +406,8 @@ exports.updateDiscount = async (req, res) => {
     // ===================================================
     // SOCKET
     // ===================================================
-    if (req.io) {
-      req.io.emit("discount:updated", updatedDiscount);
-      req.io.emit("discountUpdated", updatedDiscount);
-    }
+    emitSocketEvent("discount:updated", updatedDiscount);
+    emitSocketEvent("discountUpdated", updatedDiscount);
 
     return res.status(200).json({
       message: "Discount updated successfully",
@@ -441,10 +445,8 @@ exports.deleteDiscount = async (req, res) => {
       return res.status(404).json({ message: "Discount not found" });
     }
 
-    if (req.io) {
-      req.io.emit("discount:deleted", req.params.id);
-      req.io.emit("discountDeleted", req.params.id);
-    }
+    emitSocketEvent("discount:deleted", req.params.id);
+    emitSocketEvent("discountDeleted", req.params.id);
 
     return res.status(200).json({ message: "Discount deleted successfully" });
   } catch (error) {
