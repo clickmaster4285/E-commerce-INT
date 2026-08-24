@@ -25,9 +25,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { productApi } from "@/apis/productApi";
-import { categoryApi } from "@/apis/categoryApi";
-import { brandApi } from "@/apis/brandApi";
+import { productApi } from "@/apis/admin/productApi";
+import { categoryApi } from "@/apis/admin/categoryApi";
+import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 
 const ITEMS_PER_PAGE = 20;

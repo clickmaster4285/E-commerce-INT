@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
-import { categoryApi } from "../../../apis/categoryApi";
+import { categoryApi } from "../../../apis/admin/categoryApi";
 import { toast } from "sonner";
 import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
 

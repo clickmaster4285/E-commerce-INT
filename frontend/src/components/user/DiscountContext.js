@@ -1,18 +1,50 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
-import { discountApi } from "@/apis/admin/discountApi";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
+import { discountApi } from "@/apis/user/discountApi";
+import { useSocket } from "@/hooks/useSocket";
 
 // ✅ Fetch active public discounts (no auth)
 export function useDiscounts() {
+  const queryClient = useQueryClient();
+  const { socket } = useSocket();
+
   const { data: discounts = [], isLoading } = useQuery({
     queryKey: ["publicDiscounts"],
     queryFn: () => discountApi.getPublic(),
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 30 * 1000,        // ✅ 2 min → 30 sec (socket fast karega)
+    refetchInterval: 5 * 60 * 1000, // ✅ Fallback: 5 min mein refetch
     retry: 1,
   });
+
+  // ✅ SOCKET LISTENERS — Admin changes ko live reflect karo
+  useEffect(() => {
+    if (!socket) return;
+
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ["publicDiscounts"] });
+    };
+
+    // Backend yeh 3 events emit karta hai discountController se
+    socket.on("discount:created", refresh);
+    socket.on("discount:updated", refresh);
+    socket.on("discount:deleted", refresh);
+
+    // Fallback event names (agar colon wale na milein)
+    socket.on("discountCreated", refresh);
+    socket.on("discountUpdated", refresh);
+    socket.on("discountDeleted", refresh);
+
+    return () => {
+      socket.off("discount:created", refresh);
+      socket.off("discount:updated", refresh);
+      socket.off("discount:deleted", refresh);
+      socket.off("discountCreated", refresh);
+      socket.off("discountUpdated", refresh);
+      socket.off("discountDeleted", refresh);
+    };
+  }, [socket, queryClient]);
 
   // ✅ Calculate best discount for a product
   const calculateProductDiscount = useCallback(

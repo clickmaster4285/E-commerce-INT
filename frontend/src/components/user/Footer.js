@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { categoryApi } from "@/apis/categoryApi";
-import { storeApi } from "@/apis/admin/storeApi";
+import { categoryApi } from "@/apis/user/categoryApi";
+import { storeApi } from "@/apis/user/storeApi";
 import { Mail, Phone, MapPin, CreditCard, Truck, ShieldCheck } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube, FaLinkedinIn } from "react-icons/fa";
 
@@ -161,7 +161,7 @@ const country = store?.country || "";
               Categories
             </h3>
 
-            <ul className="space-y-3 text-sm text-[var(--user-text-muted)]">
+            <ul className="space-y-5 my-3 text-sm text-[var(--user-text-muted)]">
               {footerCategories.length > 0 ? (
                 footerCategories.map((cat) => (
                   <FooterLink
@@ -184,7 +184,7 @@ const country = store?.country || "";
               Support
             </h3>
 
-            <ul className="space-y-3 text-sm text-[var(--user-text-muted)]">
+            <ul className="space-y-5 my-3 text-sm text-[var(--user-text-muted)]">
               <FooterLink href={`mailto:${supportEmail}`} label="Contact Us" />
               <FooterLink href="#" label="Privacy Policy" />
               <FooterLink href="#" label="Terms & Conditions" />
@@ -199,11 +199,11 @@ const country = store?.country || "";
               Follow Us
             </h3>
 
-            <p className="text-sm text-[var(--user-text-muted)] mb-4">
+            <p className="text-sm py-3 text-[var(--user-text-muted)]  mb-4">
               Stay connected with our latest updates.
             </p>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 my-10">
               {activeSocials.length > 0 ? (
                 activeSocials.map(({ key, Icon, url, label }) => (
                   <a

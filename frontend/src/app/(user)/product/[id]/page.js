@@ -26,7 +26,7 @@ import {
   Clock,
 } from "lucide-react";
 
-import { productApi } from "@/apis/productApi";
+import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";

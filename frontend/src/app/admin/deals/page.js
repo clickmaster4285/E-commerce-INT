@@ -5,9 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { dealApi } from "../../../apis/admin/dealApi";
-import { productApi } from "../../../apis/productApi";
-import { categoryApi } from "../../../apis/categoryApi";
-import { brandApi } from "../../../apis/brandApi";
+import { productApi } from "../../../apis/admin/productApi";
+import { categoryApi } from "../../../apis/admin/categoryApi";
+import { brandApi } from "../../../apis/admin/brandApi";
 // ✅ FIX: Importing the new socket sync hook
 import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
 

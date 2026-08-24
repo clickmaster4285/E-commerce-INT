@@ -6,7 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { categoryApi } from "@/apis/categoryApi"; // Adjust path as needed
+import { categoryApi } from "@/apis/admin/categoryApi"; // Adjust path as needed
 import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
 

@@ -32,6 +32,8 @@ const tagRoutes = require("./routes/tagRoutes"); // ✅ ADDED TAG ROUTES IMPORT
 const addressRoutes = require("./routes/addressRoutes"); // ✅ ADDRESS ROUTES
 const bannerRoutes = require("./routes/bannerRoutes");
 const bannerScheduler = require("./utils/bannerScheduler"); // ✅ Ye line add karo
+const orderRoutes = require("./routes/orderRoutes"); // ✅ ORDER ROUTES
+const cartRoutes = require("./routes/cartRoutes"); // ✅ CART ROUTES
 // ==========================================
 // APP
 // ==========================================
@@ -315,6 +317,18 @@ app.use(
 app.use(
   `${API_PREFIX}/banners`,
   bannerRoutes
+);
+
+// ✅ REGISTER ORDER ROUTES
+app.use(
+  `${API_PREFIX}/orders`,
+  orderRoutes
+);
+
+// ✅ REGISTER CART ROUTES
+app.use(
+  `${API_PREFIX}/cart`,
+  cartRoutes
 );
 // ==========================================
 // ROOT ROUTE

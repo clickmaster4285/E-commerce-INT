@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useWishlist } from "@/components/user/WishlistContext";
-import { productApi } from "@/apis/productApi";
+import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { Heart, Loader2, ShoppingBag } from "lucide-react";
 

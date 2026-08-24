@@ -25,6 +25,9 @@ const getCookieOptions = (maxAge) => ({
 // ==========================================
 // REGISTER (Customer only)
 // ==========================================
+// ==========================================
+// REGISTER (Customer only)
+// ==========================================
 const createUser = async (req, res) => {
   try {
     const { name, username, phone, email, password } = req.body;
@@ -39,7 +42,6 @@ const createUser = async (req, res) => {
         .json({ success: false, message: "User already exists" });
     const hashedPassword = await bcrypt.hash(password, 10);
     const defaultStore = await Store.findOne();
-    
     const user = await User.create({
       name,
       username:
@@ -47,11 +49,9 @@ const createUser = async (req, res) => {
       phone,
       email,
       password: hashedPassword,
-      role: finalRole, // ✅ Explicitly setting role
       storeId: defaultStore?._id,
       role: "user",
     });
-
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie(
@@ -61,7 +61,7 @@ const createUser = async (req, res) => {
     );
     res.status(201).json({
       success: true,
-      message: "Staff registered successfully",
+      message: "User registered successfully",
       user: {
         id: user._id,
         name: user.name,

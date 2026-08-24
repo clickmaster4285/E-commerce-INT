@@ -19,7 +19,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
-import { productApi } from "@/apis/productApi";
+import { productApi } from "@/apis/admin/productApi";
 import { variantApi } from "@/apis/admin/variantApi";
 
 const API_ORIGIN =

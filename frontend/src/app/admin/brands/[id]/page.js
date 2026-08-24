@@ -7,8 +7,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { Country } from "country-state-city";
-import { brandApi } from "../../../../apis/brandApi"; // Adjust path as needed
-import { productApi } from "../../../../apis/productApi"; // Adjust path as needed
+import { brandApi } from "../../../../apis/admin/brandApi"; // Adjust path as needed
+import { productApi } from "../../../../apis/admin/productApi"; // Adjust path as needed
 import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
 import { useSocket } from "@/hooks/useSocket";
 

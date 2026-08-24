@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { productApi } from "../../../apis/productApi";
+import { productApi } from "../../../apis/admin/productApi";
 import { discountApi } from "../../../apis/admin/discountApi";
-import { categoryApi } from "../../../apis/categoryApi";
-import { brandApi } from "../../../apis/brandApi";
+import { categoryApi } from "../../../apis/admin/categoryApi";
+import { brandApi } from "../../../apis/admin/brandApi";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";

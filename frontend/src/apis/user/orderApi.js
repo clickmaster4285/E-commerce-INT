@@ -1,4 +1,4 @@
-import axiosInstance from "./axiosInstance";
+import axiosInstance from "../axiosInstance";
 
 export const orderApi = {
   place: (data) => axiosInstance.post("/orders", data).then((res) => res.data?.data),

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dealApi } from "../../../../apis/admin/dealApi"; // Adjust path if needed
-import { productApi } from "../../../../apis/productApi";
+import { productApi } from "../../../../apis/admin/productApi";
 import useDealSocketSync from "@/hooks/useDealSocketSync"; 
 /* =========================================================
    ICON COMPONENTS
