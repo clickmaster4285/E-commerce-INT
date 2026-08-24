@@ -4,14 +4,27 @@ import { io } from "socket.io-client";
 
 let globalSocket = null;
 
+// ✅ DYNAMIC URL — jis host par frontend khula hai, wahi backend (5000) use karo
+const getSocketURL = () => {
+  // SSR ke liye env fallback
+  if (typeof window === "undefined") {
+    return (
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
+      "http://localhost:5000"
+    );
+  }
+  // Browser mein — current hostname + backend port 5000
+  return (
+    process.env.NEXT_PUBLIC_SOCKET_URL ||
+    `http://${window.location.hostname}:5000`
+  );
+};
+
 function getSocket() {
   if (globalSocket && globalSocket.connected) return globalSocket;
 
-  // ✅ FIXED: 5000 (backend) not 3000 (frontend)
-  const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
-
+  const SOCKET_URL = getSocketURL();
   console.log("🔌 Creating socket connection to:", SOCKET_URL);
 
   globalSocket = io(SOCKET_URL, {

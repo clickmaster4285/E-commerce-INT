@@ -42,6 +42,7 @@ const fixPermissions = (oldPerms = {}) => ({
   store: oldPerms?.store ?? false,
   discounts: oldPerms?.discounts ?? true,
   deals: oldPerms?.deals ?? true,
+  banners: oldPerms?.banners ?? true,
 });
 
 const needsPermissionMigration = (perms) => {
@@ -71,6 +72,7 @@ const needsPermissionMigration = (perms) => {
     "store",
     "discounts",
     "deals",
+    "banners",
   ];
 
   return requiredKeys.some(
@@ -571,6 +573,7 @@ exports.updateEmployee = async (req, res) => {
         "store",
         "discounts",
         "deals",
+        "banners",
       ];
 
       for (const key of permissionKeys) {

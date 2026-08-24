@@ -41,6 +41,7 @@ import {
   Layers,
   ShieldCheck,
   Percent,
+  Image, // ✅ Added for Banners
 } from "lucide-react";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
@@ -58,6 +59,7 @@ const ALLOWED_PERMISSIONS = {
   deals: { label: "Deals", default: true },
   profile: { label: "Profile", default: true },
   store: { label: "Store", default: false },
+  banners: { label: "Banners", default: true }, // ✅ Added Banners Permission
 };
 
 // ==========================================
@@ -588,7 +590,7 @@ export default function EmployeeDetailPage() {
     });
 
   // ==========================================
-  // ✅ DEALS ADDED HERE
+  // ✅ PERMISSIONS STATE (BANNERS ADDED)
   // ==========================================
   const [
     permissionsData,
@@ -602,6 +604,7 @@ export default function EmployeeDetailPage() {
     deals: true,
     profile: true,
     store: false,
+    banners: true, // ✅ Added Banners
   });
 
   const [showPassword, setShowPassword] =

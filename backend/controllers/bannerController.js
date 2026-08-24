@@ -1,6 +1,14 @@
 const Banner = require("../models/Banner");
 const fs = require("fs");
 const path = require("path");
+const { getIO } = require("../utils/socket");
+
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (_) {}
+};
 
 const deleteFile = (filePath) => {
   if (!filePath) return;
@@ -71,6 +79,10 @@ exports.createBanner = async (req, res) => {
     }
 
     const banner = await Banner.create(data);
+
+    emitSocketEvent("banner:created", { success: true, data: banner });
+    emitSocketEvent("bannerCreated", { success: true, data: banner });
+
     res.status(201).json({ success: true, data: banner });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -97,6 +109,10 @@ exports.updateBanner = async (req, res) => {
     }
 
     const updated = await Banner.findByIdAndUpdate(req.params.id, data, { new: true });
+
+    emitSocketEvent("banner:updated", { success: true, data: updated });
+    emitSocketEvent("bannerUpdated", { success: true, data: updated });
+
     res.json({ success: true, data: updated });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -109,6 +125,10 @@ exports.toggleStatus = async (req, res) => {
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
     banner.status = banner.status === "active" ? "inactive" : "active";
     await banner.save();
+
+    emitSocketEvent("banner:updated", { success: true, data: banner });
+    emitSocketEvent("bannerToggled", { success: true, data: banner });
+
     res.json({ success: true, data: banner });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -124,6 +144,10 @@ exports.duplicateBanner = async (req, res) => {
     copy.title = `${original.title} (Copy)`;
     copy.status = "draft";
     const newBanner = await Banner.create(copy);
+
+    emitSocketEvent("banner:created", { success: true, data: newBanner });
+    emitSocketEvent("bannerCreated", { success: true, data: newBanner });
+
     res.status(201).json({ success: true, data: newBanner });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -136,6 +160,10 @@ exports.deleteBanner = async (req, res) => {
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
     [banner.desktopImage, banner.tabletImage, banner.mobileImage].forEach(deleteFile);
     await Banner.findByIdAndDelete(req.params.id);
+
+    emitSocketEvent("banner:deleted", { success: true, data: { id: req.params.id } });
+    emitSocketEvent("bannerDeleted", { success: true, data: { id: req.params.id } });
+
     res.json({ success: true, message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

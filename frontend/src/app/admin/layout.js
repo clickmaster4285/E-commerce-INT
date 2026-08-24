@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Sidebar from '../../components/ui/adminComponents/Sidebar';
-import Navbar from '../../components/ui/adminComponents/Navbar';
+import Sidebar from '../../components/adminComponents/Sidebar';
+import Navbar from '../../components/adminComponents/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
@@ -21,6 +21,8 @@ const ROUTE_PERMISSIONS = {
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',
   '/admin/discounts': 'discounts',
+  '/admin/deals': 'deals',
+  '/admin/banners': 'banners',
 };
 
 // ==========================================
@@ -308,12 +310,34 @@ export default function AdminLayout({ children }) {
         updatedData
       );
 
-      const updatedUser =
+      const payload =
+        updatedData?.data ||
         updatedData?.user ||
         updatedData?.employee ||
         updatedData;
 
+      const updatedUser = payload?.userId && typeof payload.userId === 'object'
+        ? payload.userId
+        : payload;
+
       if (!updatedUser) return;
+
+      const targetUserId = updatedData?.userId || updatedUser?._id;
+      if (targetUserId && String(targetUserId) !== String(userData._id)) return;
+
+      const nextRole = updatedUser.role ?? userData.role;
+      const nextPermissions = updatedUser.permissions ?? updatedData?.permissions ?? userData.permissions ?? {};
+      const matchedRoute = Object.entries(ROUTE_PERMISSIONS).find(
+        ([route]) => pathname === route || pathname.startsWith(`${route}/`)
+      );
+
+      if (
+        String(nextRole).toLowerCase() !== 'admin' &&
+        matchedRoute &&
+        nextPermissions[matchedRoute[1]] !== true
+      ) {
+        router.replace('/admin/access-denied');
+      }
 
       // ==========================================
       // UPDATE TANSTACK USER CACHE
@@ -326,12 +350,9 @@ export default function AdminLayout({ children }) {
           return {
             ...oldUser,
             ...updatedUser,
-            permissions:
-              updatedUser.permissions ??
-              oldUser.permissions,
+            permissions: nextPermissions,
             role:
-              updatedUser.role ??
-              oldUser.role,
+              nextRole,
           };
         }
       );
@@ -339,6 +360,11 @@ export default function AdminLayout({ children }) {
 
     socket.on(
       'permissionsUpdated',
+      handlePermissionUpdate
+    );
+
+    socket.on(
+      'authPermissionsUpdated',
       handlePermissionUpdate
     );
 
@@ -354,6 +380,11 @@ export default function AdminLayout({ children }) {
       );
 
       socket.off(
+        'authPermissionsUpdated',
+        handlePermissionUpdate
+      );
+
+      socket.off(
         'employeeUpdated',
         handlePermissionUpdate
       );
@@ -362,6 +393,7 @@ export default function AdminLayout({ children }) {
     isLoginPage,
     userData?._id,
     userData?.role,
+    pathname,
     queryClient,
   ]);
 

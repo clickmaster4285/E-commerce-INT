@@ -5,39 +5,100 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
+import useBannerSocketSync from "../../../hooks/useBannerSocket";
 
 // ==========================================
 // API SETUP
 // ==========================================
-const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+// ==========================================
+// API SETUP
+// ==========================================
+const API_BASE =
+  process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
+  "http://localhost:5000";
+
 const API_URL = `${API_BASE}/api`;
+
+// ✅ Banner API instance
+// Cookie based authentication ke liye withCredentials zaroori hai
+const bannerAxios = axios.create({
+  baseURL: API_URL,
+  withCredentials: true,
+});
+
+// ✅ Agar accessToken normal cookie mein available ho
+// to Authorization header bhi bhej do.
+// Agar cookie HttpOnly hai to browser withCredentials ke through
+// automatically cookie bhejega.
+bannerAxios.interceptors.request.use(
+  (config) => {
+    try {
+      const cookies = document.cookie.split(";");
+
+      const accessTokenCookie = cookies.find((cookie) =>
+        cookie.trim().startsWith("accessToken=")
+      );
+
+      if (accessTokenCookie) {
+        const token = accessTokenCookie
+          .split("=")
+          .slice(1)
+          .join("=")
+          .trim();
+
+        if (token) {
+          config.headers.Authorization = `Bearer ${decodeURIComponent(token)}`;
+        }
+      }
+    } catch (error) {
+      console.error("Banner auth token read error:", error);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 const adminBannerApi = {
   getAll: async () => {
-    const res = await axios.get(`${API_URL}/banners`);
+    const res = await bannerAxios.get("/banners");
     return res.data.data || [];
   },
+
   create: async (data) => {
-    const res = await axios.post(`${API_URL}/banners`, data, { headers: { "Content-Type": "multipart/form-data" } });
+    const res = await bannerAxios.post("/banners", data, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
     return res.data.data;
   },
+
   update: async (id, data) => {
-    const res = await axios.put(`${API_URL}/banners/${id}`, data, { headers: { "Content-Type": "multipart/form-data" } });
+    const res = await bannerAxios.put(`/banners/${id}`, data, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
     return res.data.data;
   },
+
   delete: async (id) => {
-    await axios.delete(`${API_URL}/banners/${id}`);
+    await bannerAxios.delete(`/banners/${id}`);
   },
+
   toggle: async (id) => {
-    const res = await axios.patch(`${API_URL}/banners/${id}/toggle`);
+    const res = await bannerAxios.patch(`/banners/${id}/toggle`);
     return res.data.data;
   },
+
   duplicate: async (id) => {
-    const res = await axios.post(`${API_URL}/banners/${id}/duplicate`);
+    const res = await bannerAxios.post(`/banners/${id}/duplicate`);
     return res.data.data;
   },
 };
-
 // ==========================================
 // ICONS
 // ==========================================
@@ -94,6 +155,9 @@ const EyeIcon = ({ className = "w-4 h-4" }) => (
 const CopyIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
 );
+const InfoIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+);
 
 // ==========================================
 // HELPERS
@@ -118,12 +182,149 @@ const StatusBadge = ({ status }) => {
 };
 
 // ==========================================
+// PROFESSIONAL FORM COMPONENTS
+// ==========================================
+const FormSection = ({ number, title, description, children }) => (
+  <div className="rounded-lg border p-6 shadow-sm" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+    <div className="mb-5">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xs font-bold">
+          {number}
+        </div>
+        <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>{title}</h3>
+      </div>
+      {description && <p className="text-xs ml-10" style={{ color: "var(--text-muted)" }}>{description}</p>}
+    </div>
+    {children}
+  </div>
+);
+
+const FormField = ({ label, required, helpText, children }) => (
+  <div className="space-y-1.5">
+    <label className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+      {label}
+      {required && <span className="text-red-500">*</span>}
+    </label>
+    {children}
+    {helpText && (
+      <p className="text-[11px] flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
+        <InfoIcon className="w-3 h-3" />
+        {helpText}
+      </p>
+    )}
+  </div>
+);
+
+const Input = ({ ...props }) => (
+  <input
+    {...props}
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder:text-gray-400"
+    style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
+  />
+);
+
+const Select = ({ children, ...props }) => (
+  <select
+    {...props}
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+    style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
+  >
+    {children}
+  </select>
+);
+
+const Textarea = ({ ...props }) => (
+  <textarea
+    {...props}
+    className="w-full px-3 py-2.5 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder:text-gray-400 resize-none"
+    style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
+  />
+);
+
+const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions }) => {
+  const inputRef = React.useRef(null);
+  
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+    }
+  };
+
+  const handleRemove = () => {
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div
+        onClick={() => !preview && inputRef.current?.click()}
+        className={`relative border-2 border-dashed rounded-lg p-4 transition-all duration-200 cursor-pointer ${
+          preview 
+            ? "border-emerald-300 bg-emerald-50/30" 
+            : "hover:border-emerald-400"
+        }`}
+        style={{ borderColor: preview ? "" : "var(--border-color)", backgroundColor: preview ? "" : "var(--bg-tertiary)" }}
+      >
+        {preview ? (
+          <div className="space-y-2">
+            <img src={preview} alt={label} className="w-full h-24 object-cover rounded-md" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+              className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+            >
+              <CloseIcon className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-4 text-center">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+              <UploadIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+            </div>
+            <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>Click to upload</p>
+            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{dimensions}</p>
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </div>
+    </div>
+  );
+};
+
+const Checkbox = ({ checked, onChange, label }) => (
+  <label className="flex items-center gap-2 cursor-pointer group">
+    <div className="relative">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+      />
+    </div>
+    <span className="text-sm transition" style={{ color: "var(--text-primary)" }}>{label}</span>
+  </label>
+);
+
+// ==========================================
 // MAIN COMPONENT
 // ==========================================
 export default function BannersPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  const { markSelfAction } = useBannerSocketSync();
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -148,13 +349,9 @@ export default function BannersPage() {
   };
 
   const [form, setForm] = useState(defaultForm);
-  const [removeDesktop, setRemoveDesktop] = useState(false);
-  const [removeTablet, setRemoveTablet] = useState(false);
-  const [removeMobile, setRemoveMobile] = useState(false);
 
   const resetForm = () => {
     setForm(defaultForm);
-    setRemoveDesktop(false); setRemoveTablet(false); setRemoveMobile(false);
     setEditingBanner(null);
   };
 
@@ -166,7 +363,10 @@ export default function BannersPage() {
   });
 
   const bannerMutation = useMutation({
-    mutationFn: ({ data, id }) => id ? adminBannerApi.update(id, data) : adminBannerApi.create(data),
+    mutationFn: ({ data, id }) => {
+      markSelfAction(id ? "update" : "create");
+      return id ? adminBannerApi.update(id, data) : adminBannerApi.create(data);
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
       toast.success(variables.id ? "Banner updated successfully" : "Banner added successfully");
@@ -177,7 +377,10 @@ export default function BannersPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map((id) => adminBannerApi.delete(id))),
+    mutationFn: (ids) => {
+      markSelfAction("delete");
+      return Promise.all(ids.map((id) => adminBannerApi.delete(id)));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
       setSelectedIds([]);
@@ -237,9 +440,6 @@ export default function BannersPage() {
       else if (typeof value === "object" && value !== null) fd.append(key, JSON.stringify(value));
       else if (value !== null && value !== undefined) fd.append(key, value);
     });
-    if (removeDesktop) fd.append("removeDesktop", "true");
-    if (removeTablet) fd.append("removeTablet", "true");
-    if (removeMobile) fd.append("removeMobile", "true");
 
     bannerMutation.mutate({ data: fd, id: editingBanner?._id });
   };
@@ -272,13 +472,15 @@ export default function BannersPage() {
   const updateForm = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
   const updateNested = (parent, field, value) => setForm((prev) => ({ ...prev, [parent]: { ...prev[parent], [field]: value } }));
 
+  const getImagePreview = (file) => {
+    if (!file) return null;
+    if (file instanceof File) return URL.createObjectURL(file);
+    return `${API_BASE}/${file}`;
+  };
+
   // --- Reusable Styles ---
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
-
-  const SectionTitle = ({ children }) => (
-    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--border-color)" }}>{children}</h3>
-  );
 
   const SortHeader = ({ label, sortKey }) => (
     <th className="px-4 py-3 text-left">
@@ -329,8 +531,8 @@ export default function BannersPage() {
   };
 
   return (
-    <div className="w-full min-h-screen p-6" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full max-w-7xl mx-auto space-y-6">
+    <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
+      <div className="w-full space-y-5">
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -349,7 +551,7 @@ export default function BannersPage() {
         </div>
 
         {/* ===== Stat Cards ===== */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: "Total Banners", value: stats.total, color: "var(--text-primary)" },
             { label: "Active", value: stats.active, color: "#34d399" },
@@ -364,12 +566,16 @@ export default function BannersPage() {
           ))}
         </div>
 
-        {/* ===== Search & Filters ===== */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-            <input type="text" placeholder="Search by title..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
-          </div>
+        {/* ===== Search ===== */}
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+            <SearchIcon />
+          </span>
+          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+        </div>
+
+        {/* ===== Filters ===== */}
+        <div className="flex flex-wrap items-center gap-3">
           <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -461,7 +667,7 @@ export default function BannersPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {paginatedBanners.map((banner) => (
               <div key={banner._id} onClick={() => router.push(`${pathname}/${banner._id}`)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                 <img src={`${API_BASE}/${banner.desktopImage}`} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
@@ -501,184 +707,198 @@ export default function BannersPage() {
           </div>
         )}
 
-        {/* ===== Add/Edit Modal - IMPROVED SPACING ===== */}
+        {/* ===== PROFESSIONAL MODAL FORM ===== */}
         {showModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="w-full max-w-3xl rounded-xl overflow-hidden" style={cardStyle}>
-              <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{editingBanner ? "Edit Banner" : "Add New Banner"}</h3>
-                <button onClick={() => { setShowModal(false); resetForm(); }} disabled={bannerMutation.isPending} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
+            <div className="w-full max-w-4xl rounded-xl overflow-hidden shadow-2xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+              {/* Modal Header */}
+              <div className="px-6 py-4 flex items-center justify-between border-b" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                <div>
+                  <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{editingBanner ? "Edit Banner" : "Create New Banner"}</h3>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Fill in the details below to {editingBanner ? "update" : "create"} your banner</p>
+                </div>
+                <button onClick={() => { setShowModal(false); resetForm(); }} disabled={bannerMutation.isPending} className="p-2 rounded-lg transition disabled:opacity-50 hover:bg-gray-500/10">
+                  <CloseIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+                </button>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
                 
                 {/* 1. Basic Information */}
-                <div>
-                  <SectionTitle>1. Basic Information</SectionTitle>
+                <FormSection number="1" title="Basic Information" description="Define your banner's identity and type">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Banner Title *</label>
-                      <input type="text" value={form.title} onChange={(e) => updateForm("title", e.target.value)} required className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="Summer Sale Hero" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Banner Type</label>
-                      <select value={form.bannerType} onChange={(e) => updateForm("bannerType", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle}>
+                    <FormField label="Banner Title" required helpText="Internal name for admin reference">
+                      <Input type="text" value={form.title} onChange={(e) => updateForm("title", e.target.value)} required placeholder="e.g., Summer Sale 2024" />
+                    </FormField>
+                    <FormField label="Banner Type" helpText="Determines where this banner appears">
+                      <Select value={form.bannerType} onChange={(e) => updateForm("bannerType", e.target.value)}>
                         <option value="homepage_hero">Homepage Hero</option>
                         <option value="promotional">Promotional</option>
                         <option value="product">Product</option>
                         <option value="collection">Collection</option>
                         <option value="popup">Popup</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Position (Sort Order)</label>
-                      <input type="number" value={form.position} onChange={(e) => updateForm("position", parseInt(e.target.value))} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} />
-                    </div>
+                      </Select>
+                    </FormField>
+                    <FormField label="Position" helpText="Lower numbers appear first">
+                      <Input type="number" value={form.position} onChange={(e) => updateForm("position", parseInt(e.target.value) || 0)} min="0" />
+                    </FormField>
                   </div>
-                </div>
+                </FormSection>
 
                 {/* 2. Responsive Images */}
-                <div>
-                  <SectionTitle>2. Responsive Images</SectionTitle>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Desktop Image *</label>
-                        <div className="flex items-center gap-3">
-                          <div className="w-full h-10 rounded-md flex items-center justify-center overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                            {form.desktopImage ? <img src={form.desktopImage instanceof File ? URL.createObjectURL(form.desktopImage) : `${API_BASE}/${editingBanner?.desktopImage}`} alt="Desktop" className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
-                          </div>
-                        </div>
-                        <input type="file" accept="image/*" onChange={(e) => updateForm("desktopImage", e.target.files?.[0])} className="mt-2 text-xs" style={{ color: "var(--text-muted)" }} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tablet Image</label>
-                        <div className="w-full h-10 rounded-md flex items-center justify-center overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                          {form.tabletImage ? <img src={form.tabletImage instanceof File ? URL.createObjectURL(form.tabletImage) : `${API_BASE}/${editingBanner?.tabletImage}`} alt="Tablet" className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
-                        </div>
-                        <input type="file" accept="image/*" onChange={(e) => updateForm("tabletImage", e.target.files?.[0])} className="mt-2 text-xs" style={{ color: "var(--text-muted)" }} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Mobile Image</label>
-                        <div className="w-full h-10 rounded-md flex items-center justify-center overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                          {form.mobileImage ? <img src={form.mobileImage instanceof File ? URL.createObjectURL(form.mobileImage) : `${API_BASE}/${editingBanner?.mobileImage}`} alt="Mobile" className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
-                        </div>
-                        <input type="file" accept="image/*" onChange={(e) => updateForm("mobileImage", e.target.files?.[0])} className="mt-2 text-xs" style={{ color: "var(--text-muted)" }} />
-                      </div>
-                    </div>
+                <FormSection number="2" title="Responsive Images" description="Upload images for different screen sizes">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <ImageUploadBox
+                      label="Desktop Image"
+                      required
+                      dimensions="1920x600px recommended"
+                      file={form.desktopImage}
+                      setFile={(f) => updateForm("desktopImage", f)}
+                      preview={getImagePreview(form.desktopImage)}
+                    />
+                    <ImageUploadBox
+                      label="Tablet Image"
+                      dimensions="1024x500px recommended"
+                      file={form.tabletImage}
+                      setFile={(f) => updateForm("tabletImage", f)}
+                      preview={getImagePreview(form.tabletImage)}
+                    />
+                    <ImageUploadBox
+                      label="Mobile Image"
+                      dimensions="640x400px recommended"
+                      file={form.mobileImage}
+                      setFile={(f) => updateForm("mobileImage", f)}
+                      preview={getImagePreview(form.mobileImage)}
+                    />
                   </div>
-                </div>
+                  <div className="mt-4">
+                    <FormField label="Alt Text" helpText="For SEO and accessibility">
+                      <Input type="text" value={form.altText} onChange={(e) => updateForm("altText", e.target.value)} placeholder="Describe the banner image" />
+                    </FormField>
+                  </div>
+                </FormSection>
 
-                {/* 3. Content */}
-                <div>
-                  <SectionTitle>3. Banner Content</SectionTitle>
+                {/* 3. Banner Content */}
+                <FormSection number="3" title="Banner Content" description="Text content displayed on the banner">
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Eyebrow / Small Heading</label>
-                      <input type="text" value={form.eyebrow} onChange={(e) => updateForm("eyebrow", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="Summer Collection" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Main Heading</label>
-                      <input type="text" value={form.heading} onChange={(e) => updateForm("heading", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="UP TO 50% OFF" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
-                      <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} rows="3" className="px-3 py-2 rounded-md text-sm w-full outline-none resize-none" style={inputStyle} placeholder="Brief description..." />
-                    </div>
+                    <FormField label="Eyebrow / Small Heading" helpText="Small text above main heading">
+                      <Input type="text" value={form.eyebrow} onChange={(e) => updateForm("eyebrow", e.target.value)} placeholder="e.g., SUMMER COLLECTION" />
+                    </FormField>
+                    <FormField label="Main Heading" required helpText="Primary bold text on banner">
+                      <Input type="text" value={form.heading} onChange={(e) => updateForm("heading", e.target.value)} placeholder="e.g., UP TO 50% OFF" />
+                    </FormField>
+                    <FormField label="Description" helpText="Brief description below heading">
+                      <Textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} rows="3" placeholder="Shop our latest collection..." />
+                    </FormField>
                   </div>
-                </div>
+                </FormSection>
 
                 {/* 4. Call to Action */}
-                <div>
-                  <SectionTitle>4. Call to Action</SectionTitle>
+                <FormSection number="4" title="Call to Action" description="Button and link configuration">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Button Text</label>
-                      <input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="Shop Now" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Link Type</label>
-                      <select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle}>
+                    <FormField label="Button Text" helpText="Text displayed on button">
+                      <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
+                    </FormField>
+                    <FormField label="Link Type" helpText="Where button click leads">
+                      <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
                         <option value="custom_url">Custom URL</option>
-                        <option value="product">Product</option>
-                        <option value="category">Category</option>
+                        <option value="product">Product Page</option>
+                        <option value="category">Category Page</option>
                         <option value="none">No Link</option>
-                      </select>
-                    </div>
+                      </Select>
+                    </FormField>
                     {form.primaryButton.linkType === "custom_url" && (
-                      <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Target URL</label>
-                        <input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} placeholder="https://..." />
-                      </div>
+                      <FormField label="Target URL" required helpText="Full URL destination">
+                        <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
+                      </FormField>
                     )}
                   </div>
-                </div>
+                </FormSection>
 
                 {/* 5. Display Rules */}
-                <div>
-                  <SectionTitle>5. Display Rules</SectionTitle>
+                <FormSection number="5" title="Display Rules" description="Control where banner appears">
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Show On Pages:</label>
-                      <div className="flex flex-wrap gap-3">
+                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Show On Pages:</label>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {["homepage", "category", "product", "cart", "checkout"].map((page) => (
-                          <label key={page} className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={form.displayRules.pages.includes(page)} onChange={(e) => {
+                          <Checkbox
+                            key={page}
+                            checked={form.displayRules.pages.includes(page)}
+                            onChange={(e) => {
                               const pages = e.target.checked ? [...form.displayRules.pages, page] : form.displayRules.pages.filter(p => p !== page);
                               updateNested("displayRules", "pages", pages);
-                            }} className="w-4 h-4 rounded" style={{ accentColor: "var(--accent)" }} />
-                            <span className="text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{page}</span>
-                          </label>
+                            }}
+                            label={page.charAt(0).toUpperCase() + page.slice(1)}
+                          />
                         ))}
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Show On Devices:</label>
-                      <div className="flex flex-wrap gap-3">
+                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Show On Devices:</label>
+                      <div className="grid grid-cols-3 gap-3">
                         {["desktop", "tablet", "mobile"].map((device) => (
-                          <label key={device} className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={form.displayRules.devices.includes(device)} onChange={(e) => {
+                          <Checkbox
+                            key={device}
+                            checked={form.displayRules.devices.includes(device)}
+                            onChange={(e) => {
                               const devices = e.target.checked ? [...form.displayRules.devices, device] : form.displayRules.devices.filter(d => d !== device);
                               updateNested("displayRules", "devices", devices);
-                            }} className="w-4 h-4 rounded" style={{ accentColor: "var(--accent)" }} />
-                            <span className="text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{device}</span>
-                          </label>
+                            }}
+                            label={device.charAt(0).toUpperCase() + device.slice(1)}
+                          />
                         ))}
                       </div>
                     </div>
                   </div>
-                </div>
+                </FormSection>
 
                 {/* 6. Schedule */}
-                <div>
-                  <SectionTitle>6. Schedule</SectionTitle>
+                <FormSection number="6" title="Schedule" description="Set when banner should be active">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Start Date & Time</label>
-                      <input type="datetime-local" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>End Date & Time</label>
-                      <input type="datetime-local" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} />
-                    </div>
+                    <FormField label="Start Date & Time" helpText="When banner becomes active">
+                      <Input type="datetime-local" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
+                    </FormField>
+                    <FormField label="End Date & Time" helpText="When banner expires">
+                      <Input type="datetime-local" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
+                    </FormField>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={form.autoPublish} onChange={(e) => updateForm("autoPublish", e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: "var(--accent)" }} />
-                      <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Auto-publish on start date</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={form.autoDisable} onChange={(e) => updateForm("autoDisable", e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: "var(--accent)" }} />
-                      <span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Auto-disable after end date</span>
-                    </label>
+                  <div className="flex flex-col sm:flex-row gap-4 pt-3 border-t" style={{ borderColor: "var(--border-color)" }}>
+                    <Checkbox
+                      checked={form.autoPublish}
+                      onChange={(e) => updateForm("autoPublish", e.target.checked)}
+                      label="Auto-publish on start date"
+                    />
+                    <Checkbox
+                      checked={form.autoDisable}
+                      onChange={(e) => updateForm("autoDisable", e.target.checked)}
+                      label="Auto-disable after end date"
+                    />
                   </div>
-                </div>
+                </FormSection>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                  <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={bannerMutation.isPending} className="flex-1 h-10 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                  <button type="submit" disabled={bannerMutation.isPending} className="flex-1 h-10 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                    {bannerMutation.isPending ? "Saving..." : editingBanner ? "Update" : "Save"}
+                <div className="flex gap-3 pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowModal(false); resetForm(); }}
+                    disabled={bannerMutation.isPending}
+                    className="flex-1 h-11 rounded-lg text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border"
+                    style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={bannerMutation.isPending}
+                    className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                  >
+                    {bannerMutation.isPending ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Spinner className="w-4 h-4" />
+                        Saving...
+                      </span>
+                    ) : editingBanner ? "Update Banner" : "Create Banner"}
                   </button>
                 </div>
               </form>
@@ -690,19 +910,19 @@ export default function BannersPage() {
         {deleteTarget && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
-            <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+            <div className="w-full max-w-sm rounded-xl p-5 shadow-2xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)", animation: "modalScaleIn 0.2s ease-out" }}>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                  <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  <svg className="w-5 h-5" style={{ color: "var(--danger, #ef4444)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold">{deleteTarget.banners.length === 1 ? `Delete "${deleteTarget.banners[0].title}"?` : `Delete ${deleteTarget.banners.length} banners?`}</h3>
+                  <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{deleteTarget.banners.length === 1 ? `Delete "${deleteTarget.banners[0].title}"?` : `Delete ${deleteTarget.banners.length} banners?`}</h3>
                   <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
                 </div>
               </div>
               <div className="flex gap-2 mt-5">
-                <button onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
+                <button onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
+                <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger, #ef4444)" }}>
                   {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
                 </button>
               </div>

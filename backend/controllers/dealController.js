@@ -1,4 +1,12 @@
 const Deal = require("../models/Deal");
+const { getIO } = require("../utils/socket");
+
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (_) {}
+};
 
 // ==========================================
 // CREATE DEAL
@@ -11,6 +19,9 @@ const createDeal = async (req, res) => {
       createdBy: req.user?._id || req.user?.id || null,
       updatedBy: req.user?._id || req.user?.id || null,
     });
+
+    emitSocketEvent("deal:created", { success: true, data: deal });
+    emitSocketEvent("dealCreated", { success: true, data: deal });
 
     res.status(201).json({
       success: true,
@@ -229,6 +240,9 @@ const updateDeal = async (req, res) => {
       .populate("brandIds", "name")
       .populate("bundleProducts.product", "name sku images selling_price");
 
+    emitSocketEvent("deal:updated", { success: true, data: updatedDeal });
+    emitSocketEvent("dealUpdated", { success: true, data: updatedDeal });
+
     res.status(200).json({
       success: true,
       message: "Deal updated successfully",
@@ -262,6 +276,9 @@ const deleteDeal = async (req, res) => {
     }
 
     await Deal.findByIdAndDelete(id);
+
+    emitSocketEvent("deal:deleted", { success: true, data: { id } });
+    emitSocketEvent("dealDeleted", { success: true, data: { id } });
 
     res.status(200).json({
       success: true,
@@ -303,6 +320,9 @@ const toggleDealStatus = async (req, res) => {
       null;
 
     await deal.save();
+
+    emitSocketEvent("deal:updated", { success: true, data: deal });
+    emitSocketEvent("dealUpdated", { success: true, data: deal });
 
     res.status(200).json({
       success: true,
