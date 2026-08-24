@@ -1,111 +1,90 @@
 @import "tailwindcss";
 
-/* =========================================
-   ROOT / DARK THEME
-========================================= */
-
+/* Simple professional navy and blue theme */
 :root {
-  --bg-primary: #0b1120;
-  --bg-secondary: #0f172a;
-  --bg-tertiary: #1e293b;
+  --bg-primary: #0f1720;
+  --bg-secondary: #111a26;
+  --bg-tertiary: #1e2b3b;
+  --bg-sidebar: #111a26;
+  --bg-sidebar-hover: #1d3048;
+  --bg-sidebar-active: #3155d8;
+  --bg-navbar: #111a26;
+  --bg-card: #17212d;
+  --bg-card-alt: #1d2a39;
+  --bg-table: #151f2a;
+  --bg-input: #192838;
 
-  --bg-sidebar: #020617;
-  --bg-sidebar-hover: #0f172a;
-  --bg-sidebar-active: #1e293b;
-
-  --bg-navbar: #0f172a;
-  --bg-card: #0f172a;
-  --bg-card-alt: #1e293b;
-  --bg-input: #1e293b;
-
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
+  --text-primary: #f8fafc;
+  --text-secondary: #b8c5d6;
   --text-muted: #64748b;
+  --text-sidebar: #f8fafc;
+  --text-sidebar-muted: #94a3b8;
+  --text-navbar: #f8fafc;
+  --text-inverse: #0f1720;
 
-  --text-sidebar: #e2e8f0;
-  --text-sidebar-muted: #64748b;
-  --text-navbar: #f1f5f9;
-  --text-inverse: #0b1120;
+  --border-color: #263445;
+  --border-sidebar: #223348;
+  --border-navbar: #263445;
+  --border-card: #263445;
 
-  --border-color: #1e293b;
-  --border-sidebar: #1e293b;
-  --border-navbar: #1e293b;
-  --border-card: #1e293b;
-
-  --accent: #10b981;
-  --accent-hover: #059669;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
   --accent-text: #ffffff;
-  --accent-soft: rgba(16, 185, 129, 0.1);
-
+  --accent-soft: rgba(59, 130, 246, 0.16);
+  --tag: #334155;
   --danger: #ef4444;
   --danger-hover: #dc2626;
-  --success: #10b981;
+  --success: #22c55e;
   --warning: #f59e0b;
-  --info: #3b82f6;
+  --info: #60a5fa;
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
-
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 6px 16px rgb(0 0 0 / 0.28);
+  --shadow-lg: 0 16px 36px rgb(0 0 0 / 0.38);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-
   --sidebar-width: 240px;
   --topbar-height: 64px;
 }
 
-/* =========================================
-   LIGHT THEME
-========================================= */
-
 html.light {
-  --bg-primary: #f8fafc;
+  --bg-primary: #f5f7fb;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #f1f5f9;
-
+  --bg-tertiary: #eef2f7;
   --bg-sidebar: #ffffff;
-  --bg-sidebar-hover: #f1f5f9;
-  --bg-sidebar-active: #e2e8f0;
-
+  --bg-sidebar-hover: #e8f0ff;
+  --bg-sidebar-active: #3155d8;
   --bg-navbar: #ffffff;
   --bg-card: #ffffff;
   --bg-card-alt: #f8fafc;
+  --bg-table: #f1f5f9;
   --bg-input: #f1f5f9;
-
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
-
-  --text-sidebar: #1e293b;
+  --text-sidebar: #0f172a;
   --text-sidebar-muted: #64748b;
   --text-navbar: #0f172a;
   --text-inverse: #ffffff;
-
-  --border-color: #e2e8f0;
-  --border-sidebar: #e2e8f0;
-  --border-navbar: #e2e8f0;
-  --border-card: #e2e8f0;
-
-  --accent: #059669;
-  --accent-hover: #047857;
+  --border-color: #dbe3ed;
+  --border-sidebar: #dbe3ed;
+  --border-navbar: #dbe3ed;
+  --border-card: #dbe3ed;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
   --accent-text: #ffffff;
-  --accent-soft: rgba(5, 150, 105, 0.1);
-
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --tag: #e2e8f0;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+  --info: #2563eb;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 6px 16px rgb(15 23 42 / 0.09);
+  --shadow-lg: 0 16px 36px rgb(15 23 42 / 0.13);
 }
-
-/* =========================================
-   GLOBAL RESET
-========================================= */
-
-/*
-  Important:
-  Yahan margin aur padding ko global level par reset nahi karna,
-  warna Tailwind ki px, py, mt, mb aur gap classes override hoti hain.
-*/
 
 *,
 *::before,
@@ -114,28 +93,20 @@ html.light {
 }
 
 html {
-  height: 100%;
-  background-color: var(--bg-primary);
+  min-height: 100%;
+  background: var(--bg-primary);
   transition: background-color 0.3s ease;
 }
 
 body {
   min-height: 100%;
   margin: 0;
-  background-color: var(--bg-primary);
+  background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
-
-/* =========================================
-   DEFAULT ELEMENTS
-========================================= */
 
 a {
   color: inherit;
@@ -166,13 +137,8 @@ h4,
 h5,
 h6,
 p {
-  /* Sirf default browser margin remove kar rahe hain */
   margin: 0;
 }
-
-/* =========================================
-   SCROLLBAR
-========================================= */
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -192,36 +158,14 @@ p {
   background: var(--text-muted);
 }
 
-/* Firefox scrollbar */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--bg-tertiary) var(--bg-secondary);
 }
 
-/* =========================================
-   MAIN CONTENT SCROLLING
-========================================= */
-
 main {
   min-width: 0;
 }
-
-main::-webkit-scrollbar {
-  width: 8px;
-}
-
-main::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-
-main::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 999px;
-}
-
-/* =========================================
-   SIDEBAR SCROLLBAR
-========================================= */
 
 .sidebar-wrapper {
   scrollbar-width: thin;
@@ -241,56 +185,40 @@ main::-webkit-scrollbar-thumb {
   border-radius: 999px;
 }
 
-/* =========================================
-   REUSABLE CARD
-========================================= */
-
 .card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* =========================================
-   BUTTON
-========================================= */
-
 .btn-primary {
-  border: none;
+  border: 0;
   border-radius: var(--radius-sm);
-  background-color: var(--accent);
+  background: var(--accent);
   color: var(--accent-text);
   padding: 8px 16px;
   font-size: 14px;
-  font-weight: 500;
-  transition: background-color 0.15s ease;
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
 .btn-primary:hover {
-  background-color: var(--accent-hover);
+  background: var(--accent-hover);
+  transform: translateY(-1px);
 }
-
-/* =========================================
-   INPUT
-========================================= */
 
 .input-field {
   width: 100%;
-  outline: none;
+  outline: 0;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  background-color: var(--bg-input);
+  background: var(--bg-input);
   color: var(--text-primary);
   padding: 8px 12px;
   font-size: 14px;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.3s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input-field::placeholder {
@@ -299,11 +227,8 @@ main::-webkit-scrollbar-thumb {
 
 .input-field:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-
-/* =========================================
-   SECTION HEADER
-========================================= */
 
 .section-header {
   display: flex;
@@ -312,39 +237,27 @@ main::-webkit-scrollbar-thumb {
   margin-bottom: 16px;
   color: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-
-/* =========================================
-   PROGRESS BAR
-========================================= */
 
 .progress-bar {
   height: 3px;
   margin-top: 12px;
   overflow: hidden;
   border-radius: 2px;
-  background-color: var(--bg-tertiary);
+  background: var(--bg-tertiary);
 }
 
 .progress-bar-fill {
   height: 100%;
   border-radius: 2px;
-  background-color: var(--danger);
+  background: var(--accent);
 }
 
-/* =========================================
-   RESPONSIVE
-========================================= */
-
 @media (max-width: 768px) {
-:root {
+  :root {
     --sidebar-width: 280px;
   }
 }
-
-/* =========================
-USER WEBSITE THEME
-========================= */

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { dealApi } from "../../../apis/admin/dealApi";
 import { productApi } from "../../../apis/productApi";
@@ -13,6 +14,8 @@ import useDealSocketSync from "../../../hooks/useDealSocketSync";
 /* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
+const ListIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>);
+const GridIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>);
 const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>);
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
@@ -20,6 +23,7 @@ const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={classNam
 const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
 const DealIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16v5H4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 7v14" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.5 7C7.1 7 6 5.9 6 4.5S7.1 2 8.5 2C10.5 2 12 7 12 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.5 7C16.9 7 18 5.9 18 4.5S16.9 2 15.5 2C13.5 2 12 7 12 7" /></svg>);
 const CheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>);
+const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>);
 
 /* ==================== HELPERS (FIXED FOR BACKEND SCHEMA) ==================== */
 const normalizeArrayResponse = (response) => {
@@ -29,7 +33,14 @@ const normalizeArrayResponse = (response) => {
   return [];
 };
 
-const getId = (item) => String(item?._id || item?.id || "");
+// ✅ Helper to safely extract ID string from object or primitive
+const getId = (item) => {
+  if (!item) return "";
+  // If it's an object with _id or id, return that as string
+  if (typeof item === 'object') return String(item._id || item.id || "");
+  // If it's already a string/primitive, just return it as string
+  return String(item);
+};
 
 const getName = (item, type) => {
   if (type === "product") return item?.name || item?.title || "Unnamed Product";
@@ -127,9 +138,13 @@ const StatusBadge = ({ status }) => {
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets"); // Default changed to avoid conflict
+  const [viewMode, setViewMode] = useState("list"); // ✅ Added view mode state like Brands
   const [showModal, setShowModal] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
@@ -169,6 +184,11 @@ export default function DealsPage() {
     });
     setEditingDeal(null);
     setSelector({ open: false, type: null });
+  };
+
+  // ✅ Navigation Handler for View Details
+  const handleViewDeal = (id) => {
+    router.push(`${pathname}/${id}`);
   };
 
   const saveMutation = useMutation({
@@ -259,6 +279,7 @@ export default function DealsPage() {
     setShowModal(true);
   };
 
+  // ✅ FIXED SUBMIT HANDLER TO PREVENT PROXY OBJECT ERROR
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
@@ -277,15 +298,21 @@ export default function DealsPage() {
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
-    // FIXED: Payload matches Backend Schema exactly
+    // ✅ CRITICAL FIX: Clean IDs before sending to backend to avoid Proxy/Object errors
+    const cleanProductIds = formData.selected_product_ids.map(id => String(id?._id || id));
+    const cleanCategoryIds = formData.selected_category_ids.map(id => String(id?._id || id));
+    const cleanBrandIds = formData.selected_brand_ids.map(id => String(id?._id || id));
+
     const payload = {
       name: String(formData.name).trim(),
       description: String(formData.description || "").trim() || undefined,
       
       applyTo: formData.target_type, // Backend field
-      productIds: formData.target_type === "product" ? formData.selected_product_ids : [],
-      categoryIds: formData.target_type === "category" ? formData.selected_category_ids : [],
-      brandIds: formData.target_type === "brand" ? formData.selected_brand_ids : [],
+      
+      // ✅ Use cleaned arrays here
+      productIds: formData.target_type === "product" ? cleanProductIds : [],
+      categoryIds: formData.target_type === "category" ? cleanCategoryIds : [],
+      brandIds: formData.target_type === "brand" ? cleanBrandIds : [],
       
       type: formData.value_type,
       discountValue: ["percentage", "fixed_amount"].includes(formData.value_type) ? dealValue : 0, // Backend field
@@ -326,6 +353,22 @@ export default function DealsPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
+  // ✅ Action Buttons Component with Eye Icon & Stop Propagation
+  const ActionButtons = ({ deal }) => (
+    <div className="flex items-center justify-end gap-1 sm:gap-2">
+      {/* ✅ VIEW BUTTON ADDED */}
+      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
+        <EyeIcon className="w-4 h-4" />
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
+        <EditIcon className="w-4 h-4" />
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
+        <TrashIcon className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5 p-4 md:p-0">
@@ -335,9 +378,16 @@ export default function DealsPage() {
             <h1 className="text-[24px] leading-7 font-bold tracking-tight">Deal Management</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage professional deals for your store.</p>
           </div>
-          <button onClick={() => { resetForm(); setShowModal(true); }} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-            <PlusIcon /> Create Deal
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {/* ✅ View Mode Toggles Added */}
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+            </div>
+            <button onClick={() => { resetForm(); setShowModal(true); }} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <PlusIcon /> Create Deal
+            </button>
+          </div>
         </div>
 
         {/* STATS */}
@@ -384,7 +434,7 @@ export default function DealsPage() {
           />
         </div>
 
-        {/* TABLE */}
+        {/* TABLE / GRID DISPLAY */}
         {isLoading ? (
           <div className="rounded-lg py-14 flex justify-center items-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading deals...</span></div>
         ) : filteredDeals.length === 0 ? (
@@ -392,7 +442,8 @@ export default function DealsPage() {
             <DealIcon className="w-8 h-8 mb-3 opacity-50" />
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No deals found" : "No deals created yet"}</p>
           </div>
-        ) : (
+        ) : viewMode === "list" ? (
+          /* ✅ LIST VIEW WITH CLICK NAVIGATION */
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -410,12 +461,13 @@ export default function DealsPage() {
                     const id = deal?._id || deal?.id;
                     const status = getDealStatus(deal);
                     return (
-                      <tr key={id} style={{ borderBottom: index < filteredDeals.length - 1 ? "1px solid var(--border-color)" : "none" }} className="hover:bg-white/[0.02] transition">
+                      <tr key={id} onClick={() => handleViewDeal(id)} style={{ borderBottom: index < filteredDeals.length - 1 ? "1px solid var(--border-color)" : "none" }} className="hover:bg-white/[0.02] transition cursor-pointer">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{deal?.name || "Untitled Deal"}</p>
+                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
                           </div>
                         </td>
@@ -430,11 +482,8 @@ export default function DealsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end items-center gap-1">
-                            <button title="Edit" onClick={() => openEdit(deal)} className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/5 transition" style={{ color: "var(--text-secondary)" }}><EditIcon /></button>
-                            <button title="Delete" onClick={() => setDeleteTarget([deal])} className="w-8 h-8 rounded-md flex items-center justify-center text-red-500 hover:bg-red-500/10 transition"><TrashIcon /></button>
-                          </div>
+                        <td className="px-4 py-3 whitespace-nowrap w-1">
+                          <ActionButtons deal={deal} />
                         </td>
                       </tr>
                     );
@@ -442,6 +491,26 @@ export default function DealsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        ) : (
+          /* ✅ GRID VIEW WITH CLICK NAVIGATION */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filteredDeals.map((deal) => (
+              <div key={deal._id || deal.id} onClick={() => handleViewDeal(deal._id || deal.id)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><DealIcon className="w-5 h-5" /></div>
+                  <StatusBadge status={getDealStatus(deal)} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-[13px] truncate">{deal?.name || "Untitled Deal"}</p>
+                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
+                </div>
+                <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
+                  <span className="text-[12px] font-bold" style={{ color: "#34d399" }}>{formatDealValue(deal)}</span>
+                  <ActionButtons deal={deal} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -643,7 +712,8 @@ function DealFormModal({ formData, setFormData, editingDeal, saveMutation, setSh
 /* ==================== SELECTION MODAL ==================== */
 function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
-  const [draftIds, setDraftIds] = useState(selectedIds.map(String));
+  // ✅ Ensure draftIds are always strings to prevent proxy issues
+  const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
   
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
@@ -652,7 +722,10 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
   }, [items, search, type]);
 
   const title = type === "product" ? "Products" : type === "category" ? "Categories" : "Brands";
-  const toggle = (id) => setDraftIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const toggle = (id) => {
+    const cleanId = String(id?._id || id);
+    setDraftIds((prev) => prev.includes(cleanId) ? prev.filter((x) => x !== cleanId) : [...prev, cleanId]);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

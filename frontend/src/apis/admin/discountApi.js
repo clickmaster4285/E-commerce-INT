@@ -1,40 +1,73 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_SERVERURL;
-
-const handleResponse = async (response) => {
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || "Something went wrong");
-  return data;
-};
-
-const request = async (endpoint, options = {}) => {
-  const { body, ...restOptions } = options;
-  const fetchOptions = {
-    ...restOptions,
-    credentials: "include",
-    headers: { ...(restOptions.headers || {}) },
-  };
-  if (body instanceof FormData) {
-    fetchOptions.body = body;
-  } else if (body !== undefined && body !== null) {
-    fetchOptions.headers["Content-Type"] = "application/json";
-    fetchOptions.body = JSON.stringify(body);
-  }
-  return handleResponse(await fetch(`${API_BASE_URL}${endpoint}`, fetchOptions));
-};
+import axiosInstance from "../axiosInstance"; // ✅ Curly braces {} ke baghair (Default Import)
 
 export const discountApi = {
-  // ✅ FIXED: Sahi admin endpoint hit karega jo backend par define hai
+  // ✅ GET ALL DISCOUNTS
   getAll: async () => {
-    const response = await request("/discounts/admin/all");
-    return response; // Backend seedha array bhej raha hai is liye direct return
+    try {
+      // Backend route: GET /discounts
+      const response = await axiosInstance.get("/discounts");
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching discounts:", error);
+      throw error;
+    }
   },
-  
+
+  // ✅ GET SINGLE DISCOUNT
   getById: async (id) => {
-    const response = await request(`/discounts/${id}`);
-    return response;
+    try {
+      if (!id) throw new Error("Discount ID is required");
+      const response = await axiosInstance.get(`/discounts/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error fetching discount ${id}:`, error);
+      throw error;
+    }
   },
-  
-  create: async (formData) => request("/discounts", { method: "POST", body: formData }),
-  update: async (id, formData) => request(`/discounts/${id}`, { method: "PUT", body: formData }),
-  delete: async (id) => request(`/discounts/${id}`, { method: "DELETE" }),
+
+  // ✅ CREATE DISCOUNT
+  create: async (data) => {
+    try {
+      const response = await axiosInstance.post("/discounts", data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error creating discount:", error);
+      throw error;
+    }
+  },
+
+  // ✅ UPDATE DISCOUNT
+  update: async (id, data) => {
+    try {
+      if (!id) throw new Error("Discount ID is required");
+      const response = await axiosInstance.put(`/discounts/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error updating discount ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // ✅ DELETE DISCOUNT
+  delete: async (id) => {
+    try {
+      if (!id) throw new Error("Discount ID is required");
+      const response = await axiosInstance.delete(`/discounts/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error deleting discount ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // ✅ PUBLIC DISCOUNTS
+  getPublic: async () => {
+    try {
+      const response = await axiosInstance.get("/discounts/public");
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching public discounts:", error);
+      throw error;
+    }
+  },
 };

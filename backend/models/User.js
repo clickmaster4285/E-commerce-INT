@@ -34,7 +34,9 @@ const userSchema = new mongoose.Schema(
       profile: { type: Boolean, default: true },       // ✅ Added
       employees: { type: Boolean, default: true },     // ✅ Added
       discounts: { type: Boolean, default: true },     // ✅ Added
+      deals: { type: Boolean, default: true },         // ✅ Added
       store: { type: Boolean, default: false },        // ✅ Added
+      banners: { type: Boolean, default: true },       // ✅ Added
     },
     
     preferences: {

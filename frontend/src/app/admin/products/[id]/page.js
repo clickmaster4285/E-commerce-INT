@@ -105,7 +105,7 @@ function InnerCard({ children, className = "" }) {
 function SBtn({ onClick, disabled, danger, primary, children, type = "button", className = "" }) {
   const [hov, setHov] = useState(false);
   let bg, cl;
-  if (danger) { bg = hov ? "rgba(239,68,68,0.1)" : "transparent"; cl = "#f87171"; }
+  if (danger) { bg = hov ? "rgba(239,68,68,0.1)" : "transparent"; cl = "var(--danger)"; }
   else if (primary) { bg = "var(--accent)"; cl = "var(--accent-text)"; }
   else { bg = hov ? "rgba(255,255,255,0.06)" : "transparent"; cl = "var(--text-secondary)"; }
   return (
@@ -116,8 +116,8 @@ function SBtn({ onClick, disabled, danger, primary, children, type = "button", c
   );
 }
 
-function Person({ user, label, date, color = "#34d399", fallback = "Unknown" }) {
-  const bg = color === "#60a5fa" ? "rgba(96,165,250,0.1)" : "rgba(52,211,153,0.1)";
+function Person({ user, label, date, color = "var(--accent)", fallback = "Unknown" }) {
+  const bg = color === "var(--info)" ? "rgba(96,165,250,0.1)" : "var(--accent-soft)";
   if (!user) return (
     <div className="py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color }}>{label}</p>
@@ -142,8 +142,8 @@ function Person({ user, label, date, color = "#34d399", fallback = "Unknown" }) 
   );
 }
 
-function TItem({ icon, title, sub, user, date, color = "#34d399", last }) {
-  const bg = color === "#60a5fa" ? "rgba(96,165,250,0.1)" : "rgba(52,211,153,0.1)";
+function TItem({ icon, title, sub, user, date, color = "var(--accent)", last }) {
+  const bg = color === "var(--info)" ? "rgba(96,165,250,0.1)" : "var(--accent-soft)";
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
@@ -178,10 +178,10 @@ function TItem({ icon, title, sub, user, date, color = "#34d399", last }) {
 }
 
 function StatusPill({ active }) {
-  const c = active ? "#34d399" : "#f87171";
+  const c = active ? "var(--success)" : "var(--danger)";
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium shrink-0"
-      style={{ backgroundColor: active ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", color: c }}>
+      style={{ backgroundColor: active ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: c }}>
       <span className="w-1 h-1 rounded-full" style={{ backgroundColor: c }} />
       {active ? "Active" : "Inactive"}
     </span>
@@ -641,67 +641,89 @@ export default function ProductDetailPage() {
 
   return (
     <div className="w-full" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-4">
+      <div className="w-full space-y-6">
         {/* HEADER */}
-        <div className="px-1">
-          <div className="flex items-center gap-1.5 mb-3">
+        <div>
+          <div className="mb-4 flex items-center gap-2 text-[12px]">
             <button onClick={() => router.push("/admin/products")}
-              className="text-[12px] font-medium transition hover:opacity-70"
+              className="font-medium transition hover:text-[var(--accent)]"
               style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Products</button>
-            <Ico d={D.chevron} className="w-3 h-3" sw={1.5} />
-            <span className="text-[12px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{product.name}</span>
+            <Ico d={D.chevron} className="h-3 w-3" sw={1.5} style={{ color: "var(--text-muted)" }} />
+            <span className="font-medium truncate" style={{ color: "var(--text-primary)" }}>{product.name}</span>
           </div>
-          <div className="rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(52,211,153,0.1)" }}>
-                <Package className="w-5 h-5" style={{ color: "#34d399" }} />
+          <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)", boxShadow: "0 0 0 4px var(--accent-soft)" }}>
+                <Package className="h-7 w-7" style={{ color: "var(--accent)" }} />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-[16px] sm:text-[18px] font-semibold truncate leading-tight">{product.name}</h1>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{product.name}</h1>
                   <StatusPill active={product.status === "active"} />
                 </div>
-                <div className="flex items-center gap-2 text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
                   <span className="font-mono flex items-center gap-1"><Hash className="w-3 h-3" />{product.product_code || product.sku || "N/A"}</span>
                   <span>·</span><span>{totalVariants} Variants</span><span>·</span><span>{totalStock} Units</span><span>·</span><span>Created {fd(product.created_at)}</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <SBtn onClick={handleEdit} primary><Pencil className="w-3.5 h-3.5" />Edit</SBtn>
               <SBtn onClick={handleDelete} danger><Trash2 className="w-3.5 h-3.5" />Delete</SBtn>
             </div>
           </div>
+          </div>
+        </div>
+
+        {/* SUMMARY STRIP */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Check className="h-3.5 w-3.5" /> Status</div>
+            <StatusPill active={product.status === "active"} />
+          </div>
+          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Layers3 className="h-3.5 w-3.5" /> Variants</div>
+            <p className="text-2xl font-bold tracking-tight">{totalVariants}</p>
+            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Available options</p>
+          </div>
+          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Box className="h-3.5 w-3.5" /> Total stock</div>
+            <p className="text-2xl font-bold tracking-tight" style={{ color: totalStock === 0 ? "var(--danger)" : "var(--success)" }}>{totalStock}</p>
+            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Units in inventory</p>
+          </div>
+          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><DollarSign className="h-3.5 w-3.5" /> Price range</div>
+            <p className="truncate text-sm font-semibold">{priceRange}</p>
+            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Selling price</p>
+          </div>
         </div>
 
         {/* TABS */}
-        <div className="rounded-xl overflow-hidden" style={cs}>
-          <div className="px-5 flex items-center gap-5 overflow-x-auto"
-            style={{ borderBottom: "1px solid var(--border-color)", scrollbarWidth: "none" }}>
+        <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
             {tabList.map((tb) => {
               const active = activeTab === tb.id;
               return (
                 <button key={tb.id} type="button" onClick={() => setActiveTab(tb.id)}
-                  className="flex items-center gap-1.5 text-[12px] font-medium transition-colors duration-150 whitespace-nowrap"
-                  style={{ background: "none", border: "none", cursor: "pointer", padding: "10px 0 9px 0",
-                    color: active ? "#34d399" : "var(--text-muted)",
-                    borderBottom: active ? "2px solid #34d399" : "2px solid transparent", marginBottom: "-1px" }}>
+                  className="relative flex items-center gap-1.5 whitespace-nowrap py-3 text-[12px] font-medium transition-colors duration-150"
+                  style={{ background: "none", border: "none", cursor: "pointer",
+                    color: active ? "var(--accent)" : "var(--text-muted)" }}>
                   {tb.label}
                   {tb.badge && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold leading-none"
-                      style={{ backgroundColor: active ? "rgba(16,185,129,0.15)" : "var(--bg-tertiary)", color: active ? "#34d399" : "var(--text-muted)" }}>
+                        style={{ backgroundColor: active ? "var(--accent-soft)" : "var(--bg-tertiary)", color: active ? "var(--accent)" : "var(--text-muted)" }}>
                       {tb.badge}</span>
                   )}
+                      {active && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px]" style={{ backgroundColor: "var(--accent)" }} />}
                 </button>
               );
             })}
-          </div>
+        </div>
 
-          <div className="p-4 sm:p-5">
+        <div className="w-full p-4 sm:p-5">
             {/* OVERVIEW */}
             {activeTab === "overview" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <InnerCard className="flex flex-col">
                   <SecTitle>Product Details</SecTitle>
                   <div className="divide-y flex-1" style={{ borderColor: "var(--border-color)" }}>
@@ -1086,7 +1108,6 @@ export default function ProductDetailPage() {
             )}
           </div>
         </div>
-      </div>
 
       {/* EDIT MODAL */}
       {showModal && (

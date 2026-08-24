@@ -91,7 +91,7 @@ const deleteOldLogo = async () => {
   }
 };
 
-// ✅ Permission helpers - FIXED: Added 'deals' permission
+// ✅ Permission helpers - FIXED: Added 'deals' and 'banners' permissions
 const fixPermissions = (oldPerms) => ({
   employees: oldPerms?.employees ?? true,
   products: oldPerms?.products ?? true,
@@ -100,12 +100,15 @@ const fixPermissions = (oldPerms) => ({
   profile: oldPerms?.profile ?? true,
   store: oldPerms?.store ?? false,
   discounts: oldPerms?.discounts ?? true,
-  deals: oldPerms?.deals ?? true, // ✅ Deals permission added
+  deals: oldPerms?.deals ?? true,
+  banners: oldPerms?.banners ?? true,
 });
 
 const needsPermissionMigration = (perms) => {
   if (!perms) return true;
-  return ["users", "orders", "settings", "dashboard"].some((k) => perms[k] !== undefined);
+  if (["users", "orders", "settings", "dashboard"].some((k) => perms[k] !== undefined)) return true;
+  const requiredKeys = ["employees", "products", "brands", "categories", "profile", "store", "discounts", "deals", "banners"];
+  return requiredKeys.some((key) => typeof perms[key] !== "boolean");
 };
 
 // ✅ Socket initialization

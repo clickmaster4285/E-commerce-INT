@@ -124,9 +124,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || "U";
   const isAdmin = userRole?.toLowerCase() === "admin";
   
-  const avatarGradient = isAdmin 
-    ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' 
-    : 'linear-gradient(135deg, #10b981, #14b8a6)';
+  const avatarGradient = isAdmin
+    ? 'linear-gradient(135deg, var(--accent), var(--info))'
+    : 'linear-gradient(135deg, var(--accent), var(--success))';
 
   useEffect(() => {
     const handler = (e) => {
@@ -170,8 +170,8 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     <header
       className="sticky top-0 z-40 flex h-16 items-center justify-between px-3 sm:px-5 backdrop-blur-xl transition-colors duration-300"
       style={{
-        backgroundColor: isDark ? 'rgba(10, 12, 20, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        backgroundColor: 'color-mix(in srgb, var(--bg-navbar) 94%, transparent)',
+        borderBottom: '1px solid var(--border-navbar)',
       }}
     >
       {/* ===== LEFT ===== */}
@@ -181,8 +181,8 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
           onClick={onMenuClick}
           aria-label="Open menu"
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95 md:hidden"
-          style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-soft)'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           <Menu size={18} />
@@ -199,14 +199,14 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
           aria-label="Toggle theme"
           title={isDark ? 'Light mode' : 'Dark mode'}
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95"
-          style={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)' }}
+          style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
-            e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)';
+            e.currentTarget.style.backgroundColor = 'var(--accent-soft)';
+            e.currentTarget.style.color = 'var(--accent)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)';
+            e.currentTarget.style.color = 'var(--text-muted)';
           }}
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
@@ -215,7 +215,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         {/* Divider */}
         <div
           className="mx-1 hidden h-5 w-px sm:block"
-          style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}
+          style={{ backgroundColor: 'var(--border-navbar)' }}
         />
 
         {/* ===== PROFILE DROPDOWN ===== */}
@@ -226,12 +226,12 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
             className="flex items-center gap-2.5 rounded-lg py-1 pl-1 pr-2 sm:pr-2.5 transition-all duration-150"
             style={{
               backgroundColor: isOpen || isProfileActive
-                ? isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
+                ? 'var(--accent-soft)'
                 : 'transparent',
             }}
             onMouseEnter={(e) => {
               if (!isOpen && !isProfileActive)
-                e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+                e.currentTarget.style.backgroundColor = 'var(--accent-soft)';
             }}
             onMouseLeave={(e) => {
               if (!isOpen && !isProfileActive)
@@ -244,7 +244,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               style={{
                 background: avatarGradient,
                 boxShadow: isOpen || isProfileActive
-                  ? `0 0 0 2px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}, 0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`
+                  ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
                   : '0 1px 3px rgba(0,0,0,0.2)',
               }}
             >
@@ -255,7 +255,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
             <div className="hidden sm:flex flex-col items-start leading-none">
               <span
                 className="text-[13px] font-semibold truncate max-w-[120px]"
-                style={{ color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.85)' }}
+                style={{ color: 'var(--text-primary)' }}
               >
                 {displayName}
               </span>
@@ -267,7 +267,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               className="hidden sm:block transition-transform duration-200"
               style={{
                 transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)',
+                color: 'var(--text-muted)',
               }}
             />
           </button>
@@ -280,18 +280,16 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               <div
                 className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
                 style={{
-                  backgroundColor: isDark ? '#13151f' : '#ffffff',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
-                  boxShadow: isDark
-                    ? '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)'
-                    : '0 20px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-card)',
+                  boxShadow: 'var(--shadow-lg)',
                   animation: 'navDropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               >
                 {/* --- User Header --- */}
                 <div
                   className="px-4 py-3.5"
-                  style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
+                  style={{ borderBottom: '1px solid var(--border-color)' }}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -306,14 +304,14 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-[13px] font-semibold truncate"
-                        style={{ color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.9)' }}
+                        style={{ color: 'var(--text-primary)' }}
                       >
                         {displayName}
                       </p>
                       {displayEmail && (
                         <p
                           className="text-[11px] truncate mt-0.5"
-                          style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.45)' }}
+                          style={{ color: 'var(--text-muted)' }}
                         >
                           {displayEmail}
                         </p>
@@ -321,7 +319,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                     </div>
                     <div
                       className="h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: '#10b981', boxShadow: '0 0 6px rgba(16, 185, 129, 0.4)' }}
+                      style={{ backgroundColor: 'var(--success)', boxShadow: '0 0 6px var(--accent-soft)' }}
                     />
                   </div>
                 </div>
@@ -343,27 +341,27 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-100"
                         style={{
                           backgroundColor: isActive
-                            ? isDark ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.06)'
+                            ? 'var(--accent-soft)'
                             : 'transparent',
-                          color: isActive ? '#10b981' : isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)',
+                          color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                         }}
                         onMouseEnter={(e) => {
                           if (!isActive) {
-                            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
-                            e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.85)';
+                            e.currentTarget.style.backgroundColor = 'var(--accent-soft)';
+                            e.currentTarget.style.color = 'var(--text-primary)';
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isActive) {
                             e.currentTarget.style.backgroundColor = 'transparent';
-                            e.currentTarget.style.color = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.6)';
+                            e.currentTarget.style.color = 'var(--text-secondary)';
                           }
                         }}
                       >
                         <Icon
                           size={15}
                           className="shrink-0"
-                          style={{ color: isActive ? '#10b981' : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
+                          style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
                         />
                         {option.name}
                       </Link>
@@ -374,7 +372,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                 {/* --- Sign Out --- */}
                 <div
                   className="px-1.5 pb-1.5 pt-0.5"
-                  style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
+                  style={{ borderTop: '1px solid var(--border-color)' }}
                 >
                   <button
                     type="button"

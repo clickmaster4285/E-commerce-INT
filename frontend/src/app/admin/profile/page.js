@@ -40,7 +40,7 @@ const InfoRow = ({ icon: Icon, label, value, isLink = false, accent = false }) =
       <Icon
         size={15}
         className="mt-0.5 shrink-0"
-        style={{ color: accent ? "#34d399" : "var(--text-muted)" }}
+        style={{ color: accent ? "var(--accent)" : "var(--text-muted)" }}
       />
       <span
         className="text-[12px] w-28 shrink-0 leading-snug"
@@ -50,7 +50,7 @@ const InfoRow = ({ icon: Icon, label, value, isLink = false, accent = false }) =
       </span>
       <span
         className={`text-[13px] font-medium break-all leading-snug ${isLink ? "hover:underline cursor-pointer" : ""}`}
-        style={{ color: isLink || accent ? "#34d399" : "var(--text-primary)" }}
+        style={{ color: isLink || accent ? "var(--accent)" : "var(--text-primary)" }}
       >
         {displayValue}
       </span>
@@ -183,7 +183,7 @@ export default function ProfilePage() {
       storeName: store.store_name || user.store_name || "My Store",
       address: user.address || store.address || "",
       storeStatus: store.store_status || "Active",
-      primaryColor: store.primary_color || "#10b981",
+      primaryColor: store.primary_color || "var(--accent)",
       // ✅ CHANGE 1 continued: Extract permissions
       permissions: user.permissions || {},
     };
@@ -426,7 +426,7 @@ export default function ProfilePage() {
         style={{ backgroundColor: "var(--bg-main)" }}
       >
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#34d399" }} />
+          <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--accent)" }} />
           <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
             Loading profile...
           </p>
@@ -496,7 +496,7 @@ export default function ProfilePage() {
                 className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl overflow-hidden flex items-center justify-center"
                 style={{
                   border: "2px solid var(--border-color)",
-                  background: "linear-gradient(135deg, rgba(16,185,129,0.25), rgba(20,184,166,0.15))",
+                  background: "linear-gradient(135deg, var(--accent-soft), rgba(59,130,246,0.06))",
                 }}
               >
                 {profile.avatar ? (
@@ -513,7 +513,7 @@ export default function ProfilePage() {
               <div
                 className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center"
                 style={{
-                  backgroundColor: "#10b981",
+                  backgroundColor: "var(--success)",
                   border: "2px solid var(--bg-card)",
                 }}
               >
@@ -531,26 +531,26 @@ export default function ProfilePage() {
               </h1>
               <p
                 className="text-[13px] font-semibold mb-2.5"
-                style={{ color: "#34d399" }}
+                style={{ color: "var(--accent)" }}
               >
                 {profile.role}
               </p>
               <div
                 className="inline-flex items-center gap-2 rounded-full px-3 py-1"
                 style={{
-                  backgroundColor: "rgba(16,185,129,0.1)",
-                  border: "1px solid rgba(16,185,129,0.3)",
+                  backgroundColor: "var(--accent-soft)",
+                  border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
                 }}
               >
-                <Store size={12} style={{ color: "#34d399" }} />
-                <span className="text-[12px] font-bold" style={{ color: "#34d399" }}>
+                <Store size={12} style={{ color: "var(--accent)" }} />
+                <span className="text-[12px] font-bold" style={{ color: "var(--accent)" }}>
                   {profile.storeName}
                 </span>
                 <span
                   className="h-1 w-1 rounded-full"
-                  style={{ backgroundColor: "#34d399" }}
+                  style={{ backgroundColor: "var(--accent)" }}
                 />
-                <span className="text-[12px] font-semibold" style={{ color: "#34d399" }}>
+                <span className="text-[12px] font-semibold" style={{ color: "var(--accent)" }}>
                   {profile.storeStatus}
                 </span>
               </div>
@@ -584,7 +584,7 @@ export default function ProfilePage() {
             {/* Security Card */}
             <div className="rounded-lg p-5" style={cardStyle}>
               <div className="flex items-center gap-2 mb-4">
-                <Lock size={15} style={{ color: "#34d399" }} />
+                <Lock size={15} style={{ color: "var(--accent)" }} />
                 <h3
                   className="text-[12px] font-semibold uppercase tracking-wider"
                   style={{ color: "var(--text-muted)" }}
@@ -655,7 +655,7 @@ export default function ProfilePage() {
                 style={{ borderBottom: "1px solid var(--border-color)" }}
               >
                 <div className="flex items-center gap-2.5">
-                  <User size={16} style={{ color: "#34d399" }} />
+                  <User size={16} style={{ color: "var(--accent)" }} />
                   <h3
                     className="text-[14px] font-semibold"
                     style={{ color: "var(--text-primary)" }}
