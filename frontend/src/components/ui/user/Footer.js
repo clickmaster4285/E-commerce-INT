@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { categoryApi } from "@/apis/categoryApi";
+import { categoryApi } from "@/apis/user/categoryApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import { Mail, Phone, MapPin, CreditCard, Truck, ShieldCheck } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube, FaLinkedinIn } from "react-icons/fa";

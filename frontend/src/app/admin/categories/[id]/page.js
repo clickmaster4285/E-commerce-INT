@@ -7,7 +7,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { categoryApi } from "@/apis/categoryApi";
+import { categoryApi } from "@/apis/admin/categoryApi";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 

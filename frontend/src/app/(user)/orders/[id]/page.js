@@ -3,10 +3,10 @@
 import { use, Fragment } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { orderApi } from "@/apis/orderApi";
+import { orderApi } from "@/apis/user/orderApi";
 import {
-  ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
-  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck, Tag,
+   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
+  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck,
 } from "lucide-react";
 
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
@@ -150,11 +150,15 @@ export default function OrderDetailPage({ params }) {
           <div className="text-right">
             <p className="text-[10px] text-[var(--user-text-muted)] uppercase tracking-wider">Total</p>
             <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</p>
-            {totalSavings > 0 && (
-              <p className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 justify-end mt-1">
-                <Tag size={10} /> You saved Rs. {totalSavings.toLocaleString()}
+           
+           
+                     {totalSavings > 0 && (
+              <p className="text-[10px] text-[var(--user-success)] font-semibold mt-1">
+                You saved Rs. {totalSavings.toLocaleString()}
               </p>
             )}
+
+
           </div>
         </div>
 
@@ -199,15 +203,13 @@ export default function OrderDetailPage({ params }) {
                     {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] truncate">{i.variantTitle}</p>}
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <p className="text-[11px] text-[var(--user-text-subtle)]">Qty: {i.qty} × Rs. {Number(i.price).toLocaleString()}</p>
+                     
+                     
                       {hasDiscount && (
                         <p className="text-[10px] text-[var(--user-text-subtle)] line-through">Rs. {originalPrice.toLocaleString()}</p>
                       )}
                     </div>
-                    {hasDiscount && i.discount_name && (
-                      <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
-                        <Tag size={8} /> {i.discount_name}
-                      </p>
-                    )}
+                 
                   </div>
                   <div className="text-right shrink-0">
                     {hasDiscount && (
@@ -277,14 +279,14 @@ export default function OrderDetailPage({ params }) {
                 <span>Subtotal</span>
                 <span className="text-[var(--user-text)] font-semibold">Rs. {order.subtotal.toLocaleString()}</span>
               </div>
-              {totalSavings > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-[var(--user-success)] flex items-center gap-1">
-                    <Tag size={12} /> Discount Savings
-                  </span>
-                  <span className="text-[var(--user-success)] font-semibold">-Rs. {totalSavings.toLocaleString()}</span>
+                           {totalSavings > 0 && (
+                <div className="flex justify-between text-[var(--user-success)]">
+                  <span>You saved</span>
+                  <span className="font-semibold">-Rs. {totalSavings.toLocaleString()}</span>
                 </div>
               )}
+
+
               <div className="flex justify-between text-[var(--user-text-muted)]">
                 <span>Shipping</span>
                 <span className="text-[var(--user-text)] font-semibold">{order.shipping === 0 ? "FREE" : `Rs. ${order.shipping.toLocaleString()}`}</span>

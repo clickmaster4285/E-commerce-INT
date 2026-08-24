@@ -21,7 +21,15 @@ const saveProductImages = require("../middleware/saveProductImages");
 
 const router = express.Router();
 
-// ✅ CREATE PRODUCT — Permission required
+// ==========================================
+// 🌐 PUBLIC ROUTES — bina login (User GUI)
+// ==========================================
+router.get("/", getProducts);
+router.get("/:id", getProductById);
+
+// ==========================================
+// 🛡️ ADMIN ROUTES — login + permission
+// ==========================================
 router.post(
   "/",
   authMiddleware,
@@ -32,7 +40,6 @@ router.post(
   createProduct,
 );
 
-// ✅ UPDATE PRODUCT — Permission required
 router.put(
   "/:id",
   authMiddleware,
@@ -43,16 +50,7 @@ router.put(
   updateProduct,
 );
 
-// ✅ DELETE PRODUCT — Permission required
 router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
-
-// ✅ TOGGLE STATUS — Permission required
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
-
-// ✅ GET ALL PRODUCTS — No permission (read-only, sab dekh saken)
-router.get("/", authMiddleware, getProducts);
-
-// ✅ GET SINGLE PRODUCT — No permission (read-only)
-router.get("/:id", authMiddleware, getProductById);
 
 module.exports = router;

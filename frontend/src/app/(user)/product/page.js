@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { productApi } from "@/apis/productApi";
+import { productApi } from "@/apis/user/productApi";
 import ProductCard from "../../../components/user/ProductCard";
 import { Package, SearchX, SlidersHorizontal } from "lucide-react";
 

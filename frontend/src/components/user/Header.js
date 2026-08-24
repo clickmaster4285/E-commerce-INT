@@ -7,10 +7,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import axiosInstance from "@/apis/axiosInstance";
-import { categoryApi } from "@/apis/categoryApi";
-import { brandApi } from "@/apis/brandApi";
-import { productApi } from "@/apis/productApi";
-import { storeApi } from "@/apis/admin/storeApi";
+import { categoryApi } from "@/apis/user/categoryApi";
+import { brandApi } from "@/apis/user/brandApi";
+import { productApi } from "@/apis/user/productApi";
+import { storeApi } from "@/apis/user/storeApi";
 import Cookies from "js-cookie"; // ✅ Cookies library import
 
 import {

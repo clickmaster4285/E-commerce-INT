@@ -3,8 +3,8 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { productApi } from "@/apis/productApi";
-import { brandApi } from "@/apis/brandApi";
+import { productApi } from "@/apis/user/productApi";
+import { brandApi } from "@/apis/user/brandApi";
 import ProductCard from "@/components/user/ProductCard";
 import { Package, ChevronRight, Star } from "lucide-react";
 

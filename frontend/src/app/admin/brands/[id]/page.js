@@ -2,8 +2,8 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { brandApi } from "../../../../apis/brandApi";
-import { productApi } from "../../../../apis/productApi"; // ✅ NEW IMPORT
+import { brandApi } from "../../../../apis/admin/brandApi";
+import { productApi } from "../../../../apis/admin/productApi"; // ✅ NEW IMPORT
 import { Country } from "country-state-city";
 
 // ✅ SOCKET HOOKS IMPORT

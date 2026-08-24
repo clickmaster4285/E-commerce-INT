@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { categoryApi } from "@/apis/categoryApi";
+import { categoryApi } from "@/apis/user/categoryApi";
 import { Package } from "lucide-react";
 
 export default function CategoryBar() {

@@ -4,9 +4,9 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { categoryApi } from "@/apis/categoryApi";
-import { brandApi } from "@/apis/brandApi";
-import { productApi } from "@/apis/productApi";
+import { categoryApi } from "@/apis/user/categoryApi";
+import { brandApi } from "@/apis/user/brandApi";
+import { productApi } from "@/apis/user/productApi";
 import ProductCard from "./ProductCard";
 
 // ✅ ARROW — hamesha visible, disable jab aage/peeche kuch na ho

@@ -1,15 +1,23 @@
 import axiosInstance from "../axiosInstance";
 
+// ✅ Smart list unwrap
+const list = (res) => {
+  const d = res.data;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.data)) return d.data;
+  if (Array.isArray(d?.products)) return d.products;
+  return [];
+};
+
 // ==========================================
-// 🛡️ ADMIN PRODUCT API — /admin endpoints
+// 🛡️ ADMIN PRODUCT API
 // ==========================================
 export const adminProductApi = {
-  // ✅ Admin list — active + inactive (deleted nahi)
-  getAll: () =>
-    axiosInstance.get("/products/admin/all").then((res) => res.data),
+  // ✅ Ab /products use karo (admin/all exist nahi karta)
+  getAll: () => axiosInstance.get("/products").then(list),
 
   getById: (id) =>
-    axiosInstance.get(`/products/${id}`).then((res) => res.data),
+    axiosInstance.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 
   create: (data) =>
     axiosInstance.post("/products", data).then((res) => res.data),
@@ -23,3 +31,6 @@ export const adminProductApi = {
   toggleStatus: (id) =>
     axiosInstance.patch(`/products/${id}/toggle-status`).then((res) => res.data),
 };
+
+// ✅ ALIAS
+export const productApi = adminProductApi;

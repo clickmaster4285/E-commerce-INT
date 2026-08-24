@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
-import { orderApi } from "@/apis/orderApi";
+import { orderApi } from "@/apis/user/orderApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
@@ -234,17 +234,22 @@ export default function OrdersPage() {
           <DraftProgress step={draft.step} />
         </div>
 
+       
         <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)] flex-wrap gap-3">
-          <div>
-            {totalSavings > 0 && (
-              <p className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 mb-0.5">
-                <Tag size={10} /> Save Rs. {totalSavings.toLocaleString()}
-              </p>
-            )}
+          
+          
+                  <div>
             <p className="text-xs text-[var(--user-text-muted)]">
               Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</span>
             </p>
+            {totalSavings > 0 && (
+              <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5">
+                You save Rs. {totalSavings.toLocaleString()}
+              </p>
+            )}
           </div>
+
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => resumeDraft(draft._id)}

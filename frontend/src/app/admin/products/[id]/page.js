@@ -11,9 +11,9 @@ import {
   Edit3, Save
 } from "lucide-react";
 import { toast } from "sonner";
-import { productApi } from "@/apis/productApi";
-import { categoryApi } from "@/apis/categoryApi";
-import { brandApi } from "@/apis/brandApi";
+import { productApi } from "@/apis/admin/productApi";
+import { categoryApi } from "@/apis/admin/categoryApi";
+import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { tagApi } from "@/apis/admin/tagApi";
 

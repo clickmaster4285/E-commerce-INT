@@ -6,8 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Country, State, City } from "country-state-city";
 import axiosInstance from "@/apis/axiosInstance";
-import { addressApi } from "@/apis/addressApi";
-import { orderApi } from "@/apis/orderApi";
+import { addressApi } from "@/apis/user/addressApi";
+import { orderApi } from "@/apis/user/orderApi";
 
 
 import { useCart } from "@/components/user/CartContext";
@@ -555,7 +555,7 @@ function CheckoutContent() {
       <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
         <PackageCheck size={16} className="text-[var(--user-accent)]" /> Order Summary
       </h2>
-      <div className="space-y-2.5 sm:space-y-3 max-h-[250px] sm:max-h-[300px] overflow-y-auto pr-1 mb-3 sm:mb-4">
+      <div className="space-y-2.5 my-3 sm:space-y-3 max-h-[250px] sm:max-h-[300px] overflow-y-auto pr-1 mb-3 sm:mb-4">
         {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-center gap-2.5 sm:gap-3">
             <ItemThumb item={i} size="w-10 h-10 sm:w-12 sm:h-12" />
@@ -800,7 +800,7 @@ function CheckoutContent() {
                     <MapPin size={14} className="text-[var(--user-accent)] sm:w-4 sm:h-4" /> Delivery Address
                   </h2>
                   {addresses.length > 0 ? (
-                    <div className="grid sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="grid my-3 sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
                       {addresses.map((a) => (
                         <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`text-left rounded-lg sm:rounded-xl border p-3 sm:p-4 transition cursor-pointer ${selectedAddressId === a._id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
                           <div className="flex items-center justify-between mb-1 gap-1 sm:gap-2">
@@ -832,7 +832,7 @@ function CheckoutContent() {
                   <h2 className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
                     <Truck size={14} className="text-[var(--user-accent)] sm:w-4 sm:h-4" /> Shipping Method
                   </h2>
-                  <div className="grid sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="grid my-3 sm:grid-cols-2 gap-2 sm:gap-3">
                     {SHIPPING_METHODS.map((m) => {
                       const fee = getShippingFee(m.id, subtotal);
                       const active = shippingMethod === m.id;
@@ -854,7 +854,7 @@ function CheckoutContent() {
                   <h2 className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
                     <CreditCard size={14} className="text-[var(--user-accent)] sm:w-4 sm:h-4" /> Payment Method
                   </h2>
-                  <div className="space-y-2 sm:space-y-3">
+                  <div className="space-y-2 my-3 sm:space-y-3">
                     {[
                       { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay in cash when your order arrives" },
                       { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer directly to our bank account" },
@@ -916,7 +916,7 @@ function CheckoutContent() {
                   <h2 className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
                     <ShieldCheck size={14} className="text-[var(--user-accent)] sm:w-4 sm:h-4" /> Review (Read-Only)
                   </h2>
-                  <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid sm:grid-cols-2 my-3 gap-3 sm:gap-4">
                     <div className="rounded-lg sm:rounded-xl border border-[var(--user-border)] p-3 sm:p-4">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-[10px] sm:text-xs font-bold text-[var(--user-text)] uppercase tracking-wider">Deliver To</p>
@@ -942,7 +942,7 @@ function CheckoutContent() {
                   </div>
                   <div className="mt-3 sm:mt-4 rounded-lg sm:rounded-xl border border-[var(--user-border)] p-3 sm:p-4 space-y-2 sm:space-y-3">
                     <p className="text-[10px] sm:text-xs font-bold text-[var(--user-text)] uppercase tracking-wider">Items ({activeItems.length})</p>
-                    <div className="divide-y divide-[var(--user-border)]">
+                    <div className="divide-y my-2 divide-[var(--user-border)]">
                       {activeItems.map((i) => (
                         <div key={i.key} className="flex items-center gap-2 sm:gap-3 py-2 sm:py-2.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-9 h-9 sm:w-10 sm:h-10" />

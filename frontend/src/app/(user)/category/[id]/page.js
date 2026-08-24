@@ -3,8 +3,8 @@
 import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { productApi } from "@/apis/productApi";
-import { categoryApi } from "@/apis/categoryApi";
+import { productApi } from "@/apis/user/productApi";
+import { categoryApi } from "@/apis/user/categoryApi";
 import ProductCard from "@/components/user/ProductCard";
 import { ChevronRight, Package, SlidersHorizontal } from "lucide-react";
 

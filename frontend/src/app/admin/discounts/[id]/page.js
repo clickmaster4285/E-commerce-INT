@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { discountApi } from "../../../../apis/discountApi";
+import { discountApi } from "../../../../apis/admin/discountApi";
 import { useSocket } from "@/hooks/useSocket";
 
 /* =========================================================
