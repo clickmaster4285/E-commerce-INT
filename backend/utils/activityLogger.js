@@ -51,7 +51,6 @@ const logActivity = async (io, data) => {
       io.to("activities").emit("activity:new", populated);
     }
 
-    console.log(`📝 Activity logged: ${action}`);
     return populated;
   } catch (error) {
     console.error("❌ Activity log error:", error.message);

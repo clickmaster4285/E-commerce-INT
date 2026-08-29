@@ -32,21 +32,11 @@ const dealSchema = new mongoose.Schema(
       enum: [
         "percentage",
         "fixed",
+        "fixed_amount",
         "buy_x_get_y",
         "bundle",
         "free_shipping",
         "flash_sale",
-      ],
-      required: true,
-    },
-   type: {
-      type: String,
-      enum: [
-        "percentage",
-        "fixed_amount", // Fixed: "fixed" ki jagah "fixed_amount" kar diya
-        "buy_x_get_y",
-        "bundle",
-        "free_shipping",
       ],
       required: true,
     },

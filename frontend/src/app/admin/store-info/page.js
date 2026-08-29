@@ -254,7 +254,6 @@ export default function StoreInfoPage() {
     socket.emit("getStoreInfo");
 
     const handleStoreData = (response) => {
-      console.log("📦 Store data received:", response);
 
       if (response?.success && response?.data) {
         const data = response.data;
@@ -268,7 +267,6 @@ export default function StoreInfoPage() {
 
         const url = getLogoUrl(data);
         if (url) {
-          console.log("🖼️ Logo URL set:", url);
           setLogoPreview(url);
           setLogoError(false);
         } else {
@@ -279,7 +277,6 @@ export default function StoreInfoPage() {
     };
 
     const handleStoreUpdate = (d) => {
-      console.log("🔄 Store updated:", d);
 
       setFormData((prev) => ({
         ...prev,
@@ -411,7 +408,6 @@ export default function StoreInfoPage() {
           reader.readAsDataURL(logoFile);
         });
 
-        console.log("📤 Logo base64 length:", logoBase64?.length);
       }
 
       const dataToSend = {
@@ -425,7 +421,6 @@ export default function StoreInfoPage() {
         "updateStoreInfo",
         dataToSend,
         (resp) => {
-          console.log("📥 Server response:", resp);
 
           // ✅ CHECK FOR PERMISSION ERROR
           if (resp?.success === false && resp?.message?.toLowerCase().includes("permission")) {
@@ -679,13 +674,13 @@ export default function StoreInfoPage() {
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Store Name</label>
                       <input type="text" name="store_name" value={formData.store_name} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Enter store name" />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tagline</label>
                       <input type="text" name="tagline" value={formData.tagline} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Enter store tagline" />
                     </div>
                     <div className="md:col-span-2">
@@ -696,7 +691,7 @@ export default function StoreInfoPage() {
                             className="absolute -left-1 -top-1 h-12 w-12 cursor-pointer" />
                         </div>
                         <input type="text" name="primary_color" value={formData.primary_color} onChange={handleChange}
-                          className="h-9 px-3 rounded-lg text-[13px] flex-1 outline-none font-mono uppercase transition focus:ring-1 focus:ring-emerald-500/40"
+                          className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] flex-1 outline-none font-mono uppercase transition focus:ring-1 focus:ring-emerald-500/40"
                           style={inputStyle} />
                       </div>
                     </div>
@@ -718,26 +713,28 @@ export default function StoreInfoPage() {
                     <div className="relative">
                       <div className="w-28 h-28 rounded-xl flex items-center justify-center overflow-hidden"
                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                        {logoPreview ? (
+                        {logoPreview && !logoError ? (
                           <img 
                             src={logoPreview} 
                             alt="Logo" 
                             className="w-full h-full object-cover"
                             onError={(e) => { 
-                              console.error("❌ Logo image failed to load:", logoPreview);
                               e.target.style.display = "none"; 
                               if (e.target.nextSibling) {
                                 e.target.nextSibling.style.display = "flex";
                               }
                               setLogoError(true);
                             }}
-                            onLoad={() => {
-                              console.log("✅ Logo image loaded successfully");
+                            onLoad={(e) => {
+                              e.target.style.display = "block";
+                              if (e.target.nextSibling) {
+                                e.target.nextSibling.style.display = "none";
+                              }
                               setLogoError(false);
                             }}
                           />
                         ) : null}
-                        <div className="flex-col items-center gap-1.5" style={{ color: "var(--text-muted)", display: logoPreview ? "none" : "flex" }}>
+                        <div className="flex-col items-center gap-1.5" style={{ color: "var(--text-muted)", display: logoPreview && !logoError ? "none" : "flex" }}>
                           <Store size={28} />
                           <span className="text-[10px]">No Logo</span>
                         </div>
@@ -775,7 +772,7 @@ export default function StoreInfoPage() {
                   <div>
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Email Address</label>
                     <input type="email" name="email" value={formData.email} onChange={handleChange}
-                      className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                      className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                       style={inputStyle} placeholder="store@example.com" />
                   </div>
                   <div>
@@ -790,7 +787,7 @@ export default function StoreInfoPage() {
                   <div>
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Support Email</label>
                     <input type="email" name="support_email" value={formData.support_email} onChange={handleChange}
-                      className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                      className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                       style={inputStyle} placeholder="support@example.com" />
                   </div>
                   <div>
@@ -839,13 +836,13 @@ export default function StoreInfoPage() {
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Postal Code</label>
                       <input type="text" name="zip_code" value={formData.zip_code} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Postal code" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Store Address</label>
                       <input type="text" name="address" value={formData.address} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Full store address" />
                     </div>
                   </div>
@@ -865,19 +862,19 @@ export default function StoreInfoPage() {
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Business Type</label>
                       <input type="text" name="business_type" value={formData.business_type} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Private Limited" />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Total Employees</label>
                       <input type="text" name="total_employees" value={formData.total_employees} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="25–50" />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Year Established</label>
                       <input type="text" name="year_established" value={formData.year_established} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="2020" />
                     </div>
                     <div>
@@ -889,13 +886,13 @@ export default function StoreInfoPage() {
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tax Rate (%)</label>
                       <input type="number" name="tax_rate" value={formData.tax_rate} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="0" />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Weight Unit</label>
                       <select name="weight_unit" value={formData.weight_unit} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40 appearance-none"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40 appearance-none"
                         style={inputStyle}>
                         <option value="kg">Kilogram (kg)</option>
                         <option value="g">Gram (g)</option>
@@ -931,7 +928,7 @@ export default function StoreInfoPage() {
                         <span className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>{label}</span>
                       </div>
                       <input type="text" name={`social_${key}`} value={formData.social_links[key] || ""} onChange={handleChange}
-                        className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                        className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder={`${label} URL`} />
                     </div>
                   ))}
@@ -962,7 +959,7 @@ export default function StoreInfoPage() {
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{field.label}</label>
                       {field.type === "input" ? (
                         <input type="text" name={field.name} value={formData[field.name]} onChange={handleChange}
-                          className="h-9 px-3 rounded-lg text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                          className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                           style={inputStyle} placeholder={field.placeholder} />
                       ) : (
                         <textarea name={field.name} value={formData[field.name]} onChange={handleChange} rows={3}
@@ -1032,21 +1029,28 @@ export default function StoreInfoPage() {
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                {logoPreview ? (
+                {logoPreview && !logoError ? (
                   <img 
                     src={logoPreview} 
                     alt="Logo" 
                     className="w-full h-full object-cover"
                     onError={(e) => { 
-                      console.error("❌ Logo display error:", logoPreview);
                       e.target.style.display = "none"; 
                       if (e.target.nextSibling) {
                         e.target.nextSibling.style.display = "flex";
                       }
+                      setLogoError(true);
+                    }}
+                    onLoad={(e) => {
+                      e.target.style.display = "block";
+                      if (e.target.nextSibling) {
+                        e.target.nextSibling.style.display = "none";
+                      }
+                      setLogoError(false);
                     }}
                   />
                 ) : null}
-                <div style={{ display: logoPreview ? "none" : "flex", flexDirection: "column", alignItems: "center", gap: "4px", color: "var(--text-muted)" }}>
+                <div style={{ display: logoPreview && !logoError ? "none" : "flex", flexDirection: "column", alignItems: "center", gap: "4px", color: "var(--text-muted)" }}>
                   <Store size={32} />
                   <span style={{ fontSize: "10px" }}>No Logo</span>
                 </div>

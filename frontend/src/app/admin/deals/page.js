@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -24,6 +24,10 @@ const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} an
 const DealIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16v5H4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 7v14" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.5 7C7.1 7 6 5.9 6 4.5S7.1 2 8.5 2C10.5 2 12 7 12 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.5 7C16.9 7 18 5.9 18 4.5S16.9 2 15.5 2C13.5 2 12 7 12 7" /></svg>);
 const CheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>);
 const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>);
+const BoxIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
+const FolderIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>);
+const AwardIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>);
+const GlobeIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 
 /* ==================== HELPERS (FIXED FOR BACKEND SCHEMA) ==================== */
 const normalizeArrayResponse = (response) => {
@@ -150,6 +154,11 @@ export default function DealsPage() {
   const [selector, setSelector] = useState({ open: false, type: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // ✅ Same pattern as Discounts page: "New Deal" dropdown -> related form
+  const [activeFormType, setActiveFormType] = useState(null); // 'all' | 'product' | 'category' | 'brand' | null
+  const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
+  const typeMenuRef = useRef(null);
+
   // ✅ FIX: Using the dedicated socket sync hook for real-time updates
   const { markSelfAction } = useDealSocketSync();
 
@@ -173,6 +182,17 @@ export default function DealsPage() {
   const { data: brandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
+  // ✅ Close the "New Deal" dropdown when clicking outside (same as Discounts)
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (typeMenuRef.current && !typeMenuRef.current.contains(event.target)) {
+        setIsTypeMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name: "", code: "", description: "", target_type: "all",
@@ -184,6 +204,7 @@ export default function DealsPage() {
     });
     setEditingDeal(null);
     setSelector({ open: false, type: null });
+    setActiveFormType(null);
   };
 
   // ✅ Navigation Handler for View Details
@@ -233,7 +254,7 @@ export default function DealsPage() {
       // Filter by applyTo (Fixed for 'all_targets' vs 'all')
       const rawTarget = deal?.applyTo || "all";
       const matchTarget = targetFilter === "all_targets" || rawTarget === targetFilter;
-                          
+                           
       return matchSearch && matchStatus && matchTarget;
     });
   }, [deals, search, statusFilter, targetFilter]);
@@ -276,6 +297,7 @@ export default function DealsPage() {
       is_featured: Boolean(deal?.isFeatured),
     });
     setEditingDeal(deal);
+    setActiveFormType(deal?.applyTo || "all"); // ✅ Same as Discounts: edit opens the related form
     setShowModal(true);
   };
 
@@ -353,17 +375,53 @@ export default function DealsPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
+  // ✅ Deal type options for the "New Deal" dropdown (same UX as Discounts page)
+  const dealTypes = [
+    {
+      key: "all",
+      title: "All Products Deal",
+      desc: "Apply deal on all products",
+      icon: GlobeIcon,
+    },
+    {
+      key: "product",
+      title: "Product Deal",
+      desc: "Apply deal on specific products",
+      icon: BoxIcon,
+    },
+    {
+      key: "category",
+      title: "Category Deal",
+      desc: "Apply deal on entire categories",
+      icon: FolderIcon,
+    },
+    {
+      key: "brand",
+      title: "Brand Deal",
+      desc: "Apply deal on specific brands",
+      icon: AwardIcon,
+    },
+  ];
+
+  const openDealForm = (type) => {
+    resetForm();
+    setIsTypeMenuOpen(false);
+    setActiveFormType(type);
+    setFormData((prev) => ({ ...prev, target_type: type }));
+    setShowModal(true);
+  };
+
   // ✅ Action Buttons Component with Eye Icon & Stop Propagation
   const ActionButtons = ({ deal }) => (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
       {/* ✅ VIEW BUTTON ADDED */}
-      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
+      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
         <EyeIcon className="w-4 h-4" />
       </button>
-      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
+      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
         <EditIcon className="w-4 h-4" />
       </button>
-      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
+      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
         <TrashIcon className="w-4 h-4" />
       </button>
     </div>
@@ -384,9 +442,25 @@ export default function DealsPage() {
               <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
               <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
             </div>
-            <button onClick={() => { resetForm(); setShowModal(true); }} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <PlusIcon /> Create Deal
-            </button>
+            <div className="relative shrink-0" ref={typeMenuRef}>
+              <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                <PlusIcon /> New Deal
+                <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isTypeMenuOpen && (
+                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                  {dealTypes.map((dt) => {
+                    const Icon = dt.icon;
+                    return (
+                      <button key={dt.key} type="button" onClick={() => openDealForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                        <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -401,7 +475,7 @@ export default function DealsPage() {
         {/* SEARCH & FILTERS */}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search deal name..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none" style={inputStyle} />
+          <input type="text" placeholder="Search deal name..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none" style={inputStyle} />
         </div>
         
         <div className="flex flex-wrap gap-3">
@@ -517,7 +591,7 @@ export default function DealsPage() {
 
       {/* MODALS */}
       {showModal && (
-        <DealFormModal formData={formData} setFormData={setFormData} editingDeal={editingDeal} saveMutation={saveMutation} setShowModal={setShowModal} resetForm={resetForm} setSelector={setSelector} getSelectedItems={getSelectedItems} handleSubmit={handleSubmit} inputStyle={inputStyle} />
+        <DealFormModal formType={activeFormType} formData={formData} setFormData={setFormData} editingDeal={editingDeal} saveMutation={saveMutation} setShowModal={setShowModal} resetForm={resetForm} setSelector={setSelector} getSelectedItems={getSelectedItems} handleSubmit={handleSubmit} inputStyle={inputStyle} products={products} categories={categories} brands={brands} />
       )}
       {selector.open && (
         <SelectionModal type={selector.type} items={selector.type === "product" ? products : selector.type === "category" ? categories : brands} selectedIds={selector.type === "product" ? formData.selected_product_ids : selector.type === "category" ? formData.selected_category_ids : formData.selected_brand_ids} onClose={() => setSelector({ open: false, type: null })} onApply={(ids) => {
@@ -559,7 +633,7 @@ function Select({ value, onChange, options, inputStyle }) {
       <select 
         value={value} 
         onChange={(e) => onChange(e.target.value)} 
-        className="appearance-none h-9 w-[170px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer" 
+        className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" 
         style={inputStyle}
       >
         {options.map(([val, label]) => (
@@ -579,7 +653,7 @@ function Select({ value, onChange, options, inputStyle }) {
 function Field({ label, value, onChange, type = "text", placeholder, inputStyle }) {
   return (<div>
     <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{label}</label>
-    <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-9 px-3 rounded-md text-sm w-full outline-none" style={inputStyle} />
+    <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none" style={inputStyle} />
   </div>);
 }
 
@@ -602,19 +676,69 @@ function SelectionField({ label, items, onClick, onRemove }) {
 }
 
 /* ==================== DEAL FORM MODAL ==================== */
-function DealFormModal({ formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle }) {
+// ✅ Same as Discounts: har deal type ka apna tailored form
+const DEAL_TYPE_LABELS = {
+  all: "All Products Deal",
+  product: "Product Deal",
+  category: "Category Deal",
+  brand: "Brand Deal",
+};
+
+const DEAL_TYPE_SUBTITLES = {
+  all: "This deal will apply to all products in your store",
+  product: "Apply deal on specific products",
+  category: "Apply deal on entire categories",
+  brand: "Apply deal on specific brands",
+};
+
+// ✅ Discount page jaisa initials helper
+const getInitials = (name) => {
+  if (!name) return "??";
+  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
+};
+
+function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+
+  const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
+
+  // ✅ Same as Discounts: sirf us type ka selection section dikhta hai jo dropdown se chuna gaya
+  const selConfig = {
+    product: { key: "selected_product_ids", items: products, label: "Products" },
+    category: { key: "selected_category_ids", items: categories, label: "Categories" },
+    brand: { key: "selected_brand_ids", items: brands, label: "Brands" },
+  };
+  const sel = formType !== "all" ? selConfig[formType] : null;
+  const ids = sel ? (formData[sel.key] || []) : [];
+  const selectedItems = sel ? sel.items.filter((item) => ids.includes(getId(item))) : [];
+
+  const filteredItems = (() => {
+    if (!sel) return [];
+    const term = itemSearch.toLowerCase().trim();
+    if (!term) return sel.items;
+    return sel.items.filter((item) => getName(item, formType).toLowerCase().includes(term));
+  })();
+
+  const toggleItem = (id) => {
+    if (!sel) return;
+    setFormData((prev) => ({
+      ...prev,
+      [sel.key]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+    }));
+  };
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
           <div>
-            <h3 className="text-base font-semibold">{editingDeal ? "Edit Deal" : "Create New Deal"}</h3>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Set the offer, products and deal schedule.</p>
+            <h3 className="text-base font-semibold">{editingDeal ? `Edit ${typeLabel}` : `Create ${typeLabel}`}</h3>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{DEAL_TYPE_SUBTITLES[formType] || "Set the offer, products and deal schedule."}</p>
           </div>
           <button onClick={() => { setShowModal(false); resetForm(); }} disabled={saveMutation.isPending} className="p-1 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
           <div>
             <p className="text-sm font-semibold mb-3">Basic Information</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -631,7 +755,7 @@ function DealFormModal({ formData, setFormData, editingDeal, saveMutation, setSh
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Type</label>
-                <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} className="h-9 w-full px-3 rounded-md text-sm outline-none" style={inputStyle}>
+                <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} className="h-10 md:h-9 w-full px-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle}>
                   <option value="percentage">Percentage Discount (%)</option>
                   <option value="fixed_amount">Fixed Amount Discount (Rs.)</option>
                   <option value="buy_x_get_y">Buy X Get Y</option>
@@ -657,18 +781,83 @@ function DealFormModal({ formData, setFormData, editingDeal, saveMutation, setSh
             </div>
           </div>
 
-          <div>
-            <p className="text-sm font-semibold mb-3">Applies To</p>
-            <select value={formData.target_type} onChange={(e) => setFormData({ ...formData, target_type: e.target.value })} className="h-9 w-full px-3 rounded-md text-sm outline-none" style={inputStyle}>
-              <option value="all">All Products</option>
-              <option value="product">Specific Products</option>
-              <option value="category">Specific Categories</option>
-              <option value="brand">Specific Brands</option>
-            </select>
-            {formData.target_type === "product" && (<SelectionField label="Products" items={getSelectedItems("product")} onClick={() => setSelector({ open: true, type: "product" })} onRemove={(id) => setFormData((prev) => ({ ...prev, selected_product_ids: prev.selected_product_ids.filter((x) => x !== id) }))} />)}
-            {formData.target_type === "category" && (<SelectionField label="Categories" items={getSelectedItems("category")} onClick={() => setSelector({ open: true, type: "category" })} onRemove={(id) => setFormData((prev) => ({ ...prev, selected_category_ids: prev.selected_category_ids.filter((x) => x !== id) }))} />)}
-            {formData.target_type === "brand" && (<SelectionField label="Brands" items={getSelectedItems("brand")} onClick={() => setSelector({ open: true, type: "brand" })} onRemove={(id) => setFormData((prev) => ({ ...prev, selected_brand_ids: prev.selected_brand_ids.filter((x) => x !== id) }))} />)}
-          </div>
+          {/* ✅ Selection Section (same as Discounts) — sirf product/category/brand par dikhta hai */}
+          {sel && (
+            <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              <button type="button" onClick={() => setIsSelectionOpen((open) => !open)} aria-expanded={isSelectionOpen} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[var(--bg-tertiary)]" style={{ borderBottom: isSelectionOpen ? "1px solid var(--border-color)" : "none" }}>
+                <span>
+                  <span className="block text-[13px] font-semibold">Select {sel.label} *</span>
+                  <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>{ids.length} selected</span>
+                </span>
+                <span className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{isSelectionOpen ? "Close" : "Choose"}<ChevronDownIcon className={`h-4 w-4 transition-transform ${isSelectionOpen ? "rotate-180" : ""}`} /></span>
+              </button>
+
+              {isSelectionOpen && (
+                <>
+                  {/* Search */}
+                  <div className="p-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
+                      <input type="text" value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder={`Search ${sel.label.toLowerCase()}...`} className="h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
+                    </div>
+                  </div>
+
+                  {/* Selected Chips */}
+                  {selectedItems.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-3 py-2.5" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                      {selectedItems.map((item) => {
+                        const id = getId(item);
+                        return (
+                          <span key={id} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                            <span className="max-w-[120px] truncate">{getName(item, formType)}</span>
+                            <button type="button" onClick={() => toggleItem(id)} className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition">
+                              <CloseIcon className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Items List */}
+                  <div className="max-h-[220px] overflow-y-auto">
+                    {filteredItems.length === 0 ? (
+                      <p className="py-8 text-center text-xs" style={{ color: "var(--text-muted)" }}>No {sel.label.toLowerCase()} found</p>
+                    ) : (
+                      <div className="p-1.5 space-y-0.5">
+                        {filteredItems.map((item) => {
+                          const id = getId(item);
+                          const isSelected = ids.includes(id);
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => toggleItem(id)}
+                              className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition"
+                              style={{ backgroundColor: isSelected ? "var(--accent-soft)" : "transparent" }}
+                              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }}
+                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >
+                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${isSelected ? "" : "border-slate-600"}`}
+                                style={isSelected ? { backgroundColor: "var(--accent)", borderColor: "var(--accent)", color: "#0a0a0a" } : {}}>
+                                {isSelected && <CheckIcon className="w-3 h-3" />}
+                              </span>
+                              <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--border-color)" }}>
+                                {getInitials(getName(item, formType))}
+                              </div>
+                              <span className="text-[13px] truncate flex-1" style={{ color: isSelected ? "var(--accent)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>
+                                {getName(item, formType)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           <div>
             <p className="text-sm font-semibold mb-3">Deal Schedule & Limits</p>
@@ -685,7 +874,7 @@ function DealFormModal({ formData, setFormData, editingDeal, saveMutation, setSh
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="h-9 w-full px-3 rounded-md text-sm outline-none" style={inputStyle}>
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="h-10 md:h-9 w-full px-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle}>
                   <option value="active">Active</option>
                   <option value="disabled">Disabled</option>
                 </select>
@@ -729,7 +918,7 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg rounded-xl overflow-hidden" style={cardStyle}>
+      <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={cardStyle}>
         <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
           <h3 className="text-base font-semibold">Select {title}</h3>
           <button onClick={onClose} style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
@@ -737,7 +926,7 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
         <div className="p-4">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-            <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${title.toLowerCase()}...`} className="w-full h-9 pl-9 pr-3 rounded-md text-sm outline-none" style={inputStyle} />
+            <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${title.toLowerCase()}...`} className="w-full h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle} />
           </div>
         </div>
         <div className="max-h-[320px] overflow-y-auto px-4 pb-4">

@@ -1,146 +1,407 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import axiosInstance from "@/apis/axiosInstance";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axiosInstance from '@/apis/axiosInstance';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
+
+// ==========================================
+// VALIDATION HELPERS
+// ==========================================
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const validateEmail = (value) => {
+  const email = value.trim();
+
+  if (!email) return 'Email address is required.';
+  if (!EMAIL_REGEX.test(email)) return 'Enter a valid email address.';
+
+  return '';
+};
+
+const validatePassword = (value) => {
+  if (!value) return 'Password is required.';
+
+  return '';
+};
 
 export default function AdminLoginPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    password: '',
+  });
   const [error, setError] = useState('');
-  const router = useRouter();
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await axiosInstance.post("/users/admin/login", userData);
+      const response = await axiosInstance.post(
+        '/users/admin/login',
+        userData
+      );
+
       return response.data;
     },
+
     onSuccess: (data) => {
-      // ✅ FIX: Ab admin, staff, aur manager teeno ko allow karein
-      const allowedRoles = ['admin', 'staff', 'manager'];
-      
-      if (allowedRoles.includes(data.user.role)) {
-        router.push('/admin/dashboard');
-      } else {
-        // Agar user ka role allowed nahi hai to logout aur error
+      /*
+       * IMPORTANT
+       * Backend (/users/admin/login) already rejects non-admin
+       * roles BEFORE issuing cookies — this is only a safety net
+       * for an unexpected response shape. Guarded so it can never
+       * throw and silently swallow the redirect.
+       */
+      const role = String(data?.user?.role || '').toLowerCase();
+
+      if (
+        !data?.user ||
+        !['admin', 'staff', 'manager'].includes(role)
+      ) {
         axiosInstance.post('/users/logout').catch(() => {});
-        setError('Access denied. Only administrators, managers and staff members can log in.');
+        setError(
+          'Access denied. Only administrators, managers and staff members can log in.'
+        );
+        return;
       }
+
+      /*
+       * Fresh session — drop any cached queries from a previous
+       * account so the dashboard fetches everything for the user
+       * who just logged in.
+       */
+      queryClient.removeQueries();
+
+      router.replace('/admin/dashboard');
     },
-    onError: (error) => {
-      setError(error.response?.data?.message || 'Login failed!');
-    }
+
+    onError: (err) => {
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+        return;
+      }
+
+      if (!err.response) {
+        setError(
+          'Unable to reach the server. Please check your connection and try again.'
+        );
+        return;
+      }
+
+      setError('Login failed. Please try again.');
+    },
   });
 
-  const handleLogin = (e) => {
+  const isSubmitting = loginMutation.isPending;
+
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+
+    if (fieldErrors.email) {
+      setFieldErrors((prev) => ({ ...prev, email: '' }));
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+
+    if (fieldErrors.password) {
+      setFieldErrors((prev) => ({ ...prev, password: '' }));
+    }
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Prevent duplicate submissions
+    if (isSubmitting) return;
+
+    const errors = {
+      email: validateEmail(email),
+      password: validatePassword(password),
+    };
+
+    setFieldErrors(errors);
+
+    if (errors.email || errors.password) return;
+
     setError('');
-    loginMutation.mutate({ email, password });
+    loginMutation.mutate({ email: email.trim(), password });
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-900">
-      {/* Left Side */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-gray-950">
-        {/* TOP */}
+    <div className="flex min-h-screen w-full bg-[var(--bg-secondary)]">
+      {/* ================= LEFT — BRAND PANEL ================= */}
+
+      <aside className="hidden shrink-0 flex-col justify-between border-r border-[var(--border-color)] bg-[var(--bg-primary)] p-12 lg:flex lg:w-[44%] xl:w-1/2">
+        {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">C</span>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]">
+            <span className="text-lg font-bold text-white">C</span>
           </div>
-          <span className="text-white font-semibold text-xl">ClickMasters</span>
+
+          <span className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+            ClickMaster
+          </span>
         </div>
 
-        {/* MIDDLE */}
-        <div className="flex-1 flex flex-col justify-center -mt-20">
-          <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
-            Admin Control<br />
-            <span className="text-emerald-500">Panel</span>
+        {/* Hero */}
+        <div className="flex flex-1 flex-col justify-center">
+          <h1 className="max-w-md text-[34px] font-bold leading-[1.15] tracking-tight text-[var(--text-primary)] xl:text-[42px]">
+            Admin Control
+            <br />
+            <span className="text-[var(--accent)]">Panel</span>
           </h1>
-          <p className="text-gray-400 text-lg mb-8">
-            Inventory · Brands · Categories · Products · Analytics<br />
-            Manage everything from one secure workspace.
+
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[var(--text-muted)]">
+            Inventory · Brands · Categories · Products · Analytics.
+            <span className="mt-2 block text-[var(--text-secondary)]">
+              Manage everything from one secure workspace.
+            </span>
           </p>
         </div>
 
-        {/* BOTTOM */}
-        <div className="text-gray-500 text-sm">© 2026 ClickMasters Admin</div>
-      </div>
+        {/* Footer */}
+        <p className="text-xs text-[var(--text-muted)]">
+          © 2026 ClickMaster Admin
+        </p>
+      </aside>
 
-      {/* Right Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-900">
-        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-emerald-500 text-xs font-bold uppercase tracking-wider">Admin Sign-In</span>
+      {/* ================= RIGHT — LOGIN FORM ================= */}
+
+      <main className="flex flex-1 items-center justify-center p-4 py-8 sm:p-8">
+        <div className="w-full max-w-[400px]">
+
+          {/* Mobile brand */}
+          <div className="mb-6 flex items-center justify-center gap-2.5 lg:hidden">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)]">
+              <span className="text-sm font-bold text-white">C</span>
+            </div>
+
+            <span className="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              ClickMaster
+            </span>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-1">Admin Login</h2>
-          <p className="text-gray-400 text-sm mb-6">Admin account use karein.</p>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-gray-300 text-sm mb-2">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500"
-                placeholder="admin@example.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-300 text-sm mb-2">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-900 text-white px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:border-emerald-500 transition placeholder-gray-500 pr-12"
-                  placeholder="••••••••"
-                  required
+          {/* Card */}
+          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-sm sm:p-8">
+            {/* Header */}
+            <div className="mb-6">
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2 py-1">
+                <ShieldCheck
+                  size={13}
+                  className="text-[var(--accent)]"
+                  aria-hidden="true"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                  Admin Panel
+                </span>
               </div>
+
+              <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+                Welcome back
+              </h2>
+
+              <p className="mt-1 text-[13px] text-[var(--text-muted)]">
+                Sign in to your admin account.
+              </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={loginMutation.isPending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-70"
-            >
-              {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
+            {/* Global error */}
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 flex items-start gap-2.5 rounded-lg border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.08)] px-3.5 py-2.5"
+              >
+                <AlertCircle
+                  size={15}
+                  className="mt-0.5 shrink-0 text-[var(--danger)]"
+                  aria-hidden="true"
+                />
 
-          {/* User Login Link */}
-          <p className="text-center mt-6 text-gray-500 text-sm">
-            Normal user hain?{" "}
-            <Link href="/login" className="text-emerald-500 hover:underline font-semibold">
-              User Login
-            </Link>
+                <p className="text-[13px] leading-snug text-[var(--danger)]">
+                  {error}
+                </p>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
+
+              {/* Email */}
+              <div>
+                <label
+                  htmlFor="admin-email"
+                  className="mb-1.5 block text-[13px] font-medium text-[var(--text-secondary)]"
+                >
+                  Email Address
+                </label>
+
+                <div className="relative">
+                  <Mail
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
+
+                  <input
+                    id="admin-email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={handleEmailChange}
+                    autoComplete="email"
+                    placeholder="you@company.com"
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={
+                      fieldErrors.email ? 'admin-email-error' : undefined
+                    }
+                    className={`h-11 w-full rounded-lg border bg-[var(--bg-input)] pl-10 pr-3.5 text-[16px] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[var(--accent-soft)] ${
+                      fieldErrors.email
+                        ? 'border-[var(--danger)]'
+                        : 'border-[var(--border-color)]'
+                    }`}
+                  />
+                </div>
+
+                {fieldErrors.email && (
+                  <p
+                    id="admin-email-error"
+                    role="alert"
+                    className="mt-1.5 text-xs text-[var(--danger)]"
+                  >
+                    {fieldErrors.email}
+                  </p>
+                )}
+              </div>
+
+              {/* Password */}
+              <div>
+                <label
+                  htmlFor="admin-password"
+                  className="mb-1.5 block text-[13px] font-medium text-[var(--text-secondary)]"
+                >
+                  Password
+                </label>
+
+                <div className="relative">
+                  <Lock
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                    aria-hidden="true"
+                  />
+
+                  <input
+                    id="admin-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={handlePasswordChange}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={
+                      fieldErrors.password
+                        ? 'admin-password-error'
+                        : undefined
+                    }
+                    className={`h-11 w-full rounded-lg border bg-[var(--bg-input)] pl-10 pr-11 text-[16px] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-[3px] focus:ring-[var(--accent-soft)] ${
+                      fieldErrors.password
+                        ? 'border-[var(--danger)]'
+                        : 'border-[var(--border-color)]'
+                    }`}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPassword((prev) => !prev)
+                    }
+                    aria-label={
+                      showPassword
+                        ? 'Hide password'
+                        : 'Show password'
+                    }
+                    aria-pressed={showPassword}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-soft)]"
+                  >
+                    {showPassword ? (
+                      <EyeOff size={16} aria-hidden="true" />
+                    ) : (
+                      <Eye size={16} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+
+                {fieldErrors.password && (
+                  <p
+                    id="admin-password-error"
+                    role="alert"
+                    className="mt-1.5 text-xs text-[var(--danger)]"
+                  >
+                    {fieldErrors.password}
+                  </p>
+                )}
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] text-sm font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                      aria-hidden="true"
+                    />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+
+            </form>
+
+            {/* User login link */}
+            <p className="mt-6 border-t border-[var(--border-color)] pt-4 text-center text-[13px] text-[var(--text-muted)]">
+              Regular customer?{' '}
+              <Link
+                href="/login"
+                className="font-medium text-[var(--accent)] hover:underline"
+              >
+                User Login
+              </Link>
+            </p>
+
+          </div>
+
+          {/* Mobile footer */}
+          <p className="mt-5 text-center text-xs text-[var(--text-muted)] lg:hidden">
+            © 2026 ClickMaster Admin
           </p>
+
         </div>
-      </div>
+      </main>
     </div>
   );
 }

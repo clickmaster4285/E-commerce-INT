@@ -32,14 +32,16 @@ const D = {
   percent: "M19 5l-14 14M10 5a5 5 0 100 10M14 19a5 5 0 100-10",
   warn: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
   check: "M5 13l4 4L19 7",
+  plus: "M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z",
+  pencil: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
 };
 
 /* =========================================================
    HELPERS
 ========================================================= */
-function formatDate(date) {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+function ini(name) {
+  if (!name) return "??";
+  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
 function formatDateTime(date) {
@@ -95,12 +97,11 @@ function StatusPill({ status }) {
 function Button({ children, onClick, danger = false, primary = false, disabled = false, type = "button" }) {
   return (
     <button type={type} onClick={onClick} disabled={disabled}
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-all hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex min-h-[44px] h-10 md:h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
       style={{
         backgroundColor: primary ? "var(--accent)" : danger ? "rgba(239,68,68,.08)" : "var(--bg-tertiary)",
         color: primary ? "var(--accent-text)" : danger ? "var(--danger)" : "var(--text-primary)",
         border: primary ? "none" : danger ? "1px solid rgba(239,68,68,.25)" : "1px solid var(--border-color)",
-        boxShadow: primary ? "0 6px 16px var(--accent-soft)" : "none",
       }}>
       {children}
     </button>
@@ -109,7 +110,7 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
 
 function Card({ children, className = "" }) {
   return (
-    <div className={`overflow-hidden rounded-xl ${className}`} style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
+    <div className={`overflow-hidden rounded-xl ${className}`} style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
       {children}
     </div>
   );
@@ -226,13 +227,13 @@ export default function DealDetailPage() {
             <span style={{ color: "var(--text-primary)" }}>Deal Details</span>
           </div>
 
-          <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-center gap-4">
                 {/* Deal Icon Placeholder */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl" 
-                  style={{ backgroundColor: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", boxShadow: "0 0 0 4px rgba(16,185,129,0.05)" }}>
-                  <Ico d={D.tag} className="h-8 w-8" style={{ color: "var(--accent)" }} />
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg" 
+                  style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)" }}>
+                  <Ico d={D.tag} className="h-7 w-7" style={{ color: "var(--accent)" }} />
                 </div>
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -259,29 +260,6 @@ export default function DealDetailPage() {
           </div>
         </div>
 
-        {/* SUMMARY STRIP */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Card className="p-4">
-            <div className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.check} className="h-3.5 w-3.5" /> Current Status</div>
-            <StatusPill status={status} />
-          </Card>
-          <Card className="p-4">
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.users} className="h-3.5 w-3.5" /> Target Count</div>
-            <p className="text-2xl font-bold tracking-tight">{targetCount}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Applies to {deal.applyTo || "all"}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.calendar} className="h-3.5 w-3.5" /> Start Date</div>
-            <p className="text-sm font-semibold">{formatDate(deal.startDate)}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Deal activation</p>
-          </Card>
-          <Card className="p-4">
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.clock} className="h-3.5 w-3.5" /> End Date</div>
-            <p className="truncate text-sm font-semibold">{formatDate(deal.endDate)}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Deal expiration</p>
-          </Card>
-        </div>
-
         {/* TABS */}
         <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)" }}>
           {[
@@ -303,8 +281,9 @@ export default function DealDetailPage() {
 
         {/* OVERVIEW TAB */}
         {tab === "info" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
+            {/* Left column */}
+            <div className="space-y-4 min-w-0">
               {/* Basic Info */}
               <Card>
                 <CardHeader title="Deal Information" icon={<Ico d={D.tag} className="w-4 h-4" />} />
@@ -313,15 +292,26 @@ export default function DealDetailPage() {
                   <InfoRow label="Deal Code" value={deal.code} mono />
                   <InfoRow label="Target Type" value={deal.applyTo?.toUpperCase() || "ALL"} />
                   <InfoRow label="Featured" value={deal.isFeatured ? "Yes" : "No"} green={deal.isFeatured} />
-                  
+
                   <div className="py-3 border-b" style={{ borderColor: "var(--border-color)" }}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Created By</span>
-                      <span className="text-[12px] font-medium">{deal.createdby?.name || "System"}</span>
+                      <span className="text-[12px] font-medium">{deal.createdby?.name || deal.createdBy?.name || "System"}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Created At</span>
-                      <span className="text-[12px]">{formatDateTime(deal.created_at)}</span>
+                      <span className="text-[12px]">{formatDateTime(deal.created_at || deal.createdAt)}</span>
+                    </div>
+                  </div>
+
+                  <div className="py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Last Updated By</span>
+                      <span className="text-[12px] font-medium">{deal.updatedby?.name || deal.updatedBy?.name || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Last Updated At</span>
+                      <span className="text-[12px]">{deal.updated_at || deal.updatedAt ? formatDateTime(deal.updated_at || deal.updatedAt) : "Never"}</span>
                     </div>
                   </div>
                 </div>
@@ -330,30 +320,30 @@ export default function DealDetailPage() {
               {/* Description */}
               <Card>
                 <CardHeader title="Description" icon={<Ico d={D.activity} className="w-4 h-4" />} />
-                <div className="p-5 min-h-[250px] flex flex-col">
+                <div className="p-5">
                   {deal.description ? (
                     <p className="text-[12px] leading-6 whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>{deal.description}</p>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="flex flex-col items-center justify-center text-center py-8">
                       <Ico d={D.activity} className="w-7 h-7 mb-3" sw={1.4} />
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No description provided.</p>
                     </div>
                   )}
                 </div>
               </Card>
-
-              {/* Schedule & Limits */}
-              <Card>
-                <CardHeader title="Schedule & Limits" icon={<Ico d={D.clock} className="w-4 h-4" />} />
-                <div className="px-4">
-                  <InfoRow label="Start Date" value={formatDateTime(deal.startDate)} />
-                  <InfoRow label="End Date" value={formatDateTime(deal.endDate)} />
-                  <InfoRow label="Total Usage Limit" value={deal.usageLimit || "Unlimited"} mono />
-                  <InfoRow label="Per User Limit" value={deal.perUserLimit || "Unlimited"} mono />
-                  <InfoRow label="Min Order Value" value={deal.minOrderValue ? `Rs. ${deal.minOrderValue}` : "None"} />
-                </div>
-              </Card>
             </div>
+
+            {/* Right column — Schedule & Limits */}
+            <Card>
+              <CardHeader title="Schedule & Limits" icon={<Ico d={D.clock} className="w-4 h-4" />} />
+              <div className="px-4">
+                <InfoRow label="Start Date" value={formatDateTime(deal.startDate)} />
+                <InfoRow label="End Date" value={formatDateTime(deal.endDate)} />
+                <InfoRow label="Total Usage Limit" value={deal.usageLimit || "Unlimited"} mono />
+                <InfoRow label="Per User Limit" value={deal.perUserLimit || "Unlimited"} mono />
+                <InfoRow label="Min Order Value" value={deal.minOrderValue ? `Rs. ${deal.minOrderValue}` : "None"} />
+              </div>
+            </Card>
           </div>
         )}
 
@@ -422,50 +412,75 @@ export default function DealDetailPage() {
                 <div className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,.10)", color: "var(--accent)" }}>
-                      <Ico d={D.check} className="w-4 h-4" />
+                      <Ico d={D.plus} className="w-4 h-4" />
                     </div>
                     <div className="w-px flex-1 mt-1" style={{ backgroundColor: "var(--border-color)" }} />
                   </div>
                   <div className="pb-2">
                     <p className="text-[13px] font-medium">Deal Created</p>
                     <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                      Created by <span className="font-semibold text-[var(--text-primary)]">{deal.createdby?.name || "System"}</span>
+                      Created by <span className="font-semibold text-[var(--text-primary)]">{deal.createdby?.name || deal.createdBy?.name || "System"}</span>
+                      {(deal.createdby?.email || deal.createdBy?.email) && <span className="block text-[10px] opacity-70">{deal.createdby?.email || deal.createdBy?.email}</span>}
                     </p>
-                    <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>{formatDateTime(deal.created_at)}</p>
+                    <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>{formatDateTime(deal.created_at || deal.createdAt)}</p>
                   </div>
                 </div>
-                
-                {deal.updated_at && deal.updated_at !== deal.created_at && (
+
+                {deal.updated_at && deal.updated_at !== deal.created_at ? (
                   <div className="flex gap-4">
                     <div>
                       <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(96,165,250,.10)", color: "#60a5fa" }}>
-                        <Ico d={D.edit} className="w-4 h-4" />
+                        <Ico d={D.pencil} className="w-4 h-4" />
                       </div>
                     </div>
                     <div>
                       <p className="text-[13px] font-medium">Deal Updated</p>
                       <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                        Updated by <span className="font-semibold text-[var(--text-primary)]">{deal.updatedby?.name || "Unknown"}</span>
+                        Updated by <span className="font-semibold text-[var(--text-primary)]">{deal.updatedby?.name || deal.updatedBy?.name || "Unknown"}</span>
+                        {(deal.updatedby?.email || deal.updatedBy?.email) && <span className="block text-[10px] opacity-70">{deal.updatedby?.email || deal.updatedBy?.email}</span>}
                       </p>
-                      <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>{formatDateTime(deal.updated_at)}</p>
+                      <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>{formatDateTime(deal.updated_at || deal.updatedAt)}</p>
                     </div>
+                  </div>
+                ) : (
+                  <div className="ml-11 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>No updates recorded yet.</span>
                   </div>
                 )}
               </div>
             </Card>
 
+            {/* Activity Info Side Panel */}
             <Card>
-              <CardHeader title="Creator Details" icon={<Ico d={D.users} className="w-4 h-4" />} />
-              <div className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-sm font-bold">
-                    {(deal.createdby?.name || "S")[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-medium">{deal.createdby?.name || "System Admin"}</p>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{deal.createdby?.email || "admin@store.com"}</p>
+              <CardHeader title="User Details" icon={<Ico d={D.users} className="w-4 h-4" />} />
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Creator</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                      {ini(deal.createdby?.name || deal.createdBy?.name)}
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-medium">{deal.createdby?.name || deal.createdBy?.name || "System"}</p>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{deal.createdby?.email || deal.createdBy?.email || "—"}</p>
+                    </div>
                   </div>
                 </div>
+
+                {(deal.updated_at || deal.updatedAt) && (
+                  <div className="pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
+                    <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Last Editor</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                        {ini(deal.updatedby?.name || deal.updatedBy?.name)}
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-medium">{deal.updatedby?.name || deal.updatedBy?.name || "Unknown"}</p>
+                        <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{deal.updatedby?.email || deal.updatedBy?.email || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
@@ -476,7 +491,7 @@ export default function DealDetailPage() {
       {/* DELETE MODAL */}
       {showDelete && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
+          <div className="w-full max-w-sm rounded-xl p-5 max-h-[90vh] overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,.10)", color: "#f87171" }}>
                 <Ico d={D.warn} className="w-4 h-4" />
@@ -488,7 +503,7 @@ export default function DealDetailPage() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-5">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-5">
               <Button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}>Cancel</Button>
               <Button danger disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
                 {deleteMutation.isPending ? <><Spin className="w-3.5 h-3.5" /> Deleting...</> : <><Ico d={D.trash} className="w-3.5 h-3.5" /> Delete Deal</>}

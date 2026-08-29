@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const { validatePhone } = require("../utils/phoneValidator");
 
 // =====================================================
 // ACTIVITY HELPER
@@ -43,6 +44,15 @@ const fixPermissions = (oldPerms = {}) => ({
   discounts: oldPerms?.discounts ?? true,
   deals: oldPerms?.deals ?? true,
   banners: oldPerms?.banners ?? true,
+
+  /*
+   * IMPORTANT
+   * manageStock pehle yahan missing tha, is wajah se ye key
+   * har fixPermissions() call par strip ho jati thi — permission
+   * DB tak pahunchti hi nahi thi aur sidebar me kabhi show nahi
+   * hoti thi.
+   */
+  manageStock: oldPerms?.manageStock ?? false,
 });
 
 const needsPermissionMigration = (perms) => {
@@ -73,6 +83,7 @@ const needsPermissionMigration = (perms) => {
     "discounts",
     "deals",
     "banners",
+    "manageStock",
   ];
 
   return requiredKeys.some(
@@ -94,6 +105,8 @@ exports.getAllEmployees = async (req, res) => {
         select:
           "name email phone role status avatar permissions twoFactorEnabled created_at",
       })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .sort({
         created_at: -1,
       })
@@ -158,6 +171,8 @@ exports.getEmployeeById = async (req, res) => {
         path: "userId",
         select: "-password -activities",
       })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .lean();
 
     if (
@@ -242,6 +257,15 @@ exports.createEmployee = async (req, res) => {
       });
     }
 
+    let sanitizedPhone = "";
+    if (phone) {
+      const phoneResult = validatePhone(phone);
+      if (!phoneResult.valid) {
+        return res.status(400).json({ success: false, message: phoneResult.message });
+      }
+      sanitizedPhone = phoneResult.sanitized;
+    }
+
     const normalizedEmail = email
       .toLowerCase()
       .trim();
@@ -300,7 +324,7 @@ exports.createEmployee = async (req, res) => {
       email: normalizedEmail,
       username: finalUsername,
       password: hashedPassword,
-      phone: phone || "",
+      phone: sanitizedPhone,
       role,
       status,
       permissions: fixPermissions(
@@ -507,18 +531,34 @@ exports.updateEmployee = async (req, res) => {
         ) !==
           String(updates[field] ?? "")
       ) {
-        changes.push({
-          field,
-          oldValue:
-            employee.userId[field] ||
-            "(empty)",
-          newValue:
-            updates[field] ||
-            "(empty)",
-        });
-
-        userUpdates[field] =
-          updates[field];
+        if (field === "phone") {
+          const phoneResult = validatePhone(updates[field]);
+          if (!phoneResult.valid) {
+            return res.status(400).json({ success: false, message: phoneResult.message });
+          }
+          changes.push({
+            field,
+            oldValue:
+              employee.userId[field] ||
+              "(empty)",
+            newValue:
+              phoneResult.sanitized ||
+              "(empty)",
+          });
+          userUpdates[field] = phoneResult.sanitized;
+        } else {
+          changes.push({
+            field,
+            oldValue:
+              employee.userId[field] ||
+              "(empty)",
+            newValue:
+              updates[field] ||
+              "(empty)",
+          });
+          userUpdates[field] =
+            updates[field];
+        }
       }
     }
 
@@ -574,6 +614,15 @@ exports.updateEmployee = async (req, res) => {
         "discounts",
         "deals",
         "banners",
+
+        /*
+         * IMPORTANT
+         * manageStock pehle is list me nahi tha — isliye sirf
+         * Manage Stock toggle karne par permissionsChanged false
+         * rehta tha aur koi socket event emit nahi hota tha.
+         * Employee ka browser real-time update kabhi nahi pata tha.
+         */
+        "manageStock",
       ];
 
       for (const key of permissionKeys) {
@@ -749,10 +798,6 @@ exports.updateEmployee = async (req, res) => {
               ?.role || "staff",
         };
 
-        console.log(
-          "🔐 Sending fresh permissions:",
-          permissionPayload
-        );
 
         req.io
           .to(
@@ -926,6 +971,9 @@ exports.toggleStatus = async (
       }
     );
 
+    employee.updatedby = performerId;
+    await employee.save();
+
     await pushActivity(
       employee._id,
       {
@@ -957,6 +1005,8 @@ exports.toggleStatus = async (
           select:
             "-password -activities",
         })
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email")
         .lean();
 
     if (req.io) {

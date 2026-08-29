@@ -13,7 +13,6 @@ export default function useDealSocketSync() {
 
   const markSelfAction = (action) => {
     selfActionRef.current = action;
-    console.log("👤 Self Deal Action:", action);
     
     // 3 seconds baad reset kar dein
     setTimeout(() => {
@@ -39,18 +38,15 @@ export default function useDealSocketSync() {
     // -------------------------------------------------------
     
     const handleDealCreated = (result) => {
-      console.log("🟢 Socket: dealCreated", result);
       invalidateDeals();
       
       if (selfActionRef.current === "create") {
-        console.log("✅ Self create action handled");
         selfActionRef.current = null;
       }
     };
 
     const handleDealUpdated = (result) => {
       const data = result?.data || result;
-      console.log("✏️ Socket: dealUpdated", data);
       
       // Agar specific ID mil rahi hai to usay update karein
       if (data?._id) {
@@ -97,14 +93,12 @@ export default function useDealSocketSync() {
       }
 
       if (selfActionRef.current === "update" || selfActionRef.current === "toggle") {
-        console.log("✅ Self update/toggle action handled");
         selfActionRef.current = null;
       }
     };
 
     const handleDealDeleted = (result) => {
       const id = result?.data?.id || result?.id || result;
-      console.log("🗑️ Socket: dealDeleted", id);
       
       invalidateDeals();
       
@@ -114,7 +108,6 @@ export default function useDealSocketSync() {
       }
       
       if (selfActionRef.current === "delete") {
-        console.log("✅ Self delete action handled");
         selfActionRef.current = null;
       }
     };

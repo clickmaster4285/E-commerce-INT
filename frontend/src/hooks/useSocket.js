@@ -10,8 +10,7 @@ const getSocketURL = () => {
   if (typeof window === "undefined") {
     return (
       process.env.NEXT_PUBLIC_SOCKET_URL ||
-      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-      "http://localhost:5000"
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") 
     );
   }
   // Browser mein — current hostname + backend port 5000
@@ -25,7 +24,6 @@ function getSocket() {
   if (globalSocket && globalSocket.connected) return globalSocket;
 
   const SOCKET_URL = getSocketURL();
-  console.log("🔌 Creating socket connection to:", SOCKET_URL);
 
   globalSocket = io(SOCKET_URL, {
     withCredentials: true,
@@ -38,11 +36,9 @@ function getSocket() {
   });
 
   globalSocket.on("connect", () => {
-    console.log("✅ Socket Connected:", globalSocket.id);
   });
 
   globalSocket.on("disconnect", (reason) => {
-    console.log("❌ Socket Disconnected:", reason);
   });
 
   globalSocket.on("connect_error", (err) => {

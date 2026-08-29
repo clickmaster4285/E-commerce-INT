@@ -568,7 +568,7 @@ const CountryDropdown = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search country..."
-                className="w-full h-8 pl-8 pr-3 rounded-md text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                 style={{
                   backgroundColor: "var(--bg-tertiary)",
                   border: "1px solid var(--border-color)",
@@ -639,30 +639,32 @@ export default function BrandsPage() {
     setAutoBrandCode("");
   };
 
+  // ✅ Fallback: highest numeric BRD-### from loaded brands + 1 (always a valid string)
+  const computeFallbackBrandCode = () => {
+    const nums = brands
+      .filter((b) => typeof b.brand_code === "string" && /^BRD-\d+$/.test(b.brand_code))
+      .map((b) => parseInt(b.brand_code.split("-")[1], 10))
+      .filter(Number.isFinite);
+    const nextNum = (nums.length ? Math.max(...nums) : 0) + 1;
+    return `BRD-${String(nextNum).padStart(3, "0")}`;
+  };
+
   const fetchNextBrandCode = async () => {
     try {
       setLoadingCode(true);
-      // ✅ CHANGE 3: adminBrandApi.getNextCode
-      const nextCode = await adminBrandApi.getNextCode();
-      setAutoBrandCode(nextCode);
+      // ✅ API returns { success, data: { nextCode } } — unwrap to a plain string
+      const res = await adminBrandApi.getNextCode();
+      const candidate =
+        typeof res === "string" ? res : typeof res?.nextCode === "string" ? res.nextCode : "";
+      const trimmed = candidate.trim();
+      const validNextCode = /^BRD-\d+$/.test(trimmed) ? trimmed : computeFallbackBrandCode();
+      setAutoBrandCode(validNextCode);
       if (!editingBrand) {
-        setFormData((prev) => ({ ...prev, brand_code: nextCode }));
+        setFormData((prev) => ({ ...prev, brand_code: validNextCode }));
       }
     } catch (err) {
       console.error("Failed to fetch next brand code:", err);
-      const lastBrand = brands
-        .filter((b) => b.brand_code && /^BRD-\d+$/.test(b.brand_code))
-        .sort((a, b) => {
-          const numA = parseInt(a.brand_code.split("-")[1], 10);
-          const numB = parseInt(b.brand_code.split("-")[1], 10);
-          return numB - numA;
-        })[0];
-
-      let nextNum = 1;
-      if (lastBrand) {
-        nextNum = parseInt(lastBrand.brand_code.split("-")[1], 10) + 1;
-      }
-      const fallbackCode = `BRD-${String(nextNum).padStart(3, "0")}`;
+      const fallbackCode = computeFallbackBrandCode();
       setAutoBrandCode(fallbackCode);
       if (!editingBrand) {
         setFormData((prev) => ({ ...prev, brand_code: fallbackCode }));
@@ -996,7 +998,7 @@ export default function BrandsPage() {
       <select
         value={value}
         onChange={onChange}
-        className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
+        className="appearance-none h-10 md:h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
         style={inputStyle}
       >
         {children}
@@ -1017,7 +1019,7 @@ export default function BrandsPage() {
           e.stopPropagation();
           handleViewBrand(brand._id);
         }}
-        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
+        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
         style={{ color: "#34d399" }}
         title="View Details"
       >
@@ -1028,7 +1030,7 @@ export default function BrandsPage() {
           e.stopPropagation();
           handleEdit(brand);
         }}
-        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
         style={{ color: "var(--text-secondary)" }}
         title="Edit"
       >
@@ -1040,7 +1042,7 @@ export default function BrandsPage() {
           handleDelete(brand);
         }}
         disabled={isDeleting}
-        className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
+        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
         title="Delete"
       >
         <TrashIcon className="w-4 h-4" />
@@ -1191,7 +1193,7 @@ export default function BrandsPage() {
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+            className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
             style={inputStyle}
           />
         </div>
@@ -1475,7 +1477,7 @@ export default function BrandsPage() {
               >
                 <ChevronLeftIcon className="w-4 h-4" />
               </button>
-              <div className="flex items-center gap-1">
+              <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? (
@@ -1506,7 +1508,7 @@ export default function BrandsPage() {
                     )}
                   </React.Fragment>
                 ))}
-              </div>
+              </span>
               <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
@@ -1534,7 +1536,7 @@ export default function BrandsPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div
-            className="w-full max-w-lg rounded-xl overflow-visible"
+            className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl"
             style={cardStyle}
           >
             <div
@@ -1562,10 +1564,9 @@ export default function BrandsPage() {
 
             <form
               onSubmit={handleSubmit}
-              className="p-5 space-y-4 max-h-[70vh] overflow-y-auto overflow-x-visible"
-              style={{ overflowClipMargin: "200px" }}
+              className="p-5 space-y-4 overflow-y-auto flex-1"
             >
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label
                     className="block text-xs font-medium mb-1.5"
@@ -1583,7 +1584,7 @@ export default function BrandsPage() {
                       required
                       readOnly={!!editingBrand}
                       disabled={isSubmitting || loadingCode || !!editingBrand}
-                      className={`h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 ${editingBrand ? "cursor-not-allowed opacity-70" : ""}`}
+                      className={`h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 ${editingBrand ? "cursor-not-allowed opacity-70" : ""}`}
                       style={{
                         backgroundColor: "var(--bg-tertiary)",
                         border: "1px solid var(--border-color)",
@@ -1621,7 +1622,7 @@ export default function BrandsPage() {
                     }
                     required
                     disabled={isSubmitting}
-                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50"
+                    className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50"
                     style={{
                       backgroundColor: "var(--bg-tertiary)",
                       border: "1px solid var(--border-color)",
@@ -1726,7 +1727,7 @@ export default function BrandsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                 <div>
                   <label
                     className="block text-xs font-medium mb-1.5"

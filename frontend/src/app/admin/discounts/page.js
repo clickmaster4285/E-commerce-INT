@@ -200,7 +200,10 @@ export default function DiscountsPage() {
   const initialForm = {
     name: "", code: "", description: "",
     selected_ids: [],
-    value_type: "percentage", value: "",
+    value_type: "percentage", value: "", max_discount: "",
+    min_order_amount: "", min_quantity: "",
+    usage_limit: "", usage_per_customer: "",
+    priority: "1", is_stackable: false,
     start_at: "", end_at: "", status: "active",
   };
   const [formData, setFormData] = useState(initialForm);
@@ -320,6 +323,13 @@ export default function DiscountsPage() {
       selected_ids,
       value_type: discount?.value_type || (discount?.type === "fixed" ? "fixed_amount" : "percentage"),
       value: discount?.value ?? "",
+      max_discount: discount?.maxDiscountAmount ?? "",
+      min_order_amount: discount?.minOrderValue ?? "",
+      min_quantity: discount?.minQuantity ?? "",
+      usage_limit: discount?.usageLimit ?? "",
+      usage_per_customer: discount?.perUserLimit ?? "",
+      priority: discount?.priority ?? "1",
+      is_stackable: discount?.isStackable ?? false,
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
       status: discount?.status || (discount?.isActive ? "active" : "draft"),
@@ -365,6 +375,13 @@ export default function DiscountsPage() {
       value_type: formData.value_type,
       type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
       value: Number(formData.value),
+      max_discount: formData.max_discount !== "" ? Number(formData.max_discount) : undefined,
+      min_order_amount: formData.min_order_amount !== "" ? Number(formData.min_order_amount) : undefined,
+      min_quantity: formData.min_quantity !== "" ? Number(formData.min_quantity) : undefined,
+      usage_limit: formData.usage_limit !== "" ? Number(formData.usage_limit) : undefined,
+      usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
+      priority: formData.priority !== "" ? Number(formData.priority) : undefined,
+      is_stackable: formData.is_stackable,
       start_at: dateInputToISO(formData.start_at) || new Date().toISOString(),
       end_at: dateInputToISO(formData.end_at) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       status: formData.status,
@@ -571,7 +588,7 @@ export default function DiscountsPage() {
                     const isSelected = selectedIds.includes(id);
                     const status = getDiscountStatus(discount);
                     return (
-                      <tr key={id} className="transition" style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
+                      <tr key={id} onClick={() => handleView(discount)} className="transition cursor-pointer" style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}>
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
@@ -591,13 +608,13 @@ export default function DiscountsPage() {
                         <td className="px-4 py-2.5"><StatusBadge status={status} /></td>
                         <td className="px-4 py-2.5 whitespace-nowrap w-1">
                           <div className="flex items-center justify-end gap-1 sm:gap-2">
-                            <button onClick={() => handleView(discount)} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
+                            <button onClick={(e) => { e.stopPropagation(); handleView(discount); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
                               <EyeIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => openEdit(discount)} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
+                            <button onClick={(e) => { e.stopPropagation(); openEdit(discount); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
                               <EditIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleDelete(discount)} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(discount); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
                               <TrashIcon className="w-4 h-4" />
                             </button>
                           </div>
@@ -615,7 +632,7 @@ export default function DiscountsPage() {
               const id = discount._id || discount.id;
               const status = getDiscountStatus(discount);
               return (
-                <div key={id} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
+                <div key={id} onClick={() => handleView(discount)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><TagIcon className="w-5 h-5" /></div>
                     <StatusBadge status={status} />
@@ -630,13 +647,13 @@ export default function DiscountsPage() {
                       <p className="text-sm font-bold text-emerald-500 mt-0.5">{formatValue(discount)}</p>
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => handleView(discount)} className="w-8 h-8 rounded-md flex items-center justify-center transition hover:bg-emerald-500/10" style={{ color: "#34d399" }} title="View">
+                      <button onClick={(e) => { e.stopPropagation(); handleView(discount); }} className="w-8 h-8 rounded-md flex items-center justify-center transition hover:bg-emerald-500/10" style={{ color: "#34d399" }} title="View">
                         <EyeIcon className="w-4 h-4" />
                       </button>
-                      <button onClick={() => openEdit(discount)} className="w-8 h-8 rounded-md flex items-center justify-center transition hover:bg-white/5" style={{ color: "var(--text-secondary)" }} title="Edit">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(discount); }} className="w-8 h-8 rounded-md flex items-center justify-center transition hover:bg-white/5" style={{ color: "var(--text-secondary)" }} title="Edit">
                         <EditIcon className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(discount)} className="w-8 h-8 rounded-md flex items-center justify-center transition text-red-500 hover:bg-red-500/10" title="Delete">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(discount); }} className="w-8 h-8 rounded-md flex items-center justify-center transition text-red-500 hover:bg-red-500/10" title="Delete">
                         <TrashIcon className="w-4 h-4" />
                       </button>
                     </div>
@@ -653,7 +670,7 @@ export default function DiscountsPage() {
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)} of {totalDiscounts} discounts</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon /></button>
-              <div className="flex items-center gap-1">
+              <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
@@ -661,7 +678,7 @@ export default function DiscountsPage() {
                     )}
                   </React.Fragment>
                 ))}
-              </div>
+              </span>
               <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon /></button>
             </div>
           </div>
@@ -817,11 +834,11 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Name *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="Summer Sale 2026" />
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="Summer Sale 2026" />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Coupon Code</label>
-                <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 uppercase font-mono focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="SUMMER20" />
+                <input type="text" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })} disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 uppercase font-mono focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="SUMMER20" />
               </div>
             </div>
 
@@ -846,7 +863,7 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
                 <div className="p-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
-                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={current.placeholder} className="h-9 pl-9 pr-3 rounded-md text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
+                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={current.placeholder} className="h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
                   </div>
                 </div>
 
@@ -915,7 +932,7 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Type</label>
                   <div className="relative">
-                    <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} disabled={mutation.isPending} className="appearance-none h-9 px-3 pr-8 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle}>
+                    <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} disabled={mutation.isPending} className="appearance-none h-10 md:h-9 px-3 pr-8 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle}>
                       <option value="percentage">Percentage (%)</option>
                       <option value="fixed_amount">Fixed Amount</option>
                       <option value="fixed_price">Fixed Price</option>
@@ -926,11 +943,50 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Value *</label>
                   <div className="relative">
-                    <input type="number" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required min="0" step="0.01" disabled={mutation.isPending} className="h-9 pl-3 pr-10 rounded-md text-sm w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder={formData.value_type === "percentage" ? "20" : "500"} />
+                    <input type="number" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required min="0" step="0.01" disabled={mutation.isPending} className="h-10 md:h-9 pl-3 pr-10 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder={formData.value_type === "percentage" ? "20" : "500"} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-                      {formData.value_type === "percentage" ? "%" : "$"}
+                      {formData.value_type === "percentage" ? "%" : "Rs."}
                     </span>
                   </div>
+                </div>
+              </div>
+              {formData.value_type === "percentage" && (
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Max Discount Cap (Rs.)</label>
+                  <input type="number" value={formData.max_discount} onChange={(e) => setFormData({ ...formData, max_discount: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="e.g. 1000" />
+                </div>
+              )}
+            </div>
+
+            {/* Conditions */}
+            <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Conditions</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Min Order Amount (Rs.)</label>
+                  <input type="number" value={formData.min_order_amount} onChange={(e) => setFormData({ ...formData, min_order_amount: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Min Quantity</label>
+                  <input type="number" value={formData.min_quantity} onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Usage Limit (total)</label>
+                  <input type="number" value={formData.usage_limit} onChange={(e) => setFormData({ ...formData, usage_limit: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="Unlimited" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Per User Limit</label>
+                  <input type="number" value={formData.usage_per_customer} onChange={(e) => setFormData({ ...formData, usage_per_customer: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Priority</label>
+                  <input type="number" value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value })} min="0" disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} placeholder="1" />
+                </div>
+                <div className="flex items-center gap-2 h-9">
+                  <input type="checkbox" checked={formData.is_stackable} onChange={(e) => setFormData({ ...formData, is_stackable: e.target.checked })} disabled={mutation.isPending} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
+                  <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Allow stacking with other discounts</label>
                 </div>
               </div>
             </div>
@@ -939,11 +995,11 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Start Date</label>
-                <input type="datetime-local" value={formData.start_at} onChange={(e) => setFormData({ ...formData, start_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+                <input type="datetime-local" value={formData.start_at} onChange={(e) => setFormData({ ...formData, start_at: e.target.value })} disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>End Date</label>
-                <input type="datetime-local" value={formData.end_at} onChange={(e) => setFormData({ ...formData, end_at: e.target.value })} disabled={mutation.isPending} className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
+                <input type="datetime-local" value={formData.end_at} onChange={(e) => setFormData({ ...formData, end_at: e.target.value })} disabled={mutation.isPending} className="h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 [color-scheme:dark] focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
               </div>
             </div>
 
@@ -951,7 +1007,7 @@ function DiscountFormModal({ type, formData, setFormData, editingDiscount, produ
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
               <div className="relative">
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={mutation.isPending} className="appearance-none h-9 px-3 pr-8 rounded-md text-sm w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={mutation.isPending} className="appearance-none h-10 md:h-9 px-3 pr-8 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 cursor-pointer focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
                   <option value="draft">Draft</option>
                   <option value="scheduled">Scheduled</option>
                   <option value="active">Active</option>

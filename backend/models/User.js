@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema(
       deals: { type: Boolean, default: true },         // ✅ Added
       store: { type: Boolean, default: false },        // ✅ Added
       banners: { type: Boolean, default: true },       // ✅ Added
+      manageStock: { type: Boolean, default: false },  // ✅ Manage Stock module
     },
     
     preferences: {

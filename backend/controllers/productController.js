@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const Tag = require("../models/Tag");
+const Category = require("../models/Category");
+const Attribute = require("../models/Attribute");
 
 const { getNextSku } = require("../utils/skuHelper");
 const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
@@ -105,6 +107,73 @@ const resolveTags = async (tagNames, userId) => {
 };
 
 // ======================================================
+// ⭐ VALIDATE SPECIFICATIONS AGAINST CATEGORY ATTRIBUTES
+// ======================================================
+const validateSpecifications = async (categoryId, specifications, tenantId) => {
+  if (!specifications || typeof specifications !== 'object') {
+    return {};
+  }
+
+  const category = await Category.findOne({
+    _id: categoryId,
+    tenant_id: tenantId,
+    is_deleted: false,
+  }).lean();
+
+  if (!category) {
+    throw new Error("Invalid category");
+  }
+
+  const attributeIds = (category.attributes || []).map(attr => attr.attribute_id);
+  
+  if (attributeIds.length === 0) {
+    return specifications;
+  }
+
+  const attributes = await Attribute.find({
+    _id: { $in: attributeIds },
+    tenant_id: tenantId,
+    is_deleted: false,
+    is_active: true,
+  }).lean();
+
+  const attributeMap = new Map(attributes.map(attr => [attr.code, attr]));
+  const validatedSpecs = {};
+
+  for (const [code, value] of Object.entries(specifications)) {
+    const attr = attributeMap.get(code);
+    
+    if (!attr) {
+      continue;
+    }
+
+    const config = category.attributes.find(a => String(a.attribute_id) === String(attr._id));
+    
+    if (config?.is_required && (!value || value === '')) {
+      throw new Error(`Specification "${attr.name}" is required`);
+    }
+
+    if (attr.data_type === 'select' || attr.data_type === 'multi_select') {
+      const validValues = (attr.values || []).map(v => v.value);
+      if (value && !validValues.includes(value)) {
+        throw new Error(`Invalid value for "${attr.name}"`);
+      }
+    }
+
+    if (attr.data_type === 'number' || attr.data_type === 'decimal') {
+      const numValue = Number(value);
+      if (value && !Number.isFinite(numValue)) {
+        throw new Error(`"${attr.name}" must be a valid number`);
+      }
+    }
+
+    validatedSpecs[code] = value;
+  }
+
+  return validatedSpecs;
+};
+
+// ======================================================
 // GET ALL PRODUCTS
 // ======================================================
 const getProducts = async (req, res) => {
@@ -115,6 +184,8 @@ const getProducts = async (req, res) => {
       .populate("category_id", "name")
       .populate("brand_id", "name")
       .populate("tag_ids", "name")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .sort({ created_at: -1 })
       .lean();
 
@@ -170,6 +241,8 @@ const getProductById = async (req, res) => {
       .populate("category_id", "name")
       .populate("brand_id", "name")
       .populate("tag_ids", "name")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .lean();
 
     if (!product) {
@@ -225,11 +298,30 @@ const createProduct = async (req, res) => {
     const tagNames = parseJSON(req.body.tag_names, []);
     const tagIds = await resolveTags(tagNames, req.user?._id);
 
+    // ✅ Validate and process specifications
+    let specifications = {};
+    if (req.body.specifications) {
+      try {
+        const rawSpecs = typeof req.body.specifications === 'string' 
+          ? JSON.parse(req.body.specifications) 
+          : req.body.specifications;
+        
+        specifications = await validateSpecifications(
+          req.body.category_id,
+          rawSpecs,
+          req.user?.tenant_id
+        );
+      } catch (error) {
+        return res.status(400).json({ message: error.message || "Invalid specifications" });
+      }
+    }
+
     const productData = {
       name: productName,
       category_id: req.body.category_id,
       brand_id: req.body.brand_id,
       tag_ids: tagIds,
+      specifications,
       description: String(req.body.description || "").trim(),
       tax: toNumber(req.body.tax, 0),
       status: req.body.status === "inactive" ? "inactive" : "active",
@@ -294,8 +386,7 @@ const createProduct = async (req, res) => {
         quantity: toNumber(item.quantity, 0),
         min_qnt: toNumber(item.min_qnt, 0),
         max_qnt: toNumber(item.max_qnt, 0),
-        attributes: item.attributes || {},
-        // ✅ ADDED: Save variant tags during creation
+        attributes: item.option_values || item.attributes || {},
         tags: Array.isArray(item.tags) ? item.tags : [],
         images: imagesByVariant[index] || [],
         createdby: req.user?._id || null,
@@ -328,11 +419,20 @@ const createProduct = async (req, res) => {
       performerId
     );
 
+    const populatedProduct = await Product.findById(createdProduct._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
     emitSocketEvent("productCreated", {
       _id: createdProduct._id,
       name: createdProduct.name,
       tag_ids: createdProduct.tag_ids,
       variants: createdVariants,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at || createdProduct.created_at,
+      updated_at: populatedProduct?.updated_at || createdProduct.updated_at,
     });
 
     return res.status(201).json({
@@ -401,6 +501,23 @@ const updateProduct = async (req, res) => {
       product.tag_ids = tagIds;
     }
 
+    // ✅ Update specifications
+    if (req.body.specifications !== undefined) {
+      try {
+        const rawSpecs = typeof req.body.specifications === 'string' 
+          ? JSON.parse(req.body.specifications) 
+          : req.body.specifications;
+        
+        product.specifications = await validateSpecifications(
+          product.category_id,
+          rawSpecs,
+          req.user?.tenant_id
+        );
+      } catch (error) {
+        return res.status(400).json({ message: error.message || "Invalid specifications" });
+      }
+    }
+
     if (req.body.description !== undefined) {
       product.description = String(req.body.description || "").trim();
     }
@@ -445,9 +562,6 @@ const updateProduct = async (req, res) => {
       for (let index = 0; index < variants.length; index++) {
         const item = variants[index] || {};
 
-        // ==============================================
-        // EXISTING VARIANT
-        // ==============================================
         if (item._id) {
           const variantId = String(item._id);
           const variant = existingVariantMap.get(variantId);
@@ -505,11 +619,10 @@ const updateProduct = async (req, res) => {
             variant.max_qnt = toNumber(item.max_qnt, 0);
           }
 
-          if (item.attributes !== undefined) {
-            variant.attributes = item.attributes || {};
+          if (item.option_values !== undefined || item.attributes !== undefined) {
+            variant.attributes = item.option_values || item.attributes || {};
           }
 
-          // ✅ ADDED: Update variant tags
           if (item.tags !== undefined) {
             variant.tags = Array.isArray(item.tags) ? item.tags : [];
           }
@@ -521,12 +634,7 @@ const updateProduct = async (req, res) => {
 
           variant.updatedby = req.user?._id || null;
           await variant.save();
-        }
-
-        // ==============================================
-        // NEW VARIANT
-        // ==============================================
-        else {
+        } else {
           let sku = normalizeSku(item.sku);
           if (!sku) {
             sku = await getNextSku();
@@ -550,8 +658,7 @@ const updateProduct = async (req, res) => {
             quantity: toNumber(item.quantity, 0),
             min_qnt: toNumber(item.min_qnt, 0),
             max_qnt: toNumber(item.max_qnt, 0),
-            attributes: item.attributes || {},
-            // ✅ ADDED: Save variant tags for new variants
+            attributes: item.option_values || item.attributes || {},
             tags: Array.isArray(item.tags) ? item.tags : [],
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
@@ -601,12 +708,21 @@ const updateProduct = async (req, res) => {
       performerId
     );
 
+    const populatedProduct = await Product.findById(product._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
     emitSocketEvent("productUpdated", {
       _id: product._id,
       name: product.name,
       status: product.status,
       tag_ids: product.tag_ids,
       variants: updatedVariants,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at,
+      updated_at: populatedProduct?.updated_at,
     });
 
     return res.status(200).json({
@@ -724,11 +840,20 @@ const toggleProductStatus = async (req, res) => {
       performerId
     );
 
+    const populatedProduct = await Product.findById(product._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
     emitSocketEvent("productUpdated", {
       _id: product._id,
       name: product.name,
       status: product.status,
       tag_ids: product.tag_ids,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at,
+      updated_at: populatedProduct?.updated_at,
     });
 
     return res.status(200).json({

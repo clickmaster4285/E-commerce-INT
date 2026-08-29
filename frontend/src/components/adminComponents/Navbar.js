@@ -58,7 +58,6 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
       if (!res) return;
       const data = res.data || res.user || res;
       if (data && (data.name || data._id)) {
-        console.log("📥 Navbar socket → profile data:", data.name, data.email);
         setLiveUser(data);
       }
     };
@@ -66,7 +65,6 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     const handleProfileUpdated = (res) => {
       const data = res?.data || res?.user || res;
       if (data && (data.name || data._id)) {
-        console.log("🔄 Navbar socket → profile updated:", data.name, data.email);
         setLiveUser(data);
       }
     };
@@ -77,7 +75,6 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
       
       const currentUserId = liveUser?._id || userData?._id;
       if (currentUserId && data._id.toString() === currentUserId.toString()) {
-        console.log("🔄 Navbar socket → MY employee data updated:", data.name, data.email);
         setLiveUser((prev) => ({
           ...(prev || {}),
           ...data,
@@ -87,12 +84,10 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     };
 
     const handlePermissionsUpdated = (data) => {
-      console.log("🔔 Navbar socket → permissionsUpdated, re-fetching profile...");
       socket.emit("getProfile");
     };
 
     const handleConnect = () => {
-      console.log("🟢 Navbar socket connected:", socket.id);
       socket.emit("getProfile");
     };
 

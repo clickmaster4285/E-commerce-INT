@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
@@ -23,6 +23,7 @@ const ROUTE_PERMISSIONS = {
   '/admin/discounts': 'discounts',
   '/admin/deals': 'deals',
   '/admin/banners': 'banners',
+  '/admin/manage-stock': 'manageStock',
 };
 
 // ==========================================
@@ -54,7 +55,6 @@ function getLayoutPermSocket() {
 const getProfile = async () => {
   const response = await axiosInstance.get('/users/profile');
 
-  console.log('🔍 RAW API RESPONSE:', response.data);
 
   let extractedUser = null;
 
@@ -93,8 +93,6 @@ const getStoreData = async () => {
 export default function AdminLayout({ children }) {
   const [theme, setTheme] = useState('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
-  const [permissionCheckDone, setPermissionCheckDone] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -129,83 +127,30 @@ export default function AdminLayout({ children }) {
   });
 
   // ==========================================
-  // STORE QUERY
+  // DERIVED AUTH + PERMISSION RESULT
+  // (setState ki jagah render ke waqt derive)
   // ==========================================
-  const {
-    data: storeData,
-    isLoading: storeLoading,
-  } = useQuery({
-    queryKey: ['store'],
-    queryFn: getStoreData,
-    enabled: !isLoginPage && isAuthenticated === true,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
-
-  // ==========================================
-  // THEME
-  // ==========================================
-  useEffect(() => {
-    const saved = Cookies.get('theme') || 'dark';
-
-    setTheme(saved);
-
-    document.documentElement.classList.toggle(
-      'light',
-      saved === 'light'
-    );
-  }, []);
-
-  // ==========================================
-  // AUTHENTICATION
-  // ==========================================
-  useEffect(() => {
+  const authResult = useMemo(() => {
     if (isLoginPage) {
-      setIsAuthenticated(true);
-      setPermissionCheckDone(true);
-      return;
+      return { isAuthenticated: true, checkComplete: true, redirectTo: null };
     }
 
     if (userLoading) {
-      setIsAuthenticated(null);
-      return;
+      return {
+        isAuthenticated: null,
+        checkComplete: false,
+        redirectTo: null,
+      };
     }
 
-    if (userError) {
-      console.error(
-        '❌ Auth failed:',
-        userQueryError?.message || 'Authentication failed'
-      );
-
-      setIsAuthenticated(false);
-      setPermissionCheckDone(true);
-
-      router.push('/admin/login');
-
-      return;
+    if (userError || !userData) {
+      return {
+        isAuthenticated: false,
+        checkComplete: true,
+        redirectTo: '/admin/login',
+        redirectMode: 'push',
+      };
     }
-
-    if (!userData) {
-      setIsAuthenticated(false);
-      setPermissionCheckDone(true);
-
-      router.push('/admin/login');
-
-      return;
-    }
-
-    setIsAuthenticated(true);
-
-    console.log(
-      '✅ USER:',
-      userData?.name,
-      '| ROLE:',
-      userData?.role,
-      '| PERMS:',
-      userData?.permissions
-    );
 
     // ==========================================
     // ADMIN HAS FULL ACCESS
@@ -213,8 +158,11 @@ export default function AdminLayout({ children }) {
     const role = userData?.role?.toLowerCase();
 
     if (role === 'admin') {
-      setPermissionCheckDone(true);
-      return;
+      return {
+        isAuthenticated: true,
+        checkComplete: true,
+        redirectTo: null,
+      };
     }
 
     // ==========================================
@@ -227,11 +175,12 @@ export default function AdminLayout({ children }) {
       typeof perms !== 'object' ||
       !Object.values(perms).some((value) => value === true)
     ) {
-      setPermissionCheckDone(true);
-
-      router.replace('/admin/access-denied');
-
-      return;
+      return {
+        isAuthenticated: true,
+        checkComplete: true,
+        redirectTo: '/admin/access-denied',
+        redirectMode: 'replace',
+      };
     }
 
     // ==========================================
@@ -244,23 +193,80 @@ export default function AdminLayout({ children }) {
     );
 
     if (matched && perms[matched[1]] === false) {
-      setPermissionCheckDone(true);
+      return {
+        isAuthenticated: true,
+        checkComplete: true,
+        redirectTo: '/admin/access-denied',
+        redirectMode: 'replace',
+      };
+    }
 
-      router.replace('/admin/access-denied');
+    return {
+      isAuthenticated: true,
+      checkComplete: true,
+      redirectTo: null,
+    };
+  }, [isLoginPage, userLoading, userError, userData, pathname]);
+
+  // ==========================================
+  // STORE QUERY
+  // ==========================================
+  const {
+    data: storeData,
+    isLoading: storeLoading,
+  } = useQuery({
+    queryKey: ['store'],
+    queryFn: getStoreData,
+    enabled: !isLoginPage && authResult.isAuthenticated === true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  // ==========================================
+  // THEME
+  // ==========================================
+  useEffect(() => {
+    const saved = Cookies.get('theme') || 'dark';
+
+    document.documentElement.classList.toggle(
+      'light',
+      saved === 'light'
+    );
+
+    const frame = requestAnimationFrame(() => setTheme(saved));
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // ==========================================
+  // AUTH REDIRECT SIDE-EFFECT
+  // ==========================================
+  useEffect(() => {
+    if (!authResult.redirectTo) return;
+
+    if (authResult.redirectMode === 'push') {
+      console.error(
+        '❌ Auth failed:',
+        userQueryError?.message || 'Authentication failed'
+      );
+
+      router.push(authResult.redirectTo);
 
       return;
     }
 
-    setPermissionCheckDone(true);
-  }, [
-    userData,
-    userLoading,
-    userError,
-    userQueryError,
-    router,
-    pathname,
-    isLoginPage,
-  ]);
+    router.replace(authResult.redirectTo);
+  }, [authResult, router, userQueryError]);
+
+  // ==========================================
+  // USER LOG
+  // ==========================================
+  useEffect(() => {
+    if (!userData) return;
+
+  }, [userData]);
 
   // ==========================================
   // LIVE STORE SOCKET UPDATE
@@ -269,7 +275,6 @@ export default function AdminLayout({ children }) {
     const handleStoreUpdate = (event) => {
       if (!event.detail) return;
 
-      console.log('🔄 Store updated from socket');
 
       queryClient.setQueryData(
         ['store'],
@@ -304,11 +309,22 @@ export default function AdminLayout({ children }) {
 
     const socket = getLayoutPermSocket();
 
+    // ==========================================
+    // RECONNECT SAFEGUARD
+    // Socket reconnect hote hi profile refetch —
+    // koi permission event miss ho jaye (disconnect,
+    // laptop sleep) to sidebar + route guard khud
+    // fresh permissions par converge kar jate hain.
+    // ==========================================
+    const handlePermissionSocketConnect = () => {
+      queryClient.invalidateQueries({
+        queryKey: ['admin-user-profile'],
+      });
+    };
+
+    socket.on('connect', handlePermissionSocketConnect);
+
     const handlePermissionUpdate = (updatedData) => {
-      console.log(
-        '🔄 Permission update received:',
-        updatedData
-      );
 
       const payload =
         updatedData?.data ||
@@ -375,6 +391,11 @@ export default function AdminLayout({ children }) {
 
     return () => {
       socket.off(
+        'connect',
+        handlePermissionSocketConnect
+      );
+
+      socket.off(
         'permissionsUpdated',
         handlePermissionUpdate
       );
@@ -407,7 +428,10 @@ export default function AdminLayout({ children }) {
   // ==========================================
   // AUTH LOADING
   // ==========================================
-  if (isAuthenticated === null || !permissionCheckDone) {
+  if (
+    authResult.isAuthenticated === null ||
+    !authResult.checkComplete
+  ) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"
@@ -440,7 +464,7 @@ export default function AdminLayout({ children }) {
   // ==========================================
   // NOT AUTHENTICATED
   // ==========================================
-  if (!isAuthenticated) {
+  if (!authResult.isAuthenticated) {
     return null;
   }
 
@@ -527,7 +551,8 @@ export default function AdminLayout({ children }) {
       >
         <Sidebar
           onNavigate={closeSidebar}
-          storeData={storeData}
+          storeName={storeData?.store_name || storeData?.storeName || undefined}
+          primaryColor={storeData?.primary_color || storeData?.primaryColor || undefined}
           userData={userData}
         />
       </div>
@@ -540,7 +565,7 @@ export default function AdminLayout({ children }) {
           theme={theme}
           toggleTheme={toggleTheme}
           onMenuClick={toggleSidebar}
-          storeData={storeData}
+          userData={userData}
         />
 
         {/* Page */}

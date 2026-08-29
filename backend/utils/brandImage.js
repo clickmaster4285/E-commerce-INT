@@ -26,10 +26,6 @@ const deleteBrandImage = async (img_url) => {
 
   } catch(error){
 
-    console.log(
-      "Delete brand image error:",
-      error.message
-    );
 
   }
 
@@ -60,10 +56,6 @@ const deleteBrandFolder = async (brandId) => {
 
   }catch(error){
 
-    console.log(
-      "Delete brand folder error:",
-      error.message
-    );
 
   }
 

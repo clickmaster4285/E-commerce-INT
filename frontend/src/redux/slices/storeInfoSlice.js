@@ -73,7 +73,6 @@ const storeInfoSlice = createSlice({
       state.isLoaded = true;
 
       // ✅ NO localStorage - tum cookies use karte ho
-      console.log("✅ Redux storeInfo updated:", state.storeName);
     },
 
     setStoreName(state, action) {

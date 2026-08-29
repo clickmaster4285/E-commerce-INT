@@ -13,7 +13,7 @@ export function useDiscounts() {
   const { data: discounts = [], isLoading } = useQuery({
     queryKey: ["publicDiscounts"],
     queryFn: () => discountApi.getPublic(),
-    staleTime: 30 * 1000,        // ✅ 2 min → 30 sec (socket fast karega)
+    staleTime: 30 * 1000,        // 30 sec (socket fast karega)
     refetchInterval: 5 * 60 * 1000, // ✅ Fallback: 5 min mein refetch
     retry: 1,
   });
@@ -121,6 +121,9 @@ export function useDiscounts() {
         let finalPrice = originalPrice;
         if (discount.type === "percentage") {
           finalPrice = originalPrice * (1 - Number(discount.value) / 100);
+          if (discount.maxDiscountAmount && originalPrice - finalPrice > discount.maxDiscountAmount) {
+            finalPrice = originalPrice - discount.maxDiscountAmount;
+          }
         } else if (discount.type === "fixed") {
           finalPrice = Math.max(0, originalPrice - Number(discount.value));
         } else if (discount.type === "fixed_price") {

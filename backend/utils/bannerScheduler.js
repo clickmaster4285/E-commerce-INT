@@ -26,4 +26,3 @@ cron.schedule('* * * * *', async () => {
   );
 });
 
-console.log('✅ Banner scheduler started');

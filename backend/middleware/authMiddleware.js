@@ -35,7 +35,12 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    // ✅ FIX: Map storeId to tenant_id so existing controllers work correctly
+    req.user = {
+      ...user,
+      tenant_id: user.storeId || null,
+    };
+
     next();
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
