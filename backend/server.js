@@ -34,6 +34,7 @@ const bannerRoutes = require("./routes/bannerRoutes");
 const bannerScheduler = require("./utils/bannerScheduler"); // ✅ Ye line add karo
 const orderRoutes = require("./routes/orderRoutes"); // ✅ ORDER ROUTES
 const cartRoutes = require("./routes/cartRoutes"); // ✅ CART ROUTES
+const shippingRoutes = require("./routes/shippingRoutes"); // ✅ SHIPPING ROUTES  ← ADD HERE
 // ==========================================
 // APP
 // ==========================================
@@ -329,6 +330,11 @@ app.use(
 app.use(
   `${API_PREFIX}/cart`,
   cartRoutes
+);
+// ✅ REGISTER SHIPPING ROUTES  ← ADD HERE
+app.use(
+  `${API_PREFIX}/shipping`,
+  shippingRoutes
 );
 // ==========================================
 // ROOT ROUTE

@@ -1,4 +1,5 @@
 "use client";
+import { ShoppingCart } from "lucide-react"; // ✅ Top par import kar lo
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,11 +26,13 @@ import {
   Users,
   Gift,
   Image as ImageIcon,
-  Menu, // Hamburger Icon
+  Menu,
+  Truck,
 } from "lucide-react";
 
 // ... [Keep allMenuItems, getSidebarSocket, disconnectSidebarSocket exactly as before] ...
 const allMenuItems = [
+  
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: null },
     { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
     { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
@@ -40,12 +43,17 @@ const allMenuItems = [
     { name: "Discounts", icon: Tag, path: "/admin/discounts", permissionKey: "discounts" },
     { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
     { name: "Banners", icon: ImageIcon, path: "/admin/banners", permissionKey: "banners" },
+          { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "orders" }, // ✅ YE 
+              { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "store" },
+
+          
+
 ];
 
 let sidebarSocket = null;
 
 function getSidebarSocket() {
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ;
   if (sidebarSocket) return sidebarSocket;
 
   sidebarSocket = io(SOCKET_URL, {

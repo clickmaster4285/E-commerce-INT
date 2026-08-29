@@ -17,16 +17,25 @@ const orderSchema = new mongoose.Schema(
         name: { type: String, required: true },
         brand: { type: String, default: "" },
         variantTitle: { type: String, default: "" },
-          image: { type: String, default: "" },
+        image: { type: String, default: "" },
         price: { type: Number, required: true },
         original_price: { type: Number, default: 0 },
         discount_name: { type: String, default: "" },
         savings: { type: Number, default: 0 },
         qty: { type: Number, required: true, min: 1 },
+        
+        // ✅ NEW: Deal-specific fields for Buy X Get Y & others
+        deal_id: { type: mongoose.Schema.Types.ObjectId, ref: "Deal", default: null },
+        deal_type: { type: String, default: "" },
+        deal_name: { type: String, default: "" },
+        deal_buy_quantity: { type: Number, default: 0 },
+        deal_get_quantity: { type: Number, default: 0 },
+        free_items: { type: Number, default: 0 },
+        payable_items: { type: Number, default: 0 },
+        deal_savings: { type: Number, default: 0 },
       },
     ],
 
-    // Address ka snapshot (order ke waqt ka — baad mein address change ho to order na toote)
     address_snapshot: {
       full_name: { type: String, required: true },
       phone: { type: String, required: true },
@@ -59,6 +68,16 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     notes: { type: String, default: "" },
+
+    // ✅ NEW: Root level deal tracking
+    deal_ids: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Deal",
+    }],
+    total_deal_savings: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );

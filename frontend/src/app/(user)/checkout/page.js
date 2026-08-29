@@ -8,8 +8,8 @@ import { Country, State, City } from "country-state-city";
 import axiosInstance from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import { orderApi } from "@/apis/user/orderApi";
-
-
+import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings } from "@/utils/dealCalculator";
+import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
@@ -17,8 +17,6 @@ import {
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
   Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2, Tag,
 } from "lucide-react";
-
-
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getImgUrl = (img) => {
@@ -28,15 +26,10 @@ const getImgUrl = (img) => {
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
 
-const SHIPPING_METHODS = [
-  { id: "standard", title: "Standard Delivery", time: "2–4 working days", fee: 200, freeOver: 5000 },
-  { id: "express", title: "Express Delivery", time: "1–2 working days", fee: 500, freeOver: null },
-];
-
-const getShippingFee = (method, subtotal) => {
-  const m = SHIPPING_METHODS.find((x) => x.id === method) || SHIPPING_METHODS[0];
-  if (m.freeOver && subtotal >= m.freeOver) return 0;
-  return m.fee;
+const DEFAULT_SHIP_CONFIG = {
+  standard: { fee: 200, min_days: 2, max_days: 4 },
+  express: { fee: 500, min_days: 1, max_days: 2 },
+  free_shipping_over: 0,
 };
 
 const emptyAddress = (phone = "") => ({
@@ -87,8 +80,7 @@ function CheckoutContent() {
   const urlDraftId = searchParams.get("draftId");
   const [currentDraftId, setCurrentDraftId] = useState(null);
 
-
-   const { cart, removeItems, updateQty, restoreItems } = useCart();
+  const { cart, removeItems, updateQty, restoreItems } = useCart();
   const { calculateProductDiscount } = useDiscounts();
 
   const [step, setStep] = useState(1);
@@ -124,33 +116,20 @@ function CheckoutContent() {
     if (!userLoading && !user) router.replace("/login?redirect=/checkout");
   }, [user, userLoading, router]);
 
-
-
-
-
-
-     // ✅ DRAFT LOAD — fresh vs resume (by draftId)
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // ✅ Case 1: URL has draftId → specific draft load (resume)
       if (urlDraftId) {
         try {
-          const res = await axiosInstance.get(
-            `/users/checkout-drafts/${urlDraftId}`,
-          );
+          const res = await axiosInstance.get(`/users/checkout-drafts/${urlDraftId}`);
           const d = res.data?.draft;
           if (cancelled || !d) {
             setSelectedKeys(cart.map((i) => i.key));
-            if (!cancelled) {
-              draftRestored.current = true;
-              setDraftReady(true);
-            }
+            if (!cancelled) { draftRestored.current = true; setDraftReady(true); }
             return;
           }
           setCurrentDraftId(urlDraftId);
-          if (typeof d.step === "number" && d.step >= 1 && d.step <= 3)
-            setStep(d.step);
+          if (typeof d.step === "number" && d.step >= 1 && d.step <= 3) setStep(d.step);
           if (Array.isArray(d.items) && d.items.length) setDraftItems(d.items);
           if (Array.isArray(d.selectedKeys) && d.selectedKeys.length > 0) {
             setSelectedKeys(d.selectedKeys);
@@ -163,27 +142,14 @@ function CheckoutContent() {
         } catch {
           setSelectedKeys(cart.map((i) => i.key));
         }
-        if (!cancelled) {
-          draftRestored.current = true;
-          setDraftReady(true);
-        }
+        if (!cancelled) { draftRestored.current = true; setDraftReady(true); }
         return;
       }
-
-      // ✅ Case 2: No draftId → fresh checkout
       setSelectedKeys(cart.map((i) => i.key));
-      if (!cancelled) {
-        draftRestored.current = true;
-        setDraftReady(true);
-      }
+      if (!cancelled) { draftRestored.current = true; setDraftReady(true); }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [cart, urlDraftId]);
-
-
-
 
   const { data: addresses = [] } = useQuery({
     queryKey: ["addresses"],
@@ -191,7 +157,6 @@ function CheckoutContent() {
     enabled: !!user,
   });
 
-   // ✅ Auto-select default address (draft load hone ke baad)
   useEffect(() => {
     if (!draftReady) return;
     if (!selectedAddressId && addresses.length) {
@@ -199,61 +164,33 @@ function CheckoutContent() {
       setSelectedAddressId(def._id);
     }
   }, [addresses, selectedAddressId, draftReady]);
-  // ✅ Debounced save (fields)
-
 
   useEffect(() => {
     if (!user || !draftRestored.current || !currentDraftId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      axiosInstance
-        .put(`/users/checkout-drafts/${currentDraftId}`, {
-          step,
-          selectedKeys: selectedKeys || [],
-          selectedAddressId: selectedAddressId || null,
-          shippingMethod,
-          paymentMethod,
-          saved: false,
-          items: draftItems,
-        })
-        .catch(() => {});
+      axiosInstance.put(`/users/checkout-drafts/${currentDraftId}`, {
+        step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
+        shippingMethod, paymentMethod, saved: false, items: draftItems,
+      }).catch(() => {});
     }, 800);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [
-    selectedKeys,
-    selectedAddressId,
-    shippingMethod,
-    paymentMethod,
-    user,
-    step,
-    draftItems,
-    currentDraftId,
-  ]);
-
-
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId]);
 
   const goToStep = async (n) => {
     if (currentDraftId) {
       try {
         await axiosInstance.put(`/users/checkout-drafts/${currentDraftId}`, {
-          step: n,
-          selectedKeys: selectedKeys || [],
-          selectedAddressId: selectedAddressId || null,
-          shippingMethod,
-          paymentMethod,
-          saved: false,
-          items: draftItems,
+          step: n, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
+          shippingMethod, paymentMethod, saved: false, items: draftItems,
         });
       } catch {}
     }
     setStep(n);
   };
 
-    const proceedToStep2 = async () => {
-    if (!selectedCartItems.length)
-      return toast.error("Please select at least one item");
+  const proceedToStep2 = async () => {
+    if (!selectedCartItems.length) return toast.error("Please select at least one item");
     const snap = selectedCartItems.map((i) => ({ ...i }));
     setDraftItems(snap);
     removeItems(snap.map((i) => i.key));
@@ -261,47 +198,29 @@ function CheckoutContent() {
 
     try {
       let draftId = currentDraftId;
-
       if (!draftId) {
-        // ✅ Naya draft create
         const createRes = await axiosInstance.post("/users/checkout-drafts", {
-          step: 2,
-          selectedKeys: [],
-          selectedAddressId: selectedAddressId || null,
-          shippingMethod,
-          paymentMethod,
-          items: snap,
+          step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
+          shippingMethod, paymentMethod, items: snap,
         });
         draftId = createRes.data?.draft?._id;
         setCurrentDraftId(draftId);
-        if (draftId)
-          router.replace(`/checkout?draftId=${draftId}`, { scroll: false });
+        if (draftId) router.replace(`/checkout?draftId=${draftId}`, { scroll: false });
       } else {
-        // ✅ Existing draft update
         await axiosInstance.put(`/users/checkout-drafts/${draftId}`, {
-          step: 2,
-          selectedKeys: [],
-          selectedAddressId: selectedAddressId || null,
-          shippingMethod,
-          paymentMethod,
-          items: snap,
+          step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
+          shippingMethod, paymentMethod, items: snap,
         });
       }
-    } catch (e) {
-      console.error("proceedToStep2 error:", e);
-    }
+    } catch (e) { console.error("proceedToStep2 error:", e); }
     setStep(2);
   };
 
-   const backToStep1 = async () => {
+  const backToStep1 = async () => {
     if (draftItems.length) restoreItems(draftItems);
     setDraftItems([]);
     if (currentDraftId) {
-      try {
-        await axiosInstance.delete(
-          `/users/checkout-drafts/${currentDraftId}`,
-        );
-      } catch {}
+      try { await axiosInstance.delete(`/users/checkout-drafts/${currentDraftId}`); } catch {}
       setCurrentDraftId(null);
       router.replace("/checkout", { scroll: false });
     }
@@ -309,14 +228,9 @@ function CheckoutContent() {
   };
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
-
   useEffect(() => {
-    fetch("https://ipapi.co/country_name/")
-      .then((r) => r.text())
-      .then((name) => name && setDetectedCountry(name.trim()))
-      .catch(() => {});
+    fetch("https://ipapi.co/country_name/").then((r) => r.text()).then((name) => name && setDetectedCountry(name.trim())).catch(() => {});
   }, []);
-
   useEffect(() => {
     if (showAddressModal && !editingAddressId && detectedCountry && !addressForm.country) {
       setAddressForm((f) => ({ ...f, country: detectedCountry }));
@@ -337,7 +251,6 @@ function CheckoutContent() {
   useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [addressForm.country]);
   useEffect(() => { setAddressForm((f) => ({ ...f, city: "" })); }, [addressForm.state]);
 
-  // ✅ Cart keys sync (step 1)
   useEffect(() => {
     if (!draftRestored.current) return;
     setSelectedKeys((prev) => {
@@ -352,50 +265,93 @@ function CheckoutContent() {
   const selectedCartItems = useMemo(() => cart.filter((i) => (selectedKeys || []).includes(i.key)), [cart, selectedKeys]);
   const activeItems = step === 1 ? selectedCartItems : draftItems;
 
-  const toggleKey = (key) =>
-    setSelectedKeys((prev) => {
-      const list = prev ?? cart.map((i) => i.key);
-      return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
-    });
+  const toggleKey = (key) => setSelectedKeys((prev) => {
+    const list = prev ?? cart.map((i) => i.key);
+    return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+  });
 
   const allSelected = cart.length > 0 && (selectedKeys || []).length === cart.length;
   const toggleAll = () => setSelectedKeys(allSelected ? [] : cart.map((i) => i.key));
 
-  // ✅ Active items with discounts applied
   const itemsWithDiscounts = activeItems.map((i) => {
+    const qty = Number(i.qty) || 1;
+    const price = Number(i.price) || 0;
+    
     const fakeProduct = {
       _id: i.productId || i.id,
       category_id: i.categoryId || null,
       brand_id: i.brandId || null,
       discount: i.productDiscountPct || 0,
     };
-    const disc = calculateProductDiscount(fakeProduct, i.price);
+    
+    const disc = calculateProductDiscount(fakeProduct, price);
+    const discountedPrice = Number(disc.discountedPrice) || price;
+    const originalPrice = Number(disc.originalPrice) || price;
+    
+    let freeItems = 0;
+    let payableItems = qty;
+    let dealSavings = 0;
+    
+    if (i.dealType === "buy_x_get_y" && i.dealBuyQuantity && i.dealGetQuantity) {
+      freeItems = calculateFreeItems(qty, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
+      payableItems = calculatePayableItems(qty, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
+      dealSavings = calculateBuyXGetYSavings(qty, discountedPrice, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
+    }
+    
+    const lineTotal = Number(payableItems * discountedPrice) || 0;
+
     return {
       ...i,
-      displayPrice: disc.discountedPrice,
-      originalPrice: disc.originalPrice,
-      hasDiscount: disc.hasDiscount,
-      savings: disc.savings,
+      qty,
+      displayPrice: discountedPrice,
+      originalPrice: originalPrice,
+      hasDiscount: disc.hasDiscount || i.dealType === "buy_x_get_y",
+      savings: disc.savings || 0,
+      dealSavings,
+      freeItems,
+      payableItems,
+      lineTotal,
     };
   });
 
-  const subtotal = itemsWithDiscounts.reduce(
-    (s, i) => s + i.displayPrice * i.qty,
-    0,
-  );
-  const totalSavings = itemsWithDiscounts.reduce(
-    (s, i) => s + i.savings * i.qty,
-    0,
-  );
-  const shipping = getShippingFee(shippingMethod, subtotal);
+  const subtotal = itemsWithDiscounts.reduce((s, i) => s + i.lineTotal, 0);
+  const totalSavings = itemsWithDiscounts.reduce((s, i) => s + (i.savings * i.qty) + i.dealSavings, 0);
+
+  // ✅ CHANGE 1: Live shipping config + quote
+  const { data: shipConfig } = useQuery({
+    queryKey: ["shippingConfig"],
+    queryFn: shippingApi.getConfig,
+    staleTime: 60 * 1000,
+  });
+  const cfg = shipConfig || DEFAULT_SHIP_CONFIG;
+
+  const { data: shipQuote } = useQuery({
+    queryKey: [
+      "shippingQuote",
+      shippingMethod,
+      Math.round(subtotal),
+      activeItems.map((i) => i.productId || i.id).join(","),
+    ],
+    queryFn: () =>
+      shippingApi.quote({
+        items: activeItems.map((i) => ({
+          productId: i.productId || i.id,
+          brandId: i.brandId,
+          categoryId: i.categoryId,
+        })),
+        method: shippingMethod,
+        subtotal,
+      }),
+    enabled: activeItems.length > 0,
+  });
+
+  const shipping = shipQuote?.fee ?? (shippingMethod === "express" ? cfg.express.fee : cfg.standard.fee);
+  const shippingReason = shipQuote?.reason || "";
+
   const tax = Math.round(
-    itemsWithDiscounts.reduce(
-      (s, i) => s + i.displayPrice * i.qty * (Number(i.tax || 0) / 100),
-      0,
-    ),
+    itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0)
   );
   const grandTotal = Math.round(subtotal + shipping + tax);
-  const freeLeft = Math.max(0, 5000 - subtotal);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
   const needsPhone = !!user && !user.phone;
@@ -474,20 +430,14 @@ function CheckoutContent() {
         items: activeItems, address_id: selectedAddressId,
         payment_method: paymentMethod, shipping_method: shippingMethod,
       });
-
-
-         queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       setDraftItems([]);
       if (currentDraftId) {
-        await axiosInstance
-          .delete(`/users/checkout-drafts/${currentDraftId}`)
-          .catch(() => {});
+        await axiosInstance.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {});
         setCurrentDraftId(null);
       }
       router.push("/orders");
-
-
     } catch (e) {
       toast.error(e.response?.data?.message || "Order place failed");
       setPlacing(false);
@@ -550,7 +500,7 @@ function CheckoutContent() {
     </div>
   );
 
-   const SummaryPanel = ({ footer }) => (
+  const SummaryPanel = ({ footer }) => (
     <div className={`${cardCls} p-4 sm:p-5 lg:sticky lg:top-24`}>
       <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
         <PackageCheck size={16} className="text-[var(--user-accent)]" /> Order Summary
@@ -561,43 +511,63 @@ function CheckoutContent() {
             <ItemThumb item={i} size="w-10 h-10 sm:w-12 sm:h-12" />
             <div className="flex-1 min-w-0">
               <p className="text-[11px] sm:text-xs font-semibold text-[var(--user-text)] truncate">{i.name}</p>
-              <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)]">Qty: {i.qty}</p>
-              {i.hasDiscount && (
-                <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
-                  <Tag size={8} /> Save Rs. {(i.savings * i.qty).toLocaleString()}
-                </p>
+              
+              {i.dealId && (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full">
+                    <Tag size={9} /> 
+                    {i.dealType === 'buy_x_get_y' 
+                      ? `Buy ${i.dealBuyQuantity || 2} Get ${i.dealGetQuantity || 1} Free` 
+                      : (i.dealName || 'Active Deal')}
+                  </span>
+                  {i.freeItems > 0 && (
+                    <span className="text-[9px] sm:text-[10px] font-bold text-green-600 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded-full">
+                      {i.freeItems} FREE
+                    </span>
+                  )}
+                </div>
               )}
+
+              <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] mt-1">
+Qty: {i.qty} {i.freeItems > 0 && `(${i.payableItems} paid + ${i.freeItems} FREE = ${i.payableItems + i.freeItems} items)`}
+              </p>
             </div>
             <div className="text-right">
-              {i.hasDiscount && (
+              {i.hasDiscount && i.originalPrice > i.displayPrice && (
                 <p className="text-[9px] text-[var(--user-text-subtle)] line-through">
                   Rs. {(i.originalPrice * i.qty).toLocaleString()}
                 </p>
               )}
               <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)]">
-                Rs. {(i.displayPrice * i.qty).toLocaleString()}
+                Rs. {i.lineTotal.toLocaleString()}
               </p>
+              {((i.savings * i.qty) + i.dealSavings) > 0 && (
+                <p className="text-[9px] font-bold text-[var(--user-success)] mt-0.5">
+                  Save Rs. {((i.savings * i.qty) + i.dealSavings).toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
         ))}
       </div>
       <div className="space-y-2 pt-3 border-t border-[var(--user-border)] text-sm">
         <div className="flex justify-between text-[var(--user-text-muted)] text-xs sm:text-sm">
-          <span>Subtotal ({itemsWithDiscounts.length})</span>
+          <span>Subtotal</span>
           <span className="text-[var(--user-text)] font-semibold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
           <div className="flex justify-between text-xs sm:text-sm">
             <span className="text-[var(--user-success)] flex items-center gap-1">
-              <Tag size={12} /> Discount Savings
+              <Tag size={12} /> Total Savings
             </span>
-            <span className="text-[var(--user-success)] font-semibold">
-              -Rs. {totalSavings.toLocaleString()}
-            </span>
+            <span className="text-[var(--user-success)] font-semibold">-Rs. {totalSavings.toLocaleString()}</span>
           </div>
         )}
         <div className="flex justify-between text-[var(--user-text-muted)] text-xs sm:text-sm">
-          <span className="flex items-center gap-1">Shipping {shipping === 0 && <span className="text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>}</span>
+          <span className="flex items-center gap-1">
+            Shipping
+            {shipping === 0 && <span className="text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>}
+          </span>
           <span className="text-[var(--user-text)] font-semibold">{shipping === 0 ? "Rs. 0" : `Rs. ${shipping}`}</span>
         </div>
         {tax > 0 && <div className="flex justify-between text-[var(--user-text-muted)] text-xs sm:text-sm"><span>Tax</span><span className="text-[var(--user-text)] font-semibold">Rs. {tax.toLocaleString()}</span></div>}
@@ -610,6 +580,21 @@ function CheckoutContent() {
     </div>
   );
 
+  // ✅ CHANGE 3: Dynamic shipping methods from config
+  const shippingMethods = [
+    {
+      id: "standard",
+      title: "Standard Delivery",
+      time: `${cfg.standard.min_days}–${cfg.standard.max_days} working days`,
+      icon: Truck,
+    },
+    {
+      id: "express",
+      title: "Express Delivery",
+      time: `${cfg.express.min_days}–${cfg.express.max_days} working days`,
+      icon: Zap,
+    },
+  ];
 
   return (
     <main className="max-w-[1200px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-10">
@@ -659,9 +644,7 @@ function CheckoutContent() {
                   </label>
                 </div>
 
-
-
-                               <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[320px] sm:max-h-[380px] lg:max-h-[calc(100vh-240px)]">
+                <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2 overflow-y-auto max-h-[320px] sm:max-h-[380px] lg:max-h-[calc(100vh-240px)]">
                   {itemsWithDiscounts.map((item) => {
                     const checked = (selectedKeys || []).includes(item.key);
                     return (
@@ -673,15 +656,27 @@ function CheckoutContent() {
                         <div className="flex-1 min-w-0">
                           <p className="text-[11px] sm:text-xs font-semibold text-[var(--user-text)] truncate">{item.name}</p>
                           {item.variantTitle && <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          
+                          {item.dealId && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full">
+                                <Tag size={9} /> 
+                                {item.dealType === 'buy_x_get_y' 
+                                  ? `Buy ${item.dealBuyQuantity || 2} Get ${item.dealGetQuantity || 1} Free` 
+                                  : (item.dealName || 'Active Deal')}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5 mt-1">
                             <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
-                            {item.hasDiscount && (
+                            {item.hasDiscount && item.originalPrice > item.displayPrice && (
                               <p className="text-[9px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
                             )}
                           </div>
-                          {item.hasDiscount && (
+                          {((item.savings * item.qty) + item.dealSavings) > 0 && (
                             <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
-                              <Tag size={8} /> Save Rs. {(item.savings * item.qty).toLocaleString()}
+                              <Tag size={8} /> Save Rs. {((item.savings * item.qty) + item.dealSavings).toLocaleString()}
                             </p>
                           )}
                         </div>
@@ -691,24 +686,17 @@ function CheckoutContent() {
                               <Minus size={11} className="sm:w-3 sm:h-3" />
                             </button>
                             <span className="text-[9px] sm:text-[10px] font-black text-[var(--user-text)] w-5 sm:w-6 text-center">{item.qty}</span>
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-1 sm:p-1.5 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
-                              <Plus size={11} className="sm:w-3 sm:h-3" />
-                            </button>
+                          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-1 sm:p-1.5 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
+  <Plus size={11} className="sm:w-3 sm:h-3" />
+</button>
                           </div>
-                          <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-accent)]">Rs. {(item.displayPrice * item.qty).toLocaleString()}</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
                         </div>
                       </label>
                     );
                   })}
                 </div>
-
-
-
               </div>
-
-
-
-
 
               <div className={`${cardCls} lg:sticky lg:top-24 flex flex-col`}>
                 <div className="flex items-center justify-between px-3 sm:px-5 py-3 sm:py-3.5 border-b border-[var(--user-border)] shrink-0">
@@ -725,7 +713,7 @@ function CheckoutContent() {
                       <p className="text-xs sm:text-sm font-semibold text-[var(--user-text)] mb-1">No items selected</p>
                       <p className="text-[10px] sm:text-xs text-[var(--user-text-muted)]">Select items from the list on the left.</p>
                     </div>
-                                 ) : (
+                  ) : (
                     <div className="divide-y divide-[var(--user-border)]">
                       {itemsWithDiscounts.filter((i) => (selectedKeys || []).includes(i.key)).map((item) => (
                         <div key={item.key} className="flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 first:pt-0 last:pb-0">
@@ -733,20 +721,24 @@ function CheckoutContent() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm font-semibold text-[var(--user-text)] truncate">{item.name}</p>
                             {item.variantTitle && <p className="text-[10px] sm:text-[11px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <p className="text-[10px] sm:text-[11px] text-[var(--user-text-subtle)]">Qty: {item.qty} × Rs. {item.displayPrice.toLocaleString()}</p>
-                              {item.hasDiscount && (
-                                <p className="text-[9px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
-                              )}
-                            </div>
-                            {item.hasDiscount && (
-                              <p className="text-[9px] font-bold text-[var(--user-success)] flex items-center gap-0.5 mt-0.5">
-                                <Tag size={8} /> Save Rs. {(item.savings * item.qty).toLocaleString()}
-                              </p>
+                            
+                            {item.dealId && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full">
+                                  <Tag size={9} /> 
+                                  {item.dealType === 'buy_x_get_y' 
+                                    ? `Buy ${item.dealBuyQuantity || 2} Get ${item.dealGetQuantity || 1} Free` 
+                                    : (item.dealName || 'Active Deal')}
+                                </span>
+                              </div>
                             )}
+                            
+                            <p className="text-[10px] sm:text-[11px] text-[var(--user-text-subtle)] mt-1">
+                              Qty: {item.qty} {item.freeItems > 0 && `(${item.payableItems} paid + ${item.freeItems} FREE)`}
+                            </p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="text-xs sm:text-sm font-black text-[var(--user-accent)]">Rs. {(item.displayPrice * item.qty).toLocaleString()}</p>
+                            <p className="text-xs sm:text-sm font-black text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
                             <button onClick={() => toggleKey(item.key)} className="mt-1 inline-flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] font-bold text-[var(--user-text-subtle)] hover:text-[var(--user-danger)] transition">
                               <X size={9} className="sm:w-2.5 sm:h-2.5" /> Remove
                             </button>
@@ -755,36 +747,15 @@ function CheckoutContent() {
                       ))}
                     </div>
                   )}
-
-
-                  
                 </div>
                 <div className="px-3 sm:px-5 py-3 sm:py-4 border-t border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 rounded-b-xl sm:rounded-b-2xl shrink-0">
-                  {freeLeft > 0 && selectedCartItems.length > 0 && (
-                    <div className="mb-2 sm:mb-3">
-                      <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] flex items-center gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
-                        <Truck size={11} className="text-[var(--user-accent)] sm:w-3 sm:h-3" />
-                        Add <span className="font-bold text-[var(--user-accent)]">Rs. {freeLeft.toLocaleString()}</span> more for FREE Delivery
-                      </p>
-                      <div className="h-1.5 rounded-full bg-[var(--user-bg-hover)] overflow-hidden">
-                        <div className="h-full bg-[var(--user-accent)] rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (subtotal / 5000) * 100)}%` }} />
-                      </div>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <div>
                       <p className="text-[10px] sm:text-[11px] text-[var(--user-text-muted)]">Selected: <span className="font-bold text-[var(--user-text)]">{selectedCartItems.length}</span></p>
                       <p className="text-lg sm:text-xl font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                     </div>
-                    {subtotal >= 5000 && selectedCartItems.length > 0 && (
-                      <span className="text-[9px] sm:text-[10px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/30 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">🎉 FREE</span>
-                    )}
                   </div>
-                  <button
-                    onClick={proceedToStep2}
-                    disabled={!selectedCartItems.length}
-                    className="w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
+                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className="w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
                     Next: Delivery & Payment <ArrowRight size={14} className="sm:w-4 sm:h-4" />
                   </button>
                 </div>
@@ -832,18 +803,32 @@ function CheckoutContent() {
                   <h2 className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[var(--user-text)] mb-3 sm:mb-4">
                     <Truck size={14} className="text-[var(--user-accent)] sm:w-4 sm:h-4" /> Shipping Method
                   </h2>
+                  {cfg.free_shipping_over > 0 && (
+                    <p className="text-[10px] sm:text-[11px] text-[var(--user-success)] font-semibold mb-2 flex items-center gap-1">
+                      <Tag size={10} /> Free shipping on orders over Rs. {cfg.free_shipping_over.toLocaleString()}
+                    </p>
+                  )}
+                  {/* ✅ CHANGE 2: Dynamic shipping methods from admin config */}
                   <div className="grid my-3 sm:grid-cols-2 gap-2 sm:gap-3">
-                    {SHIPPING_METHODS.map((m) => {
-                      const fee = getShippingFee(m.id, subtotal);
+                    {shippingMethods.map((m) => {
                       const active = shippingMethod === m.id;
+                      const IconComp = m.icon;
+                      const baseFee = m.id === "express" ? cfg.express.fee : cfg.standard.fee;
+                      const displayFee = active ? shipping : baseFee;
+                      const isFree = displayFee === 0;
                       return (
                         <button key={m.id} onClick={() => setShippingMethod(m.id)} className={`flex items-center gap-2 sm:gap-3 rounded-lg sm:rounded-xl border p-3 sm:p-4 text-left transition ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          {m.id === "express" ? <Zap size={16} className={`sm:w-5 sm:h-5 ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`} /> : <Truck size={16} className={`sm:w-5 sm:h-5 ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`} />}
+                          <IconComp size={16} className={`sm:w-5 sm:h-5 ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs sm:text-sm font-bold text-[var(--user-text)]">{m.title}</p>
                             <p className="text-[10px] sm:text-[11px] text-[var(--user-text-muted)]">{m.time}</p>
+                            {active && shippingReason && (
+                              <p className="text-[9px] text-[var(--user-success)] mt-0.5 truncate">{shippingReason}</p>
+                            )}
                           </div>
-                          <span className={`text-[10px] sm:text-xs font-black ${fee === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{fee === 0 ? "FREE" : `Rs. ${fee}`}</span>
+                          <span className={`text-[10px] sm:text-xs font-black ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                            {isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}
+                          </span>
                         </button>
                       );
                     })}
@@ -895,10 +880,7 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-2">
-                  <button
-                    onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")}
-                    className="w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition"
-                  >
+                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className="w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs sm:text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
                     Review Order <ArrowRight size={14} className="sm:w-4 sm:h-4" />
                   </button>
                   <button onClick={backToStep1} className="w-full h-9 sm:h-10 rounded-lg sm:rounded-xl border border-[var(--user-border)] text-[10px] sm:text-xs font-semibold text-[var(--user-text-secondary)] hover:text-[var(--user-text)] transition flex items-center justify-center gap-2">
@@ -935,22 +917,39 @@ function CheckoutContent() {
                         <button onClick={() => goToStep(2)} className="text-[10px] sm:text-[11px] font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
                       </div>
                       <p className="text-[10px] sm:text-xs text-[var(--user-text-muted)] leading-relaxed">
-                        🚚 {SHIPPING_METHODS.find((m) => m.id === shippingMethod)?.title} · {SHIPPING_METHODS.find((m) => m.id === shippingMethod)?.time}<br />
+                        🚚 {shippingMethods.find((m) => m.id === shippingMethod)?.title} · {shippingMethods.find((m) => m.id === shippingMethod)?.time}<br />
+                        {shippingReason && <span className="text-[var(--user-success)]">{shippingReason}<br /></span>}
                         {paymentMethod === "cod" ? "💵 Cash on Delivery" : paymentMethod === "bank" ? "🏦 Bank Transfer" : "💳 Debit / Credit Card"}
                       </p>
                     </div>
                   </div>
                   <div className="mt-3 sm:mt-4 rounded-lg sm:rounded-xl border border-[var(--user-border)] p-3 sm:p-4 space-y-2 sm:space-y-3">
-                    <p className="text-[10px] sm:text-xs font-bold text-[var(--user-text)] uppercase tracking-wider">Items ({activeItems.length})</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-[var(--user-text)] uppercase tracking-wider">Items ({itemsWithDiscounts.length})</p>
                     <div className="divide-y my-2 divide-[var(--user-border)]">
-                      {activeItems.map((i) => (
+                      {itemsWithDiscounts.map((i) => (
                         <div key={i.key} className="flex items-center gap-2 sm:gap-3 py-2 sm:py-2.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-9 h-9 sm:w-10 sm:h-10" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[11px] sm:text-xs font-semibold text-[var(--user-text)] truncate">{i.name}</p>
-                            <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)]">Qty: {i.qty}</p>
+                            
+                            {i.dealId && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded-full">
+                                  <Tag size={9} /> 
+                                  {i.dealType === 'buy_x_get_y' 
+                                    ? `Buy ${i.dealBuyQuantity || 2} Get ${i.dealGetQuantity || 1} Free` 
+                                    : (i.dealName || 'Active Deal')}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] mt-1">
+                           Qty: {i.qty} {i.freeItems > 0 && `(${i.payableItems} paid + ${i.freeItems} FREE = ${i.payableItems + i.freeItems} items)`}
+                            </p>
                           </div>
-                          <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)]">Rs. {(i.price * i.qty).toLocaleString()}</p>
+                          <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)]">
+                            Rs. {Number(i.lineTotal || 0).toLocaleString()}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -1052,7 +1051,7 @@ function CheckoutContent() {
                 </button>
               </div>
             </div>
-                   </div>
+          </div>
         </div>
       )}
     </main>
@@ -1061,13 +1060,7 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-[60vh] items-center justify-center">
-          <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>}>
       <CheckoutContent />
     </Suspense>
   );

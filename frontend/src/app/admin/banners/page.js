@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
 import useBannerSocketSync from "../../../hooks/useBannerSocket";
+import { dealApi } from "../../../apis/admin/dealApi";
 
 // ==========================================
 // API SETUP
@@ -360,6 +361,13 @@ export default function BannersPage() {
     queryKey: ["adminBanners"],
     queryFn: adminBannerApi.getAll,
     retry: false,
+  });
+
+  // ✅ Deals list — for linking a banner button to a Deal
+  const { data: deals = [] } = useQuery({
+    queryKey: ["banner-deal-options"],
+    queryFn: dealApi.getAll,
+    staleTime: 60 * 1000,
   });
 
   const bannerMutation = useMutation({
@@ -804,9 +812,25 @@ export default function BannersPage() {
                         <option value="custom_url">Custom URL</option>
                         <option value="product">Product Page</option>
                         <option value="category">Category Page</option>
+                        <option value="deal">Deal Page</option>
                         <option value="none">No Link</option>
                       </Select>
                     </FormField>
+                    {form.primaryButton.linkType === "deal" && (
+                      <FormField label="Select Deal" required helpText="Banner button opens this deal on the storefront">
+                        <Select
+                          value={form.primaryButton.dealId || ""}
+                          onChange={(e) => updateNested("primaryButton", "dealId", e.target.value)}
+                        >
+                          <option value="">— Choose a deal —</option>
+                          {deals.map((d) => (
+                            <option key={d._id} value={d._id}>
+                              {d.name}{d.isActive ? "" : " (disabled)"}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    )}
                     {form.primaryButton.linkType === "custom_url" && (
                       <FormField label="Target URL" required helpText="Full URL destination">
                         <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />

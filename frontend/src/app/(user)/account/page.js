@@ -9,24 +9,8 @@ import axiosInstance from "@/apis/axiosInstance";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
-  User,
-  Package,
-  Clock,
-  CheckCircle2,
-  Truck,
-  XCircle,
-  ShoppingBag,
-  Loader2,
-  Calendar,
-  MapPin,
-  CreditCard,
-  Banknote,
-  Landmark,
-  Zap,
-  ArrowRight,
-  Trash2,
-  Play,
-  Tag,
+  User, Package, Clock, CheckCircle2, Truck, XCircle, ShoppingBag, Loader2,
+  Calendar, MapPin, CreditCard, Banknote, Landmark, Zap, ArrowRight, Trash2, Play, Tag,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -70,10 +54,7 @@ const OrderProgress = ({ status }) => {
     <div className="flex items-center gap-1.5">
       {STATUS_FLOW.map((s, i) => (
         <Fragment key={s}>
-          <div
-            className={`w-2.5 h-2.5 rounded-full shrink-0 transition ${i <= idx ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`}
-            title={STATUS_CONFIG[s].label}
-          />
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 transition ${i <= idx ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} title={STATUS_CONFIG[s].label} />
           {i < STATUS_FLOW.length - 1 && (
             <div className={`h-0.5 flex-1 rounded-full ${i < idx ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
           )}
@@ -168,20 +149,14 @@ export default function AccountPage() {
           <User size={28} className="text-[var(--user-accent)] lg:w-8 lg:h-8 opacity-60" />
         </div>
         <h1 className="text-xl lg:text-2xl font-bold text-[var(--user-text)] mb-2">Login Required</h1>
-        <p className="text-[var(--user-text-muted)] text-sm mb-6 lg:mb-8 max-w-sm mx-auto">
-          Please login to view your account and orders.
-        </p>
-        <Link href="/login?redirect=/account" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 lg:px-8 py-2.5 lg:py-3 rounded-xl text-sm font-bold hover:opacity-90 active:scale-95 transition">
-          Login to Your Account
-        </Link>
+        <p className="text-[var(--user-text-muted)] text-sm mb-6 lg:mb-8 max-w-sm mx-auto">Please login to view your account and orders.</p>
+        <Link href="/login?redirect=/account" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 lg:px-8 py-2.5 lg:py-3 rounded-xl text-sm font-bold hover:opacity-90 active:scale-95 transition">Login to Your Account</Link>
       </div>
     );
   }
 
   const avatarLetter = (user.name || user.email || "U").charAt(0).toUpperCase();
-  const memberSince = user.created_at
-    ? new Date(user.created_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
-    : "";
+  const memberSince = user.created_at ? new Date(user.created_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "";
 
   const counts = orders.reduce((acc, o) => {
     acc[o.status] = (acc[o.status] || 0) + 1;
@@ -196,32 +171,12 @@ export default function AccountPage() {
     const count = items.length || draft.selectedKeys?.length || 0;
 
     const discountedItems = items.map((i) => {
-      const disc = calculateProductDiscount(
-        {
-          _id: i.productId || i.id,
-          category_id: i.categoryId || null,
-          brand_id: i.brandId || null,
-          discount: i.productDiscountPct || 0,
-        },
-        i.price,
-      );
-      return {
-        ...i,
-        displayPrice: disc.discountedPrice,
-        originalPrice: disc.originalPrice,
-        hasDiscount: disc.hasDiscount,
-        savings: disc.savings,
-      };
+      const disc = calculateProductDiscount({ _id: i.productId || i.id, category_id: i.categoryId || null, brand_id: i.brandId || null, discount: i.productDiscountPct || 0 }, i.price);
+      return { ...i, displayPrice: disc.discountedPrice, originalPrice: disc.originalPrice, hasDiscount: disc.hasDiscount, savings: disc.savings };
     });
 
-    const total = discountedItems.reduce(
-      (s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1),
-      0,
-    );
-    const totalSavings = discountedItems.reduce(
-      (s, i) => s + (Number(i.savings) || 0) * (Number(i.qty) || 1),
-      0,
-    );
+    const total = discountedItems.reduce((s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1), 0);
+    const totalSavings = discountedItems.reduce((s, i) => s + (Number(i.savings) || 0) * (Number(i.qty) || 1) + Number(i.deal_savings || 0), 0);
     const pay = PAYMENT_LABEL[draft.paymentMethod] || PAYMENT_LABEL.cod;
 
     return (
@@ -270,36 +225,24 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <DraftProgress step={draft.step} />
-        </div>
+        <div className="mb-4"><DraftProgress step={draft.step} /></div>
 
         <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)] flex-wrap gap-3">
-         
-         
-                 <div>
+          <div>
             <p className="text-xs text-[var(--user-text-muted)]">
               Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</span>
             </p>
             {totalSavings > 0 && (
-              <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5">
-                You save Rs. {totalSavings.toLocaleString()}
+              <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5 flex items-center gap-1">
+                <Tag size={10} /> You save Rs. {totalSavings.toLocaleString()}
               </p>
             )}
           </div>
-
-
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => resumeDraft(draft._id)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] font-bold hover:opacity-90 transition"
-            >
+            <button onClick={() => resumeDraft(draft._id)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] font-bold hover:opacity-90 transition">
               <Play size={12} /> Resume
             </button>
-            <button
-              onClick={() => deleteDraft(draft._id, items)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-[11px] font-bold hover:bg-[var(--user-danger)]/10 transition"
-            >
+            <button onClick={() => deleteDraft(draft._id, items)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-[11px] font-bold hover:bg-[var(--user-danger)]/10 transition">
               <Trash2 size={12} /> Delete
             </button>
           </div>
@@ -325,17 +268,11 @@ export default function AccountPage() {
           )}
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl lg:text-2xl font-extrabold text-[var(--user-text)] capitalize truncate">
-              {user.name || user.username}
-            </h1>
+            <h1 className="text-xl lg:text-2xl font-extrabold text-[var(--user-text)] capitalize truncate">{user.name || user.username}</h1>
             <p className="text-[var(--user-text-muted)] text-xs lg:text-sm mt-1 truncate">{user.email}</p>
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] lg:text-[10px] font-bold px-2.5 lg:px-3 py-1 rounded-full uppercase tracking-wider">
-                ClickMasters Member
-              </span>
-              {memberSince && (
-                <span className="text-[10px] lg:text-[11px] text-[var(--user-text-subtle)]">Member since {memberSince}</span>
-              )}
+              <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] lg:text-[10px] font-bold px-2.5 lg:px-3 py-1 rounded-full uppercase tracking-wider">ClickMasters Member</span>
+              {memberSince && <span className="text-[10px] lg:text-[11px] text-[var(--user-text-subtle)]">Member since {memberSince}</span>}
             </div>
           </div>
 
@@ -364,29 +301,13 @@ export default function AccountPage() {
 
         {(orders.length > 0 || hasDrafts) && (
           <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
-            <button
-              onClick={() => setFilter("all")}
-              className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold border transition ${
-                filter === "all"
-                  ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]"
-                  : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] border-[var(--user-border)] hover:border-[var(--user-accent)]/50"
-              }`}
-            >
+            <button onClick={() => setFilter("all")} className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold border transition ${filter === "all" ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] border-[var(--user-border)] hover:border-[var(--user-accent)]/50"}`}>
               All ({orders.length})
             </button>
 
             {hasDrafts && (
-              <button
-                onClick={() => setFilter("draft")}
-                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition ${
-                  filter === "draft"
-                    ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]"
-                    : "bg-[var(--user-bg-card)] border-[var(--user-accent)]/40 hover:border-[var(--user-accent)]"
-                }`}
-                style={filter !== "draft" ? { color: "var(--user-accent)" } : {}}
-              >
-                <ShoppingBag size={12} />
-                Draft ({drafts.length})
+              <button onClick={() => setFilter("draft")} className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition ${filter === "draft" ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]" : "bg-[var(--user-bg-card)] border-[var(--user-accent)]/40 hover:border-[var(--user-accent)]"}`} style={filter !== "draft" ? { color: "var(--user-accent)" } : {}}>
+                <ShoppingBag size={12} /> Draft ({drafts.length})
               </button>
             )}
 
@@ -394,16 +315,7 @@ export default function AccountPage() {
               const Icon = cfg.icon;
               const isActive = filter === key;
               return (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition ${
-                    isActive
-                      ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]"
-                      : "bg-[var(--user-bg-card)] border-[var(--user-border)] hover:border-[var(--user-accent)]/50"
-                  }`}
-                  style={!isActive ? { color: `var(--user-text-secondary)` } : {}}
-                >
+                <button key={key} onClick={() => setFilter(key)} className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition ${isActive ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]" : "bg-[var(--user-bg-card)] border-[var(--user-border)] hover:border-[var(--user-accent)]/50"}`} style={!isActive ? { color: `var(--user-text-secondary)` } : {}}>
                   <Icon size={12} className={!isActive ? cfg.color : ""} />
                   {cfg.label} ({counts[key] || 0})
                 </button>
@@ -413,31 +325,19 @@ export default function AccountPage() {
         )}
 
         {hasDrafts && (filter === "all" || filter === "draft") && (
-          <div className="space-y-4 mb-4">
-            {drafts.map((draft) => (
-              <DraftCard key={draft._id} draft={draft} />
-            ))}
-          </div>
+          <div className="space-y-4 mb-4">{drafts.map((draft) => <DraftCard key={draft._id} draft={draft} />)}</div>
         )}
 
         {ordersLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
-          </div>
+          <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
         ) : filter !== "draft" && filtered.length === 0 && !(filter === "all" && hasDrafts) ? (
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-12 text-center">
             <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
               <ShoppingBag size={32} className="text-[var(--user-text-subtle)]" />
             </div>
-            <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">
-              {orders.length === 0 ? "No orders yet" : "No orders in this status"}
-            </h2>
-            <p className="text-sm text-[var(--user-text-muted)] mb-6 max-w-sm mx-auto">
-              {orders.length === 0 ? "Start shopping to see your orders here." : "Try a different filter."}
-            </p>
-            <Link href="/" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">
-              Shop Now
-            </Link>
+            <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">{orders.length === 0 ? "No orders yet" : "No orders in this status"}</h2>
+            <p className="text-sm text-[var(--user-text-muted)] mb-6 max-w-sm mx-auto">{orders.length === 0 ? "Start shopping to see your orders here." : "Try a different filter."}</p>
+            <Link href="/" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">Shop Now</Link>
           </div>
         ) : filter !== "draft" && filtered.length > 0 ? (
           <div className="space-y-4">
@@ -447,13 +347,17 @@ export default function AccountPage() {
               const pay = PAYMENT_LABEL[order.payment?.method] || PAYMENT_LABEL.cod;
               const PayIcon = pay.icon;
               const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+              
+              // ✅ Dynamic savings calculation
+              const orderTotalSavings = order.items.reduce((sum, i) => {
+                const original = Number(i.original_price || 0);
+                const paid = Number(i.price || 0);
+                const qty = Number(i.qty) || 1;
+                return sum + ((original - paid) * qty) + Number(i.deal_savings || 0);
+              }, 0);
 
               return (
-                <button
-                  key={order._id}
-                  onClick={() => router.push(`/orders/${order._id}`)}
-                  className="w-full text-left rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 lg:p-5 hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 transition group"
-                >
+                <button key={order._id} onClick={() => router.push(`/orders/${order._id}`)} className="w-full text-left rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 lg:p-5 hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 transition group">
                   <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
                     <div className="flex items-center gap-3 flex-wrap">
                       <div>
@@ -503,14 +407,19 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  <div className="mb-4">
-                    <OrderProgress status={order.status} />
-                  </div>
+                  <div className="mb-4"><OrderProgress status={order.status} /></div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)]">
-                    <p className="text-xs text-[var(--user-text-muted)]">
-                      Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</span>
-                    </p>
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)] flex-wrap gap-2">
+                    <div>
+                      <p className="text-xs text-[var(--user-text-muted)]">
+                        Total: <span className="text-base font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</span>
+                      </p>
+                      {orderTotalSavings > 0 && (
+                        <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5 flex items-center gap-1">
+                          <Tag size={10} /> You saved Rs. {orderTotalSavings.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                     <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--user-text-secondary)] group-hover:text-[var(--user-accent)] transition">
                       View Details <ArrowRight size={13} className="group-hover:translate-x-0.5 transition" />
                     </span>

@@ -855,32 +855,52 @@ export default function BannerDetailPage() {
               value={formatType(banner.primaryButton?.linkType)}
             />
 
-            <InfoItem
-              label="Target Link"
-            >
-              {banner.primaryButton?.link ? (
-                <div className="flex items-center gap-2">
-                  <LinkIcon
-                    className="w-3.5 h-3.5 shrink-0"
-                    style={{ color: "#34d399" }}
-                  />
-
+            {banner.primaryButton?.linkType === "deal" &&
+            banner.primaryButton?.dealId ? (
+              <InfoItem label="Linked Deal">
+                <span className="flex items-center gap-2">
                   <span
-                    className="text-sm break-all"
+                    className="text-sm font-semibold"
+                    style={{ color: "#34d399" }}
+                  >
+                    {typeof banner.primaryButton.dealId === "object"
+                      ? banner.primaryButton.dealId.name || "—"
+                      : "Deal"}
+                  </span>
+                  {typeof banner.primaryButton.dealId === "object" &&
+                    !banner.primaryButton.dealId.isActive && (
+                      <StatusBadge status="inactive" />
+                    )}
+                </span>
+              </InfoItem>
+            ) : (
+              <InfoItem
+                label="Target Link"
+              >
+                {banner.primaryButton?.link ? (
+                  <div className="flex items-center gap-2">
+                    <LinkIcon
+                      className="w-3.5 h-3.5 shrink-0"
+                      style={{ color: "#34d399" }}
+                    />
+  
+                    <span
+                      className="text-sm break-all"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {banner.primaryButton.link}
+                    </span>
+                  </div>
+                ) : (
+                  <span
+                    className="text-sm"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {banner.primaryButton.link}
+                    —
                   </span>
-                </div>
-              ) : (
-                <span
-                  className="text-sm"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  —
-                </span>
-              )}
-            </InfoItem>
+                )}
+              </InfoItem>
+            )}
 
           </div>
         </Section>

@@ -4,7 +4,7 @@ const buttonSchema = new mongoose.Schema({
   text: { type: String, default: "" },
   linkType: {
     type: String,
-    enum: ["custom_url", "product", "category", "brand", "collection", "campaign", "none"],
+    enum: ["custom_url", "product", "category", "brand", "collection", "campaign", "deal", "none"],
     default: "none",
   },
   link: { type: String, default: "" },
@@ -12,6 +12,7 @@ const buttonSchema = new mongoose.Schema({
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
   brandId: { type: mongoose.Schema.Types.ObjectId, ref: "Brand" },
   collectionId: { type: mongoose.Schema.Types.ObjectId, ref: "Collection" },
+  dealId: { type: mongoose.Schema.Types.ObjectId, ref: "Deal" }, // ✅ Deal promotion link
 }, { _id: false });
 
 const displayRulesSchema = new mongoose.Schema({

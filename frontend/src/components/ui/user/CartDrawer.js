@@ -19,9 +19,8 @@ export default function CartDrawer() {
     return `${API_ORIGIN}${path}`;
   };
 
-  const shipping = total >= 5000 ? 0 : 200; // ✅ 250 se 200 kar diya
+  const shipping = 200;
   const grandTotal = total + shipping;
-  const freeShippingLeft = Math.max(0, 5000 - total);
 
   return (
     <>
@@ -57,36 +56,6 @@ export default function CartDrawer() {
             <X size={16} className="text-[var(--user-text)]" />
           </button>
         </div>
-
-        {/* FREE SHIPPING PROGRESS BAR */}
-        {cart.length > 0 && freeShippingLeft > 0 && (
-          <div className="px-5 sm:px-6 py-3 bg-[var(--user-bg-card)] border-b border-[var(--user-border)]">
-            <div className="flex items-center justify-between text-[11px] mb-1.5">
-              <span className="text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <Truck size={13} className="text-[var(--user-accent)]" />
-                Add Rs. {freeShippingLeft.toLocaleString()} more for free shipping
-              </span>
-              <span className="text-[var(--user-accent)] font-bold">
-                {Math.round(((5000 - freeShippingLeft) / 5000) * 100)}%
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-[var(--user-bg-hover)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--user-accent)] rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, ((5000 - freeShippingLeft) / 5000) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {cart.length > 0 && shipping === 0 && (
-          <div className="px-5 sm:px-6 py-2.5 bg-[var(--user-success)]/10 border-b border-[var(--user-success)]/20">
-            <p className="text-[11px] font-semibold text-[var(--user-success)] flex items-center gap-1.5">
-              <Truck size={13} />
-              You've unlocked FREE shipping!
-            </p>
-          </div>
-        )}
 
         {/* ITEMS */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 sm:py-5 space-y-3">

@@ -2,13 +2,13 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
-
+import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, maxPayableQty } from "@/utils/dealCalculator";
 const CartContext = createContext(null);
 
 const CART_KEY = "cm_cart";
 
-// ✅ localStorage se cart parho
 const readLocalCart = () => {
   if (typeof window === "undefined") return [];
   try {
@@ -27,36 +27,39 @@ const writeLocalCart = (items) => {
   } catch {}
 };
 
-const mergeCarts = (server, current) => {
+const mergeCarts = (server, guest) => {
   const map = new Map();
-  [...server, ...current].forEach((item) => {
-    const existing = map.get(item.key);
-    if (existing) {
-      // ✅ Fields preserve karo (id wali item jeete), qty sum karo
-      const merged = {
-        ...existing,
-        ...item,
-        qty: (Number(existing.qty) || 0) + (Number(item.qty) || 0),
-      };
-      if (!merged.id && existing.id) merged.id = existing.id;
-      if (!merged.productId && existing.productId) merged.productId = existing.productId;
-      map.set(item.key, merged);
+  (server || []).forEach((i) => map.set(i.key, { ...i }));
+  (guest || []).forEach((i) => {
+    const ex = map.get(i.key);
+    if (ex) {
+      map.set(i.key, {
+        ...ex,
+        ...i,
+        qty: (Number(ex.qty) || 0) + (Number(i.qty) || 0),
+        id: ex.id || i.id,
+        productId: ex.productId || i.productId,
+      });
     } else {
-      map.set(item.key, { ...item });
+      map.set(i.key, { ...i });
     }
   });
   return [...map.values()];
 };
 
+// ✅ Stock nikalo variant/product se (null = unknown/unlimited)
+const getStock = (product, variant) => {
+  const raw = variant?.quantity ?? variant?.stock ?? product?.quantity ?? product?.stock;
+  const n = Number(raw);
+  return Number.isFinite(n) && raw !== undefined && raw !== null ? n : null;
+};
+
 export function CartProvider({ children }) {
-  // ✅ Hydration-safe: pehla render hamesha EMPTY (server se match)
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const cartRef = useRef([]);
-  const syncedRef = useRef(false);
-  const prevLoggedIn = useRef(null);
+  const prevUserIdRef = useRef(null);
 
-  // ✅ Current user
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
@@ -67,76 +70,111 @@ export function CartProvider({ children }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const loggedIn = !!user;
+  const userId = user?._id || user?.id || null;
 
-  // ✅ MOUNT ke baad localStorage se load (hydration ke baad — koi error nahi)
   useEffect(() => {
     const stored = readLocalCart();
-    if (stored.length) {
-      cartRef.current = stored;
-      setCart(stored);
-    }
+    cartRef.current = stored;
+    setCart(stored);
   }, []);
 
-  // ✅ Login hote hi: server cart (account) + local cart merge
   useEffect(() => {
-    if (!loggedIn || syncedRef.current) return;
-    syncedRef.current = true;
+    const prev = prevUserIdRef.current;
+    if (prev === userId) return;
+    prevUserIdRef.current = userId;
+
+    if (!userId) {
+      cartRef.current = [];
+      setCart([]);
+      writeLocalCart([]);
+      return;
+    }
 
     (async () => {
       try {
         const res = await axiosInstance.get("/cart");
-        const serverItems = res.data?.data || [];
-        const merged = mergeCarts(serverItems, cartRef.current);
-
-        cartRef.current = merged;
-        setCart(merged);
-        writeLocalCart(merged);
-        await axiosInstance.put("/cart", { items: merged });
-      } catch {
-        // server fail ho to local cart hi rehne do
-      }
+        let items = res.data?.data || [];
+        const guest = readLocalCart();
+        if (guest.length) {
+          items = mergeCarts(items, guest);
+          await axiosInstance.put("/cart", { items }).catch(() => {});
+          writeLocalCart([]);
+        }
+        cartRef.current = items;
+        setCart(items);
+      } catch {}
     })();
-  }, [loggedIn]);
+  }, [userId]);
 
-  // ✅ Sirf LOGOUT par clear (login→logout transition) — guest refresh par kabhi nahi
-  useEffect(() => {
-    if (prevLoggedIn.current === true && !loggedIn) {
-      cartRef.current = [];
-      setCart([]);
-      syncedRef.current = false;
-      writeLocalCart([]);
-    }
-    prevLoggedIn.current = loggedIn;
-  }, [loggedIn]);
-
-  // ✅ Save — localStorage (sab) + server (account wale)
   const save = (next) => {
     cartRef.current = next;
     setCart(next);
-    writeLocalCart(next);
-    if (loggedIn) {
+    if (userId) {
       axiosInstance.put("/cart", { items: next }).catch(() => {});
+    } else {
+      writeLocalCart(next);
     }
   };
 
-  const addToCart = (product, variant = null, qty = 1) => {
+  // ✅ ADD TO CART — with STOCK CHECK
+  const addToCart = (product, variant = null, qty = 1, dealInfo = null) => {
     const id = product._id || product.id;
     const key = `${id}__${variant?._id || variant?.title || "default"}`;
     const price = Number(variant?.selling_price || product.price || 0);
+    const stock = getStock(product, variant);
 
     const existing = cartRef.current.find((i) => i.key === key);
+    const currentQty = existing?.qty || 0;
+
+    // ✅ STOCK ENFORCEMENT (Buy X Get Y: paid + free dono stock se kat-te hain)
+    const bxgBuy = existing?.dealBuyQuantity || dealInfo?.buyQuantity || 0;
+    const bxgGet = existing?.dealGetQuantity || dealInfo?.getQuantity || 0;
+    const isBxG = (existing?.dealType || dealInfo?.dealType) === "buy_x_get_y" && bxgBuy > 0 && bxgGet > 0;
+    const limit = stock !== null
+      ? (isBxG ? maxPayableQty(stock, bxgBuy, bxgGet) : stock)
+      : null;
+
+    if (limit !== null) {
+      if (limit <= 0) {
+        toast.error(`"${product.name}" is out of stock`);
+        return;
+      }
+      if (currentQty >= limit) {
+        toast.error(`Only ${limit} available in stock for "${product.name}"`);
+        return;
+      }
+    }
+
+    const addQty = limit !== null ? Math.min(qty, limit - currentQty) : qty;
+    if (addQty < qty) {
+      toast.info(`Only ${stock} available in stock — adding ${addQty}`);
+    }
 
     if (existing) {
       save(
         cartRef.current.map((i) =>
-          i.key === key ? { ...i, qty: i.qty + qty } : i
+          i.key === key ? { ...i, qty: i.qty + addQty, stock: stock ?? i.stock } : i
         )
       );
     } else {
+      const dealData = dealInfo
+        ? {
+            dealId: dealInfo.dealId || null,
+            dealType: dealInfo.dealType || null,
+            dealName: dealInfo.dealName || null,
+            dealBadge: dealInfo.dealBadge || null,
+            dealSavings: Number(dealInfo.savings) || 0,
+            dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
+            ...(dealInfo.dealType === "buy_x_get_y"
+              ? {
+                  dealBuyQuantity: dealInfo.buyQuantity || 0,
+                  dealGetQuantity: dealInfo.getQuantity || 0,
+                }
+              : {}),
+          }
+        : {};
 
-
-          save([
+      save([
         ...cartRef.current,
         {
           key,
@@ -147,32 +185,43 @@ export function CartProvider({ children }) {
           price,
           image: variant?.images?.[0]?.img_url || "",
           variantTitle: variant?.title || "",
-          qty,
+          qty: addQty,
+          stock: stock, // ✅ Stock saved for UI limits
           tax: Number(product.tax || 0),
-          // ✅ Discount calculation ke liye IDs
           productId: String(id),
-          categoryId: String(
-            product.category_id?._id || product.category_id || "",
-          ),
+          categoryId: String(product.category_id?._id || product.category_id || ""),
           brandId: String(product.brand_id?._id || product.brand_id || ""),
           productDiscountPct: Number(product.discount || 0),
+          ...dealData,
         },
       ]);
-
-
     }
   };
 
-  const updateQty = (key, qty) => {
+  // ✅ UPDATE QTY — with STOCK CHECK
+    const updateQty = (key, qty) => {
     if (qty <= 0) return save(cartRef.current.filter((i) => i.key !== key));
+
+    const item = cartRef.current.find((i) => i.key === key);
+    let max = item?.stock != null ? Number(item.stock) : null;
+    if (max !== null && item?.dealType === "buy_x_get_y" && item.dealBuyQuantity && item.dealGetQuantity) {
+      max = maxPayableQty(max, item.dealBuyQuantity, item.dealGetQuantity);
+    }
+
+    if (max !== null && qty > max) {
+      toast.error(`Only ${max} available in stock for "${item?.name || "this item"}"`);
+      qty = max;
+      if (qty <= 0) return;
+    }
+
     save(cartRef.current.map((i) => (i.key === key ? { ...i, qty } : i)));
   };
 
-  const removeFromCart = (key) =>
-    save(cartRef.current.filter((i) => i.key !== key));
-  const removeItems = (keys) =>
-    save(cartRef.current.filter((i) => !keys.includes(i.key)));
-    const restoreItems = (items) => {
+  const removeFromCart = (key) => save(cartRef.current.filter((i) => i.key !== key));
+
+  const removeItems = (keys) => save(cartRef.current.filter((i) => !keys.includes(i.key)));
+
+  const restoreItems = (items) => {
     const map = new Map(cartRef.current.map((i) => [i.key, i]));
     items.forEach((it) => {
       const ex = map.get(it.key);
@@ -181,10 +230,29 @@ export function CartProvider({ children }) {
     });
     save([...map.values()]);
   };
+
   const clearCart = () => save([]);
 
   const count = cart.reduce((s, i) => s + i.qty, 0);
-  const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+
+  const total = cart.reduce((s, i) => {
+    if (i.dealType === "buy_x_get_y" && i.dealBuyQuantity && i.dealGetQuantity) {
+      const payableQty = calculatePayableItems(i.qty, i.dealBuyQuantity, i.dealGetQuantity);
+      return s + (payableQty * i.price);
+    }
+    return s + (i.qty * i.price);
+  }, 0);
+
+  const getDealInfoForItem = (item) => {
+    if (!item.dealId || item.dealType !== "buy_x_get_y") return null;
+    return {
+      buyQty: item.dealBuyQuantity || 2,
+      getQty: item.dealGetQuantity || 1,
+      freeItems: calculateFreeItems(item.qty, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
+      payableItems: calculatePayableItems(item.qty, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
+      savings: calculateBuyXGetYSavings(item.qty, item.price, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
+    };
+  };
 
   return (
     <CartContext.Provider
@@ -193,13 +261,14 @@ export function CartProvider({ children }) {
         addToCart,
         updateQty,
         removeFromCart,
-         removeItems, 
-          restoreItems,
+        removeItems,
+        restoreItems,
         clearCart,
         count,
         total,
         isCartOpen,
         setIsCartOpen,
+        getDealInfoForItem,
       }}
     >
       {children}
