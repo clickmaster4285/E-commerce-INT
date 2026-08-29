@@ -1,6 +1,7 @@
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { validatePhone } = require("../utils/phoneValidator");
 
 // @desc    Get Store Info
 const getStoreInfo = async (req, res) => {
@@ -46,9 +47,21 @@ const updateStoreInfo = async (req, res) => {
     if (store_name !== undefined) store.store_name = store_name;
     if (tagline !== undefined) store.tagline = tagline;
     if (email !== undefined) store.email = email;
-    if (phone !== undefined) store.phone = phone;
+    if (phone !== undefined) {
+      const phoneResult = validatePhone(phone);
+      if (!phoneResult.valid) {
+        return res.status(400).json({ success: false, message: `Phone: ${phoneResult.message}` });
+      }
+      store.phone = phoneResult.sanitized;
+    }
     if (support_email !== undefined) store.support_email = support_email;
-    if (support_phone !== undefined) store.support_phone = support_phone;
+    if (support_phone !== undefined) {
+      const supportPhoneResult = validatePhone(support_phone);
+      if (!supportPhoneResult.valid) {
+        return res.status(400).json({ success: false, message: `Support phone: ${supportPhoneResult.message}` });
+      }
+      store.support_phone = supportPhoneResult.sanitized;
+    }
     if (country !== undefined) store.country = country;
     if (state !== undefined) store.state = state;
     if (city !== undefined) store.city = city;

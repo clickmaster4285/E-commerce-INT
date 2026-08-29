@@ -8,25 +8,44 @@ const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 // ================================
 // GET NEXT BRAND CODE
 // ================================
+// ✅ Always finds the HIGHEST existing numeric Brand Code (BRD-###) in the
+// database (active + soft deleted) and adds +1. Numeric comparison is used,
+// so BRD-009 -> BRD-010, BRD-099 -> BRD-100, BRD-999 -> BRD-1000 etc.
+const generateNextBrandCode = async () => {
+  const brands = await Brand.find({ brand_code: { $regex: /^BRD-\d+$/ } })
+    .select("brand_code")
+    .lean();
+
+  let maxNum = 0;
+  for (const brand of brands) {
+    const num = parseInt(String(brand.brand_code).split("-")[1], 10);
+    if (Number.isFinite(num) && num > maxNum) maxNum = num;
+  }
+
+  return `BRD-${String(maxNum + 1).padStart(3, "0")}`;
+};
+
+// ✅ Ensures the stored value is always a clean "BRD-###"-style string.
+// Never allows objects / "[object Object]" / undefined / null through.
+const normalizeBrandCode = (value) => {
+  if (typeof value !== "string") return "";
+  const cleaned = value.trim();
+  if (
+    !cleaned ||
+    cleaned === "[object Object]" ||
+    cleaned.toLowerCase() === "undefined" ||
+    cleaned.toLowerCase() === "null"
+  ) {
+    return "";
+  }
+  return cleaned;
+};
+
 const getNextBrandCode = async (req, res) => {
   try {
-    const lastBrand = await Brand.findOne({
-      brand_code: { $regex: /^BRD-\d+$/ },
-      is_deleted: false,
-    })
-      .sort({ brand_code: -1 })
-      .select("brand_code");
-
-    let nextNumber = 1;
-    if (lastBrand && lastBrand.brand_code) {
-      const lastNum = parseInt(lastBrand.brand_code.split("-")[1], 10);
-      if (!isNaN(lastNum)) nextNumber = lastNum + 1;
-    }
-
-    const nextCode = `BRD-${String(nextNumber).padStart(3, "0")}`;
+    const nextCode = await generateNextBrandCode();
     res.status(200).json({ success: true, data: { nextCode } });
   } catch (error) {
-    console.log("❌ Get next brand code error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -36,11 +55,14 @@ const getNextBrandCode = async (req, res) => {
 // ================================
 const createBrand = async (req, res) => {
   try {
-    console.log("========== CREATE BRAND ==========");
 
-    if (req.body.brand_code) {
+    // ✅ Sanitize incoming brand_code; auto-generate when missing/invalid
+    const incomingCode = normalizeBrandCode(req.body?.brand_code);
+    const brand_code = incomingCode || (await generateNextBrandCode());
+
+    if (incomingCode) {
       const existing = await Brand.findOne({
-        brand_code: req.body.brand_code,
+        brand_code,
         is_deleted: false,
       });
       if (existing) {
@@ -53,6 +75,7 @@ const createBrand = async (req, res) => {
 
     const brandData = {
       ...req.body,
+      brand_code,
       createdby: req.user?._id || null,
       updatedby: req.user?._id || null,
     };
@@ -96,7 +119,6 @@ const createBrand = async (req, res) => {
     try {
       io.emit("brandCreated", updatedBrand.toObject());
     } catch (socketErr) {
-      console.log("⚠️ Socket emit skipped:", socketErr.message);
     }
 
     res.status(201).json({
@@ -111,7 +133,6 @@ const createBrand = async (req, res) => {
         message: "This Brand Code already exists. Please use a different code.",
       });
     }
-    console.log("❌ Create error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -137,7 +158,6 @@ const getBrands = async (req, res) => {
 
     res.status(200).json({ success: true, data: brandsWithProducts });
   } catch (error) {
-    console.log("❌ Get brands error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -164,7 +184,6 @@ const getBrandById = async (req, res) => {
       data: { ...brand.toObject(), products },
     });
   } catch (error) {
-    console.log("❌ Get brand by id error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -191,7 +210,6 @@ const getBrandWithProducts = async (req, res) => {
       data: { ...brand.toObject(), products },
     });
   } catch (error) {
-    console.log("❌ Get brand with products error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -211,6 +229,14 @@ const updateBrand = async (req, res) => {
       ...req.body,
       updatedby: req.user?._id || null,
     };
+
+    // ✅ Never overwrite a brand_code with junk ("[object Object]", etc.)
+    const normalizedCode = normalizeBrandCode(req.body?.brand_code);
+    if (!normalizedCode) {
+      updateData.brand_code = existingBrand.brand_code;
+    } else {
+      updateData.brand_code = normalizedCode;
+    }
 
     if (req.brandImage) {
       if (existingBrand.logo?.img_url) {
@@ -261,7 +287,6 @@ const updateBrand = async (req, res) => {
     try {
       io.emit("brandUpdated", brand.toObject());
     } catch (socketErr) {
-      console.log("⚠️ Socket emit skipped:", socketErr.message);
     }
 
     res.status(200).json({
@@ -276,7 +301,6 @@ const updateBrand = async (req, res) => {
         message: "This Brand Code already exists. Please use a different code.",
       });
     }
-    console.log("❌ Update error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -292,7 +316,6 @@ const deleteBrand = async (req, res) => {
       return res.status(404).json({ success: false, message: "Brand not found or already deleted" });
     }
 
-    console.log("========== SOFT DELETE BRAND ==========");
 
     await brand.softDelete(req.user._id);
 
@@ -312,7 +335,6 @@ const deleteBrand = async (req, res) => {
     try {
       io.emit("brandDeleted", { _id: brand._id.toString() });
     } catch (socketErr) {
-      console.log("⚠️ Socket emit skipped:", socketErr.message);
     }
 
     res.status(200).json({
@@ -321,7 +343,6 @@ const deleteBrand = async (req, res) => {
       data: { _id: brand._id, deleted_at: brand.deleted_at },
     });
   } catch (error) {
-    console.log("❌ Soft delete error:", error.message);
     res.status(400).json({ success: false, message: error.message });
   }
 };

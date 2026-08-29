@@ -21,9 +21,7 @@ export const employeeApi = {
   // ==========================================================
   getAll: async () => {
     try {
-      console.log("🔄 Fetching all employees...");
       const response = await axiosInstance.get("/employees", { timeout: 10000 });
-      console.log("✅ All employees fetched successfully");
       return unwrap(response.data);
     } catch (error) {
       console.error("❌ getAllEmployees error:", error);
@@ -39,9 +37,7 @@ export const employeeApi = {
     if (!id) throw new Error("Employee ID is required");
 
     try {
-      console.log(`🔄 Fetching employee with ID: ${id}`);
       const response = await axiosInstance.get(`/employees/${id}`, { timeout: 10000 }); // ✅ 10s Timeout Added
-      console.log("✅ Employee data received successfully");
       return unwrap(response.data);
     } catch (error) {
       console.error(`❌ getEmployeeById (${id}) error:`, error);

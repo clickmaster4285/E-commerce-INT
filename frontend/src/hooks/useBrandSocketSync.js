@@ -9,12 +9,10 @@ export function useBrandSocketSync() {
   const { socket, isConnected } = useSocket();
 
   useEffect(() => {
-    console.log("🔌 Socket Sync → socket:", !!socket, "connected:", isConnected);
 
     if (!socket || !isConnected) return;
 
     const invalidateBrands = (eventName) => {
-      console.log(`🔄 Socket event received: ${eventName} → Invalidating brands...`);
       queryClient.invalidateQueries({ queryKey: ["brands"] });
     };
 

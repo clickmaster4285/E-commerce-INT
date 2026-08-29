@@ -150,6 +150,17 @@ exports.createDiscount = async (req, res) => {
     }
 
     // ===================================================
+    // DATE VALIDATION
+    // ===================================================
+    if (start_at && end_at) {
+      const startDate = new Date(start_at);
+      const endDate = new Date(end_at);
+      if (startDate >= endDate) {
+        return res.status(400).json({ message: "Start date must be before end date" });
+      }
+    }
+
+    // ===================================================
     // STATUS
     // ===================================================
     const finalStatus = status || "draft";
@@ -236,6 +247,8 @@ exports.getDiscounts = async (req, res) => {
       .populate("selectedProducts", "name sku selling_price")
       .populate("selectedCategories", "name")
       .populate("selectedBrands", "name")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email")
       .sort({ createdAt: -1 });
 
     // ✅ FIXED: Returning raw array so frontend can display it immediately
@@ -258,7 +271,9 @@ exports.getDiscountById = async (req, res) => {
     })
       .populate("selectedProducts", "name sku selling_price")
       .populate("selectedCategories", "name")
-      .populate("selectedBrands", "name");
+      .populate("selectedBrands", "name")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
 
     if (!discount) {
       return res.status(404).json({ message: "Discount not found" });
@@ -385,6 +400,13 @@ exports.updateDiscount = async (req, res) => {
     }
     if (start_at !== undefined) discount.startDate = new Date(start_at);
     if (end_at !== undefined) discount.endDate = new Date(end_at);
+
+    // ===================================================
+    // DATE VALIDATION
+    // ===================================================
+    if (discount.startDate && discount.endDate && discount.startDate >= discount.endDate) {
+      return res.status(400).json({ message: "Start date must be before end date" });
+    }
     
     if (usage_limit !== undefined) {
       discount.usageLimit = usage_limit === "" || usage_limit === null ? null : Number(usage_limit);
@@ -396,6 +418,14 @@ exports.updateDiscount = async (req, res) => {
     if (status !== undefined) {
       discount.status = status;
       discount.isActive = status === "active";
+    }
+
+    // ===================================================
+    // UPDATED BY
+    // ===================================================
+    const userId = req.user?._id || req.user?.id;
+    if (userId) {
+      discount.updatedBy = userId;
     }
 
     // ===================================================

@@ -18,6 +18,8 @@ import {
   User,
   Loader2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   X,
   Eye,
@@ -45,6 +47,7 @@ import {
 } from "lucide-react";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
+import axiosInstance from "@/apis/axiosInstance";
 import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 // ==========================================
@@ -60,6 +63,7 @@ const ALLOWED_PERMISSIONS = {
   profile: { label: "Profile", default: true },
   store: { label: "Store", default: false },
   banners: { label: "Banners", default: true }, // ✅ Added Banners Permission
+  manageStock: { label: "Manage Stock", default: false }, // ✅ Manage Stock module
 };
 
 // ==========================================
@@ -169,7 +173,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           onFocus={() => setIsOpen(true)}
           placeholder="Type or select..."
           disabled={disabled}
-          className="w-full h-8 pl-3 pr-7 rounded-md text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
+          className="w-full h-10 md:h-8 pl-3 pr-7 rounded-md text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
           style={inputStyle}
         />
 
@@ -415,6 +419,44 @@ function getFilteredActivities(activities, activeTab) {
 // ==========================================
 // SCROLLABLE TABS
 // ==========================================
+
+// Compact rounded-square arrow used to scroll the tab strip
+function TabArrowButton({ direction, onClick, disabled }) {
+  const [hov, setHov] = useState(false);
+  const enabled = !disabled;
+
+  return (
+    <button
+      type="button"
+      aria-label={
+        direction === "left"
+          ? "Scroll tabs left"
+          : "Scroll tabs right"
+      }
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      className="shrink-0 h-7 w-7 flex items-center justify-center rounded-md transition-colors duration-150 disabled:cursor-default focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]"
+      style={{
+        backgroundColor: "var(--bg-tertiary)",
+        border: "1px solid var(--border-color)",
+        color:
+          enabled && hov
+            ? "var(--accent)"
+            : "var(--text-muted)",
+        opacity: enabled ? 1 : 0.35,
+      }}
+    >
+      {direction === "left" ? (
+        <ChevronLeft className="w-3.5 h-3.5" />
+      ) : (
+        <ChevronRight className="w-3.5 h-3.5" />
+      )}
+    </button>
+  );
+}
+
 function ScrollableTabs({
   tabs,
   activeTab,
@@ -423,8 +465,41 @@ function ScrollableTabs({
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const startX = useRef(0);
-  const scrollLeft = useRef(0);
+  const startScrollLeft = useRef(0);
 
+  // Arrow availability based on current scroll position
+  const [canScrollLeft, setCanScrollLeft] =
+    useState(false);
+  const [canScrollRight, setCanScrollRight] =
+    useState(false);
+
+  const updateArrows = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 1);
+    setCanScrollRight(
+      el.scrollLeft <
+        el.scrollWidth - el.clientWidth - 1
+    );
+  };
+
+  // Keep arrow state in sync (mount, resize, layout settle)
+  useEffect(() => {
+    updateArrows();
+    window.addEventListener("resize", updateArrows);
+    const t1 = setTimeout(updateArrows, 100);
+    const t2 = setTimeout(updateArrows, 400);
+    return () => {
+      window.removeEventListener(
+        "resize",
+        updateArrows
+      );
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [tabs.length]);
+
+  // Keep the active tab visible when it changes
   useEffect(() => {
     if (!scrollRef.current) return;
 
@@ -442,12 +517,41 @@ function ScrollableTabs({
     }
   }, [activeTab]);
 
+  // Scroll by roughly 2–3 tabs per arrow click
+  const getScrollStep = () => {
+    const el = scrollRef.current;
+    if (!el) return 240;
+
+    const btns = Array.from(
+      el.querySelectorAll("[data-tab-btn]")
+    );
+
+    const sample = btns
+      .slice(0, 3)
+      .map((b) => b.offsetWidth)
+      .filter(Boolean);
+
+    const avg = sample.length
+      ? sample.reduce((a, b) => a + b, 0) /
+        sample.length
+      : 96;
+
+    return Math.max(160, Math.round(avg * 2.5));
+  };
+
+  const scrollByAmount = (direction) => {
+    scrollRef.current?.scrollBy({
+      left: direction * getScrollStep(),
+      behavior: "smooth",
+    });
+  };
+
   const handleMouseDown = (e) => {
     isDragging.current = true;
     startX.current =
       e.pageX - scrollRef.current.offsetLeft;
 
-    scrollLeft.current =
+    startScrollLeft.current =
       scrollRef.current.scrollLeft;
 
     scrollRef.current.style.cursor = "grabbing";
@@ -466,7 +570,7 @@ function ScrollableTabs({
       (x - startX.current) * 1.5;
 
     scrollRef.current.scrollLeft =
-      scrollLeft.current - walk;
+      startScrollLeft.current - walk;
   };
 
   const handleMouseUp = () => {
@@ -479,74 +583,74 @@ function ScrollableTabs({
   };
 
   return (
-    <div className="relative">
-      <div
-        className="absolute left-0 top-0 bottom-0 w-8 z-10 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to right, var(--bg-secondary), transparent)",
-        }}
+    <div className="flex items-center gap-2">
+      {/* Left arrow */}
+      <TabArrowButton
+        direction="left"
+        onClick={() => scrollByAmount(-1)}
+        disabled={!canScrollLeft}
       />
 
+      {/* Tab strip */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-8 z-10 pointer-events-none"
+        className="relative flex-1 min-w-0"
         style={{
-          background:
-            "linear-gradient(to left, var(--bg-secondary), transparent)",
+          borderBottom: "1px solid var(--border-color)",
         }}
-      />
-
-      <div
-        ref={scrollRef}
-        className="flex items-end gap-6 pb-0 overflow-x-auto cursor-grab active:cursor-grabbing no-scrollbar"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
       >
-        {tabs.map((tab) => {
-          const isActive =
-            activeTab === tab.id;
+        <div
+          ref={scrollRef}
+          onScroll={updateArrows}
+          className="flex items-end gap-6 overflow-x-auto cursor-grab active:cursor-grabbing no-scrollbar"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {tabs.map((tab) => {
+            const isActive =
+              activeTab === tab.id;
 
-          return (
-            <button
-              key={tab.id}
-              data-active={
-                isActive ? "true" : "false"
-              }
-              onClick={() =>
-                onTabChange(tab.id)
-              }
-              className="relative text-[13px] font-medium px-1 py-3 transition-all duration-200 whitespace-nowrap flex items-center gap-2 shrink-0 group"
-              style={{
-                color: isActive
-                  ? "var(--accent)"
-                  : "var(--text-muted)",
-                borderBottom: isActive
-                  ? "2px solid var(--accent)"
-                  : "2px solid transparent",
-              }}
-            >
-              <tab.icon
-                className={`w-4 h-4 transition-colors ${
-                  isActive
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
-                }`}
-              />
+            return (
+              <button
+                key={tab.id}
+                data-tab-btn={tab.id}
+                data-active={
+                  isActive ? "true" : "false"
+                }
+                onClick={() =>
+                  onTabChange(tab.id)
+                }
+                className="relative text-[13px] font-medium px-1 py-3 transition-all duration-200 whitespace-nowrap flex items-center gap-2 shrink-0 group"
+                style={{
+                  color: isActive
+                    ? "var(--accent)"
+                    : "var(--text-muted)",
+                  borderBottom: isActive
+                    ? "2px solid var(--accent)"
+                    : "2px solid transparent",
+                }}
+              >
+                <tab.icon
+                  className={`w-4 h-4 transition-colors ${
+                    isActive
+                      ? "text-[var(--accent)]"
+                      : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                  }`}
+                />
 
-              {tab.label}
-            </button>
-          );
-        })}
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div
-        className="absolute bottom-0 left-0 right-0 h-[1px]"
-        style={{
-          backgroundColor:
-            "var(--border-color)",
-        }}
+      {/* Right arrow */}
+      <TabArrowButton
+        direction="right"
+        onClick={() => scrollByAmount(1)}
+        disabled={!canScrollRight}
       />
     </div>
   );
@@ -604,7 +708,8 @@ export default function EmployeeDetailPage() {
     deals: true,
     profile: true,
     store: false,
-    banners: true, // ✅ Added Banners
+    banners: true,
+    manageStock: false,
   });
 
   const [showPassword, setShowPassword] =
@@ -615,26 +720,22 @@ export default function EmployeeDetailPage() {
     setShowConfirmPassword,
   ] = useState(false);
 
-  const [currentUser, setCurrentUser] =
-    useState(null);
-
   // ==========================================
-  // CURRENT USER
+  // CURRENT USER (from backend via TanStack Query)
   // ==========================================
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedUserId =
-        localStorage.getItem(
-          "current_staff_id"
-        );
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/users/profile");
+      return res.data?.user || res.data;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (storedUserId) {
-        setCurrentUser({
-          _id: storedUserId,
-        });
-      }
-    }
-  }, []);
+  const currentUser = currentUserProfile
+    ? { _id: currentUserProfile._id || currentUserProfile.id }
+    : null;
 
   // ==========================================
   // GET EMPLOYEE
@@ -724,17 +825,9 @@ export default function EmployeeDetailPage() {
       mutationFn: async (
         newPermissions
       ) => {
-        console.log(
-          "🚀 Sending permissions to backend:",
-          newPermissions
-        );
 
         const currentStaffId =
-          typeof window !== "undefined"
-            ? localStorage.getItem(
-                "current_staff_id"
-              )
-            : null;
+          currentUser?._id || null;
 
         const isSelf =
           String(currentStaffId) ===
@@ -764,10 +857,6 @@ export default function EmployeeDetailPage() {
         updatedEmployee,
         newPermissions
       ) => {
-        console.log(
-          "✅ Backend response received:",
-          updatedEmployee
-        );
 
         queryClient.setQueryData(
           ["employee", employeeId],
@@ -1003,7 +1092,7 @@ export default function EmployeeDetailPage() {
         <div className="flex gap-3">
           <button
             onClick={() => refetch()}
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold border border-gray-600 hover:bg-gray-800"
+            className="min-h-[44px] h-9 px-4 rounded-lg text-[13px] font-semibold border border-gray-600 hover:bg-gray-800"
             style={{
               color:
                 "var(--text-primary)",
@@ -1016,7 +1105,7 @@ export default function EmployeeDetailPage() {
             onClick={() =>
               router.back()
             }
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold"
+            className="min-h-[44px] h-9 px-4 rounded-lg text-[13px] font-semibold"
             style={{
               backgroundColor:
                 "var(--accent)",
@@ -1326,7 +1415,7 @@ export default function EmployeeDetailPage() {
                 employee
               )
             }
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+            className="min-h-[44px] h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
             style={{
               backgroundColor:
                 "#7c3aed",
@@ -1828,7 +1917,7 @@ export default function EmployeeDetailPage() {
                           true
                         );
                       }}
-                      className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-lg shadow-purple-900/20"
+                      className="min-h-[44px] h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-lg shadow-purple-900/20"
                       style={{
                         backgroundColor:
                           "#7c3aed",
@@ -2579,7 +2668,7 @@ export default function EmployeeDetailPage() {
       {showEditModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div
-            className="w-full max-w-lg rounded-xl shadow-xl max-h-[95vh] flex flex-col"
+            className="w-full max-w-lg rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden"
             style={cardStyle}
           >
             <div
@@ -2660,7 +2749,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
                     style={
                       inputStyle
                     }
@@ -2695,7 +2784,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
                     style={
                       inputStyle
                     }
@@ -2731,7 +2820,7 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                  className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
                   style={inputStyle}
                   placeholder="+92 300 1234567"
                 />
@@ -2770,7 +2859,7 @@ export default function EmployeeDetailPage() {
                       disabled={
                         isSubmitting
                       }
-                      className="w-full h-9 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
                       style={
                         inputStyle
                       }
@@ -2833,7 +2922,7 @@ export default function EmployeeDetailPage() {
                       disabled={
                         isSubmitting
                       }
-                      className="w-full h-9 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
                       style={
                         inputStyle
                       }
@@ -2891,7 +2980,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50 cursor-pointer"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 cursor-pointer"
                     style={
                       inputStyle
                     }
@@ -2936,7 +3025,7 @@ export default function EmployeeDetailPage() {
               </div>
 
               <div
-                className="flex gap-3 pt-4 mt-2"
+                className="flex flex-col sm:flex-row gap-3 pt-4 mt-2"
                 style={{
                   borderTop:
                     "1px solid var(--border-color)",
@@ -2950,7 +3039,7 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                  className="min-h-[44px] flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                   style={{
                     backgroundColor:
                       "var(--bg-tertiary)",
@@ -2968,7 +3057,7 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
+                  className="min-h-[44px] flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
                   style={{
                     backgroundColor:
                       "#7c3aed",
@@ -2993,7 +3082,7 @@ export default function EmployeeDetailPage() {
       {showPermissionsModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div
-            className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[90vh]"
             style={cardStyle}
           >
             <div
@@ -3127,7 +3216,7 @@ export default function EmployeeDetailPage() {
             </div>
 
             <div
-              className="px-6 py-4 flex gap-3 border-t"
+              className="px-6 py-4 flex flex-col sm:flex-row gap-3 border-t"
               style={{
                 borderColor:
                   "var(--border-color)",
@@ -3139,7 +3228,7 @@ export default function EmployeeDetailPage() {
                     false
                   )
                 }
-                className="flex-1 h-10 rounded-lg text-sm font-semibold transition hover:bg-white/5 border"
+                className="min-h-[44px] flex-1 h-10 rounded-lg text-sm font-semibold transition hover:bg-white/5 border"
                 style={{
                   borderColor:
                     "var(--border-color)",
@@ -3176,7 +3265,7 @@ export default function EmployeeDetailPage() {
                 disabled={
                   updatePermissionsMutation.isPending
                 }
-                className="flex-1 h-10 rounded-lg text-sm font-bold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center shadow-lg shadow-purple-900/20"
+                className="min-h-[44px] flex-1 h-10 rounded-lg text-sm font-bold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center shadow-lg shadow-purple-900/20"
                 style={{
                   backgroundColor:
                     "#7c3aed",

@@ -131,10 +131,6 @@ function getSidebarSocket() {
   });
 
   sidebarSocket.on("disconnect", (reason) => {
-    console.log(
-      "🔴 Sidebar socket disconnected:",
-      reason
-    );
   });
 
   return sidebarSocket;
@@ -224,13 +220,6 @@ export default function Sidebar({
       const freshRole =
         data.role || "";
 
-      console.log(
-        "📥 Sidebar fresh profile:",
-        {
-          role: freshRole,
-          permissions: freshPermissions,
-        }
-      );
 
       setSocketPermissions(
         freshPermissions
@@ -279,10 +268,6 @@ export default function Sidebar({
     const socket =
       sidebarSocket;
 
-    console.log(
-      "🟢 Sidebar socket connected:",
-      socket?.id
-    );
 
     if (
       socket &&
@@ -302,10 +287,6 @@ export default function Sidebar({
   const handleProfileData =
     useCallback(
       (response) => {
-        console.log(
-          "📥 Sidebar profileData received:",
-          response
-        );
 
         applyProfile(
           response
@@ -321,10 +302,6 @@ export default function Sidebar({
   const handleProfileUpdated =
     useCallback(
       (response) => {
-        console.log(
-          "🔄 Sidebar profileUpdated:",
-          response
-        );
 
         applyProfile(
           response
@@ -340,10 +317,6 @@ export default function Sidebar({
   const handlePermissionsUpdated =
     useCallback(
       (data) => {
-        console.log(
-          "🔔 Sidebar permissionsUpdated:",
-          data
-        );
 
         if (
           !data ||
@@ -368,10 +341,6 @@ export default function Sidebar({
           ...data.permissions,
         };
 
-        console.log(
-          "✅ Applying NEW permissions:",
-          freshPermissions
-        );
 
         // ======================================================
         // IMMEDIATE SIDEBAR UPDATE
@@ -428,9 +397,6 @@ export default function Sidebar({
           if (
             sidebarSocket?.connected
           ) {
-            console.log(
-              "🔄 Requesting latest DB profile..."
-            );
 
             sidebarSocket.emit(
               "getProfile"
@@ -471,10 +437,6 @@ export default function Sidebar({
 
     // Already connected
     if (socket.connected) {
-      console.log(
-        "🟢 Sidebar socket already connected:",
-        socket.id
-      );
 
       socket.emit(
         "getProfile"
@@ -534,15 +496,6 @@ export default function Sidebar({
           role
         ).toLowerCase();
 
-      console.log(
-        "🔍 Sidebar permission check:",
-        {
-          role:
-            normalizedRole,
-          permissions,
-          socketProfileLoaded,
-        }
-      );
 
       // ========================================================
       // ADMIN
@@ -614,10 +567,6 @@ export default function Sidebar({
           return;
         }
 
-        console.log(
-          "📥 Sidebar store:",
-          data.store_name
-        );
 
         isSelfDispatching.current =
           true;
@@ -657,10 +606,6 @@ export default function Sidebar({
 
     const handleConnectStore =
       () => {
-        console.log(
-          "🟢 Sidebar store socket:",
-          socket.id
-        );
 
         socket.emit(
           "getStoreInfo"

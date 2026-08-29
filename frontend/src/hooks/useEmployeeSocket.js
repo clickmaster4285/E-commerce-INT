@@ -46,20 +46,12 @@ export function getEmployeeSocket() {
     employeeSocket.on(
       "connect",
       () => {
-        console.log(
-          "🟢 Employee Socket Connected:",
-          employeeSocket.id
-        );
       }
     );
 
     employeeSocket.on(
       "disconnect",
       (reason) => {
-        console.log(
-          "🔴 Employee Socket Disconnected:",
-          reason
-        );
       }
     );
 
@@ -384,10 +376,6 @@ export function useEmployeeSocketSync(
   ) => {
     selfActionRef.current = action;
 
-    console.log(
-      "👤 Self Employee Action:",
-      action
-    );
 
     // Automatically clear after 3 seconds
     setTimeout(() => {
@@ -421,10 +409,6 @@ export function useEmployeeSocketSync(
         return;
       }
 
-      console.log(
-        "👤 Joining employee room:",
-        normalizedEmployeeId
-      );
 
       socket.emit(
         "join:employee",
@@ -462,10 +446,6 @@ export function useEmployeeSocketSync(
 
     const handleEmployeeCreated =
       (result) => {
-        console.log(
-          "🟢 Socket: employeeCreated",
-          result
-        );
 
         invalidateEmployees();
       };
@@ -476,10 +456,6 @@ export function useEmployeeSocketSync(
 
     const handleEmployeeDeleted =
       (result) => {
-        console.log(
-          "🗑️ Socket: employeeDeleted",
-          result
-        );
 
         invalidateEmployees();
 
@@ -505,10 +481,6 @@ export function useEmployeeSocketSync(
           result?.data ||
           result;
 
-        console.log(
-          "🔄 Socket: employeeStatusToggled",
-          data
-        );
 
         if (!data?._id) {
           console.warn(
@@ -556,9 +528,6 @@ export function useEmployeeSocketSync(
           selfActionRef.current ===
           "status"
         ) {
-          console.log(
-            "✅ Self status action handled"
-          );
 
           selfActionRef.current =
             null;
@@ -575,10 +544,6 @@ export function useEmployeeSocketSync(
           result?.data ||
           result;
 
-        console.log(
-          "✏️ Socket: employeeUpdated",
-          data
-        );
 
         if (!data?._id) {
           console.warn(
@@ -626,9 +591,6 @@ export function useEmployeeSocketSync(
           selfActionRef.current ===
           "update"
         ) {
-          console.log(
-            "✅ Self update action handled"
-          );
 
           selfActionRef.current =
             null;
@@ -649,10 +611,6 @@ export function useEmployeeSocketSync(
           return;
         }
 
-        console.log(
-          "📝 New Employee Activity:",
-          activity.action
-        );
 
         if (
           normalizedEmployeeId
@@ -937,10 +895,6 @@ export function useEmployeeSocketSync(
         normalizedEmployeeId &&
         socket.connected
       ) {
-        console.log(
-          "👋 Leaving employee room:",
-          normalizedEmployeeId
-        );
 
         socket.emit(
           "leave:employee",

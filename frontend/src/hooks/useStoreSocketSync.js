@@ -19,10 +19,6 @@ export function useStoreSocketSync() {
     // =========================================================
 
     const handleStoreUpdated = (data) => {
-      console.log(
-        "📥 useStoreSocketSync → storeUpdated received:",
-        data?.store_name
-      );
 
       if (!data) {
         console.warn(
@@ -83,10 +79,6 @@ export function useStoreSocketSync() {
     // =========================================================
 
     const handleStoreInfo = (response) => {
-      console.log(
-        "📥 useStoreSocketSync → storeInfo received:",
-        response?.data?.store_name
-      );
 
       // Backend response expected:
       //
@@ -142,9 +134,6 @@ export function useStoreSocketSync() {
       handleStoreInfo
     );
 
-    console.log(
-      "✅ useStoreSocketSync → Socket listeners attached"
-    );
 
     // =========================================================
     // REQUEST CURRENT STORE INFO
@@ -152,9 +141,6 @@ export function useStoreSocketSync() {
 
     socket.emit("getStoreInfo");
 
-    console.log(
-      "📤 useStoreSocketSync → getStoreInfo emitted"
-    );
 
     // =========================================================
     // CLEANUP
@@ -171,9 +157,6 @@ export function useStoreSocketSync() {
         handleStoreInfo
       );
 
-      console.log(
-        "🧹 useStoreSocketSync → Socket listeners removed"
-      );
     };
   }, [socket, isConnected, queryClient]);
 

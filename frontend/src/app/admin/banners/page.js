@@ -6,35 +6,26 @@ import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
 import useBannerSocketSync from "../../../hooks/useBannerSocket";
+// ✅ Import Deal API for fetching and creating deals inside Banner form
+import { dealApi } from "../../../apis/admin/dealApi"; 
 
-// ==========================================
-// API SETUP
-// ==========================================
 // ==========================================
 // API SETUP
 // ==========================================
 const API_BASE =
-  process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-  "http://localhost:5000";
+  process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
 const API_URL = `${API_BASE}/api`;
 
-// ✅ Banner API instance
-// Cookie based authentication ke liye withCredentials zaroori hai
 const bannerAxios = axios.create({
   baseURL: API_URL,
   withCredentials: true,
 });
 
-// ✅ Agar accessToken normal cookie mein available ho
-// to Authorization header bhi bhej do.
-// Agar cookie HttpOnly hai to browser withCredentials ke through
-// automatically cookie bhejega.
 bannerAxios.interceptors.request.use(
   (config) => {
     try {
       const cookies = document.cookie.split(";");
-
       const accessTokenCookie = cookies.find((cookie) =>
         cookie.trim().startsWith("accessToken=")
       );
@@ -53,7 +44,6 @@ bannerAxios.interceptors.request.use(
     } catch (error) {
       console.error("Banner auth token read error:", error);
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -64,106 +54,56 @@ const adminBannerApi = {
     const res = await bannerAxios.get("/banners");
     return res.data.data || [];
   },
-
   create: async (data) => {
     const res = await bannerAxios.post("/banners", data, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
-
     return res.data.data;
   },
-
   update: async (id, data) => {
     const res = await bannerAxios.put(`/banners/${id}`, data, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
-
     return res.data.data;
   },
-
   delete: async (id) => {
     await bannerAxios.delete(`/banners/${id}`);
   },
-
   toggle: async (id) => {
     const res = await bannerAxios.patch(`/banners/${id}/toggle`);
     return res.data.data;
   },
-
   duplicate: async (id) => {
     const res = await bannerAxios.post(`/banners/${id}/duplicate`);
     return res.data.data;
   },
 };
+
 // ==========================================
 // ICONS
 // ==========================================
-const PlusIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-);
-const SearchIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-);
-const ListIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-);
-const GridIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>
-);
-const EditIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-);
-const TrashIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
-);
-const CloseIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-);
-const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-);
-const Spinner = ({ className = "w-4 h-4" }) => (
-  <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-  </svg>
-);
-const SortIndicator = ({ active, direction }) => (
-  <svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-    {active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}
-  </svg>
-);
-const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-);
-const ChevronRightIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-);
-const UploadIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-);
-const ImageIcon = ({ className = "w-6 h-6" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-);
-const EyeIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-);
-const CopyIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-);
-const InfoIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-);
+const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
+const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
+const ListIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>);
+const GridIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>);
+const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>);
+const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
+const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
+const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
+const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
+const SortIndicator = ({ active, direction }) => (<svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>{active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}</svg>);
+const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
+const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>);
+const UploadIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
+const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>);
+const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>);
+const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
 
 // ==========================================
 // HELPERS
 // ==========================================
-const formatDate = (d) =>
-  d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -318,6 +258,93 @@ const Checkbox = ({ checked, onChange, label }) => (
 );
 
 // ==========================================
+// MINI DEAL CREATOR COMPONENT
+// ==========================================
+const MiniDealCreator = ({ onClose, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    name: "",
+    discountValue: "",
+    type: "percentage", // percentage or fixed_amount
+    startDate: "",
+    endDate: "",
+  });
+
+  const queryClient = useQueryClient();
+  const createDealMutation = useMutation({
+    mutationFn: (data) => dealApi.create(data),
+    onSuccess: (newDeal) => {
+      queryClient.invalidateQueries({ queryKey: ["adminDeals"] });
+      toast.success("New deal created successfully!");
+      onSuccess(newDeal);
+    },
+    onError: (err) => toast.error(err.response?.data?.message || "Failed to create deal"),
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.name || !formData.discountValue) return toast.error("Name and Value are required");
+    
+    // Basic payload construction matching typical deal schema
+    const payload = {
+      name: formData.name,
+      discountValue: Number(formData.discountValue),
+      type: formData.type,
+      isActive: true,
+      applyTo: "all", // Defaulting to all products for quick creation
+      startDate: formData.startDate ? new Date(formData.startDate).toISOString() : new Date().toISOString(),
+      endDate: formData.endDate ? new Date(formData.endDate).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    createDealMutation.mutate(payload);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+        <div className="px-5 py-4 border-b flex justify-between items-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+          <h3 className="text-base font-semibold">Quick Create Deal</h3>
+          <button onClick={onClose} disabled={createDealMutation.isPending}><CloseIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <FormField label="Deal Name" required>
+            <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Flash Sale 50%" />
+          </FormField>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Type" required>
+              <Select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed_amount">Fixed Amount</option>
+              </Select>
+            </FormField>
+            <FormField label="Value" required>
+              <Input type="number" value={formData.discountValue} onChange={e => setFormData({...formData, discountValue: e.target.value})} placeholder="50" />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+             <FormField label="Start Date">
+               <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+             </FormField>
+             <FormField label="End Date">
+               <Input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+             </FormField>
+          </div>
+
+          <div className="pt-2 flex gap-3">
+            <button type="button" onClick={onClose} disabled={createDealMutation.isPending} className="flex-1 h-10 rounded-lg text-sm font-medium border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
+            <button type="submit" disabled={createDealMutation.isPending} className="flex-1 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center justify-center gap-2">
+              {createDealMutation.isPending ? <><Spinner className="w-4 h-4"/> Creating...</> : "Create & Select"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+
+// ==========================================
 // MAIN COMPONENT
 // ==========================================
 export default function BannersPage() {
@@ -336,6 +363,9 @@ export default function BannersPage() {
   const [editingBanner, setEditingBanner] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // ✅ New States for Deal Selection
+  const [showDealCreator, setShowDealCreator] = useState(false);
   const itemsPerPage = 20;
 
   const defaultForm = {
@@ -345,7 +375,9 @@ export default function BannersPage() {
     eyebrow: "", heading: "", description: "",
     primaryButton: { text: "", linkType: "custom_url", link: "" },
     startDate: "", endDate: "", autoPublish: false, autoDisable: true,
-    displayRules: { pages: ["homepage"], devices: ["desktop", "tablet", "mobile"] },
+    // Removed displayRules.pages as requested
+    displayRules: { devices: ["desktop", "tablet", "mobile"] },
+    linkedDealId: "" // New field for Deal
   };
 
   const [form, setForm] = useState(defaultForm);
@@ -360,6 +392,16 @@ export default function BannersPage() {
     queryKey: ["adminBanners"],
     queryFn: adminBannerApi.getAll,
     retry: false,
+  });
+
+  // ✅ Fetch Deals for the dropdown
+  const { data: deals = [] } = useQuery({
+    queryKey: ["adminDeals"],
+    queryFn: async () => {
+      const res = await dealApi.getAll();
+      return res || [];
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 mins
   });
 
   const bannerMutation = useMutation({
@@ -452,7 +494,9 @@ export default function BannersPage() {
       startDate: formatDateInput(banner.startDate),
       endDate: formatDateInput(banner.endDate),
       primaryButton: banner.primaryButton || { text: "", linkType: "custom_url", link: "" },
-      displayRules: banner.displayRules || { pages: ["homepage"], devices: ["desktop", "tablet", "mobile"] },
+      // Ensure displayRules exists even if old banner didn't have it
+      displayRules: banner.displayRules || { devices: ["desktop", "tablet", "mobile"] },
+      linkedDealId: banner.linkedDealId || "",
     });
     setShowModal(true);
   };
@@ -476,6 +520,13 @@ export default function BannersPage() {
     if (!file) return null;
     if (file instanceof File) return URL.createObjectURL(file);
     return `${API_BASE}/${file}`;
+  };
+
+  // ✅ Handler when a new deal is created in the mini modal
+  const handleNewDealCreated = (newDeal) => {
+    // Assuming newDeal has an _id
+    setForm(prev => ({ ...prev, linkedDealId: newDeal._id || newDeal.id }));
+    setShowDealCreator(false);
   };
 
   // --- Reusable Styles ---
@@ -739,9 +790,6 @@ export default function BannersPage() {
                         <option value="popup">Popup</option>
                       </Select>
                     </FormField>
-                    <FormField label="Position" helpText="Lower numbers appear first">
-                      <Input type="number" value={form.position} onChange={(e) => updateForm("position", parseInt(e.target.value) || 0)} min="0" />
-                    </FormField>
                   </div>
                 </FormSection>
 
@@ -793,47 +841,63 @@ export default function BannersPage() {
                   </div>
                 </FormSection>
 
-                {/* 4. Call to Action */}
-                <FormSection number="4" title="Call to Action" description="Button and link configuration">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField label="Button Text" helpText="Text displayed on button">
-                      <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
-                    </FormField>
-                    <FormField label="Link Type" helpText="Where button click leads">
-                      <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
-                        <option value="custom_url">Custom URL</option>
-                        <option value="product">Product Page</option>
-                        <option value="category">Category Page</option>
-                        <option value="none">No Link</option>
-                      </Select>
-                    </FormField>
-                    {form.primaryButton.linkType === "custom_url" && (
-                      <FormField label="Target URL" required helpText="Full URL destination">
-                        <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
-                      </FormField>
-                    )}
+                {/* 4. Call to Action & Deal Link */}
+                <FormSection number="4" title="Call to Action & Deals" description="Button configuration and linked promotions">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                     <div className="space-y-4">
+                        <h4 className="text-sm font-semibold" style={{color: "var(--text-primary)"}}>Button Settings</h4>
+                        <FormField label="Button Text" helpText="Text displayed on button">
+                          <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
+                        </FormField>
+                        <FormField label="Link Type" helpText="Where button click leads">
+                          <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
+                            <option value="custom_url">Custom URL</option>
+                            <option value="product">Product Page</option>
+                            <option value="category">Category Page</option>
+                            <option value="none">No Link</option>
+                          </Select>
+                        </FormField>
+                        {form.primaryButton.linkType === "custom_url" && (
+                          <FormField label="Target URL" required helpText="Full URL destination">
+                            <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
+                          </FormField>
+                        )}
+                     </div>
+
+                     <div className="space-y-4">
+                        <h4 className="text-sm font-semibold" style={{color: "var(--text-primary)"}}>Linked Deal</h4>
+                        <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
+                           <div className="flex gap-2">
+                              <Select value={form.linkedDealId || ""} onChange={(e) => {
+                                 if(e.target.value === "CREATE_NEW") {
+                                    setShowDealCreator(true);
+                                 } else {
+                                    updateForm("linkedDealId", e.target.value);
+                                 }
+                              }}>
+                                <option value="">No Deal Linked</option>
+                                {deals.map(deal => (
+                                   <option key={deal._id || deal.id} value={deal._id || deal.id}>
+                                      {deal.name} ({deal.type === 'percentage' ? `${deal.discountValue}%` : `$${deal.discountValue}`})
+                                   </option>
+                                ))}
+                                <option value="CREATE_NEW" className="font-bold text-emerald-600">+ Create New Deal...</option>
+                              </Select>
+                           </div>
+                        </FormField>
+                        {form.linkedDealId && (
+                           <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
+                              <TagIcon className="w-4 h-4 text-emerald-500" />
+                              <span>Deal is linked. Button will redirect to deal page if configured.</span>
+                           </div>
+                        )}
+                     </div>
                   </div>
                 </FormSection>
 
-                {/* 5. Display Rules */}
-                <FormSection number="5" title="Display Rules" description="Control where banner appears">
+                {/* 5. Display Rules (Devices Only) */}
+                <FormSection number="5" title="Display Rules" description="Control which devices see this banner">
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Show On Pages:</label>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        {["homepage", "category", "product", "cart", "checkout"].map((page) => (
-                          <Checkbox
-                            key={page}
-                            checked={form.displayRules.pages.includes(page)}
-                            onChange={(e) => {
-                              const pages = e.target.checked ? [...form.displayRules.pages, page] : form.displayRules.pages.filter(p => p !== page);
-                              updateNested("displayRules", "pages", pages);
-                            }}
-                            label={page.charAt(0).toUpperCase() + page.slice(1)}
-                          />
-                        ))}
-                      </div>
-                    </div>
                     <div>
                       <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Show On Devices:</label>
                       <div className="grid grid-cols-3 gap-3">
@@ -906,7 +970,7 @@ export default function BannersPage() {
           </div>
         )}
 
-        {/* ===== Delete Confirmation Modal ===== */}
+        {/* ===== DELETE CONFIRMATION MODAL ===== */}
         {deleteTarget && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
@@ -929,6 +993,15 @@ export default function BannersPage() {
             </div>
           </div>
         )}
+
+        {/* ===== MINI DEAL CREATOR MODAL ===== */}
+        {showDealCreator && (
+           <MiniDealCreator 
+              onClose={() => setShowDealCreator(false)} 
+              onSuccess={handleNewDealCreated} 
+           />
+        )}
+
       </div>
     </div>
   );

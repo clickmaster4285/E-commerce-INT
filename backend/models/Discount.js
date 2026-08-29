@@ -242,6 +242,16 @@ const discountSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
+    // =====================================================
+    // UPDATED BY
+    // =====================================================
+
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,

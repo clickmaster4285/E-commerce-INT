@@ -29,24 +29,10 @@ import { productApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
+import { attributeApi } from "@/apis/admin/attributeApi";
 
 const ITEMS_PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
-
-const ATTRIBUTE_PRESETS = [
-  { name: "Color", values: ["Black", "White", "Gray", "Red", "Blue", "Green", "Yellow", "Brown", "Pink", "Orange", "Purple", "Gold", "Silver"] },
-  { name: "Size", values: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size"] },
-  { name: "Material", values: ["Cotton", "Polyester", "Leather", "Denim", "Wool", "Silk", "Linen", "Nylon"] },
-  { name: "Fit", values: ["Regular Fit", "Slim Fit", "Loose Fit", "Relaxed Fit", "Oversized", "Skinny", "Straight", "Tapered"] },
-  { name: "Pattern", values: ["Solid", "Striped", "Checked", "Plaid", "Printed", "Floral", "Camouflage"] },
-  { name: "Sleeve", values: ["Full Sleeve", "Half Sleeve", "Sleeveless", "3/4 Sleeve", "Long Sleeve", "Short Sleeve", "Cap Sleeve"] },
-  { name: "Collar", values: ["Round Neck", "V-Neck", "Collared", "Mandarin Collar", "Polo Collar", "Turtleneck", "Hooded", "Boat Neck"] },
-  { name: "Occasion", values: ["Casual", "Formal", "Party", "Wedding", "Sports", "Gym", "Office", "Outdoor", "Daily Wear", "Festive"] },
-  { name: "Gender", values: ["Men", "Women", "Unisex", "Boys", "Girls", "Kids", "Teen"] },
-  { name: "Season", values: ["Summer", "Winter", "Spring", "Autumn", "All Season", "Monsoon"] },
-  { name: "Care", values: ["Machine Wash", "Hand Wash", "Dry Clean Only", "Do Not Bleach", "Iron Safe", "Wash Separately"] },
-  { name: "Style", values: ["Casual", "Formal", "Sporty", "Classic", "Modern", "Vintage", "Bohemian", "Streetwear", "Ethnic", "Western"] },
-];
 
 /* =========================================================
    HELPERS
@@ -54,7 +40,9 @@ const ATTRIBUTE_PRESETS = [
 function createEmptyVariant(sku = "") {
   return {
     _id: null, sku, title: "", description: "", cost_price: "", selling_price: "",
-    quantity: "0", min_qnt: "0", max_qnt: "0", attributes: [], images: [],
+    quantity: "0", min_qnt: "0", max_qnt: "0", 
+    option_values: {},
+    images: [],
   };
 }
 
@@ -144,19 +132,16 @@ export default function ProductsPage() {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
 
-  // Category Modal State
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({ category_code: "", name: "", description: "" });
   const [loadingCategoryCode, setLoadingCategoryCode] = useState(false);
 
-  // Brand Modal State
   const [showNewBrandModal, setShowNewBrandModal] = useState(false);
   const [brandFormData, setBrandFormData] = useState({ brand_code: "", name: "", description: "", country: "", is_active: true });
   const [brandLogoFile, setBrandLogoFile] = useState(null);
   const [brandLogoPreview, setBrandLogoPreview] = useState("");
   const [loadingBrandCode, setLoadingBrandCode] = useState(false);
 
-  // Product Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -164,7 +149,10 @@ export default function ProductsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   
-  // ⭐ CHANGED: tag_ids -> tag_names (array of strings)
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
+  const [loadingAttributes, setLoadingAttributes] = useState(false);
+  const [productSpecs, setProductSpecs] = useState({});
+
   const [formData, setFormData] = useState({
     category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
   });
@@ -177,6 +165,48 @@ export default function ProductsPage() {
   const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({ queryKey: ["products"], queryFn: productApi.getAll, retry: false });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
+  
+  useEffect(() => {
+    if (formData.category_id) {
+      fetchCategoryAttributes(formData.category_id);
+    } else {
+      setCategoryAttributes([]);
+      setProductSpecs({});
+    }
+  }, [formData.category_id]);
+
+  const fetchCategoryAttributes = async (catId) => {
+    try {
+      setLoadingAttributes(true);
+      const res = await attributeApi.getByCategory(catId);
+      const list = res || [];
+      setCategoryAttributes(list);
+
+      // ✅ FIX: Seed productSpecs from category-level attribute values
+      // (e.g. Mobile → RAM "8GB", Color "Black") so the product form
+      // pre-fills the same value/details entered at the category level.
+      // User can still change them per product.
+      setProductSpecs((prev) => {
+        const next = { ...prev };
+        list.forEach((attr) => {
+          if (!attr || !attr.code) return;
+          const saved = attr.category_config?.value;
+          if (saved !== undefined && saved !== null && saved !== "" && next[attr.code] === undefined) {
+            next[attr.code] = saved;
+          }
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to fetch attributes", error);
+    } finally {
+      setLoadingAttributes(false);
+    }
+  };
+
+  const variantAllowedAttributes = useMemo(() => {
+    return categoryAttributes.filter(attr => attr.variant_allowed || attr.category_config?.is_variant_option);
+  }, [categoryAttributes]);
 
   useEffect(() => {
     if (!productsError || !productsErrorMsg) return;
@@ -209,6 +239,8 @@ export default function ProductsPage() {
       const result = await variantApi.getNextSku();
       const nextSku = result?.sku || result?.data?.sku || "";
       setFormData({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant(nextSku)] });
+      setProductSpecs({});
+      setCategoryAttributes([]);
       setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
       setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
       setShowModal(true);
@@ -238,7 +270,7 @@ export default function ProductsPage() {
       const sku = await getNextLocalSku();
       const old = formData.variants[index];
       if (!old) return;
-      const copy = { ...old, _id: null, sku, attributes: old.attributes.map((a) => ({ ...a })), images: [] };
+      const copy = { ...old, _id: null, sku, option_values: { ...old.option_values }, images: [] };
       setFormData((prev) => {
         const v = [...prev.variants]; v.splice(index + 1, 0, copy);
         return { ...prev, variants: v };
@@ -257,42 +289,15 @@ export default function ProductsPage() {
     setFormData((prev) => { const v = [...prev.variants]; v[index] = { ...v[index], [field]: value }; return { ...prev, variants: v }; });
   };
 
-  /* Attributes */
-  const addAttribute = (vi) => {
+  const updateVariantOption = (vi, attrCode, value) => {
     setFormData((prev) => {
       const v = [...prev.variants];
-      v[vi] = { ...v[vi], attributes: [...v[vi].attributes, { name: ATTRIBUTE_PRESETS[0]?.name || "", value: "", isCustom: false }] };
+      v[vi] = { 
+        ...v[vi], 
+        option_values: { ...v[vi].option_values, [attrCode]: value } 
+      };
       return { ...prev, variants: v };
     });
-  };
-
-  const updateAttribute = (vi, ai, field, value) => {
-    setFormData((prev) => {
-      const v = [...prev.variants];
-      const attrs = [...v[vi].attributes];
-      attrs[ai] = { ...attrs[ai], [field]: value };
-      v[vi] = { ...v[vi], attributes: attrs };
-      return { ...prev, variants: v };
-    });
-  };
-
-  const removeAttribute = (vi, ai) => {
-    setFormData((prev) => {
-      const v = [...prev.variants];
-      v[vi] = { ...v[vi], attributes: v[vi].attributes.filter((_, i) => i !== ai) };
-      return { ...prev, variants: v };
-    });
-  };
-
-  const changeAttributeName = (vi, ai, name) => {
-    updateAttribute(vi, ai, "name", name);
-    updateAttribute(vi, ai, "value", "");
-    updateAttribute(vi, ai, "isCustom", false);
-  };
-
-  const changeAttributeValue = (vi, ai, value) => {
-    const attr = formData.variants[vi]?.attributes[ai];
-    if (attr) updateAttribute(vi, ai, "value", value);
   };
 
   /* Images */
@@ -326,17 +331,19 @@ export default function ProductsPage() {
 
   /* Edit Product */
   const handleEdit = (product) => {
+    const specs = product.specifications || {};
+    setProductSpecs(specs);
+
     const variants = product?.variants?.length
       ? product.variants.map((v) => ({
           _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
           cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
           quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
-          attributes: Object.entries(v.attributes || {}).map(([n, val]) => ({ name: n, value: String(val ?? ""), isCustom: false })),
+          option_values: v.attributes || {},
           images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
         }))
       : [createEmptyVariant()];
 
-    // ⭐ Extract tag names from populated objects
     const currentTagNames = (product.tag_ids || [])
       .map(t => typeof t === 'object' ? t.name : t)
       .filter(Boolean);
@@ -345,9 +352,14 @@ export default function ProductsPage() {
       category_id: normalizeId(product?.category_id), brand_id: normalizeId(product?.brand_id),
       name: product?.name || "", description: product?.description || "", tax: String(product?.tax ?? 0),
       status: product?.status || "active", 
-      tag_names: currentTagNames, // ⭐ Use names
+      tag_names: currentTagNames,
       variants,
     });
+    
+    if (product?.category_id) {
+      fetchCategoryAttributes(normalizeId(product?.category_id));
+    }
+
     setTagInput("");
     setEditingProduct(product); setCurrentStep(1); setExpandedVariant(0);
     setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
@@ -361,6 +373,16 @@ export default function ProductsPage() {
     if (!formData.category_id) { toast.error("Please select category"); return; }
     if (!formData.brand_id) { toast.error("Please select brand"); return; }
     if (!formData.name.trim()) { toast.error("Product name is required"); return; }
+    
+    const missingSpecs = categoryAttributes.filter(attr => 
+      (attr.is_required || attr.category_config?.is_required) && !productSpecs[attr.code]
+    );
+    
+    if (missingSpecs.length > 0) {
+      toast.error(`Please fill required specifications: ${missingSpecs.map(a => a.name).join(", ")}`);
+      return;
+    }
+
     setCurrentStep(2);
   };
 
@@ -389,13 +411,12 @@ export default function ProductsPage() {
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
     
-    // ⭐ Send tag_names (array of strings)
+    data.append("specifications", JSON.stringify(productSpecs));
+    
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
 
     const imageVariantIndexes = [];
     const variantsPayload = formData.variants.map((v, idx) => {
-      const attrs = {};
-      v.attributes.forEach((a) => { if (a.name.trim()) attrs[a.name] = a.value ?? ""; });
       const existingImgs = v.images.filter((i) => i.existing).map((i) => i.metadata);
       v.images.filter((i) => !i.existing && i.file).forEach((i) => {
         if (i.file) { data.append("images", i.file); imageVariantIndexes.push(idx); }
@@ -409,7 +430,8 @@ export default function ProductsPage() {
         _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description || "",
         cost_price: Number(v.cost_price || 0), selling_price: Number(v.selling_price || 0),
         quantity: Number(v.quantity || 0), min_qnt: Number(v.min_qnt || 0), max_qnt: Number(v.max_qnt || 0),
-        attributes: attrs, existing_images: existingImgs,
+        option_values: v.option_values,
+        existing_images: existingImgs,
       };
     });
 
@@ -420,7 +442,7 @@ export default function ProductsPage() {
     else createMutation.mutate(data);
   };
 
-  /* ⭐ SIMPLIFIED TAG HANDLERS */
+  /* TAG HANDLERS */
   const addTag = (e) => {
     e?.preventDefault();
     const val = tagInput.trim().toLowerCase();
@@ -606,7 +628,6 @@ export default function ProductsPage() {
                   const low = qty <= min;
                   const img = fv?.images?.[0]?.img_url;
                   
-                  // ⭐ Get tag names directly from populated object
                   const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
                   
                   return (
@@ -752,7 +773,63 @@ export default function ProductsPage() {
                     </Field>
                   </div>
                   
-                  {/* ⭐ SIMPLIFIED TAG INPUT */}
+                  {/* DYNAMIC SPECIFICATIONS SECTION */}
+                  {formData.category_id && (
+                    <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} />
+                        Product Specifications
+                      </h4>
+                      
+                      {loadingAttributes ? (
+                        <div className="flex items-center justify-center py-4">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
+                          <span className="ml-2 text-xs text-gray-500">Loading attributes...</span>
+                        </div>
+                      ) : categoryAttributes.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {categoryAttributes.map((attr) => (
+                            <Field key={attr._id} label={`${attr.name} ${(attr.is_required || attr.category_config?.is_required) ? '*' : ''}`}>
+                              {attr.data_type === 'select' ? (
+                                <select
+                                  value={productSpecs[attr.code] || ""}
+                                  onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
+                                  className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                  style={inputStyle}
+                                >
+                                  <option value="">Select {attr.name}</option>
+                                  {(attr.values || []).map(val => <option key={val.value} value={val.value}>{val.value}</option>)}
+                                </select>
+                              ) : attr.data_type === 'color' ? (
+                                 <div className="flex items-center gap-2">
+                                   <input 
+                                     type="color" 
+                                     value={productSpecs[attr.code] || '#000000'}
+                                     onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
+                                     className="h-9 w-12 cursor-pointer rounded border p-1"
+                                   />
+                                   <span className="text-xs">{productSpecs[attr.code]}</span>
+                                 </div>
+                              ) : (
+                                <input
+                                  type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'}
+                                  value={productSpecs[attr.code] || ""}
+                                  onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
+                                  placeholder={`Enter ${attr.name}`}
+                                  className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                  style={inputStyle}
+                                />
+                              )}
+                            </Field>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No specific attributes configured for this category.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAG INPUT */}
                   <Field label="Tags">
                     <div className="flex gap-2">
                       <input 
@@ -769,7 +846,6 @@ export default function ProductsPage() {
                       </button>
                     </div>
                     
-                    {/* Selected Tags Display */}
                     {formData.tag_names.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {formData.tag_names.map(tag => (
@@ -800,7 +876,7 @@ export default function ProductsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} /> Variants ({formData.variants.length})</h4>
-                      <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, attributes and images</p>
+                      <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, options and images</p>
                     </div>
                     <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
                   </div>
@@ -828,6 +904,50 @@ export default function ProductsPage() {
                               </div>
                               <div className="mt-3"><Field label="Variant Description"><textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={e => updateVariant(index, "description", e.target.value)} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field></div>
                             </div>
+
+                            {/* VARIANT OPTIONS SECTION */}
+                            {variantAllowedAttributes.length > 0 && (
+                              <div>
+                                <SectionTitle>Variant Options</SectionTitle>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                  {variantAllowedAttributes.map(attr => (
+                                    <Field key={attr.code} label={attr.name}>
+                                      {attr.data_type === 'select' ? (
+                                        <select
+                                          value={variant.option_values[attr.code] || ""}
+                                          onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
+                                          className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                          style={inputStyle}
+                                        >
+                                          <option value="">Select {attr.name}</option>
+                                          {(attr.values || []).map(val => <option key={val.value} value={val.value}>{val.value}</option>)}
+                                        </select>
+                                      ) : attr.data_type === 'color' ? (
+                                        <div className="flex items-center gap-2">
+                                          <input 
+                                            type="color" 
+                                            value={variant.option_values[attr.code] || '#000000'}
+                                            onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
+                                            className="h-9 w-12 cursor-pointer rounded border p-1"
+                                          />
+                                          <span className="text-xs">{variant.option_values[attr.code]}</span>
+                                        </div>
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          value={variant.option_values[attr.code] || ""}
+                                          onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
+                                          placeholder={`Enter ${attr.name}`}
+                                          className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                          style={inputStyle}
+                                        />
+                                      )}
+                                    </Field>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             <div>
                               <SectionTitle>Pricing & Stock</SectionTitle>
                               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -844,49 +964,7 @@ export default function ProductsPage() {
                                 </div>
                               )}
                             </div>
-                            <div>
-                              <SectionTitle>Attributes</SectionTitle>
-                              <div className="space-y-2">
-                                {variant.attributes.map((attribute, attrIndex) => {
-                                  const preset = ATTRIBUTE_PRESETS.find(item => item.name === attribute.name);
-                                  const isCustom = !!attribute.isCustom;
-                                  return (
-                                    <div key={attrIndex} className="flex flex-wrap items-center gap-2">
-                                      <div className="relative min-w-[140px] flex-1">
-                                        <select value={attribute.name} onChange={e => changeAttributeName(index, attrIndex, e.target.value)} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm" style={inputStyle}>
-                                          {ATTRIBUTE_PRESETS.map(pi => <option key={pi.name} value={pi.name}>{pi.name}</option>)}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
-                                      </div>
-                                      {preset ? (
-                                        <>
-                                          <div className="relative min-w-[140px] flex-1">
-                                            <select value={isCustom ? "__custom__" : attribute.value} onChange={e => { const val = e.target.value; if (val === "__custom__") { updateAttribute(index, attrIndex, "isCustom", true); updateAttribute(index, attrIndex, "value", preset.name === "Color" ? "#000000" : ""); } else { updateAttribute(index, attrIndex, "isCustom", false); updateAttribute(index, attrIndex, "value", val); } }} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm" style={inputStyle}>
-                                              <option value="">Select value</option>
-                                              {preset.values.map(val => <option key={val} value={val}>{val}</option>)}
-                                              <option value="__custom__">+ Custom</option>
-                                            </select>
-                                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
-                                          </div>
-                                          {isCustom && (preset.name === "Color" ? (
-                                            <div className="flex flex-1 items-center gap-2">
-                                              <input type="color" value={attribute.value || "#000000"} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 w-10 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
-                                              <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{attribute.value || "#000000"}</span>
-                                            </div>
-                                          ) : (
-                                            <input type="text" placeholder="Custom value..." value={attribute.value} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 flex-1 rounded-md px-3 text-sm" style={inputStyle} />
-                                          ))}
-                                        </>
-                                      ) : (
-                                        <input type="text" placeholder="Value e.g. Black" value={attribute.value} onChange={e => changeAttributeValue(index, attrIndex, e.target.value)} className="h-9 flex-1 rounded-md px-3 text-sm" style={inputStyle} />
-                                      )}
-                                      <IconButton title="Remove" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={() => removeAttribute(index, attrIndex)}><Trash2 className="h-3.5 w-3.5" /></IconButton>
-                                    </div>
-                                  );
-                                })}
-                                <button type="button" onClick={() => addAttribute(index)} className="flex items-center gap-1.5 text-xs font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}><Plus className="h-3.5 w-3.5" /> Add Attribute</button>
-                              </div>
-                            </div>
+                            
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
                               <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
