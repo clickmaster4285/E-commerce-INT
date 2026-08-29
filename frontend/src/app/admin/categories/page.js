@@ -610,7 +610,6 @@ export default function CategoriesPage() {
                 <tbody>
                   {paginatedCategories.map((category, index) => {
                     const isSelected = selectedIds.includes(category._id);
-                    const hasChildren = categories.some((c) => String(c.parent_category_id) === String(category._id));
                     const parentName = getCategoryName(category.parent_category_id, categories);
                     const isActive = category.status !== "inactive";
                     
