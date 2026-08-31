@@ -6,8 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
 import useBannerSocketSync from "../../../hooks/useBannerSocket";
-// ✅ Import Deal API for fetching and creating deals inside Banner form
-import { dealApi } from "../../../apis/admin/dealApi"; 
+import { dealApi } from "../../../apis/admin/dealApi";
 
 // ==========================================
 // API SETUP
@@ -394,14 +393,11 @@ export default function BannersPage() {
     retry: false,
   });
 
-  // ✅ Fetch Deals for the dropdown
+  // ✅ Deals list — for linking a banner button to a Deal
   const { data: deals = [] } = useQuery({
-    queryKey: ["adminDeals"],
-    queryFn: async () => {
-      const res = await dealApi.getAll();
-      return res || [];
-    },
-    staleTime: 5 * 60 * 1000, // Cache for 5 mins
+    queryKey: ["banner-deal-options"],
+    queryFn: dealApi.getAll,
+    staleTime: 60 * 1000,
   });
 
   const bannerMutation = useMutation({
@@ -841,28 +837,43 @@ export default function BannersPage() {
                   </div>
                 </FormSection>
 
-                {/* 4. Call to Action & Deal Link */}
-                <FormSection number="4" title="Call to Action & Deals" description="Button configuration and linked promotions">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                     <div className="space-y-4">
-                        <h4 className="text-sm font-semibold" style={{color: "var(--text-primary)"}}>Button Settings</h4>
-                        <FormField label="Button Text" helpText="Text displayed on button">
-                          <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
-                        </FormField>
-                        <FormField label="Link Type" helpText="Where button click leads">
-                          <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
-                            <option value="custom_url">Custom URL</option>
-                            <option value="product">Product Page</option>
-                            <option value="category">Category Page</option>
-                            <option value="none">No Link</option>
-                          </Select>
-                        </FormField>
-                        {form.primaryButton.linkType === "custom_url" && (
-                          <FormField label="Target URL" required helpText="Full URL destination">
-                            <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
-                          </FormField>
-                        )}
-                     </div>
+                {/* 4. Call to Action */}
+                <FormSection number="4" title="Call to Action" description="Button and link configuration">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField label="Button Text" helpText="Text displayed on button">
+                      <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
+                    </FormField>
+                    <FormField label="Link Type" helpText="Where button click leads">
+                      <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
+                        <option value="custom_url">Custom URL</option>
+                        <option value="product">Product Page</option>
+                        <option value="category">Category Page</option>
+                        <option value="deal">Deal Page</option>
+                        <option value="none">No Link</option>
+                      </Select>
+                    </FormField>
+                    {form.primaryButton.linkType === "deal" && (
+                      <FormField label="Select Deal" required helpText="Banner button opens this deal on the storefront">
+                        <Select
+                          value={form.primaryButton.dealId || ""}
+                          onChange={(e) => updateNested("primaryButton", "dealId", e.target.value)}
+                        >
+                          <option value="">— Choose a deal —</option>
+                          {deals.map((d) => (
+                            <option key={d._id} value={d._id}>
+                              {d.name}{d.isActive ? "" : " (disabled)"}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    )}
+                    {form.primaryButton.linkType === "custom_url" && (
+                      <FormField label="Target URL" required helpText="Full URL destination">
+                        <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
+                      </FormField>
+                    )}
+                  </div>
+                </FormSection>
 
                      <div className="space-y-4">
                         <h4 className="text-sm font-semibold" style={{color: "var(--text-primary)"}}>Linked Deal</h4>

@@ -9,20 +9,27 @@ import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "./ProductCard";
 
-// ✅ ARROW — hamesha visible, disable jab aage/peeche kuch na ho
-function ArrowBtn({ dir, onClick, disabled }) {
+// ✅ ARROW — dark semi-transparent circular button on the outer carousel edge,
+//    vertically centered, fully visible (offsets < section padding, never clipped)
+function ArrowBtn({ dir, onClick, disabled, onHover }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      onMouseEnter={() => onHover?.(dir)}
+      onMouseLeave={() => onHover?.(null)}
       aria-label={dir === "left" ? "Previous products" : "Next products"}
-      className={`w-9 h-9 lg:w-10 lg:h-10 rounded-xl border flex items-center justify-center transition shrink-0 ${
+      className={`absolute top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-md text-white border border-white/25 shadow-lg w-10 h-10 sm:w-11 sm:h-11 transition-all duration-500 ease-out ${
+        dir === "left"
+          ? "-left-2 sm:-left-3 lg:-left-4 hover:-translate-x-0.5"
+          : "-right-2 sm:-right-3 lg:-right-4 hover:translate-x-0.5"
+      } ${
         disabled
-          ? "border-[var(--user-border)] text-[var(--user-text-disabled)] opacity-40 cursor-not-allowed"
-          : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/50 active:scale-90"
+          ? "opacity-30 cursor-not-allowed pointer-events-none"
+          : "hover:bg-black/75 hover:scale-110 hover:shadow-xl active:scale-95"
       }`}
     >
-      {dir === "left" ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
+      {dir === "left" ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
     </button>
   );
 }
@@ -49,6 +56,60 @@ function ProductRow({ title, subtitle, href, products }) {
   const scrollRef = useRef(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  // ✅ Continuous hover-scroll state (per-frame drift while hovering an arrow)
+  const hoverRef = useRef(null); // { dir, vel, max }
+  const rafRef = useRef(0);
+
+  // ✅ Stop hover-scroll smoothly — brief momentum glide-out, never a hard cut
+  const stopHoverScroll = () => {
+    const st = hoverRef.current;
+    if (!st) return;
+    hoverRef.current = null;
+    const glide = () => {
+      st.vel *= 0.8;
+      const node = scrollRef.current;
+      if (st.vel < 0.12 || !node) {
+        if (node) node.style.scrollBehavior = "";
+        rafRef.current = 0;
+        return;
+      }
+      node.scrollLeft += st.dir === "right" ? st.vel : -st.vel;
+      rafRef.current = requestAnimationFrame(glide);
+    };
+    glide();
+  };
+
+  // ✅ Start hover-scroll — slow, continuous movement for as long as hovered
+  const startHoverScroll = (dir) => {
+    const node = scrollRef.current;
+    if (!node) return;
+    cancelAnimationFrame(rafRef.current);
+    node.style.scrollBehavior = "auto"; // per-frame writes must be instant
+    const prev = hoverRef.current;
+    const card = node.querySelector("a");
+    const gap = parseFloat(getComputedStyle(node).columnGap) || 16;
+    const cardStep = card ? card.offsetWidth + gap : 240;
+    hoverRef.current = {
+      dir,
+      vel: prev && prev.dir === dir ? prev.vel : 0,
+      max: cardStep / 110, // ≈ one card every ~1.8s @ 60fps — slow & steady
+    };
+    const tick = () => {
+      const st = hoverRef.current;
+      const el = scrollRef.current;
+      if (!st || !el) {
+        rafRef.current = 0;
+        return;
+      }
+      st.vel = Math.min(st.vel + st.max / 30, st.max); // soft ease-in
+      const max = el.scrollWidth - el.clientWidth;
+      const atEnd =
+        st.dir === "right" ? el.scrollLeft >= max - 1 : el.scrollLeft <= 1;
+      if (!atEnd) el.scrollLeft += st.dir === "right" ? st.vel : -st.vel;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
 
   const updateArrows = () => {
     const el = scrollRef.current;
@@ -65,14 +126,18 @@ function ProductRow({ title, subtitle, href, products }) {
     return () => {
       if (el) el.removeEventListener("scroll", updateArrows);
       window.removeEventListener("resize", updateArrows);
+      cancelAnimationFrame(rafRef.current);
     };
   }, [products]);
 
   const scroll = (dir) => {
     const el = scrollRef.current;
     if (!el) return;
+    stopHoverScroll(); // click takes over from hover scrolling
     const card = el.querySelector("a");
-    const step = card ? card.offsetWidth + 16 : 240;
+    // ✅ Move 2 products per click (card width + flex gap, doubled)
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 16;
+    const step = card ? (card.offsetWidth + gap) * 2 : 480;
     el.scrollBy({ left: dir === "left" ? -step : step, behavior: "smooth" });
   };
 
@@ -80,7 +145,7 @@ function ProductRow({ title, subtitle, href, products }) {
 
   return (
     <section className="max-w-[1400px] mx-auto px-4 lg:px-6">
-      {/* HEADER — title left, FIXED arrows right */}
+      {/* HEADER — title left */}
       <div className="flex items-center justify-between mb-4">
         <div className="min-w-0">
           <Link href={href} className="group inline-block">
@@ -94,24 +159,32 @@ function ProductRow({ title, subtitle, href, products }) {
             </p>
           )}
         </div>
-
-        {/* ✅ ARROWS — hamesha fixed, disable jab zaroorat na ho */}
-        <div className="flex gap-2 shrink-0">
-          <ArrowBtn dir="left" onClick={() => scroll("left")} disabled={!canLeft} />
-          <ArrowBtn dir="right" onClick={() => scroll("right")} disabled={!canRight} />
-        </div>
       </div>
 
-      {/* PRODUCTS ROW — horizontal slide */}
-      <div
-        ref={scrollRef}
-        className="scrollbar-hide flex gap-3 lg:gap-4 overflow-x-auto scroll-smooth pb-1"
-      >
-        {products.map((p) => (
-          <div key={p._id} className="w-[160px] sm:w-[200px] lg:w-[230px] shrink-0">
-            <ProductCard product={p} />
-          </div>
-        ))}
+      {/* PRODUCTS ROW — horizontal slide + side arrows */}
+      <div className="relative">
+        <ArrowBtn
+          dir="left"
+          onClick={() => scroll("left")}
+          disabled={!canLeft}
+          onHover={(d) => (d ? startHoverScroll(d) : stopHoverScroll())}
+        />
+        <div
+          ref={scrollRef}
+          className="scrollbar-hide flex gap-3 lg:gap-4 overflow-x-auto scroll-smooth pb-1"
+        >
+          {products.map((p) => (
+            <div key={p._id} className="w-[160px] sm:w-[200px] lg:w-[230px] shrink-0">
+              <ProductCard product={p} />
+            </div>
+          ))}
+        </div>
+        <ArrowBtn
+          dir="right"
+          onClick={() => scroll("right")}
+          disabled={!canRight}
+          onHover={(d) => (d ? startHoverScroll(d) : stopHoverScroll())}
+        />
       </div>
     </section>
   );

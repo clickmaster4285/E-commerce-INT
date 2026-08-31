@@ -498,7 +498,6 @@ export default function CategoriesPage() {
       return matchesSearch && matchesCategory;
     });
   }, [availableAttributes, attributeSearch, formData.category_type, selectedAttributeIds]);
-
   useEffect(() => { if (categoriesError) toast.error("Unable to load categories"); }, [categoriesError]);
 
   /* ---------- Reusable styles ---------- */

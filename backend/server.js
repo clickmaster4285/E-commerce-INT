@@ -9,14 +9,12 @@ const fs = require("fs");
 const cookieParser = require("cookie-parser");
 
 const connectDB = require("./config/db");
-
 const User = require("./models/User");
 const Store = require("./models/Store");
-
 const { initSocket } = require("./utils/socket");
 
 // ==========================================
-// ROUTES (CLEANED)
+// ROUTES IMPORT
 // ==========================================
 const categoryRoutes = require("./routes/categoryRoutes");
 const brandRoutes = require("./routes/brandRoutes");
@@ -34,12 +32,12 @@ const bannerScheduler = require("./utils/bannerScheduler");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const stockRoutes = require("./routes/stockRoutes");
+const shippingRoutes = require("./routes/shippingRoutes"); // ✅ SHIPPING ROUTES
 
-// Only importing Attribute Routes if you still need basic Attribute CRUD
 const attributeRoutes = require("./routes/attributeRoutes");
 
 // ==========================================
-// APP
+// APP & SERVER
 // ==========================================
 const app = express();
 const server = http.createServer(app);
@@ -58,12 +56,12 @@ const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE || "7d";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
 const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR || "store";
 const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE || "admin";
-const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE || "Backend server is running ";
+const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE || "Backend server is running";
 
 // ==========================================
-// CLIENT URL VALIDATION & CORS
+// CORS
 // ==========================================
-if (!CLIENT_URL) console.warn("️ CLIENT_URL is not configured in .env");
+if (!CLIENT_URL) console.warn("⚠️ CLIENT_URL is not configured in .env");
 
 const buildAllowedOrigins = () => {
   const origins = new Set();
@@ -82,7 +80,6 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     
-    // Allow localhost in development
     if (NODE_ENV !== "production") {
       try {
         const url = new URL(origin);
@@ -90,7 +87,6 @@ app.use(cors({
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
 
-    // Allow private networks if enabled
     if (process.env.ALLOW_LOCAL_NETWORK === "true") {
       try {
         const url = new URL(origin);
@@ -104,7 +100,7 @@ app.use(cors({
     console.error(`❌ CORS blocked origin: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
-  credentials: true, // 🔥 IMPORTANT FOR COOKIES
+  credentials: true,
 }));
 
 // ==========================================
@@ -112,14 +108,13 @@ app.use(cors({
 // ==========================================
 app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
-app.use(cookieParser()); // 🔥 Cookies parse karne ke liye zaroori
+app.use(cookieParser());
 
 // ==========================================
 // UPLOAD DIRECTORY & STATIC FILES
 // ==========================================
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
-
 app.use("/uploads", express.static(uploadDir, { maxAge: UPLOAD_CACHE_MAX_AGE, etag: true }));
 
 // ==========================================
@@ -129,7 +124,7 @@ const io = initSocket(server);
 app.use((req, res, next) => { req.io = io; next(); });
 
 // ==========================================
-// API ROUTES
+// API ROUTES (NO DUPLICATES)
 // ==========================================
 app.use(`${API_PREFIX}/categories`, categoryRoutes);
 app.use(`${API_PREFIX}/brands`, brandRoutes);
@@ -146,9 +141,8 @@ app.use(`${API_PREFIX}/banners`, bannerRoutes);
 app.use(`${API_PREFIX}/orders`, orderRoutes);
 app.use(`${API_PREFIX}/cart`, cartRoutes);
 app.use(`${API_PREFIX}/stock`, stockRoutes);
-
-// ✅ KEPT: Basic Attributes (RAM, Color etc.)
 app.use(`${API_PREFIX}/attributes`, attributeRoutes);
+app.use(`${API_PREFIX}/shipping`, shippingRoutes); // ✅ SHIPPING
 
 // ==========================================
 // ROOT & HEALTH CHECK
@@ -221,7 +215,7 @@ const seedDefaultData = async () => {
       if (updated) { await admin.save(); console.log("🔄 Existing admin updated"); }
     }
   } catch (error) {
-    console.error(" Seed Error:", error.message);
+    console.error("❌ Seed Error:", error.message);
     throw error;
   }
 };
@@ -243,7 +237,6 @@ const startServer = async () => {
     createUploadDirectories();
     await seedDefaultData();
     
-    // ✅ FIX: Safe check for bannerScheduler to prevent crash
     if (typeof bannerScheduler === 'function') {
       bannerScheduler();
     } else if (bannerScheduler && typeof bannerScheduler.start === 'function') {
@@ -256,19 +249,20 @@ const startServer = async () => {
       const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
       console.log("");
       console.log("==========================================");
-      console.log(` ${STARTUP_MESSAGE}`);
+      console.log(`🚀 ${STARTUP_MESSAGE}`);
       console.log("==========================================");
       console.log(`🌐 Server: http://${displayHost}:${PORT}`);
       console.log(`🔗 API: http://${displayHost}:${PORT}${API_PREFIX}`);
       console.log(`❤️ Health: http://${displayHost}:${PORT}${API_PREFIX}/health`);
       console.log(`🏷️ Tags: ${API_PREFIX}/tags`);
+      console.log(`🚚 Shipping: ${API_PREFIX}/shipping`);
       console.log(`🌍 Environment: ${NODE_ENV}`);
-      console.log(` CORS Origins: ${allowedOrigins.length ? allowedOrigins.join(", ") : "Development localhost enabled"}`);
+      console.log(`🔐 CORS Origins: ${allowedOrigins.length ? allowedOrigins.join(", ") : "Development localhost enabled"}`);
       console.log("🚀 Socket.IO Ready");
       console.log("==========================================");
     });
   } catch (error) {
-    console.error(" Server start failed:", error.message);
+    console.error("❌ Server start failed:", error.message);
     process.exit(1);
   }
 };

@@ -101,10 +101,16 @@ export default function UserLoginPage() {
         <div className="absolute bottom-[-140px] right-[-140px] w-[420px] h-[420px] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
 
         {/* Top: Logo */}
-        <div className="flex items-center gap-3 relative">
+              {/* Top: Logo */}
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="flex items-center gap-3 relative cursor-pointer hover:opacity-80 transition"
+          aria-label={`${storeName} home page`}
+        >
           <StoreLogo store={store} />
           <span className="text-[var(--user-text)] font-black text-xl tracking-wide">{storeName}</span>
-        </div>
+        </button>
 
         {/* Middle: Content */}
         <div className="relative">
@@ -170,10 +176,16 @@ export default function UserLoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-5 sm:p-6 lg:p-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-6">
+                    {/* Mobile Logo */}
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="lg:hidden flex items-center justify-center gap-3 mb-6 cursor-pointer hover:opacity-80 transition"
+            aria-label={`${storeName} home page`}
+          >
             <StoreLogo store={store} sizeClass="w-9 h-9" />
             <span className="text-[var(--user-text)] font-black text-lg tracking-wide">{storeName}</span>
-          </div>
+          </button>
 
           <div className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
             {/* Header */}

@@ -20,8 +20,8 @@ const deleteFile = (filePath) => {
 exports.getBanner = async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email");
+      .populate("primaryButton.dealId", "name isActive startDate endDate")
+      .populate("secondaryButton.dealId", "name isActive startDate endDate");
     if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
     res.json({ success: true, data: banner });
   } catch (err) {

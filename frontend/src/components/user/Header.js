@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
-import Cookies from "js-cookie"; // ✅ Cookies library import
+import Cookies from "js-cookie";
 
 import {
   Menu,
@@ -37,6 +37,7 @@ import {
   Sun,
   Moon,
   Heart,
+  Package,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -58,22 +59,25 @@ const getIcon = (name) => {
   return <FolderOpen size={17} />;
 };
 
-// ✅ Search box (outside component = focus safe)
+// ✅ PILL SEARCH BOX — rounded-full, inner icon + accent button
 function SearchBox({ value, onChange, onSubmit }) {
   return (
-    <div className="flex w-full">
+    <div className="relative flex w-full items-center">
+      <Search size={16} className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none" />
       <input
         value={value}
         onChange={onChange}
         onKeyDown={(e) => e.key === "Enter" && onSubmit()}
         placeholder="Search products..."
-        className="flex-1 h-10 rounded-l-lg bg-[var(--user-bg-input)] border border-r-0 border-[var(--user-border)] pl-4 pr-3 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] transition"
+        className="w-full h-10 lg:h-11 rounded-full bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-14 lg:pr-24 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15 transition"
       />
       <button
         onClick={onSubmit}
-        className="h-10 w-12 rounded-r-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:bg-[var(--user-accent-hover)] active:scale-95 transition flex items-center justify-center shrink-0"
+        aria-label="Search"
+        className="absolute right-1 h-8 lg:h-9 px-3 lg:px-4 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 active:scale-95 transition flex items-center gap-1.5"
       >
-        <Search size={17} />
+        <Search size={14} />
+        <span className="hidden lg:inline">Search</span>
       </button>
     </div>
   );
@@ -87,9 +91,7 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
 
   if (!url || failed) {
     return (
-      <div
-        className={`${sizeClass} rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black ${textClass} flex items-center justify-center shrink-0`}
-      >
+      <div className={`${sizeClass} rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black ${textClass} flex items-center justify-center shrink-0`}>
         {letter}
       </div>
     );
@@ -145,6 +147,8 @@ export default function Header() {
   const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
 
+   
+
   // ✅ BODY SCROLL LOCK
   useEffect(() => {
     if (open || profileOpen) {
@@ -164,7 +168,7 @@ export default function Header() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ✅ THEME: Cookies se load karein
+  // ✅ THEME: Cookies se load
   useEffect(() => {
     const saved = Cookies.get("user-theme") || "dark";
     setTheme(saved);
@@ -172,15 +176,15 @@ export default function Header() {
     if (el) el.classList.toggle("light", saved === "light");
   }, []);
 
-  // ✅ THEME TOGGLE - Cookies mein save karein
+  // ✅ THEME TOGGLE
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    Cookies.set("user-theme", next, { 
-      expires: 365, // 1 saal tak valid
-      path: "/",    // Pure site par accessible
-      secure: process.env.NODE_ENV === "production", // Production mein HTTPS
-      sameSite: "lax"
+    Cookies.set("user-theme", next, {
+      expires: 365,
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     });
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", next === "light");
@@ -197,7 +201,7 @@ export default function Header() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Store info (public endpoint)
+  // ✅ Store info
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
@@ -272,30 +276,40 @@ export default function Header() {
 
   const storeName = store?.store_name || "";
 
+  // ✅ Unified icon button class
+  const iconBtn =
+    "relative w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition";
+
   return (
     <>
+      <style>{`@keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }`}</style>
+
       {/* OVERLAY */}
       {open && (
         <div onClick={() => setOpen(false)} className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" />
       )}
 
       {/* ==========================================
-          ✅ HEADER — Monochrome + Dark/Light Toggle
+          ✅ HEADER — Clean, icon-only, theme-safe
       ========================================== */}
-      <header
-        className={`sticky top-0 z-50 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-b border-[var(--user-border)] transition-shadow duration-300 ${
+          <header
+        className={`sticky top-0 z-50 border-b border-[var(--user-border)] transition-shadow duration-300 ${
           scrolled ? "shadow-[var(--user-shadow-md)]" : ""
         }`}
       >
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-6">
-          <div className="h-14 lg:h-16 flex items-center gap-2 lg:gap-5">
+        {/* ✅ Blur alag layer par — taake fixed overlay poori screen cover kare */}
+        <div className="absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md pointer-events-none" />
+
+        <div className="relative max-w-[1400px] mx-auto px-4 lg:px-6">
+          <div className="h-14 lg:h-16 flex items-center gap-2 lg:gap-4">
             {/* LEFT — Menu + Logo */}
-            <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
+            <div className="flex items-center gap-1 lg:gap-2 shrink-0">
               <button
                 onClick={() => setOpen(true)}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
+                aria-label="Open menu"
+                className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
               >
-                <Menu size={20} className="text-[var(--user-text)]" />
+                <Menu size={20} />
               </button>
 
               <Link href="/" className="flex items-center gap-2">
@@ -315,62 +329,74 @@ export default function Header() {
               />
             </div>
 
-            {/* RIGHT — Theme | Wishlist | Account/Login | Orders | Cart */}
-            <div className="flex items-center gap-1.5 lg:gap-4 ml-auto shrink-0">
-              {/* ✅ THEME TOGGLE */}
+            {/* RIGHT — Theme (desktop) | Wishlist | Cart (icon only) | Account */}
+            <div className="flex items-center gap-0.5 lg:gap-1.5 ml-auto shrink-0">
+              {/* ✅ THEME TOGGLE — desktop only (mobile: sidebar mein) */}
               <button
                 onClick={toggleTheme}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                className="w-9 h-9 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
+                aria-label="Toggle theme"
+                className={`${iconBtn} hidden md:flex`}
               >
-                {theme === "dark" ? (
-                  <Sun size={17} className="text-[var(--user-text)]" />
-                ) : (
-                  <Moon size={17} className="text-[var(--user-text)]" />
+                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+
+              {/* ✅ WISHLIST — icon + badge */}
+              <Link href="/wishlist" title="My Wishlist" aria-label="My Wishlist" className={iconBtn}>
+                <Heart size={19} />
+                {wishlistCount > 0 && (
+                  <span
+                    key={wishlistCount}
+                    className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    style={{ animation: "badgePop .25s ease-out" }}
+                  >
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+
+              {/* ✅ CART — sirf icon + badge (koi text nahi) */}
+              <button
+                onClick={() => setIsCartOpen(true)}
+                title="Cart"
+                aria-label={`Open cart, ${count} items`}
+                className={iconBtn}
+              >
+                <ShoppingCart size={19} />
+                {count > 0 && (
+                  <span
+                    key={count}
+                    className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    style={{ animation: "badgePop .25s ease-out" }}
+                  >
+                    {count}
+                  </span>
                 )}
               </button>
 
-              {/* ✅ WISHLIST — heart icon + count badge */}
-                           {/* ✅ WISHLIST — heart icon + count badge */}
-              <Link
-                href="/wishlist"
-                title="My Wishlist"
-                className="flex items-center gap-1.5 lg:gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] active:scale-95 transition relative"
-              >
-                <span className="relative">
-                  <Heart size={20} className="text-[var(--user-text)]" />
-                  {wishlistCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[var(--user-danger)] text-white text-[9px] lg:text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
-                      {wishlistCount}
-                    </span>
-                  )}
-                </span>
-              </Link>
-
-              {/* ✅ ACCOUNT / LOGIN — Smart conditional */}
-              {user ? (
+              {/* ✅ ACCOUNT / LOGIN */}
+                       {/* ✅ ACCOUNT / LOGIN */}
+                           {user ? (
                 <div className="relative">
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-1.5 lg:gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] transition"
+                    aria-label="Account menu"
+                    className="flex items-center gap-1.5 pl-1 pr-1 lg:pr-2 py-1 rounded-xl hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
                   >
                     <Avatar user={user} sizeClass="w-8 h-8 lg:w-9 lg:h-9" textClass="text-xs lg:text-sm" />
-                    <span className="hidden lg:block text-left leading-tight">
-                      <span className="block text-[10px] text-[var(--user-text-muted)]">
-                        Hello, {user.name?.split(" ")[0]}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs font-bold text-[var(--user-text)]">
-                        Account
-                        <ChevronDown size={11} className="text-[var(--user-accent)]" />
-                      </span>
-                    </span>
+                    <ChevronDown
+                      size={13}
+                      className={`hidden lg:block text-[var(--user-text-muted)] transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
+                    />
                   </button>
 
-                  {profileOpen && (
+                                   {profileOpen && (
                     <>
+                      {/* ✅ Full-screen overlay — bahar ka click sirf band karega */}
                       <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-                      <div className="absolute right-0 top-12 w-56 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl shadow-[var(--user-shadow-lg)] z-50 p-2">
-                        <div className="px-3 py-2 border-b border-[var(--user-border)] mb-1">
+                      <div className="absolute right-0 top-12 w-60 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl shadow-[var(--user-shadow-lg)] z-50 p-2">
+                        
+                        <div className="px-3 py-2.5 border-b border-[var(--user-border)] mb-1">
                           <p className="text-[var(--user-text)] text-sm font-semibold truncate">
                             {user.name || user.username}
                           </p>
@@ -379,58 +405,40 @@ export default function Header() {
                         <Link
                           href="/account"
                           onClick={() => setProfileOpen(false)}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] text-sm transition"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
                         >
                           <User size={16} className="text-[var(--user-accent)]" />
                           My Account
                         </Link>
+                        <Link
+                          href="/orders"
+                          onClick={() => setProfileOpen(false)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
+                        >
+                          <Package size={16} className="text-[var(--user-accent)]" />
+                          My Orders
+                        </Link>
+                        <div className="h-px bg-[var(--user-border)] my-1" />
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[var(--user-danger)] hover:bg-red-500/10 text-sm transition"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-danger)] hover:bg-red-500/10 text-sm transition"
                         >
                           <LogOut size={16} />
                           Logout
                         </button>
-                      </div>
+                                       </div>
                     </>
                   )}
                 </div>
               ) : (
                 <button
                   onClick={() => router.push("/login")}
-                  className="flex items-center gap-1.5 h-9 px-3 lg:px-4 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:bg-[var(--user-accent-hover)] active:scale-95 transition"
+                  className="flex items-center gap-1.5 h-9 px-3 lg:px-4 ml-1 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 active:scale-95 transition"
                 >
                   <User size={14} />
                   Login
                 </button>
               )}
-
-              {/* ORDERS (desktop only, logged-in only) */}
-              {user && (
-                <Link
-                  href="/orders"
-                  className="hidden lg:block px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] transition leading-tight"
-                >
-                  <span className="block text-[10px] text-[var(--user-text-muted)]">My</span>
-                  <span className="block text-xs font-bold text-[var(--user-text)]">Orders</span>
-                </Link>
-              )}
-
-              {/* CART */}
-              <button
-                onClick={() => setIsCartOpen(true)}
-                className="flex items-center gap-1.5 lg:gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[var(--user-bg-hover)] active:scale-95 transition relative"
-              >
-                <span className="relative">
-                  <ShoppingCart size={20} className="text-[var(--user-text)]" />
-                  {count > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] lg:text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
-                      {count}
-                    </span>
-                  )}
-                </span>
-                <span className="hidden lg:block text-xs font-bold text-[var(--user-text)]">Cart</span>
-              </button>
             </div>
           </div>
 
@@ -446,7 +454,7 @@ export default function Header() {
       </header>
 
       {/* ==========================================
-          ✅ SIDEBAR — Monochrome
+          ✅ SIDEBAR
       ========================================== */}
       <div
         className={`fixed top-0 left-0 h-full w-[85%] max-w-[320px] bg-[var(--user-bg-elevated)] z-50 shadow-[var(--user-shadow-lg)] transition-transform duration-300 flex flex-col ${
@@ -455,7 +463,7 @@ export default function Header() {
       >
         {/* TOP */}
         <div className="p-5 border-b border-[var(--user-border)] shrink-0">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-5">
             <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
               <StoreLogo store={store} sizeClass="w-8 h-8" />
               <span className="font-black text-base tracking-wide text-[var(--user-text)]">
@@ -464,6 +472,7 @@ export default function Header() {
             </Link>
             <button
               onClick={() => setOpen(false)}
+              aria-label="Close menu"
               className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-bg-hover)] hover:rotate-90 transition duration-300"
             >
               <X size={16} className="text-[var(--user-text)]" />
@@ -483,7 +492,7 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* MY ACCOUNT + LOGOUT */}
+              {/* QUICK ACTIONS */}
               <div className="space-y-2">
                 <Link
                   href="/account"
@@ -493,6 +502,18 @@ export default function Header() {
                   <User size={16} className="text-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]" />
                   <span className="text-sm font-semibold text-[var(--user-text-secondary)] group-hover:text-[var(--user-accent-text)] flex-1">
                     My Account
+                  </span>
+                  <ChevronRight size={14} className="text-[var(--user-text-muted)] group-hover:text-[var(--user-accent-text)]" />
+                </Link>
+
+                <Link
+                  href="/orders"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] transition group"
+                >
+                  <Package size={16} className="text-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]" />
+                  <span className="text-sm font-semibold text-[var(--user-text-secondary)] group-hover:text-[var(--user-accent-text)] flex-1">
+                    My Orders
                   </span>
                   <ChevronRight size={14} className="text-[var(--user-text-muted)] group-hover:text-[var(--user-accent-text)]" />
                 </Link>
@@ -513,7 +534,7 @@ export default function Header() {
                 <Link
                   href="/login"
                   onClick={() => setOpen(false)}
-                  className="h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold flex items-center justify-center hover:bg-[var(--user-accent-hover)] transition"
+                  className="h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold flex items-center justify-center hover:opacity-90 transition"
                 >
                   Login
                 </Link>
@@ -523,7 +544,31 @@ export default function Header() {
         </div>
 
         {/* SCROLLABLE */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-8">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-7">
+          {/* ✅ THEME TOGGLE ROW — mobile only */}
+          <div className="md:hidden">
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-bg-hover)] transition"
+            >
+              {theme === "dark" ? (
+                <Sun size={16} className="text-[var(--user-accent)]" />
+              ) : (
+                <Moon size={16} className="text-[var(--user-accent)]" />
+              )}
+              <span className="text-sm font-semibold text-[var(--user-text-secondary)] flex-1 text-left">
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </span>
+              <span
+                className={`w-9 h-5 rounded-full relative transition-colors ${theme === "dark" ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`}
+              >
+                <span
+                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${theme === "dark" ? "left-[18px]" : "left-0.5"}`}
+                />
+              </span>
+            </button>
+          </div>
+
           {/* TOP 5 CATEGORIES */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--user-text-subtle)] mb-3">

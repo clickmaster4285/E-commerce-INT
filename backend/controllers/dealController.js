@@ -340,15 +340,107 @@ const toggleDealStatus = async (req, res) => {
     });
   }
 };
-
 // ==========================================
-// EXPORTS
+// GET ACTIVE DEALS (PUBLIC — User GUI)
 // ==========================================
 
+const getActiveDeals = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const deals = await Deal.find({
+      isActive: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    })
+      .populate("productIds", "name sku images selling_price variants")
+      .populate("categoryIds", "name code")
+      .populate("brandIds", "name")
+      .populate("bundleProducts.product", "name sku images selling_price")
+      .sort({ priority: -1, createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: deals,
+    });
+  } catch (error) {
+    console.error("Get Active Deals Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch active deals",
+    });
+  }
+};
+const getActiveDealById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+    const Product = require("../models/Product");
+
+    console.log("🔍 Fetching deal with ID:", id);
+
+    const deal = await Deal.findById(id)
+      .populate("productIds", "name sku images selling_price variants brand_id category_id price discount")
+      .populate("categoryIds", "name code")
+      .populate("brandIds", "name");
+
+    if (!deal) {
+      console.log("❌ Deal not found in database");
+      return res.status(404).json({ success: false, message: "Deal not found" });
+    }
+
+    console.log("✅ Deal found:", deal.name, "| applyTo:", deal.applyTo);
+
+    let productsQuery = { is_deleted: false, status: "active" };
+    
+    if (deal.applyTo === "category" && deal.categoryIds && deal.categoryIds.length > 0) {
+      const categoryIds = deal.categoryIds.map(c => c._id || c);
+      productsQuery.category_id = { $in: categoryIds };
+    } 
+    else if (deal.applyTo === "brand" && deal.brandIds && deal.brandIds.length > 0) {
+      const brandIds = deal.brandIds.map(b => b._id || b);
+      productsQuery.brand_id = { $in: brandIds };
+    } 
+    else if (deal.applyTo === "product" && deal.productIds && deal.productIds.length > 0) {
+      const productIds = deal.productIds.map(p => p._id || p);
+      productsQuery._id = { $in: productIds };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    // ✅ NO .populate('variants') - kyunki schema mein nahi hai
+    const [productsToShow, totalProducts] = await Promise.all([
+      Product.find(productsQuery)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Product.countDocuments(productsQuery)
+    ]);
+
+    console.log("📦 Products found:", productsToShow.length, "out of total", totalProducts);
+
+    const dealObj = deal.toObject();
+    dealObj.resolvedProducts = productsToShow;
+    dealObj.totalProducts = totalProducts;
+    dealObj.currentPage = Number(page);
+    dealObj.totalPages = Math.ceil(totalProducts / Number(limit));
+
+    res.status(200).json({ success: true, data: dealObj });
+  } catch (error) {
+    console.error("❌ Get Active Deal By ID Error:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to fetch deal" });
+  }
+};
+
+// ... (exports mein add karna mat bhoolna)
 module.exports = {
   createDeal,
   getDeals,
+  getActiveDeals,
   getDealById,
+  getActiveDealById, // ✅ Yeh add karo
   updateDeal,
   deleteDeal,
   toggleDealStatus,

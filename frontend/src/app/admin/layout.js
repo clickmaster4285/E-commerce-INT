@@ -15,6 +15,8 @@ import { io } from 'socket.io-client';
 // ==========================================
 const ROUTE_PERMISSIONS = {
   '/admin/brands': 'brands',
+    '/admin/orders': 'orders',       // ✅ YE LINE ADD KARO
+
   '/admin/categories': 'categories',
   '/admin/products': 'products',
   '/admin/store-info': 'store',

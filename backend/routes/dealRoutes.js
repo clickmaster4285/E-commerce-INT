@@ -1,11 +1,13 @@
 const express = require("express");
-const authMiddleware = require("../middleware/authMiddleware"); // ✅ Auth middleware import
-const { checkPermission } = require("../middleware/checkPermission"); // ✅ Permission middleware import
+const authMiddleware = require("../middleware/authMiddleware");
+const { checkPermission } = require("../middleware/checkPermission");
 
 const {
   createDeal,
   getDeals,
+  getActiveDeals,
   getDealById,
+  getActiveDealById, // ✅ NEW
   updateDeal,
   deleteDeal,
   toggleDealStatus,
@@ -14,40 +16,23 @@ const {
 const router = express.Router();
 
 // ==========================================
-// DEAL ROUTES (Protected with Permissions)
+// 🌐 PUBLIC ROUTES — bina login (User GUI)
 // ==========================================
+router.get("/active", getActiveDeals);
+router.get("/active/:id", getActiveDealById); // ✅ NEW: Single deal detail public
 
-// ✅ GET all deals - Requires 'deals' permission
+// ==========================================
+// 🛡️ ADMIN ROUTES — login + permission
+// ==========================================
 router.get("/", authMiddleware, checkPermission("deals"), getDeals);
-
-// ✅ GET single deal - Requires 'deals' permission
 router.get("/:id", authMiddleware, checkPermission("deals"), getDealById);
-
-// ✅ CREATE deal - Requires 'deals' permission
 router.post("/", authMiddleware, checkPermission("deals"), createDeal);
-
-// ✅ UPDATE deal - Requires 'deals' permission
 router.put("/:id", authMiddleware, checkPermission("deals"), updateDeal);
-
-// ✅ DELETE deal - Requires 'deals' permission
 router.delete("/:id", authMiddleware, checkPermission("deals"), deleteDeal);
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("deals"), toggleDealStatus);
 
-// ✅ TOGGLE active / disabled - Requires 'deals' permission
-router.patch(
-  "/:id/toggle-status",
-  authMiddleware,
-  checkPermission("deals"),
-  toggleDealStatus
-);
-
-// ==========================================
-// 🛡️ 404 HANDLER
-// ==========================================
 router.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Deal API endpoint not found: ${req.method} ${req.originalUrl}`,
-  });
+  res.status(404).json({ success: false, message: `Deal API endpoint not found: ${req.method} ${req.originalUrl}` });
 });
 
-module.exports = router;
+module.exports = router;  

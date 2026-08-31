@@ -298,6 +298,69 @@ const initSocket = (server) => {
       socket.leave(`employee:${employeeId}`);
     });
 
+        // ========== SHIPPING EVENTS ==========
+    socket.on("getShippingConfig", async () => {
+      try {
+        const ShippingConfig = require("../models/ShippingConfig");
+        const cfg = await ShippingConfig.getConfig();
+        socket.emit("shippingConfigData", { success: true, data: cfg });
+      } catch (e) { socket.emit("shippingConfigData", { success: false, message: e.message }); }
+    });
+
+    socket.on("updateShippingConfig", async (payload, callback) => {
+      try {
+        const { updateShippingConfig } = require("../controllers/shippingController");
+        const req = createReq(socket, payload);
+        const res = createRes(socket, "shippingConfigUpdated", callback);
+        await updateShippingConfig(req, res);
+      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    });
+
+    socket.on("getShippingRules", async () => {
+      try {
+        const { getShippingRules } = require("../controllers/shippingController");
+        const req = createReq(socket);
+        const res = createRes(socket, "shippingRulesList");
+        await getShippingRules(req, res);
+      } catch (e) { socket.emit("shippingRulesList", { success: false, message: e.message }); }
+    });
+
+    socket.on("createShippingRule", async (payload, callback) => {
+      try {
+        const { createShippingRule } = require("../controllers/shippingController");
+        const req = createReq(socket, payload);
+        const res = createRes(socket, "shippingRuleCreated", callback);
+        await createShippingRule(req, res);
+      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    });
+
+    socket.on("updateShippingRule", async (payload, callback) => {
+      try {
+        const { updateShippingRule } = require("../controllers/shippingController");
+        const { id, ...data } = payload || {};
+        const req = createReq(socket, data, { id });
+        const res = createRes(socket, "shippingRuleUpdated", callback);
+        await updateShippingRule(req, res);
+      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    });
+
+    socket.on("deleteShippingRule", async ({ id }, callback) => {
+      try {
+        const { deleteShippingRule } = require("../controllers/shippingController");
+        const req = createReq(socket, {}, { id });
+        const res = createRes(socket, "shippingRuleDeleted", callback);
+        await deleteShippingRule(req, res);
+      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    });
+
+    socket.on("toggleShippingRule", async ({ id }, callback) => {
+      try {
+        const { toggleShippingRule } = require("../controllers/shippingController");
+        const req = createReq(socket, {}, { id });
+        const res = createRes(socket, "shippingRuleToggled", callback);
+        await toggleShippingRule(req, res);
+      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    });
     // ========== STORE EVENTS ==========
     socket.on("getStoreInfo", async () => {
       try {

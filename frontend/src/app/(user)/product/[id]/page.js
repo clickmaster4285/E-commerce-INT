@@ -24,19 +24,19 @@ import {
   ZoomIn,
   MapPin,
   Clock,
+  Tag,
+  Sparkles,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
-import { Tag } from "lucide-react";
 
 // ============================================================
 // 2. HELPERS & CONSTANTS
 // ============================================================
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-const FREE_DELIVERY_THRESHOLD = 5000;
 const DEFAULT_QTY = 1;
 const MAX_RELATED = 8;
 
@@ -52,8 +52,20 @@ const getImageUrl = (img) => {
 const extractId = (ref) => (ref && typeof ref === "object" ? ref._id : ref);
 const extractName = (ref) => (ref && typeof ref === "object" ? ref.name : ref || "");
 const toNum = (val) => (isNaN(Number(val)) ? 0 : Number(val));
-const getDiscount = (oldPrice, newPrice) =>
-  oldPrice > newPrice ? Math.round(((oldPrice - newPrice) / oldPrice) * 100) : 0;
+
+const getDealBadgeText = (deal) => {
+  if (!deal?.type) return deal?.name || "Deal";
+  if (deal.type === "percentage") return `${deal.discountValue}% OFF`;
+  if (deal.type === "fixed_amount") return `Rs. ${deal.discountValue} OFF`;
+  if (deal.type === "buy_x_get_y") {
+    const b = deal.buyQuantity || 0;
+    const g = deal.getQuantity || 0;
+    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+  }
+  if (deal.type === "bundle") return "Bundle Deal";
+  if (deal.type === "free_shipping") return "Free Shipping";
+  return deal.name || "Deal";
+};
 
 // ============================================================
 // 3. CUSTOM HOOKS
@@ -124,7 +136,7 @@ function useAddFeedback(duration = 1500) {
 // 4. PRESENTATIONAL COMPONENTS
 // ============================================================
 const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
-  <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] flex-wrap mb-6 lg:mb-8">
+  <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] flex-wrap">
     <Link href="/" className="hover:text-[var(--user-accent)] transition-colors">Home</Link>
     <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
     {categoryName && categoryId && (
@@ -142,75 +154,147 @@ const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
 ));
 Breadcrumb.displayName = "Breadcrumb";
 
-const Gallery = memo(({ mainImage, images, imageIndex, onImageSelect, discount, stock, onZoom }) => (
-  <div className="lg:sticky lg:top-24 self-start">
-    <div
-      className="relative aspect-square overflow-hidden rounded-2xl group cursor-zoom-in"
-      onClick={() => mainImage && onZoom(mainImage)}
-    >
-      {mainImage ? (
-        <>
-          <img
-            src={mainImage}
-            alt="Product"
-            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 pointer-events-none">
-            <ZoomIn className="text-white drop-shadow-lg" size={32} />
+/* ============================================================
+   ✅ UPGRADED GALLERY
+   - Auto-rotate every 5 sec (hover par pause)
+   - Amazon-style hover ZOOM (cursor follow magnify)
+   - "Click to see full view" caption
+   - Smooth image-change animation
+============================================================ */
+const Gallery = memo(({ mainImage, images, imageIndex, onImageSelect, discount, stock, onZoom }) => {
+  const [zoomed, setZoomed] = useState(false);
+  const [origin, setOrigin] = useState("50% 50%");
+  const [paused, setPaused] = useState(false);
+
+  // ✅ AUTO-ROTATE — har 5 second mein image change
+  useEffect(() => {
+    if (paused || images.length <= 1) return;
+    const t = setInterval(() => {
+      onImageSelect((imageIndex + 1) % images.length);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [paused, imageIndex, images.length, onImageSelect]);
+
+  // ✅ Zoom cursor follow
+  const handleMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    setOrigin(`${x}% ${y}%`);
+  };
+
+  return (
+    <div className="lg:sticky lg:top-24 self-start">
+      <div className="flex gap-3 lg:gap-4">
+        {/* ✅ Vertical thumbnails — desktop */}
+        {images.length > 1 && (
+          <div className="hidden lg:flex flex-col gap-2.5 shrink-0">
+            {images.map((url, i) => (
+              <button
+                key={i}
+                onClick={() => onImageSelect(i)}
+                aria-label={`View image ${i + 1}`}
+                className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                  i === imageIndex
+                    ? "border-[var(--user-accent)] shadow-md ring-2 ring-[var(--user-accent)]/15"
+                    : "border-[var(--user-border)] opacity-60 hover:opacity-100 hover:border-[var(--user-accent)]/40"
+                }`}
+              >
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
           </div>
-        </>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-[var(--user-bg-card)]">
-          <Package size={72} className="text-[var(--user-text-subtle)]" />
+        )}
+
+        {/* ✅ MAIN IMAGE — zoom + auto-rotate */}
+        <div className="relative flex-1 min-w-0">
+                    <div
+            className="relative aspect-square overflow-hidden rounded-2xl group cursor-zoom-in bg-black [.light_&]:bg-white border border-[var(--user-border)]"
+            onClick={() => mainImage && onZoom(mainImage)}
+            onMouseEnter={() => { setZoomed(true); setPaused(true); }}
+            onMouseLeave={() => { setZoomed(false); setPaused(false); }}
+            onMouseMove={handleMove}
+          >
+            {mainImage ? (
+              <div key={mainImage} className="w-full h-full" style={{ animation: "galleryImgIn .5s ease" }}>
+                <img
+                  src={mainImage}
+                  alt="Product"
+                  className="w-full h-full object-contain"
+                  style={
+                    zoomed
+                      ? { transform: "scale(1.9)", transformOrigin: origin, transition: "transform .12s ease-out" }
+                      : { transform: "scale(1)", transition: "transform .35s ease" }
+                  }
+                />
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Package size={72} className="text-[var(--user-text-subtle)]" />
+              </div>
+            )}
+
+            {/* Zoom hint (sirf jab zoom na ho) */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {!zoomed && <ZoomIn className="text-white drop-shadow-lg" size={32} />}
+            </div>
+
+            {discount > 0 && (
+              <span className="absolute top-3 right-3 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] lg:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
+                -{discount}%
+              </span>
+            )}
+            {stock === 0 && (
+              <span className="absolute top-3 left-3 bg-red-600/90 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md">
+                Out of Stock
+              </span>
+            )}
+            {stock > 0 && stock < 5 && (
+              <span className="absolute top-3 left-3 bg-yellow-500/90 backdrop-blur text-black text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md">
+                Only {stock} left
+              </span>
+            )}
+          </div>
+
+          {/* ✅ Caption (reference jaisa) */}
+          <p className="text-center text-[11px] text-[var(--user-accent)] mt-2 select-none">
+            Click to see full view
+          </p>
+        </div>
+      </div>
+
+      {/* ✅ Horizontal thumbnails — mobile */}
+      {images.length > 1 && (
+        <div className="flex gap-2.5 mt-3 overflow-x-auto lg:hidden pb-1" style={{ scrollbarWidth: "none" }}>
+          {images.map((url, i) => (
+            <button
+              key={i}
+              onClick={() => onImageSelect(i)}
+              aria-label={`View image ${i + 1}`}
+              className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden border-2 transition-all ${
+                i === imageIndex
+                  ? "border-[var(--user-accent)] shadow-md"
+                  : "border-[var(--user-border)] opacity-60 hover:opacity-100"
+              }`}
+            >
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
         </div>
       )}
-
-      {discount > 0 && (
-        <span className="absolute top-3 right-3 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] lg:text-xs font-bold px-2.5 py-1 rounded-full shadow-md">
-          -{discount}%
-        </span>
-      )}
-      {stock === 0 && (
-        <span className="absolute top-3 left-3 bg-red-600/90 backdrop-blur text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md">
-          Out of Stock
-        </span>
-      )}
-      {stock > 0 && stock < 5 && (
-        <span className="absolute top-3 left-3 bg-yellow-500/90 backdrop-blur text-black text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md">
-          Only {stock} left
-        </span>
-      )}
     </div>
-
-    {images.length > 1 && (
-      <div className="flex gap-2.5 mt-4 flex-wrap">
-        {images.map((url, i) => (
-          <button
-            key={i}
-            onClick={() => onImageSelect(i)}
-            className={`w-14 h-14 lg:w-16 lg:h-16 rounded-xl overflow-hidden border-2 transition-all ${
-              i === imageIndex
-                ? "border-[var(--user-accent)] shadow-md"
-                : "border-[var(--user-border)] opacity-60 hover:opacity-100 hover:border-[var(--user-accent)]/40"
-            }`}
-          >
-            <img src={url} alt="" className="w-full h-full object-cover" />
-          </button>
-        ))}
-      </div>
-    )}
-  </div>
-));
+  );
+});
 Gallery.displayName = "Gallery";
 
-// ✅ FIX 3+4: whitespace-pre-line (Shift+Enter lines) + break-words (no overflow)
-const Description = memo(({ text }) => {
+/* ✅ SHORT description (right side) */
+const ShortDescription = memo(({ text }) => {
   const [expanded, setExpanded] = useState(false);
   if (!text) return null;
-  const isLong = text.length > 160;
+  const isLong = text.length > 140;
   return (
-    <div className="mt-4 min-w-0">
-      <p className={`text-[13px] lg:text-sm leading-6 lg:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+    <div className="min-w-0">
+      <p className={`text-[13px] lg:text-sm leading-6 text-[var(--user-text-muted)] whitespace-pre-line break-words ${!expanded && isLong ? "line-clamp-3" : ""}`}>
         {text}
       </p>
       {isLong && (
@@ -218,17 +302,13 @@ const Description = memo(({ text }) => {
           onClick={() => setExpanded(!expanded)}
           className="mt-1.5 inline-flex items-center gap-1 text-[11px] lg:text-xs font-semibold text-[var(--user-accent)] hover:underline"
         >
-          {expanded ? (
-            <>Show less <ChevronUp size={14} /></>
-          ) : (
-            <>Read more <ChevronDown size={14} /></>
-          )}
+          {expanded ? <>Show less <ChevronUp size={14} /></> : <>Read more <ChevronDown size={14} /></>}
         </button>
       )}
     </div>
   );
 });
-Description.displayName = "Description";
+ShortDescription.displayName = "ShortDescription";
 
 const Divider = () => <hr className="my-5 lg:my-6 border-[var(--user-border)]" />;
 
@@ -244,7 +324,7 @@ const VariantSelector = memo(({ variants, selectedIndex, onSelect }) => {
   return (
     <div>
       <p className="text-[10px] lg:text-[11px] font-bold text-[var(--user-text-secondary)] uppercase tracking-widest mb-2.5">
-        Options
+        Variant
         {variants[selectedIndex]?.title && (
           <span className="normal-case tracking-normal text-[var(--user-text-muted)] font-normal ml-2">
             — {variants[selectedIndex].title}
@@ -277,10 +357,56 @@ const VariantSelector = memo(({ variants, selectedIndex, onSelect }) => {
 });
 VariantSelector.displayName = "VariantSelector";
 
+const ColorDots = memo(({ variants, selectedIndex, onSelect }) => {
+  if (!variants || variants.length <= 1) return null;
+  return (
+    <div className="mt-4">
+      <p className="text-[10px] lg:text-[11px] font-bold text-[var(--user-text-secondary)] uppercase tracking-widest mb-2.5">
+        Colours
+        {variants[selectedIndex]?.title && (
+          <span className="normal-case tracking-normal text-[var(--user-text-muted)] font-normal ml-2">
+            — {variants[selectedIndex].title}
+          </span>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-2.5">
+        {variants.map((v, i) => {
+          const firstImg = (v.images || [])[0];
+          const url = firstImg ? getImageUrl(firstImg) : null;
+          const isOut = toNum(v.quantity) < 1;
+          return (
+            <button
+              key={v._id || i}
+              onClick={() => onSelect(i)}
+              disabled={isOut}
+              aria-label={v.title || `Option ${i + 1}`}
+              title={v.title || `Option ${i + 1}`}
+              className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all ${
+                i === selectedIndex
+                  ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/20 scale-105"
+                  : "border-[var(--user-border)] opacity-70 hover:opacity-100 hover:border-[var(--user-accent)]/50"
+              } ${isOut ? "opacity-30 cursor-not-allowed" : ""}`}
+            >
+              {url ? (
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-[11px] font-bold bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]">
+                  {(v.title || "?").charAt(0)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+ColorDots.displayName = "ColorDots";
+
 const TrustBadges = memo(() => (
   <div className="grid grid-cols-3 divide-x divide-[var(--user-border)] rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm">
     {[
-      { icon: Truck, title: "Free Delivery", sub: `Rs. ${FREE_DELIVERY_THRESHOLD.toLocaleString()}+` },
+      { icon: Truck, title: "Free Delivery", sub: "On Deals" },
       { icon: ShieldCheck, title: "Warranty", sub: "Official" },
       { icon: RotateCcw, title: "7-Day Return", sub: "Easy" },
     ].map(({ icon: Icon, title, sub }) => (
@@ -310,7 +436,6 @@ const DeliveryInfo = memo(() => (
 ));
 DeliveryInfo.displayName = "DeliveryInfo";
 
-// ✅ FIX 2: CONTENT-WIDTH table (poori width nahi)
 const SpecsTable = memo(({ attributes }) => {
   const entries = Object.entries(attributes || {});
   if (entries.length === 0) return null;
@@ -338,21 +463,35 @@ const SpecsTable = memo(({ attributes }) => {
 });
 SpecsTable.displayName = "SpecsTable";
 
-// ✅ FIX 3: pre-line + break-words
-const VariantDescription = memo(({ variant }) => {
-  if (!variant?.description) return null;
+/* ✅ LONG description (neeche — short repeat NAHI hoti) */
+const DetailsSection = memo(({ fullDescription, variant }) => {
+  const hasProduct = !!fullDescription;
+  const hasVariant = !!variant?.description;
+  if (!hasProduct && !hasVariant) return null;
   return (
     <section className="mt-10 lg:mt-14">
-      <SectionHead>Details — {variant?.title || "Selected Option"}</SectionHead>
-      <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
-        <p className="text-[13px] lg:text-sm leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">
-          {variant.description}
-        </p>
+      <SectionHead>Details — Description</SectionHead>
+      <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 lg:p-6 shadow-sm space-y-5">
+        {hasProduct && (
+          <div className="text-[13px] lg:text-sm leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">
+            {fullDescription}
+          </div>
+        )}
+        {hasVariant && (
+          <div className="pt-5 border-t border-[var(--user-border)]">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--user-text-secondary)] mb-2.5">
+              {variant?.title || "Selected Option"}
+            </p>
+            <p className="text-[13px] lg:text-sm leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">
+              {variant.description}
+            </p>
+          </div>
+        )}
       </div>
     </section>
   );
 });
-VariantDescription.displayName = "VariantDescription";
+DetailsSection.displayName = "DetailsSection";
 
 const MoreImagesStack = memo(({ images, onZoom }) => {
   if (!images || images.length <= 1) return null;
@@ -364,11 +503,12 @@ const MoreImagesStack = memo(({ images, onZoom }) => {
           <button
             key={i}
             onClick={() => onZoom(url)}
-            className="block w-full rounded-2xl overflow-hidden group cursor-zoom-in shadow-sm hover:shadow-md transition-shadow"
+            className="block w-full rounded-2xl overflow-hidden group cursor-zoom-in shadow-sm hover:shadow-md transition-shadow border border-[var(--user-border)]"
           >
             <img
               src={url}
               alt={`Product view ${i + 1}`}
+              loading="lazy"
               className="w-full h-[260px] sm:h-[380px] lg:h-[520px] object-cover group-hover:scale-[1.02] transition-transform duration-500"
             />
           </button>
@@ -394,7 +534,7 @@ const RelatedProducts = memo(({ products }) => {
 });
 RelatedProducts.displayName = "RelatedProducts";
 
-const MobileStickyBar = memo(({ name, price, qty, isAdded, stock, onAdd }) => (
+const MobileStickyBar = memo(({ name, price, qty, stock, onAdd, isAdded }) => (
   <div className="fixed bottom-16 left-0 right-0 z-30 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-lg">
     <div className="h-14 px-4 flex items-center gap-3">
       <div className="flex-1 min-w-0">
@@ -404,10 +544,12 @@ const MobileStickyBar = memo(({ name, price, qty, isAdded, stock, onAdd }) => (
       <button
         onClick={onAdd}
         disabled={stock < 1}
-        className="h-9 px-4 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-40 bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+        className={`h-9 px-4 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-40 ${
+          isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+        }`}
       >
-        <ShoppingCart size={13} />
-        Add
+        {isAdded ? <Check size={13} /> : <ShoppingCart size={13} />}
+        {isAdded ? "Added!" : "Add"}
       </button>
     </div>
   </div>
@@ -494,6 +636,7 @@ export default function ProductDetailPage({ params }) {
 
   const { isAdded, trigger } = useAddFeedback();
   const { addToCart, setIsCartOpen } = useCart();
+  const { calculateProductDiscount } = useDiscounts();
 
   const [lightbox, setLightbox] = useState(null);
   const openLightbox = useCallback((url) => {
@@ -505,35 +648,58 @@ export default function ProductDetailPage({ params }) {
     [allImages.length]
   );
 
-  const handleAdd = useCallback(() => {
-    if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity);
-    trigger();
-  }, [stock, product, currentVariant, quantity, addToCart, trigger]);
-
-  const handleBuy = useCallback(() => {
-    if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity);
-    setIsCartOpen(true);
-  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen]);
-
-  const { calculateProductDiscount } = useDiscounts();
-
   const variantPrice = toNum(currentVariant?.selling_price);
   const variantOldPrice = toNum(currentVariant?.price);
 
-  // ✅ Admin + product discount — best one
   const disc = calculateProductDiscount(product, variantPrice);
   const price = disc.discountedPrice;
   const oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
   const discount = disc.hasDiscount
     ? Math.round(((disc.originalPrice - disc.discountedPrice) / disc.originalPrice) * 100)
     : 0;
+  const matchedDeal = disc.matchedDeal || null;
+
+  const dealInfo = useMemo(() => {
+    if (!matchedDeal) return null;
+    const info = {
+      dealId: matchedDeal._id,
+      dealType: matchedDeal.type,
+      dealName: matchedDeal.name,
+      dealBadge: getDealBadgeText(matchedDeal),
+      savings: Math.max(0, oldPrice - price),
+      originalPrice: oldPrice,
+    };
+    if (matchedDeal.type === "buy_x_get_y") {
+      info.buyQuantity = matchedDeal.buyQuantity;
+      info.getQuantity = matchedDeal.getQuantity;
+    }
+    return info;
+  }, [matchedDeal, oldPrice, price]);
+
+  const handleAdd = useCallback(() => {
+    if (stock < 1 || !product) return;
+    addToCart(product, currentVariant, quantity, dealInfo);
+    trigger();
+  }, [stock, product, currentVariant, quantity, addToCart, trigger, dealInfo]);
+
+  const handleBuy = useCallback(() => {
+    if (stock < 1 || !product) return;
+    addToCart(product, currentVariant, quantity, dealInfo);
+    setIsCartOpen(true);
+  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, dealInfo]);
 
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
   const brandName = extractName(product?.brand_id);
   const brandId = extractId(product?.brand_id);
+
+  // ✅ SHORT vs LONG description alag
+  const fullDescription = product?.description || "";
+  const shortDescription =
+    product?.short_description ||
+    (fullDescription.length > 220
+      ? fullDescription.slice(0, 220).replace(/\s+\S*$/, "") + "…"
+      : fullDescription);
 
   const related = useMemo(() => {
     if (!product || !allProducts.length) return [];
@@ -550,6 +716,8 @@ export default function ProductDetailPage({ params }) {
 
   return (
     <main className="max-w-[1400px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-24 md:pb-10">
+      <style>{`@keyframes galleryImgIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }`}</style>
+
       <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={product.name} />
 
       {/* ═══════════ 2-COLUMN ═══════════ */}
@@ -577,7 +745,7 @@ export default function ProductDetailPage({ params }) {
             {product.name}
           </h1>
 
-          <div className="mt-1.5 text-[11px] lg:text-xs font-medium">
+          <div className="mt-2 text-[11px] lg:text-xs font-medium">
             {stock > 0 ? (
               <span className="inline-flex items-center gap-1.5 text-[var(--user-success)]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--user-success)]" /> In Stock
@@ -589,14 +757,22 @@ export default function ProductDetailPage({ params }) {
             )}
           </div>
 
-          <Description text={product.description} />
+          {/* ✅ SHORT description (right side) */}
+          <div className="mt-4">
+            <ShortDescription text={shortDescription} />
+          </div>
 
-
-
-                <div className="mt-5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
+          {/* Price card */}
+          <div className="mt-5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
             <h2 className="text-lg lg:text-xl font-extrabold text-[var(--user-text)]">Rs. {price.toLocaleString()}</h2>
             {disc.hasDiscount && (
               <span className="text-xs lg:text-sm text-[var(--user-text-subtle)] line-through">Rs. {disc.originalPrice.toLocaleString()}</span>
+            )}
+            {dealInfo && (
+              <span className="text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Sparkles size={10} />
+                {dealInfo.dealBadge}
+              </span>
             )}
             {disc.hasDiscount && (
               <span className="ml-auto text-[10px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/25 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -606,15 +782,13 @@ export default function ProductDetailPage({ params }) {
             )}
           </div>
 
-
-
           <Divider />
 
           <VariantSelector variants={variants} selectedIndex={variantIndex} onSelect={selectVariant} />
-          {variants.length > 1 && <div className="mt-4" />}
+          <ColorDots variants={variants} selectedIndex={variantIndex} onSelect={selectVariant} />
 
-          {/* ✅ FIX 1: Dono buttons COMPACT + barabar size */}
-          <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+          {/* Qty + Add + Buy */}
+          <div className="flex items-center gap-2.5 mt-5 flex-wrap">
             <div className="flex items-center h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0">
               <button onClick={decrement} className="px-2.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease">
                 <Minus size={13} />
@@ -625,7 +799,6 @@ export default function ProductDetailPage({ params }) {
               </button>
             </div>
 
-            {/* Add to Cart — Buy Now jitna compact */}
             <button
               onClick={handleAdd}
               disabled={stock < 1}
@@ -665,11 +838,11 @@ export default function ProductDetailPage({ params }) {
       </div>
 
       {/* ═══════════ BELOW THE FOLD ═══════════ */}
-      <VariantDescription variant={currentVariant} />
+      <DetailsSection fullDescription={fullDescription} variant={currentVariant} />
       <MoreImagesStack images={allImages} onZoom={openLightbox} />
       <RelatedProducts products={related} />
 
-      <MobileStickyBar name={product.name} price={price} qty={quantity} isAdded={isAdded} stock={stock} onAdd={handleAdd} />
+      <MobileStickyBar name={product.name} price={price} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
       <Lightbox images={allImages} index={lightbox} onClose={() => setLightbox(null)} onStep={stepLightbox} />
     </main>
   );

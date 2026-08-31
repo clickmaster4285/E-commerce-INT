@@ -70,4 +70,4 @@ async function seedAttributes() {
   }
 }
 
-seedAttributes();
+seedAttributes(); 

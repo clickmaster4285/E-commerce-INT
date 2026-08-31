@@ -176,3 +176,43 @@
     animation-duration: 30s;
   }
 }
+
+/* ==========================================
+   CART DRAWER ANIMATIONS
+========================================== */
+@keyframes cart-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.cart-item-in {
+  animation: cart-item-in 0.3s ease-out both;
+}
+
+@keyframes cart-qty-pop {
+  0% {
+    transform: scale(0.75);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.cart-qty-pop {
+  display: inline-block;
+  animation: cart-qty-pop 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-item-in,
+  .cart-qty-pop {
+    animation: none;
+  }
+}

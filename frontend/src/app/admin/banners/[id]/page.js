@@ -87,63 +87,91 @@ function StatusPill({ status }) {
       {status || "draft"}
     </span>
   );
-}
+};
 
-function Button({ children, onClick, primary = false, disabled = false, type = "button" }) {
-  return (
-    <button type={type} onClick={onClick} disabled={disabled}
-      className="inline-flex min-h-[44px] h-10 md:h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+// ======================================================
+// SECTION
+// ======================================================
+
+const Section = ({ title, description, icon, children }) => (
+  <section
+    className="rounded-lg border overflow-hidden"
+    style={{
+      backgroundColor: "var(--bg-card)",
+      borderColor: "var(--border-color)",
+    }}
+  >
+    <div
+      className="px-5 py-4 border-b"
       style={{
-        backgroundColor: primary ? "var(--accent)" : "var(--bg-tertiary)",
-        color: primary ? "var(--accent-text)" : "var(--text-primary)",
-        border: primary ? "none" : "1px solid var(--border-color)",
-      }}>
-      {children}
-    </button>
-  );
-}
+        borderColor: "var(--border-color)",
+        backgroundColor: "var(--bg-tertiary)",
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center"
+          style={{
+            backgroundColor: "rgba(16,185,129,0.10)",
+            color: "#34d399",
+          }}
+        >
+          {icon}
+        </div>
 
-function Card({ children, className = "" }) {
-  return (
-    <div className={`overflow-hidden rounded-xl ${className}`} style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-      {children}
-    </div>
-  );
-}
+        <div>
+          <h2
+            className="text-sm font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {title}
+          </h2>
 
-function CardHeader({ icon, title }) {
-  return (
-    <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-      <div className="flex items-center gap-2">
-        {icon && <span style={{ color: "var(--accent)" }}>{icon}</span>}
-        <h3 className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{title}</h3>
+          {description && (
+            <p
+              className="text-[11px] mt-0.5"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {description}
+            </p>
+          )}
+        </div>
       </div>
     </div>
-  );
-}
 
-function InfoRow({ label, value, green = false, mono = false }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{label}</span>
-      <span className={`text-[12px] text-right truncate max-w-[62%] ${mono ? "font-mono" : ""}`}
-        style={{ color: green ? "#34d399" : "var(--text-primary)" }}>
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
+    <div className="p-5">{children}</div>
+  </section>
+);
 
-function Spin({ className = "w-4 h-4" }) {
-  return (
-    <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-    </svg>
-  );
-}
+// ======================================================
+// INFO ITEM
+// ======================================================
 
-function ImageCard({ title, image, icon }) {
+const InfoItem = ({ label, value, children }) => (
+  <div className="space-y-1">
+    <p
+      className="text-[11px] font-medium uppercase tracking-wide"
+      style={{ color: "var(--text-muted)" }}
+    >
+      {label}
+    </p>
+
+    {children || (
+      <p
+        className="text-sm font-medium break-words"
+        style={{ color: "var(--text-primary)" }}
+      >
+        {value ?? "—"}
+      </p>
+    )}
+  </div>
+);
+
+// ======================================================
+// IMAGE CARD
+// ======================================================
+
+const ImageCard = ({ title, image, icon }) => {
   const imageUrl = getImageUrl(image);
   return (
     <Card>
@@ -235,45 +263,47 @@ export default function BannerDetailPage() {
     <div className="w-full pb-8" style={{ color: "var(--text-primary)" }}>
       <div className="space-y-6">
 
-        {/* HEADER */}
-        <div>
-          <div className="mb-4 flex items-center gap-2 text-[12px]">
-            <button onClick={() => router.push(backPath)} className="transition hover:text-[var(--accent)]" style={{ color: "var(--text-muted)" }}>Banners</button>
-            <Ico d={D.chevron} className="h-3 w-3" style={{ color: "var(--text-muted)" }} />
-            <span style={{ color: "var(--text-primary)" }}>Banner Details</span>
-          </div>
+        {/* ==================================================
+            HEADER
+        ================================================== */}
 
-          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)" }}>
-                  {thumbSrc ? (
-                    <img src={thumbSrc} alt={banner.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <Ico d={D.image} className="h-7 w-7" sw={1.4} style={{ color: "var(--accent)" }} />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{banner.title || "Untitled Banner"}</h1>
-                    <StatusPill status={banner.status} />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                    <span>{formatType(banner.bannerType)}</span>
-                    <span>•</span>
-                    <span>Position {banner.position ?? 0}</span>
-                  </div>
-                </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+          <div className="flex items-start gap-3">
+
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-lg border flex items-center justify-center transition hover:opacity-80"
+              style={{
+                borderColor: "var(--border-color)",
+                backgroundColor: "var(--bg-card)",
+                color: "var(--text-secondary)",
+              }}
+              title="Back"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+            </button>
+
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1
+                  className="text-xl sm:text-2xl font-bold tracking-tight"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {banner.title || "Banner Details"}
+                </h1>
+
+                <StatusBadge status={banner.status} />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button onClick={() => router.push(backPath)}><Ico d={D.back} className="h-3.5 w-3.5" /> Back</Button>
-                <Button primary onClick={() => router.push(`/admin/banners?edit=${banner._id}`)}>
-                  <Ico d={D.edit} className="h-3.5 w-3.5" /> Edit Banner
-                </Button>
-              </div>
+
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Banner details and configuration
+              </p>
             </div>
           </div>
-        </div>
 
         {/* TABS */}
         <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)" }}>
@@ -300,273 +330,467 @@ export default function BannerDetailPage() {
           })}
         </div>
 
-        {/* OVERVIEW TAB */}
-        {tab === "info" && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
-            {/* Left column */}
-            <div className="space-y-4 min-w-0">
-              <Card>
-                <CardHeader title="Banner Information" icon={<Ico d={D.tag} className="w-4 h-4" />} />
-                <div className="px-4">
-                  <InfoRow label="Banner Title" value={banner.title} />
-                  <InfoRow label="Banner Type" value={formatType(banner.bannerType)} />
-                  <InfoRow label="Position" value={banner.position ?? 0} mono />
-                  <InfoRow label="Status" value={banner.status || "draft"} green={banner.status === "active"} />
-                  <InfoRow label="Alt Text" value={banner.altText || "—"} />
-                  <InfoRow label="Background Color" value={banner.backgroundColor || "—"} />
+        {/* ==================================================
+            HERO PREVIEW
+        ================================================== */}
 
-                  {/* Detailed Creation Info */}
-                  <div className="py-3 border-b" style={{ borderColor: "var(--border-color)" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Created By</span>
-                      <span className="text-[12px] font-medium">{banner.createdby?.name || banner.createdBy?.name || "System"}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Created At</span>
-                      <span className="text-[12px]">{formatDateTime(banner.createdAt)}</span>
-                    </div>
-                  </div>
+        <div
+          className="rounded-lg border overflow-hidden"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            borderColor: "var(--border-color)",
+          }}
+        >
+          <div
+            className="px-5 py-4 border-b flex items-center justify-between"
+            style={{
+              borderColor: "var(--border-color)",
+              backgroundColor: "var(--bg-tertiary)",
+            }}
+          >
+            <div>
+              <h2
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Banner Preview
+              </h2>
 
-                  {/* Detailed Update Info */}
-                  <div className="py-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Last Updated By</span>
-                      <span className="text-[12px] font-medium">{banner.updatedby?.name || banner.updatedBy?.name || (hasUpdates ? "Unknown" : "—")}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Last Updated At</span>
-                      <span className="text-[12px]">{hasUpdates ? formatDateTime(banner.updatedAt) : "Never"}</span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Content */}
-              <Card>
-                <CardHeader title="Banner Content" icon={<Ico d={D.info} className="w-4 h-4" />} />
-                <div className="px-4 pb-2">
-                  <InfoRow label="Eyebrow / Small Heading" value={banner.eyebrow || "—"} />
-                  <InfoRow label="Main Heading" value={banner.heading || "—"} />
-                </div>
-                <div className="p-4 pt-0">
-                  <p className="text-[10px] uppercase tracking-wide mb-2 mt-2" style={{ color: "var(--text-muted)" }}>Description</p>
-                  {banner.description ? (
-                    <p className="text-[12px] leading-6 whitespace-pre-wrap break-words rounded-lg p-3" style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-tertiary)" }}>{banner.description}</p>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center py-6">
-                      <Ico d={D.info} className="w-7 h-7 mb-3" sw={1.4} />
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No description provided.</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
+              <p
+                className="text-[11px] mt-0.5"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Desktop banner preview
+              </p>
             </div>
 
-            {/* Right column — Preview */}
-            <Card>
-              <CardHeader title="Banner Preview" icon={<Ico d={D.monitor} className="w-4 h-4" />} action={
-                <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
-                  Position: {banner.position ?? 0}
+            <span
+              className="text-xs px-2.5 py-1 rounded-md border"
+              style={{
+                borderColor: "var(--border-color)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Position: {banner.position ?? 0}
+            </span>
+          </div>
+
+          <div className="p-5">
+            {images.desktop ? (
+              <div
+                className="w-full overflow-hidden rounded-lg border"
+                style={{
+                  borderColor: "var(--border-color)",
+                  backgroundColor:
+                    banner.backgroundColor || "transparent",
+                }}
+              >
+                <img
+                  src={getImageUrl(images.desktop)}
+                  alt={banner.altText || banner.title || "Banner"}
+                  className="w-full max-h-[420px] object-cover"
+                />
+              </div>
+            ) : (
+              <div
+                className="h-64 rounded-lg border border-dashed flex flex-col items-center justify-center gap-3"
+                style={{
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                <ImageIcon className="w-10 h-10" />
+                <span className="text-sm">
+                  No desktop image available
                 </span>
-              } />
-              <div className="p-4">
-                {thumbSrc ? (
-                  <div className="overflow-hidden rounded-lg" style={{ border: "1px solid var(--border-color)", backgroundColor: banner.backgroundColor || "transparent" }}>
-                    <img src={thumbSrc} alt={banner.altText || banner.title || "Banner"} className="w-full object-cover max-h-[240px]" />
-                  </div>
-                ) : (
-                  <div className="h-[170px] rounded-lg flex flex-col items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                    <Ico d={D.image} className="w-7 h-7 mb-3" sw={1.4} />
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No desktop image available</p>
-                  </div>
-                )}
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] truncate" style={{ color: "var(--text-primary)" }}>{String(images.desktop || "").split("/").pop() || "—"}</p>
-                    <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{formatType(banner.bannerType)}</p>
-                  </div>
-                  {thumbSrc && (
-                    <a href={thumbSrc} target="_blank" rel="noopener noreferrer" className="text-[10px] flex items-center gap-1 shrink-0" style={{ color: "var(--accent)" }}>
-                      View <Ico d={D.link} className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
               </div>
-            </Card>
+            )}
+          </div>
+        </div>
+
+        {/* ==================================================
+            BASIC INFORMATION
+        ================================================== */}
+
+        <Section
+          title="Basic Information"
+          description="Core information about this banner"
+          icon={<InfoIcon />}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <InfoItem
+              label="Banner Title"
+              value={banner.title}
+            />
+
+            <InfoItem
+              label="Banner Type"
+              value={formatType(banner.bannerType)}
+            />
+
+            <InfoItem
+              label="Position"
+              value={banner.position ?? 0}
+            />
+
+            <InfoItem label="Status">
+              <StatusBadge status={banner.status} />
+            </InfoItem>
+
+            <InfoItem
+              label="Alt Text"
+              value={banner.altText || "—"}
+            />
+
+            <InfoItem
+              label="Background Color"
+              value={banner.backgroundColor || "—"}
+            />
+
+            <InfoItem
+              label="Created"
+              value={formatDateTime(banner.createdAt)}
+            />
+
+            <InfoItem
+              label="Last Updated"
+              value={formatDateTime(banner.updatedAt)}
+            />
+          </div>
+        </Section>
+
+        {/* ==================================================
+            RESPONSIVE IMAGES
+        ================================================== */}
+
+        <Section
+          title="Responsive Images"
+          description="Images configured for different screen sizes"
+          icon={<ImageIcon />}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+            <ImageCard
+              title="Desktop"
+              image={images.desktop}
+              icon={<MonitorIcon />}
+            />
+
+            <ImageCard
+              title="Tablet"
+              image={images.tablet}
+              icon={<TabletIcon />}
+            />
+
+            <ImageCard
+              title="Mobile"
+              image={images.mobile}
+              icon={<SmartphoneIcon />}
+            />
+
           </div>
         )}
 
-        {/* IMAGES TAB */}
-        {tab === "images" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <ImageCard title="Desktop" image={images.desktop} icon={<Ico d={D.monitor} className="w-4 h-4" />} />
-            <ImageCard title="Tablet" image={images.tablet} icon={<Ico d={D.tablet} className="w-4 h-4" />} />
-            <ImageCard title="Mobile" image={images.mobile} icon={<Ico d={D.smartphone} className="w-4 h-4" />} />
-          </div>
-        )}
+        {/* ==================================================
+            BANNER CONTENT
+        ================================================== */}
 
-        {/* RULES & SCHEDULE TAB */}
-        {tab === "rules" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Call to Action */}
-              <Card>
-                <CardHeader title="Call to Action" icon={<Ico d={D.link} className="w-4 h-4" />} />
-                <div className="px-4 pb-1">
-                  <InfoRow label="Button Text" value={banner.primaryButton?.text || "—"} />
-                  <InfoRow label="Link Type" value={formatType(banner.primaryButton?.linkType)} />
-                  <div className="py-3">
-                    <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Target Link</p>
-                    {banner.primaryButton?.link ? (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                        <Ico d={D.link} className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />
-                        <span className="text-[12px] break-all">{banner.primaryButton.link}</span>
-                      </div>
-                    ) : (
-                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>—</span>
-                    )}
-                  </div>
-                </div>
-              </Card>
+        <Section
+          title="Banner Content"
+          description="Text displayed inside the banner"
+          icon={<InfoIcon />}
+        >
+          <div className="space-y-5">
 
-              {/* Schedule */}
-              <Card>
-                <CardHeader title="Schedule" icon={<Ico d={D.calendar} className="w-4 h-4" />} />
-                <div className="px-4 pb-1">
-                  <InfoRow label="Start Date & Time" value={formatDateTime(banner.startDate)} />
-                  <InfoRow label="End Date & Time" value={formatDateTime(banner.endDate)} />
-                  <InfoRow label="Auto Publish" value={banner.autoPublish ? "Enabled" : "Disabled"} green={banner.autoPublish} />
-                  <InfoRow label="Auto Disable" value={banner.autoDisable ? "Enabled" : "Disabled"} />
-                </div>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              <InfoItem
+                label="Eyebrow / Small Heading"
+                value={banner.eyebrow || "—"}
+              />
+
+              <InfoItem
+                label="Main Heading"
+                value={banner.heading || "—"}
+              />
+
             </div>
 
-            {/* Display Rules */}
-            <Card>
-              <CardHeader title="Display Rules" icon={<Ico d={D.monitor} className="w-4 h-4" />} />
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Show On Pages</p>
-                  {pages.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {pages.map((page) => (
-                        <span key={page} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium capitalize" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                          <Ico d={D.check} className="w-3 h-3" style={{ color: "#34d399" }} />
-                          {formatType(page)}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No pages configured</span>
-                  )}
-                </div>
+            <div>
+              <p
+                className="text-[11px] font-medium uppercase tracking-wide mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Description
+              </p>
 
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Show On Devices</p>
-                  {devices.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {devices.map((device) => (
-                        <span key={device} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium capitalize" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                          <Ico d={D.check} className="w-3 h-3" style={{ color: "#34d399" }} />
-                          {formatType(device)}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No devices configured</span>
-                  )}
-                </div>
+              <div
+                className="rounded-lg border p-4 text-sm leading-6"
+                style={{
+                  borderColor: "var(--border-color)",
+                  backgroundColor: "var(--bg-tertiary)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {banner.description || "No description provided."}
               </div>
-            </Card>
+            </div>
+
           </div>
-        )}
+        </Section>
 
-        {/* ACTIVITY TAB */}
-        {tab === "activity" && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-            <Card>
-              <CardHeader title="Activity Timeline" icon={<Ico d={D.activity} className="w-4 h-4" />} />
-              <div className="p-5 space-y-6">
+        {/* ==================================================
+            CALL TO ACTION
+        ================================================== */}
 
-                {/* Created Event */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,.10)", color: "var(--accent)" }}>
-                      <Ico d={D.plus} className="w-4 h-4" />
-                    </div>
-                    {hasUpdates && <div className="w-px flex-1 mt-1" style={{ backgroundColor: "var(--border-color)" }} />}
-                  </div>
-                  <div className="pb-2">
-                    <p className="text-[13px] font-medium">Banner Created</p>
-                    <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                      Created by <span className="font-semibold text-[var(--text-primary)]">{banner.createdby?.name || banner.createdBy?.name || "System"}</span>
-                      {(banner.createdby?.email || banner.createdBy?.email) && <span className="block text-[10px] opacity-70">{banner.createdby?.email || banner.createdBy?.email}</span>}
-                    </p>
-                    <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateTime(banner.createdAt)}
-                    </p>
-                  </div>
-                </div>
+        <Section
+          title="Call to Action"
+          description="Button and destination configuration"
+          icon={<LinkIcon />}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-                {/* Updated Event */}
-                {hasUpdates ? (
-                  <div className="flex gap-4">
-                    <div>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(96,165,250,.10)", color: "#60a5fa" }}>
-                        <Ico d={D.pencil} className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-medium">Banner Updated</p>
-                      <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                        Updated by <span className="font-semibold text-[var(--text-primary)]">{banner.updatedby?.name || banner.updatedBy?.name || "Unknown"}</span>
-                      </p>
-                      <p className="text-[10px] mt-2 font-mono" style={{ color: "var(--text-secondary)" }}>
-                        {formatDateTime(banner.updatedAt)}
-                      </p>
-                    </div>
+            <InfoItem
+              label="Button Text"
+              value={banner.primaryButton?.text || "—"}
+            />
+
+            <InfoItem
+              label="Link Type"
+              value={formatType(banner.primaryButton?.linkType)}
+            />
+
+            {banner.primaryButton?.linkType === "deal" &&
+            banner.primaryButton?.dealId ? (
+              <InfoItem label="Linked Deal">
+                <span className="flex items-center gap-2">
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: "#34d399" }}
+                  >
+                    {typeof banner.primaryButton.dealId === "object"
+                      ? banner.primaryButton.dealId.name || "—"
+                      : "Deal"}
+                  </span>
+                  {typeof banner.primaryButton.dealId === "object" &&
+                    !banner.primaryButton.dealId.isActive && (
+                      <StatusBadge status="inactive" />
+                    )}
+                </span>
+              </InfoItem>
+            ) : (
+              <InfoItem
+                label="Target Link"
+              >
+                {banner.primaryButton?.link ? (
+                  <div className="flex items-center gap-2">
+                    <LinkIcon
+                      className="w-3.5 h-3.5 shrink-0"
+                      style={{ color: "#34d399" }}
+                    />
+  
+                    <span
+                      className="text-sm break-all"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {banner.primaryButton.link}
+                    </span>
                   </div>
                 ) : (
-                  <div className="ml-11 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>No updates recorded yet.</span>
-                  </div>
+                  <span
+                    className="text-sm"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    —
+                  </span>
                 )}
-              </div>
-            </Card>
+              </InfoItem>
+            )}
 
-            {/* Activity Info Side Panel */}
-            <Card>
-              <CardHeader title="User Details" icon={<Ico d={D.user} className="w-4 h-4" />} />
-              <div className="p-4 space-y-4">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Creator</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
-                      {ini(banner.createdby?.name || banner.createdBy?.name)}
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-medium">{banner.createdby?.name || banner.createdBy?.name || "System"}</p>
-                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{banner.createdby?.email || banner.createdBy?.email || "—"}</p>
-                    </div>
-                  </div>
+          </div>
+        </Section>
+
+        {/* ==================================================
+            DISPLAY RULES
+        ================================================== */}
+
+        <Section
+          title="Display Rules"
+          description="Where and on which devices this banner appears"
+          icon={<MonitorIcon />}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* PAGES */}
+
+            <div>
+              <p
+                className="text-[11px] font-medium uppercase tracking-wide mb-3"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Show On Pages
+              </p>
+
+              {pages.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {pages.map((page) => (
+                    <Tag key={page}>
+                      <CheckIcon
+                        className="w-3.5 h-3.5 mr-1"
+                        style={{ color: "#34d399" }}
+                      />
+                      {formatType(page)}
+                    </Tag>
+                  ))}
                 </div>
+              ) : (
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No pages configured
+                </span>
+              )}
+            </div>
 
-                {hasUpdates && (
-                  <div className="pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Last Editor</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
-                        {ini(banner.updatedby?.name || banner.updatedBy?.name)}
-                      </div>
-                      <div>
-                        <p className="text-[12px] font-medium">{banner.updatedby?.name || banner.updatedBy?.name || "Unknown"}</p>
-                        <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{banner.updatedby?.email || banner.updatedBy?.email || "—"}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
+            {/* DEVICES */}
+
+            <div>
+              <p
+                className="text-[11px] font-medium uppercase tracking-wide mb-3"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Show On Devices
+              </p>
+
+              {devices.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {devices.map((device) => (
+                    <Tag key={device}>
+                      <CheckIcon
+                        className="w-3.5 h-3.5 mr-1"
+                        style={{ color: "#34d399" }}
+                      />
+                      {formatType(device)}
+                    </Tag>
+                  ))}
+                </div>
+              ) : (
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No devices configured
+                </span>
+              )}
+            </div>
+
+          </div>
+        </Section>
+
+        {/* ==================================================
+            SCHEDULE
+        ================================================== */}
+
+        <Section
+          title="Schedule"
+          description="Banner activation and expiration settings"
+          icon={<CalendarIcon />}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+            <InfoItem
+              label="Start Date & Time"
+              value={formatDateTime(banner.startDate)}
+            />
+
+            <InfoItem
+              label="End Date & Time"
+              value={formatDateTime(banner.endDate)}
+            />
+
+            <InfoItem label="Auto Publish">
+              <span className="flex items-center gap-2 text-sm">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: banner.autoPublish
+                      ? "rgba(16,185,129,0.12)"
+                      : "rgba(107,114,128,0.12)",
+                    color: banner.autoPublish
+                      ? "#34d399"
+                      : "#9ca3af",
+                  }}
+                >
+                  {banner.autoPublish ? (
+                    <CheckIcon className="w-3.5 h-3.5" />
+                  ) : (
+                    "—"
+                  )}
+                </span>
+
+                {banner.autoPublish ? "Enabled" : "Disabled"}
+              </span>
+            </InfoItem>
+
+            <InfoItem label="Auto Disable">
+              <span className="flex items-center gap-2 text-sm">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{
+                    backgroundColor: banner.autoDisable
+                      ? "rgba(16,185,129,0.12)"
+                      : "rgba(107,114,128,0.12)",
+                    color: banner.autoDisable
+                      ? "#34d399"
+                      : "#9ca3af",
+                  }}
+                >
+                  {banner.autoDisable ? (
+                    <CheckIcon className="w-3.5 h-3.5" />
+                  ) : (
+                    "—"
+                  )}
+                </span>
+
+                {banner.autoDisable ? "Enabled" : "Disabled"}
+              </span>
+            </InfoItem>
+
+          </div>
+        </Section>
+
+        {/* ==================================================
+            SYSTEM INFORMATION
+        ================================================== */}
+
+        <Section
+          title="System Information"
+          description="Database and record information"
+          icon={<InfoIcon />}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+
+            <InfoItem
+              label="Banner ID"
+              value={banner._id || "—"}
+            />
+
+            <InfoItem
+              label="Created At"
+              value={formatDateTime(banner.createdAt)}
+            />
+
+            <InfoItem
+              label="Updated At"
+              value={formatDateTime(banner.updatedAt)}
+            />
+
+            <InfoItem
+              label="Current Position"
+              value={banner.position ?? 0}
+            />
+
           </div>
         )}
 
