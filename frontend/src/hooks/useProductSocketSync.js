@@ -17,12 +17,10 @@ export function useProductSocketSync() {
     }
 
     const handleCreated = (data) => {
-      console.log("📥 productCreated received:", data);
       invalidateAll();
     };
 
     const handleUpdated = (data) => {
-      console.log("📥 productUpdated received:", data);
       invalidateAll();
       // Individual product query bhi invalidate karein
       const productId = data?._id || data?.product?._id || data?.id;
@@ -32,7 +30,6 @@ export function useProductSocketSync() {
     };
 
     const handleDeleted = (data) => {
-      console.log("📥 productDeleted received:", data);
       invalidateAll();
       // Deleted product ki individual query remove karein
       const productId = typeof data === "string" ? data : (data?.id || data?._id);
@@ -45,13 +42,11 @@ export function useProductSocketSync() {
     socket.on("productUpdated", handleUpdated);
     socket.on("productDeleted", handleDeleted);
 
-    console.log("✅ Product socket listeners attached");
 
     return () => {
       socket.off("productCreated", handleCreated);
       socket.off("productUpdated", handleUpdated);
       socket.off("productDeleted", handleDeleted);
-      console.log("🧹 Product socket listeners cleaned up");
     };
   }, [socket, isConnected, queryClient]);
 

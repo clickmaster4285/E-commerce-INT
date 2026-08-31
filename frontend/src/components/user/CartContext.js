@@ -263,6 +263,8 @@ export function CartProvider({ children }) {
         removeFromCart,
         removeItems,
         restoreItems,
+        removeItems,
+        restoreItems,
         clearCart,
         count,
         total,

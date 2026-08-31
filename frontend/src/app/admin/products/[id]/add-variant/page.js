@@ -21,153 +21,10 @@ import {
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 import { variantApi } from "@/apis/admin/variantApi";
+import { attributeApi } from "@/apis/admin/attributeApi";
 
 const API_ORIGIN =
   process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-
-const ATTRIBUTE_PRESETS = [
-  {
-    name: "Color",
-    values: [
-      "Black",
-      "White",
-      "Gray",
-      "Red",
-      "Blue",
-      "Green",
-      "Yellow",
-      "Brown",
-      "Pink",
-      "Orange",
-      "Purple",
-      "Gold",
-      "Silver",
-    ],
-  },
-  {
-    name: "Size",
-    values: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size"],
-  },
-  {
-    name: "Material",
-    values: [
-      "Cotton",
-      "Polyester",
-      "Leather",
-      "Denim",
-      "Wool",
-      "Silk",
-      "Linen",
-      "Nylon",
-    ],
-  },
-  {
-    name: "Fit",
-    values: [
-      "Regular Fit",
-      "Slim Fit",
-      "Loose Fit",
-      "Relaxed Fit",
-      "Oversized",
-      "Skinny",
-      "Straight",
-      "Tapered",
-    ],
-  },
-  {
-    name: "Pattern",
-    values: [
-      "Solid",
-      "Striped",
-      "Checked",
-      "Plaid",
-      "Printed",
-      "Floral",
-      "Camouflage",
-    ],
-  },
-  {
-    name: "Sleeve",
-    values: [
-      "Full Sleeve",
-      "Half Sleeve",
-      "Sleeveless",
-      "3/4 Sleeve",
-      "Long Sleeve",
-      "Short Sleeve",
-      "Cap Sleeve",
-    ],
-  },
-  {
-    name: "Collar",
-    values: [
-      "Round Neck",
-      "V-Neck",
-      "Collared",
-      "Mandarin Collar",
-      "Polo Collar",
-      "Turtleneck",
-      "Hooded",
-      "Boat Neck",
-    ],
-  },
-  {
-    name: "Occasion",
-    values: [
-      "Casual",
-      "Formal",
-      "Party",
-      "Wedding",
-      "Sports",
-      "Gym",
-      "Office",
-      "Outdoor",
-      "Daily Wear",
-      "Festive",
-    ],
-  },
-  {
-    name: "Gender",
-    values: ["Men", "Women", "Unisex", "Boys", "Girls", "Kids", "Teen"],
-  },
-  {
-    name: "Season",
-    values: [
-      "Summer",
-      "Winter",
-      "Spring",
-      "Autumn",
-      "All Season",
-      "Monsoon",
-    ],
-  },
-  {
-    name: "Care",
-    values: [
-      "Machine Wash",
-      "Hand Wash",
-      "Dry Clean Only",
-      "Do Not Bleach",
-      "Iron Safe",
-      "Wash Separately",
-    ],
-  },
-  {
-    name: "Style",
-    values: [
-      "Casual",
-      "Formal",
-      "Sporty",
-      "Classic",
-      "Modern",
-      "Vintage",
-      "Bohemian",
-      "Streetwear",
-      "Ethnic",
-      "Western",
-    ],
-  },
-];
 
 const getImageUrl = (url) => {
   if (!url) return "";
@@ -223,6 +80,24 @@ export default function AddVariantPage() {
     enabled: !!id,
   });
 
+  const { data: rawAttributes = [] } = useQuery({
+    queryKey: ["attributes"],
+    queryFn: () => attributeApi.getAll(),
+    retry: false,
+  });
+
+  const ATTRIBUTE_PRESETS = useMemo(() => {
+    if (!rawAttributes.length) return [];
+    return rawAttributes
+      .filter((a) => a.is_active && a.variant_allowed && a.attribute_values?.length)
+      .map((a) => ({
+        name: a.name,
+        code: a.code,
+        data_type: a.data_type,
+        values: a.attribute_values.map((v) => v.value),
+      }));
+  }, [rawAttributes]);
+
   // ----------------------------------------------------------------
   // Update Mutation
   // ----------------------------------------------------------------
@@ -245,7 +120,7 @@ export default function AddVariantPage() {
   });
 
   // ----------------------------------------------------------------
-  // Initialize Form Data – FILTER OUT sku_8 AND sku_7
+  // Initialize Form Data
   // ----------------------------------------------------------------
   useEffect(() => {
     if (!product || initialized) return;
@@ -273,20 +148,12 @@ export default function AddVariantPage() {
       })),
     }));
 
-    // ===== REMOVE sku_8 AND sku_7 (case‑insensitive) =====
-    const filteredVariants = existingVariants.filter(
-      (v) => {
-        const sku = (v.sku || "").trim().toLowerCase();
-        return sku !== "sku_8" && sku !== "sku_7";
-      }
-    );
-
     let finalVariants;
     let expandIndex;
 
     if (isEditMode) {
-      // Edit mode: show ONLY the selected variant
-      const selectedVariant = filteredVariants.find(
+      // Edit mode: show ONLY the selected variant (pre-filled with its data)
+      const selectedVariant = existingVariants.find(
         (v) => String(v._id) === String(editVariantId)
       );
 
@@ -508,7 +375,6 @@ export default function AddVariantPage() {
   // ----------------------------------------------------------------
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("========== SAVE VARIANT CLICKED ==========");
     if (!id) {
       toast.error("Product ID missing");
       return;
@@ -601,9 +467,6 @@ export default function AddVariantPage() {
       data.append("variants", JSON.stringify(variants));
       data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
-      console.log("Product ID:", id);
-      console.log("Variants:", variants);
-      console.log("Image Indexes:", imageVariantIndexes);
 
       updateMutation.mutate({ id, data });
     } catch (error) {

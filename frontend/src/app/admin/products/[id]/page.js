@@ -1,7 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useProductSocketSync } from "@/hooks/useProductSocketSync";
 import { useSocket } from "@/hooks/useSocket";
 import {
@@ -16,23 +16,9 @@ import { categoryApi } from "@/apis/admin/categoryApi";
 import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { tagApi } from "@/apis/admin/tagApi";
+import { attributeApi } from "@/apis/admin/attributeApi";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-
-const ATTRIBUTE_PRESETS = [
-  { name: "Color", values: ["Black","White","Gray","Red","Blue","Green","Yellow","Brown","Pink","Orange","Purple","Gold","Silver"] },
-  { name: "Size", values: ["XS","S","M","L","XL","XXL","XXXL","Free Size"] },
-  { name: "Material", values: ["Cotton","Polyester","Leather","Denim","Wool","Silk","Linen","Nylon"] },
-  { name: "Fit", values: ["Regular Fit","Slim Fit","Loose Fit","Relaxed Fit","Oversized","Skinny","Straight","Tapered"] },
-  { name: "Pattern", values: ["Solid","Striped","Checked","Plaid","Printed","Floral","Camouflage"] },
-  { name: "Sleeve", values: ["Full Sleeve","Half Sleeve","Sleeveless","3/4 Sleeve","Long Sleeve","Short Sleeve","Cap Sleeve"] },
-  { name: "Collar", values: ["Round Neck","V-Neck","Collared","Mandarin Collar","Polo Collar","Turtleneck","Hooded","Boat Neck"] },
-  { name: "Occasion", values: ["Casual","Formal","Party","Wedding","Sports","Gym","Office","Outdoor","Daily Wear","Festive"] },
-  { name: "Gender", values: ["Men","Women","Unisex","Boys","Girls","Kids","Teen"] },
-  { name: "Season", values: ["Summer","Winter","Spring","Autumn","All Season","Monsoon"] },
-  { name: "Care", values: ["Machine Wash","Hand Wash","Dry Clean Only","Do Not Bleach","Iron Safe","Wash Separately"] },
-  { name: "Style", values: ["Casual","Formal","Sporty","Classic","Modern","Vintage","Bohemian","Streetwear","Ethnic","Western"] },
-];
 
 const getImageUrl = (url) => {
   if (!url) return "";
@@ -195,6 +181,7 @@ export default function ProductDetailPage() {
   useProductSocketSync();
   const { socket, isConnected } = useSocket();
   const id = params?.id;
+  const [liveEvents, setLiveEvents] = useState([]);
 
   useEffect(() => {
     if (!socket || !isConnected || !id) return;
@@ -204,6 +191,35 @@ export default function ProductDetailPage() {
     socket.on("productDeleted", handleDeleted);
     return () => { socket.off("productDeleted", handleDeleted); };
   }, [socket, isConnected, id, router]);
+
+  // Socket-based live activity for this product (shows who did what, in real time)
+  useEffect(() => {
+    if (!socket || !isConnected || !id) return;
+    const handleCreated = (data) => {
+      if (String(data?._id) !== String(id)) return;
+      setLiveEvents((prev) => [...prev, {
+        key: `live-c-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        type: "created",
+        user: data?.createdby || null,
+        date: data?.created_at || new Date().toISOString(),
+      }]);
+    };
+    const handleUpdated = (data) => {
+      if (String(data?._id) !== String(id)) return;
+      setLiveEvents((prev) => [...prev, {
+        key: `live-u-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        type: "updated",
+        user: data?.updatedby || null,
+        date: data?.updated_at || new Date().toISOString(),
+      }]);
+    };
+    socket.on("productCreated", handleCreated);
+    socket.on("productUpdated", handleUpdated);
+    return () => {
+      socket.off("productCreated", handleCreated);
+      socket.off("productUpdated", handleUpdated);
+    };
+  }, [socket, isConnected, id]);
 
   const [activeTab, setActiveTab] = useState("overview");
   const [showModal, setShowModal] = useState(false);
@@ -232,6 +248,19 @@ export default function ProductDetailPage() {
   });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll });
+  const { data: rawAttributes = [] } = useQuery({ queryKey: ["attributes"], queryFn: () => attributeApi.getAll(), retry: false });
+
+  const ATTRIBUTE_PRESETS = useMemo(() => {
+    if (!rawAttributes.length) return [];
+    return rawAttributes
+      .filter((a) => a.is_active && a.variant_allowed && a.attribute_values?.length)
+      .map((a) => ({
+        name: a.name,
+        code: a.code,
+        data_type: a.data_type,
+        values: a.attribute_values.map((v) => v.value),
+      }));
+  }, [rawAttributes]);
 
   const { data: globalTags = [], refetch: refetchTags } = useQuery({
     queryKey: ["globalTags"],
@@ -651,10 +680,10 @@ export default function ProductDetailPage() {
             <Ico d={D.chevron} className="h-3 w-3" sw={1.5} style={{ color: "var(--text-muted)" }} />
             <span className="font-medium truncate" style={{ color: "var(--text-primary)" }}>{product.name}</span>
           </div>
-          <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)", boxShadow: "0 0 0 4px var(--accent-soft)" }}>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)" }}>
                 <Package className="h-7 w-7" style={{ color: "var(--accent)" }} />
               </div>
               <div className="min-w-0">
@@ -673,29 +702,6 @@ export default function ProductDetailPage() {
               <SBtn onClick={handleDelete} danger><Trash2 className="w-3.5 h-3.5" />Delete</SBtn>
             </div>
           </div>
-          </div>
-        </div>
-
-        {/* SUMMARY STRIP */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Check className="h-3.5 w-3.5" /> Status</div>
-            <StatusPill active={product.status === "active"} />
-          </div>
-          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Layers3 className="h-3.5 w-3.5" /> Variants</div>
-            <p className="text-2xl font-bold tracking-tight">{totalVariants}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Available options</p>
-          </div>
-          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Box className="h-3.5 w-3.5" /> Total stock</div>
-            <p className="text-2xl font-bold tracking-tight" style={{ color: totalStock === 0 ? "var(--danger)" : "var(--success)" }}>{totalStock}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Units in inventory</p>
-          </div>
-          <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><DollarSign className="h-3.5 w-3.5" /> Price range</div>
-            <p className="truncate text-sm font-semibold">{priceRange}</p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Selling price</p>
           </div>
         </div>
 
@@ -720,71 +726,99 @@ export default function ProductDetailPage() {
             })}
         </div>
 
-        <div className="w-full p-4 sm:p-5">
-            {/* OVERVIEW */}
-            {activeTab === "overview" && (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <InnerCard className="flex flex-col">
-                  <SecTitle>Product Details</SecTitle>
-                  <div className="divide-y flex-1" style={{ borderColor: "var(--border-color)" }}>
-                    <InfoRow label="Name" value={product.name} />
-                    <InfoRow label="Category" value={product.category_id?.name || "—"} />
-                    <InfoRow label="Brand" value={product.brand_id?.name || "—"} />
-                    <InfoRow label="Status" value={product.status === "active" ? "Active" : "Inactive"} green={product.status === "active"} />
-                    <InfoRow label="Tax Rate" value={`${product.tax || 0}%`} />
-                    <InfoRow label="Price Range" value={priceRange} />
-                    
-                    <div className="py-2.5">
-                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Tags</span>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5 justify-end">
-                        {displayTagNames.length > 0 ? (
-                          displayTagNames.map(tag => (
-                            <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium" 
-                              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
-                              {tag}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No tags</span>
-                        )}
-                      </div>
+        {/* OVERVIEW */}
+        {activeTab === "overview" && (
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
+            {/* Left column */}
+            <div className="space-y-4 min-w-0">
+              <InnerCard>
+                <SecTitle>Product Details</SecTitle>
+                <div className="flex-1">
+                  <InfoRow label="Name" value={product.name} />
+                  <InfoRow label="Category" value={product.category_id?.name || "—"} />
+                  <InfoRow label="Brand" value={product.brand_id?.name || "—"} />
+                  <InfoRow label="Status" value={product.status === "active" ? "Active" : "Inactive"} green={product.status === "active"} />
+                  <InfoRow label="Tax Rate" value={`${product.tax || 0}%`} />
+                  <InfoRow label="Price Range" value={priceRange} />
+
+                  <div className="py-2.5">
+                    <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Tags</span>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5 justify-end">
+                      {displayTagNames.length > 0 ? (
+                        displayTagNames.map(tag => (
+                          <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
+                            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                            {tag}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No tags</span>
+                      )}
                     </div>
                   </div>
-                </InnerCard>
-                <InnerCard className="flex flex-col">
-                  <SecTitle>Description</SecTitle>
-                  <div className="flex-1">
-                    <p className="text-[12px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
-                      {product.description || "No description provided."}</p>
-                  </div>
-                </InnerCard>
-                <InnerCard className="flex flex-col">
-                  <SecTitle>Inventory Summary</SecTitle>
-                  <div className="space-y-3 flex-1">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                        <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Total Stock</p>
-                        <p className="text-[18px] font-semibold" style={{ color: totalStock === 0 ? "#f87171" : "#34d399" }}>{totalStock}</p>
-                      </div>
-                      <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                        <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Variants</p>
-                        <p className="text-[18px] font-semibold">{totalVariants}</p>
-                      </div>
+
+                  {/* Created By / At */}
+                  <div className="pt-1 pb-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Created By</span>
+                      <span className="text-[12px] font-medium">{product.createdby?.name || "System"}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                        <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Lowest Price</p>
-                        <p className="text-[14px] font-semibold">Rs. {lowestPrice.toLocaleString()}</p>
-                      </div>
-                      <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                        <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Highest Price</p>
-                        <p className="text-[14px] font-semibold">Rs. {highestPrice.toLocaleString()}</p>
-                      </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Created At</span>
+                      <span className="text-[12px]">{fd(product.created_at)}</span>
                     </div>
                   </div>
-                </InnerCard>
+
+                  {/* Last Updated By / At */}
+                  <div className="pt-1 pb-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Last Updated By</span>
+                      <span className="text-[12px] font-medium">{product.updatedby?.name || (wasUp ? "Unknown" : "—")}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Last Updated At</span>
+                      <span className="text-[12px]">{wasUp ? fd(product.updated_at) : "Never"}</span>
+                    </div>
+                  </div>
+                </div>
+              </InnerCard>
+              <InnerCard>
+                <SecTitle>Description</SecTitle>
+                <div className="flex-1">
+                  <p className="text-[12px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
+                    {product.description || "No description provided."}</p>
+                </div>
+              </InnerCard>
+            </div>
+
+            {/* Right column — Inventory Summary */}
+            <InnerCard>
+              <SecTitle>Inventory Summary</SecTitle>
+              <div className="space-y-3 flex-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Total Stock</p>
+                    <p className="text-[18px] font-semibold" style={{ color: totalStock === 0 ? "#f87171" : "#34d399" }}>{totalStock}</p>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Variants</p>
+                    <p className="text-[18px] font-semibold">{totalVariants}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Lowest Price</p>
+                    <p className="text-[14px] font-semibold">Rs. {lowestPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Highest Price</p>
+                    <p className="text-[14px] font-semibold">Rs. {highestPrice.toLocaleString()}</p>
+                  </div>
+                </div>
               </div>
-            )}
+            </InnerCard>
+          </div>
+        )}
 
             {/* TAGS TAB */}
             {activeTab === "tags" && (
@@ -1080,14 +1114,37 @@ export default function ProductDetailPage() {
             )}
 
             {activeTab === "activity" && (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
                 <InnerCard>
-                  <SecTitle>Timeline</SecTitle>
+                  <SecTitle>
+                    Activity Timeline
+                    <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide"
+                      style={{ color: isConnected ? "#34d399" : "var(--text-muted)" }}>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isConnected ? "#34d399" : "var(--text-muted)" }} />
+                      {isConnected ? "Live" : "Offline"}
+                    </span>
+                  </SecTitle>
+
+                  {/* Created Event */}
                   <TItem icon={<Plus className="w-3.5 h-3.5" />} title="Product Created" sub="Added to the system"
-                    user={product.createdby} date={product.created_at} color="#34d399" last={!wasUp} />
+                    user={product.createdby} date={product.created_at} color="#34d399" last={!wasUp && liveEvents.length === 0} />
+
+                  {/* DB-recorded Update */}
                   {wasUp && <TItem icon={<Pencil className="w-3.5 h-3.5" />} title="Product Updated" sub="Details were modified"
-                    user={product.updatedby} date={product.updated_at} color="#60a5fa" last={true} />}
-                  {!wasUp && (
+                    user={product.updatedby} date={product.updated_at} color="#60a5fa" last={liveEvents.length === 0} />}
+
+                  {/* Live socket events (real-time) */}
+                  {liveEvents.map((ev, i) => (
+                    <TItem key={ev.key}
+                      icon={ev.type === "created" ? <Plus className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                      title={ev.type === "created" ? "Product Created" : "Product Updated"}
+                      sub={ev.type === "created" ? "Added to the system (live)" : "Details were modified (live)"}
+                      user={ev.user} date={ev.date}
+                      color={ev.type === "created" ? "#34d399" : "#60a5fa"}
+                      last={i === liveEvents.length - 1} />
+                  ))}
+
+                  {!wasUp && liveEvents.length === 0 && (
                     <div className="mt-3 px-3 py-2.5 rounded-lg flex items-center gap-2"
                       style={{ border: "1px dashed var(--border-color)", borderRadius: "8px" }}>
                       <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
@@ -1095,19 +1152,19 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </InnerCard>
+
                 <InnerCard>
-                  <SecTitle>People</SecTitle>
+                  <SecTitle>User Details</SecTitle>
                   <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
-                    <Person user={product.createdby} label="Created By" date={product.created_at} color="#34d399" fallback="Unknown user" />
+                    <Person user={product.createdby} label="Creator" date={product.created_at} color="#34d399" fallback="Unknown user" />
                     {wasUp && product.updatedby
-                      ? <Person user={product.updatedby} label="Updated By" date={product.updated_at} color="#60a5fa" />
-                      : <Person user={null} label="Updated By" color="#60a5fa" fallback="No updates yet" />}
+                      ? <Person user={product.updatedby} label="Last Editor" date={product.updated_at} color="#60a5fa" />
+                      : <Person user={null} label="Last Editor" color="#60a5fa" fallback="No updates yet" />}
                   </div>
                 </InnerCard>
               </div>
             )}
-          </div>
-        </div>
+      </div>
 
       {/* EDIT MODAL */}
       {showModal && (
@@ -1571,4 +1628,4 @@ export default function ProductDetailPage() {
       )}
     </div>
   );
-}
+}   

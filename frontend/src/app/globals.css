@@ -48,29 +48,39 @@
   --topbar-height: 64px;
 }
 
+/* ✅ FIXED: Light Mode Variables with Explicit Sidebar Colors */
 html.light {
   --bg-primary: #f5f7fb;
   --bg-secondary: #ffffff;
   --bg-tertiary: #eef2f7;
+  
+  /* Sidebar Specific Fixes for Light Mode */
   --bg-sidebar: #ffffff;
-  --bg-sidebar-hover: #e8f0ff;
-  --bg-sidebar-active: #3155d8;
+  --bg-sidebar-hover: #f1f5f9;
+  --bg-sidebar-active: #eff6ff; /* Light blue background for active item */
   --bg-navbar: #ffffff;
+  
   --bg-card: #ffffff;
   --bg-card-alt: #f8fafc;
   --bg-table: #f1f5f9;
   --bg-input: #f1f5f9;
+
+  /* Text Colors - Ensuring Sidebar Text is Dark */
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
-  --text-sidebar: #0f172a;
-  --text-sidebar-muted: #64748b;
+  
+  --text-sidebar: #0f172a;        /* ✅ Dark text for sidebar items */
+  --text-sidebar-muted: #64748b;  /* ✅ Muted but visible text */
   --text-navbar: #0f172a;
   --text-inverse: #ffffff;
+
+  /* Borders */
   --border-color: #dbe3ed;
-  --border-sidebar: #dbe3ed;
+  --border-sidebar: #e2e8f0;      /* ✅ Lighter border for sidebar */
   --border-navbar: #dbe3ed;
   --border-card: #dbe3ed;
+
   --accent: #3b82f6;
   --accent-hover: #2563eb;
   --accent-text: #ffffff;
@@ -81,6 +91,7 @@ html.light {
   --success: #16a34a;
   --warning: #d97706;
   --info: #2563eb;
+  
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
   --shadow-md: 0 6px 16px rgb(15 23 42 / 0.09);
   --shadow-lg: 0 16px 36px rgb(15 23 42 / 0.13);

@@ -368,7 +368,6 @@ const toggleStatusMutation = useMutation({
   };
 
   const handleToggleStatus = (employee) => {
-    console.log("🔄 Clicked toggle for Employee ID:", employee._id, "Current Status:", employee.userId?.status || employee.status);
     toggleStatusMutation.mutate(employee._id);
   };
 
@@ -493,7 +492,7 @@ const toggleStatusMutation = useMutation({
         </p>
         <button
           onClick={() => refetch()}
-          className="h-9 px-4 rounded-lg text-[13px] font-semibold"
+          className="h-10 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold"
           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
         >
           Retry
@@ -514,7 +513,7 @@ const toggleStatusMutation = useMutation({
         </div>
         <button
           onClick={openAddModal}
-          className="h-10 px-5 rounded-lg text-[14px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
+              className="h-10 px-5 min-w-[44px] min-h-[44px] rounded-lg text-[14px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
         >
           <Plus className="w-4 h-4" /> Add Employee
@@ -569,7 +568,7 @@ const toggleStatusMutation = useMutation({
             <button
               onClick={handleBulkDelete}
               disabled={bulkDeleteMutation.isPending}
-              className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+              className="h-10 min-w-[44px] min-h-[44px] px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: "var(--danger)" }}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -589,7 +588,7 @@ const toggleStatusMutation = useMutation({
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+            className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
             style={inputStyle}
           />
         </div>
@@ -599,7 +598,7 @@ const toggleStatusMutation = useMutation({
             setFilterStatus(e.target.value);
             setCurrentPage(1);
           }}
-          className="appearance-none h-9 w-full sm:w-[150px] px-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
+          className="appearance-none h-10 md:h-9 w-full sm:w-[150px] px-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer"
           style={inputStyle}
         >
           <option value="all">All Status</option>
@@ -610,7 +609,7 @@ const toggleStatusMutation = useMutation({
 
       <div className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
               <tr>
                 <th className="px-4 py-3 w-10">
@@ -741,7 +740,7 @@ const toggleStatusMutation = useMutation({
                               e.stopPropagation(); 
                               router.push(`/admin/employees/${emp._id}`);
                             }}
-                            className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
                             style={{ color: "#34d399" }}
                             title="View Details"
                           >
@@ -750,7 +749,7 @@ const toggleStatusMutation = useMutation({
 
                           <button
                             onClick={() => openEditModal(emp)}
-                            className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
                             style={{ color: "var(--text-secondary)" }}
                             title="Edit"
                           >
@@ -762,7 +761,7 @@ const toggleStatusMutation = useMutation({
                               setShowDeleteModal(true);
                             }}
                             disabled={deleteMutation.isPending}
-                            className="min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
+                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -789,18 +788,18 @@ const toggleStatusMutation = useMutation({
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              className="h-10 w-10 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+            <span className="hidden sm:inline-flex px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
               Page {currentPage} of {totalPages}
             </span>
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              className="h-10 w-10 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronRight className="w-4 h-4" />
@@ -812,7 +811,7 @@ const toggleStatusMutation = useMutation({
       {/* ===== ADD/EDIT MODAL ===== */}
       {showModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-xl shadow-xl max-h-[95vh] flex flex-col" style={cardStyle}>
+          <div className="w-full max-w-lg rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center justify-between rounded-t-xl shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <div>
                 <h3 className="text-base font-semibold">{editingEmployee ? "Edit Employee" : "Add New Employee"}</h3>
@@ -826,28 +825,28 @@ const toggleStatusMutation = useMutation({
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-3 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Full Name *</label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone (optional)</label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
+                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
               </div>
 
               {!editingEmployee && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password *</label>
                     <div className="relative">
-                      <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="Min 6 chars" minLength={6} />
+                      <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="Min 6 chars" minLength={6} />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                         {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -856,7 +855,7 @@ const toggleStatusMutation = useMutation({
                   <div>
                     <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password *</label>
                     <div className="relative">
-                      <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required disabled={isSubmitting} className="w-full h-8 px-3 pr-9 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} placeholder="Confirm" minLength={6} />
+                      <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="Confirm" minLength={6} />
                       <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                         {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -865,10 +864,10 @@ const toggleStatusMutation = useMutation({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Status</label>
-                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={isSubmitting} className="w-full h-8 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle}>
+                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle}>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
@@ -880,8 +879,8 @@ const toggleStatusMutation = useMutation({
               </div>
 
               <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-8 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 h-8 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : editingEmployee ? "Update Employee" : "Create Employee"}
                 </button>
               </div>
@@ -920,7 +919,7 @@ const toggleStatusMutation = useMutation({
                   setEmployeeToDelete(null);
                 }}
                 disabled={deleteMutation.isPending}
-                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                 style={{
                   backgroundColor: "var(--bg-tertiary)",
                   border: "1px solid var(--border-color)",
@@ -932,7 +931,7 @@ const toggleStatusMutation = useMutation({
               <button
                 disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate(employeeToDelete._id)}
-                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger)" }}
               >
                 {deleteMutation.isPending ? (
@@ -970,7 +969,7 @@ const toggleStatusMutation = useMutation({
               <button
                 onClick={() => setShowBulkDeleteModal(false)}
                 disabled={bulkDeleteMutation.isPending}
-                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                 style={{
                   backgroundColor: "var(--bg-tertiary)",
                   border: "1px solid var(--border-color)",
@@ -982,7 +981,7 @@ const toggleStatusMutation = useMutation({
               <button
                 disabled={bulkDeleteMutation.isPending}
                 onClick={confirmBulkDelete}
-                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger)" }}
               >
                 {bulkDeleteMutation.isPending ? (

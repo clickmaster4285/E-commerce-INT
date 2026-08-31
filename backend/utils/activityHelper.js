@@ -60,7 +60,6 @@ const pushGlobalActivity = async (io, activityData, performerId) => {
       });
     }
     
-    console.log(`📝 Global Activity Logged: ${action}`);
   } catch (err) {
     console.error("⚠️ pushGlobalActivity error:", err.message);
   }

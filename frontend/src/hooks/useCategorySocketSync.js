@@ -11,21 +11,21 @@ export function useCategorySocketSync() {
     if (!socket || !isConnected) return;
 
     const handleCreated = (data) => {
-      console.log("📥 categoryCreated received", data);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
     };
 
     const handleUpdated = (data) => {
-      console.log("📥 categoryUpdated received", data);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       if (data?._id) {
         queryClient.invalidateQueries({ queryKey: ["category", data._id] });
       }
     };
 
     const handleDeleted = (data) => {
-      console.log("📥 categoryDeleted received", data);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       if (data?.id) {
         queryClient.removeQueries({ queryKey: ["category", data.id] });
       }
@@ -35,7 +35,6 @@ export function useCategorySocketSync() {
     socket.on("categoryUpdated", handleUpdated);
     socket.on("categoryDeleted", handleDeleted);
 
-    console.log("✅ Category socket listeners attached");
 
     return () => {
       socket.off("categoryCreated", handleCreated);

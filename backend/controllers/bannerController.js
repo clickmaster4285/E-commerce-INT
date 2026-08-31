@@ -39,6 +39,8 @@ exports.getAllBanners = async (req, res) => {
 
     const total = await Banner.countDocuments(filter);
     const banners = await Banner.find(filter)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .sort({ position: 1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));
@@ -80,6 +82,9 @@ exports.createBanner = async (req, res) => {
       data.status = new Date(data.startDate) > new Date() ? "scheduled" : "active";
     }
 
+    data.createdby = req.user?._id || null;
+    data.updatedby = req.user?._id || null;
+
     const banner = await Banner.create(data);
 
     emitSocketEvent("banner:created", { success: true, data: banner });
@@ -110,7 +115,11 @@ exports.updateBanner = async (req, res) => {
       });
     }
 
-    const updated = await Banner.findByIdAndUpdate(req.params.id, data, { new: true });
+    data.updatedby = req.user?._id || null;
+
+    const updated = await Banner.findByIdAndUpdate(req.params.id, data, { new: true })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email");
 
     emitSocketEvent("banner:updated", { success: true, data: updated });
     emitSocketEvent("bannerUpdated", { success: true, data: updated });
@@ -126,6 +135,7 @@ exports.toggleStatus = async (req, res) => {
     const banner = await Banner.findById(req.params.id);
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
     banner.status = banner.status === "active" ? "inactive" : "active";
+    banner.updatedby = req.user?._id || null;
     await banner.save();
 
     emitSocketEvent("banner:updated", { success: true, data: banner });
@@ -145,6 +155,8 @@ exports.duplicateBanner = async (req, res) => {
     delete copy._id; delete copy.createdAt; delete copy.updatedAt;
     copy.title = `${original.title} (Copy)`;
     copy.status = "draft";
+    copy.createdby = req.user?._id || null;
+    copy.updatedby = req.user?._id || null;
     const newBanner = await Banner.create(copy);
 
     emitSocketEvent("banner:created", { success: true, data: newBanner });

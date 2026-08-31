@@ -49,7 +49,10 @@ const bannerSchema = new mongoose.Schema(
     autoDisable: { type: Boolean, default: true },
 
     displayRules: { type: displayRulesSchema, default: () => ({}) },
-    storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store" }, // Aapke Store model ke liye
+    storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store" },
+
+    createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
 );

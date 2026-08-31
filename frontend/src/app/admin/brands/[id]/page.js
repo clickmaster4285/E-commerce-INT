@@ -66,13 +66,6 @@ function logoUrl(brand) {
   return "";
 }
 
-function formatDate(date) {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
-    day: "numeric", month: "short", year: "numeric",
-  });
-}
-
 function formatDateTime(date) {
   if (!date) return "—";
   return new Date(date).toLocaleDateString("en-US", {
@@ -108,12 +101,11 @@ function StatusPill({ active }) {
 function Button({ children, onClick, danger = false, primary = false, disabled = false, type = "button" }) {
   return (
     <button type={type} onClick={onClick} disabled={disabled}
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-all hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex min-h-[44px] h-10 md:h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
       style={{
         backgroundColor: primary ? "var(--accent)" : danger ? "rgba(239,68,68,.08)" : "var(--bg-tertiary)",
         color: primary ? "var(--accent-text)" : danger ? "var(--danger)" : "var(--text-primary)",
         border: primary ? "none" : danger ? "1px solid rgba(239,68,68,.25)" : "1px solid var(--border-color)",
-        boxShadow: primary ? "0 6px 16px var(--accent-soft)" : "none",
       }}>
       {children}
     </button>
@@ -122,7 +114,7 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
 
 function Card({ children, className = "" }) {
   return (
-    <div className={`overflow-hidden rounded-xl ${className}`} style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
+    <div className={`overflow-hidden rounded-xl ${className}`} style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
       {children}
     </div>
   );
@@ -267,8 +259,6 @@ export default function BrandDetailPage() {
 
   // Derived Data
   const totalProducts = brandProducts.length;
-  const activeProducts = brandProducts.filter(p => p.status === "active").length;
-  const uniqueCategories = new Set(brandProducts.map(p => p.category_id?._id || p.category_id).filter(Boolean)).size;
   const logoSrc = brand ? logoUrl(brand) : "";
   const hasLogo = Boolean(brand?.logo?.img_url) && !logoFailed;
   
@@ -309,10 +299,10 @@ export default function BrandDetailPage() {
             <span style={{ color: "var(--text-primary)" }}>Brand Details</span>
           </div>
 
-          <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-sm)" }}>
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)", boxShadow: "0 0 0 4px var(--accent-soft)" }}>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-primary)", border: "1px solid var(--border-color)" }}>
                 {hasLogo ? <img src={logoSrc} alt={brand.name} onError={() => setLogoFailed(true)} className="h-full w-full object-contain p-2" /> : <span className="text-xl font-semibold" style={{ color: "var(--accent)" }}>{ini(brand.name)}</span>}
               </div>
               <div className="min-w-0">
@@ -335,35 +325,12 @@ export default function BrandDetailPage() {
         </div>
         </div>
 
-        {/* SUMMARY STRIP */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Card className="p-4">
-              <div className="mb-3 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.check} className="h-3.5 w-3.5" /> Status</div>
-              <StatusPill active={brand.is_active} />
-            </Card>
-            <Card className="p-4">
-              <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.box} className="h-3.5 w-3.5" /> Products</div>
-              <p className="text-2xl font-bold tracking-tight">{totalProducts}</p>
-              <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>{activeProducts} active products</p>
-            </Card>
-            <Card className="p-4">
-              <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.calendar} className="h-3.5 w-3.5" /> Created</div>
-              <p className="text-sm font-semibold">{formatDate(brand.created_at)}</p>
-              <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Original record</p>
-            </Card>
-            <Card className="p-4">
-              <div className="mb-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><Ico d={D.clock} className="h-3.5 w-3.5" /> Last update</div>
-              <p className="truncate text-sm font-semibold">{hasUpdates ? formatDate(brand.updated_at) : "Never"}</p>
-              <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>{hasUpdates ? "Recently edited" : "No changes yet"}</p>
-            </Card>
-        </div>
-
         {/* TABS */}
         <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)" }}>
           {[
             { id: "info", label: "Overview" },
             { id: "products", label: "Products", badge: totalProducts },
-            { id: "activity", label: "Activity", badge: hasUpdates ? 2 : 1 },
+            { id: "activity", label: "Activity" },
           ].map((item) => {
             const active = tab === item.id;
             return (
@@ -384,8 +351,9 @@ export default function BrandDetailPage() {
 
         {/* OVERVIEW TAB */}
         {tab === "info" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
+            {/* Left column */}
+            <div className="space-y-4 min-w-0">
               {/* Brand Information */}
               <Card>
                 <CardHeader title="Brand Information" icon={<Ico d={D.tag} className="w-4 h-4" />} />
@@ -394,8 +362,8 @@ export default function BrandDetailPage() {
                   <InfoRow label="Brand Code" value={brand.brand_code} mono />
                   <InfoRow label="Country" value={brand.country || "—"} />
                   <InfoRow label="Status" value={brand.is_active ? "Active" : "Inactive"} green={brand.is_active} />
-                  
-                  {/* ADDED: Detailed Creation Info */}
+
+                  {/* Detailed Creation Info */}
                   <div className="py-3 border-b" style={{ borderColor: "var(--border-color)" }}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Created By</span>
@@ -407,7 +375,7 @@ export default function BrandDetailPage() {
                     </div>
                   </div>
 
-                  {/* ADDED: Detailed Update Info */}
+                  {/* Detailed Update Info */}
                   <div className="py-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Last Updated By</span>
@@ -424,44 +392,44 @@ export default function BrandDetailPage() {
               {/* Description */}
               <Card>
                 <CardHeader title="Description" icon={<Ico d={D.activity} className="w-4 h-4" />} />
-                <div className="p-5 min-h-[250px] flex flex-col">
+                <div className="p-5">
                   {brand.description ? (
                     <p className="text-[12px] leading-6 whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>{brand.description}</p>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="flex flex-col items-center justify-center text-center py-8">
                       <Ico d={D.activity} className="w-7 h-7 mb-3" sw={1.4} />
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No description provided.</p>
                     </div>
                   )}
                 </div>
               </Card>
-
-              {/* Logo */}
-              <Card>
-                <CardHeader title="Brand Logo" icon={<Ico d={D.image} className="w-4 h-4" />} />
-                <div className="p-4">
-                  {hasLogo ? (
-                    <div>
-                      <div className="h-[170px] rounded-lg flex items-center justify-center overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                        <img src={logoSrc} alt={brand.name} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-6" />
-                      </div>
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[11px] truncate" style={{ color: "var(--text-primary)" }}>{brand.logo.img_url?.split("/").pop()}</p>
-                          <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{fileSize(brand.logo.img_size)}</p>
-                        </div>
-                        <a href={logoSrc} target="_blank" rel="noopener noreferrer" className="text-[10px] flex items-center gap-1" style={{ color: "var(--accent)" }}>View <Ico d={D.link} className="w-3 h-3" /></a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-[170px] rounded-lg flex flex-col items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                      <Ico d={D.image} className="w-7 h-7 mb-3" sw={1.4} />
-                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No logo uploaded</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
             </div>
+
+            {/* Right column — Logo */}
+            <Card>
+              <CardHeader title="Brand Logo" icon={<Ico d={D.image} className="w-4 h-4" />} />
+              <div className="p-4">
+                {hasLogo ? (
+                  <div>
+                    <div className="h-[170px] rounded-lg flex items-center justify-center overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                      <img src={logoSrc} alt={brand.name} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-6" />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[11px] truncate" style={{ color: "var(--text-primary)" }}>{brand.logo.img_url?.split("/").pop()}</p>
+                        <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{fileSize(brand.logo.img_size)}</p>
+                      </div>
+                      <a href={logoSrc} target="_blank" rel="noopener noreferrer" className="text-[10px] flex items-center gap-1 shrink-0" style={{ color: "var(--accent)" }}>View <Ico d={D.link} className="w-3 h-3" /></a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-[170px] rounded-lg flex flex-col items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                    <Ico d={D.image} className="w-7 h-7 mb-3" sw={1.4} />
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No logo uploaded</p>
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
         )}
 
@@ -575,7 +543,7 @@ export default function BrandDetailPage() {
                 <div>
                   <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Creator</p>
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
                       {ini(brand.createdby?.name)}
                     </div>
                     <div>
@@ -589,7 +557,7 @@ export default function BrandDetailPage() {
                   <div className="pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
                     <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Last Editor</p>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-blue-900/30 text-blue-400 flex items-center justify-center text-xs font-bold">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
                         {ini(brand.updatedby?.name)}
                       </div>
                       <div>
@@ -609,7 +577,7 @@ export default function BrandDetailPage() {
       {/* EDIT MODAL (Unchanged logic, just included for completeness) */}
       {showEdit && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-xl overflow-visible" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
+          <div className="w-full max-w-lg rounded-xl overflow-hidden max-h-[90vh]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div>
                 <h2 className="text-[14px] font-semibold">Edit Brand</h2>
@@ -623,18 +591,18 @@ export default function BrandDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] mb-1.5" style={{ color: "var(--text-muted)" }}>Brand Code</label>
-                  <input value={form.brand_code} disabled readOnly className="w-full h-9 px-3 rounded-lg text-[12px] outline-none opacity-60" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                  <input value={form.brand_code} disabled readOnly className="w-full h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] outline-none opacity-60" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 </div>
                 <div>
                   <label className="block text-[11px] mb-1.5" style={{ color: "var(--text-muted)" }}>Brand Name *</label>
-                  <input value={form.name} required disabled={updateMutation.isPending} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-9 px-3 rounded-lg text-[12px] outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                  <input value={form.name} required disabled={updateMutation.isPending} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                 </div>
               </div>
               <div>
                 <label className="block text-[11px] mb-1.5" style={{ color: "var(--text-muted)" }}>Description</label>
-                <textarea rows={4} value={form.description} disabled={updateMutation.isPending} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2.5 rounded-lg text-[12px] outline-none resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                <textarea rows={4} value={form.description} disabled={updateMutation.isPending} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2.5 rounded-lg text-[16px] md:text-[13px] outline-none resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
               </div>
-              <div className="flex justify-end gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
                 <Button disabled={updateMutation.isPending} onClick={() => setShowEdit(false)}>Cancel</Button>
                 <Button primary type="submit" disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? <><Spin className="w-3.5 h-3.5" /> Saving...</> : <><Ico d={D.check} className="w-3.5 h-3.5" /> Save Changes</>}
@@ -648,7 +616,7 @@ export default function BrandDetailPage() {
       {/* DELETE MODAL */}
       {showDelete && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
+          <div className="w-full max-w-sm rounded-xl p-5 max-h-[90vh] overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 20px 60px rgba(0,0,0,.4)" }}>
             <div className="flex gap-3">
               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,.10)", color: "#f87171" }}>
                 <Ico d={D.warn} className="w-4 h-4" />
@@ -660,7 +628,7 @@ export default function BrandDetailPage() {
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-5">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-5">
               <Button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}>Cancel</Button>
               <Button danger disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
                 {deleteMutation.isPending ? <><Spin className="w-3.5 h-3.5" /> Deleting...</> : <><Ico d={D.trash} className="w-3.5 h-3.5" /> Delete Brand</>}
