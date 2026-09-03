@@ -9,8 +9,8 @@ import Footer from "../../components/user/Footer";
 import CartDrawer from "../../components/user/CartDrawer";
 import { CartProvider, useCart } from "../../components/user/CartContext";
 import { storeApi } from "@/apis/user/storeApi";
-import { Home, Search, ShoppingCart, User } from "lucide-react";
-import { WishlistProvider } from "../../components/user/WishlistContext";
+import { Home, ShoppingCart, User, Heart } from "lucide-react";
+import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
 
 function getThemeFromCookie() {
   const cookies = document.cookie.split("; ");
@@ -27,10 +27,13 @@ export function setUserTheme(theme) {
 
 function MobileNav() {
   const pathname = usePathname();
-  const { count } = useCart(); // ✅ sirf count chahiye
+  const { count } = useCart();
+  const { count: wishlistCount } = useWishlist();
 
   const isActive = (href) => {
-    if (href === "/") return pathname === "/";
+    if (href === "/") {
+      return pathname === "/";
+    }
     return pathname.startsWith(href);
   };
 
@@ -40,17 +43,31 @@ function MobileNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="grid grid-cols-4 h-16">
+
         {/* HOME */}
         <Link href="/" className="h-full">
           <NavItem icon={<Home size={20} />} label="Home" active={isActive("/")} />
         </Link>
 
-        {/* SHOP */}
-        <Link href="/products" className="h-full">
-          <NavItem icon={<Search size={20} />} label="Shop" active={isActive("/products")} />
+        {/* WISHLIST */}
+        <Link href="/wishlist" className="h-full">
+          <NavItem
+            icon={
+              <span className="relative">
+                <Heart size={20} className={isActive("/wishlist") ? "fill-current" : ""} />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-danger)] text-white text-[9px] font-bold min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
+              </span>
+            }
+            label="Wishlist"
+            active={isActive("/wishlist")}
+          />
         </Link>
 
-        {/* ✅ CART — ab /cart PAGE kholta hai (drawer nahi) */}
+        {/* ✅ CART — mobile pe /cart PAGE khulta hai */}
         <Link href="/cart" className="h-full">
           <NavItem
             icon={
@@ -72,6 +89,7 @@ function MobileNav() {
         <Link href="/account" className="h-full">
           <NavItem icon={<User size={20} />} label="Account" active={isActive("/account")} />
         </Link>
+
       </div>
     </nav>
   );

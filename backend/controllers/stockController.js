@@ -26,7 +26,7 @@ const emitSocketEvent = (event, data) => {
 
 /* =========================================================
    GET STOCK OVERVIEW
-   Existing Variant quantity/min_qnt/max_qnt reuse karta hai.
+   ✅ FIX: Sirf wo products show honge jin ka is_deleted = false
 ========================================================= */
 
 const getStockOverview = async (req, res) => {
@@ -34,7 +34,12 @@ const getStockOverview = async (req, res) => {
     const variants = await Variant.find({
       is_deleted: { $ne: true },
     })
-      .populate("product_id", "name")
+      .populate({
+        path: "product_id",
+        select: "name is_deleted",
+        // ✅ Deleted products ko exclude karo
+        match: { is_deleted: { $ne: true } },
+      })
       .select(
         "sku title quantity min_qnt max_qnt product_id"
       )
@@ -42,6 +47,8 @@ const getStockOverview = async (req, res) => {
       .lean();
 
     const items = variants
+      // ✅ Deleted product wale variants yahan null hote hain,
+      //    is liye ye filter unhe hata deta hai
       .filter((v) => v.product_id)
       .map((v) => ({
         _id: v._id,
@@ -134,9 +141,14 @@ const adjustStock = async (req, res) => {
     const variant = await Variant.findOne({
       _id: variant_id,
       is_deleted: { $ne: true },
-    }).populate("product_id", "name");
+    }).populate({
+      path: "product_id",
+      select: "name is_deleted",
+      // ✅ Deleted product ka stock adjust nahi ho sakta
+      match: { is_deleted: { $ne: true } },
+    });
 
-    if (!variant) {
+    if (!variant || !variant.product_id) {
       return res.status(404).json({
         message: "Variant not found",
       });

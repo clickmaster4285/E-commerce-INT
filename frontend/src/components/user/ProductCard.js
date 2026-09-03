@@ -66,7 +66,7 @@ export default function ProductCard({
     price = disc.discountedPrice;
     oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
     hasDiscount = disc.hasDiscount;
-    matchedDeal = disc.matchedDeal; // ✅ GET MATCHED DEAL FROM CONTEXT
+    matchedDeal = disc.matchedDeal;
   } catch (e) {
     console.warn("Discount calc error:", e);
   }
@@ -78,7 +78,6 @@ export default function ProductCard({
   const brandName = product.brand_id?.name || product.brand || "";
   const out = totalStock < 1;
 
-  // ✅ PRIORITY LOGIC: Prop se deal lo, warna context se matched deal lo
   const activeDeal = deal || matchedDeal;
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
   const displayBadgeText = badgeConfig?.text || dealBadge;
@@ -88,7 +87,6 @@ export default function ProductCard({
     e.stopPropagation();
     if (out) return;
     
-    // ✅ Use activeDeal for cart logic
     if (activeDeal) {
       const dealInfo = {
         dealId: activeDeal._id,
@@ -113,9 +111,9 @@ export default function ProductCard({
   return (
     <Link
       href={`/product/${productId}`}
-      className="group relative block bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
+      className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
     >
-      <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden">
+      <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
         {image ? (
           <img src={getImageUrl(image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
         ) : (
@@ -127,21 +125,18 @@ export default function ProductCard({
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition pointer-events-none" />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
-          {/* 1. DEAL BADGE (PRIORITY) */}
           {displayBadgeText && !hideDiscountBadge && (
             <span className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}>
               {badgeConfig?.icon ? <badgeConfig.icon size={9} /> : <Tag size={9} />} {displayBadgeText}
             </span>
           )}
 
-          {/* 2. NORMAL DISCOUNT BADGE (FALLBACK) */}
           {!displayBadgeText && hasDiscount && !hideDiscountBadge && (
             <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
               <Tag size={9} /> Sale
             </span>
           )}
 
-          {/* 3. STOCK BADGES */}
           {out ? (
             <span className="bg-[var(--user-danger)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">OUT OF STOCK</span>
           ) : totalStock < 5 ? (
@@ -167,14 +162,20 @@ export default function ProductCard({
         </button>
       </div>
 
-      <div className="p-3 lg:p-4">
+      <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
         <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">{brandName || ""}</p>
         <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">{product.name}</h3>
-        <div className="mt-2 flex items-baseline gap-2">
-          <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)]">Rs. {price.toLocaleString()}</h4>
+
+        {/* ✅ FIX: cut price AB price ke UPAR — full show hota hai */}
+        <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
           {oldPrice > price && (
-            <span className="text-[11px] lg:text-xs text-[var(--user-text-subtle)] line-through">Rs. {oldPrice.toLocaleString()}</span>
+            <span className="text-[11px] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
+              Rs. {oldPrice.toLocaleString()}
+            </span>
           )}
+          <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)] whitespace-nowrap">
+            Rs. {price.toLocaleString()}
+          </h4>
         </div>
         {children}
       </div>

@@ -142,6 +142,7 @@ export default function Header() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState("dark");
+  const [isMobile, setIsMobile] = useState(false);
   const { count, setIsCartOpen } = useCart();
   const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
@@ -169,7 +170,14 @@ export default function Header() {
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", saved === "light");
   }, []);
-
+// ✅ Mobile detect — cart ko page vs drawer decide karne ke liye
+useEffect(() => {
+  const mq = window.matchMedia("(max-width: 767px)");
+  setIsMobile(mq.matches);
+  const onChange = (e) => setIsMobile(e.matches);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}, []);
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -348,12 +356,12 @@ export default function Header() {
               </Link>
 
               {/* CART */}
-              <button
-                onClick={() => setIsCartOpen(true)}
-                title="Cart"
-                aria-label={`Open cart, ${count} items`}
-                className={iconBtn}
-              >
+             <button
+  onClick={() => (isMobile ? router.push("/cart") : setIsCartOpen(true))}
+  title="Cart"
+  aria-label={`Open cart, ${count} items`}
+  className={iconBtn}
+>
                 <ShoppingCart size={18} />
                 {count > 0 && (
                   <span
