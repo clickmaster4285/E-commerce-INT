@@ -250,17 +250,28 @@ export default function ProductDetailPage() {
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll });
   const { data: rawAttributes = [] } = useQuery({ queryKey: ["attributes"], queryFn: () => attributeApi.getAll(), retry: false });
 
+  const productCategoryId = product?.category_id?._id || product?.category_id;
+  const { data: categoryAttributes = [] } = useQuery({
+    queryKey: ["category-attributes", productCategoryId],
+    queryFn: () => attributeApi.getByCategory(productCategoryId),
+    enabled: !!productCategoryId,
+    retry: false,
+  });
+
   const ATTRIBUTE_PRESETS = useMemo(() => {
-    if (!rawAttributes.length) return [];
-    return rawAttributes
-      .filter((a) => a.is_active && a.variant_allowed && a.attribute_values?.length)
+    const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
+    if (!source.length) return [];
+    return source
+      .filter((a) => a.is_active && a.values?.length)
       .map((a) => ({
         name: a.name,
         code: a.code,
         data_type: a.data_type,
-        values: a.attribute_values.map((v) => v.value),
+        values: (a.data_type === "multi_select" && Array.isArray(a.category_config?.value) && a.category_config.value.length)
+          ? a.category_config.value
+          : (a.values || []).map((v) => v.label || v.value),
       }));
-  }, [rawAttributes]);
+  }, [rawAttributes, categoryAttributes]);
 
   const { data: globalTags = [], refetch: refetchTags } = useQuery({
     queryKey: ["globalTags"],
@@ -327,7 +338,18 @@ export default function ProductDetailPage() {
           _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
           cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
           quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
-          attributes: Object.entries(v.attributes || {}).map(([name, value]) => ({ name, value: String(value), isCustom: false })),
+          attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
+            const strValue = String(value);
+            const preset = rawAttributes.find((a) => a.name === name);
+            const isMulti = preset?.data_type === "multi_select";
+            return {
+              name,
+              value: isMulti
+                ? strValue.split(",").map((s) => s.trim()).filter(Boolean)
+                : strValue,
+              isCustom: false,
+            };
+          }),
           images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img.img_url) })),
           tags: v.tags || [],
         }))
@@ -545,7 +567,16 @@ export default function ProductDetailPage() {
     const imageVariantIndexes = [];
     const variants = formData.variants.map((v, idx) => {
       const attributes = {};
-      v.attributes.forEach(a => { if (a.name.trim()) attributes[a.name.trim()] = a.value; });
+      v.attributes.forEach((a) => {
+        const key = a.name.trim();
+        if (!key) return;
+        if (Array.isArray(a.value)) {
+          if (a.value.length === 0) return;
+          attributes[key] = a.value.join(",");
+        } else {
+          attributes[key] = a.value;
+        }
+      });
       const existingImages = v.images.filter(i => i.existing).map(i => i.metadata);
       v.images.filter(i => !i.existing && i.file).forEach(i => { data.append("images", i.file); imageVariantIndexes.push(idx); });
       let finalSku = v.sku.trim();
@@ -1405,35 +1436,83 @@ export default function ProductDetailPage() {
                                 {variant.attributes.map((attr, ai) => {
                                   const preset = ATTRIBUTE_PRESETS.find(p => p.name === attr.name);
                                   const isCustom = !!attr.isCustom;
+                                  const isMulti = preset?.data_type === "multi_select";
+                                  const selectedArr = Array.isArray(attr.value)
+                                    ? attr.value
+                                    : (typeof attr.value === "string" && attr.value.length
+                                        ? attr.value.split(",").map((s) => s.trim()).filter(Boolean)
+                                        : []);
+
+                                  const toggleMulti = (val) => {
+                                    const v = [...formData.variants];
+                                    const a = [...v[index].attributes];
+                                    const current = Array.isArray(a[ai].value)
+                                      ? a[ai].value
+                                      : (typeof a[ai].value === "string" && a[ai].value
+                                          ? a[ai].value.split(",").map((s) => s.trim()).filter(Boolean)
+                                          : []);
+                                    a[ai] = {
+                                      ...a[ai],
+                                      isCustom: false,
+                                      value: current.includes(val) ? current.filter((x) => x !== val) : [...current, val],
+                                    };
+                                    v[index] = { ...v[index], attributes: a };
+                                    setFormData({ ...formData, variants: v });
+                                  };
+
                                   return (
                                     <div key={ai} className="flex flex-wrap items-center gap-2">
                                       <select value={attr.name}
-                                        onChange={(e) => { const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],name:e.target.value,value:"",isCustom:false}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
-                                        className="h-8 px-2.5 rounded-lg text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
+                                        onChange={(e) => { const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],name:e.target.value,value:isMulti?[]:"",isCustom:false}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
+                                        className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
                                         {ATTRIBUTE_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                                       </select>
                                       {preset ? (
-                                        <>
-                                          <select value={isCustom ? "__custom__" : attr.value}
-                                            onChange={(e) => { const val=e.target.value; const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],isCustom:val==="__custom__",value:val==="__custom__"?(preset.name==="Color"?"#000000":""):val}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
-                                            className="h-8 px-2.5 rounded-lg text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
-                                            {preset.values.map(v => <option key={v} value={v}>{v}</option>)}
-                                            <option value="__custom__">+ Custom</option>
-                                          </select>
-                                          {isCustom && preset.name === "Color" ? (
-                                            <div className="flex items-center gap-2 flex-1">
-                                              <input type="color" value={attr.value||"#000000"} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
-                                                className="w-8 h-8 cursor-pointer rounded border" style={{ borderColor: "var(--border-color)" }} />
-                                              <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.value||"#000000"}</span>
-                                            </div>
-                                          ) : isCustom ? (
-                                            <input type="text" placeholder="Custom value..." value={attr.value} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
-                                              className="h-8 px-2.5 rounded-lg text-[12px] flex-1 outline-none" style={is_} />
-                                          ) : null}
-                                        </>
+                                        isMulti ? (
+                                          <div className="flex-1 min-w-[180px] flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md min-h-[34px]" style={is_}>
+                                            {selectedArr.length === 0 && (
+                                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Select values...</span>
+                                            )}
+                                            {preset.values.map((val) => {
+                                              const active = selectedArr.includes(val);
+                                              return (
+                                                <button
+                                                  type="button"
+                                                  key={val}
+                                                  onClick={() => toggleMulti(val)}
+                                                  className="px-2 py-0.5 rounded text-[10px] font-medium border"
+                                                  style={active
+                                                    ? { backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", borderColor: "rgba(16,185,129,0.4)" }
+                                                    : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", borderColor: "var(--border-color)" }}
+                                                >
+                                                  {val}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <select value={isCustom ? "__custom__" : attr.value}
+                                              onChange={(e) => { const val=e.target.value; const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],isCustom:val==="__custom__",value:val==="__custom__"?(preset.name==="Color"?"#000000":""):val}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
+                                              className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
+                                              {preset.values.map(v => <option key={v} value={v}>{v}</option>)}
+                                              <option value="__custom__">+ Custom</option>
+                                            </select>
+                                            {isCustom && preset.name === "Color" ? (
+                                              <div className="flex items-center gap-2 flex-1">
+                                                <input type="color" value={attr.value||"#000000"} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
+                                                  className="w-8 h-8 cursor-pointer rounded border" style={{ borderColor: "var(--border-color)" }} />
+                                                <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.value||"#000000"}</span>
+                                              </div>
+                                            ) : isCustom ? (
+                                              <input type="text" placeholder="Custom value..." value={attr.value} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
+                                                className="h-8 px-2.5 rounded-md text-[12px] flex-1 outline-none" style={is_} />
+                                            ) : null}
+                                          </>
+                                        )
                                       ) : (
                                         <input type="text" placeholder="Value e.g. Black" value={attr.value} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
-                                          className="h-8 px-2.5 rounded-lg text-[12px] flex-1 outline-none" style={is_} />
+                                          className="h-8 px-2.5 rounded-md text-[12px] flex-1 outline-none" style={is_} />
                                       )}
                                       <button type="button" onClick={() => removeAttribute(index,ai)}
                                         className="p-1 rounded hover:opacity-70" style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer" }}>

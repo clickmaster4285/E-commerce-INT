@@ -4,6 +4,7 @@ const Attribute = require("../models/Attribute");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { CATEGORY_ATTRIBUTE_SEED } = require("../utils/categoryAttributeSeed");
 
 // ❌ REMOVED: getTenantId helper function
 
@@ -22,6 +23,79 @@ const normalizeObjectId = (value) => {
   return new mongoose.Types.ObjectId(value);
 };
 
+const slugify = (str) =>
+  String(str || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const SEED_TYPE_TO_DATA_TYPE = {
+  text: "text",
+  number: "number",
+  "multi-select": "multi_select",
+  multi_select: "multi_select",
+};
+
+const ensureSeedAttributeByCode = async ({ code, name: label, type, options }) => {
+  if (!code) return null;
+  const safeCode = slugify(code);
+  const existing = await Attribute.findOne({ code: safeCode, is_deleted: { $ne: true } });
+  if (existing) return existing;
+
+  const values = Array.isArray(options)
+    ? options.map((opt, idx) => ({
+        label: String(opt),
+        value: String(opt),
+        sort_order: idx,
+        is_active: true,
+      }))
+    : [];
+
+  const dataType = SEED_TYPE_TO_DATA_TYPE[type] || "text";
+
+  try {
+    const created = await Attribute.create({
+      name: label || safeCode,
+      code: safeCode,
+      data_type: dataType,
+      values,
+      variant_allowed: true,
+      filterable: dataType === "multi_select",
+      searchable: true,
+      visible: true,
+      is_active: true,
+      is_deleted: false,
+    });
+    return created;
+  } catch (error) {
+    if (error.code === 11000) {
+      return Attribute.findOne({ code: safeCode, is_deleted: { $ne: true } });
+    }
+    throw error;
+  }
+};
+
+const resolveSeedAttribute = async (item) => {
+  if (item.attribute_id && mongoose.Types.ObjectId.isValid(String(item.attribute_id))) {
+    return Attribute.findOne({ _id: item.attribute_id, is_deleted: false, is_active: true }).lean();
+  }
+  if (item.seed_code) {
+    const safeCode = slugify(item.seed_code);
+    const attr = await Attribute.findOne({ code: safeCode, is_deleted: { $ne: true } }).lean();
+    if (attr) return attr;
+
+    const created = await ensureSeedAttributeByCode({
+      code: safeCode,
+      name: item.seed_name || safeCode,
+      type: item.seed_type || "text",
+      options: item.seed_options || [],
+    });
+    return created ? created.toObject() : null;
+  }
+  return null;
+};
+
 // ✅ UPDATED: validateAttributePayload no longer checks tenant_id
 const validateAttributePayload = async (attributes) => {
   if (!Array.isArray(attributes)) return [];
@@ -31,26 +105,31 @@ const validateAttributePayload = async (attributes) => {
 
   for (let index = 0; index < attributes.length; index += 1) {
     const item = attributes[index];
-    if (!item.attribute_id) throw new Error("attribute_id is required");
 
-    const attributeId = String(item.attribute_id);
-    if (!mongoose.Types.ObjectId.isValid(attributeId)) {
-      throw new Error(`Invalid attribute ID: ${attributeId}`);
+    const attribute = await resolveSeedAttribute(item);
+    if (!attribute) {
+      throw new Error("Invalid attribute or access denied");
     }
+
+    const attributeId = String(attribute._id);
     if (seen.has(attributeId)) {
       throw new Error(`Duplicate attribute assignment: ${attributeId}`);
     }
     seen.add(attributeId);
 
-    // ✅ FIX: Removed tenant_id filter from attribute validation
-    const attribute = await Attribute.findOne({
-      _id: attributeId,
-      is_deleted: false,
-      is_active: true,
-    }).lean();
-
-    if (!attribute) {
-      throw new Error("Invalid attribute or access denied");
+    let normalizedValue = "";
+    if (item.value !== undefined && item.value !== null && item.value !== "") {
+      if (attribute.data_type === "multi_select") {
+        const arr = Array.isArray(item.value) ? item.value : [item.value];
+        const cleanedArr = arr
+          .map((v) => String(v).trim())
+          .filter((v) => v.length > 0);
+        normalizedValue = Array.from(new Set(cleanedArr));
+      } else {
+        normalizedValue = Array.isArray(item.value)
+          ? String(item.value[0] || "").trim()
+          : String(item.value).trim();
+      }
     }
 
     cleaned.push({
@@ -61,8 +140,8 @@ const validateAttributePayload = async (attributes) => {
       is_searchable: Boolean(item.is_searchable),
       is_variant_option: Boolean(item.is_variant_option),
       sort_order: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : index,
-      // ✅ FIX: Preserve user-supplied default value
-      value: item.value !== undefined ? item.value : "",
+      // ✅ FIX: Preserve user-supplied default value (array for multi_select)
+      value: normalizedValue,
     });
   }
   return cleaned;

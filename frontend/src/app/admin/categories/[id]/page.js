@@ -1855,60 +1855,7 @@ export default function CategoryDetailPage() {
                     className="w-4 h-4"
                   />
                 }
-                action={
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button
-                      onClick={() => {
-                        setShowCreateAttr(true);
-                        setNewAttrForm({
-                          name: "",
-                          code: "",
-                          data_type: "text",
-                          unit: "",
-                          description: "",
-                          variant_allowed: false,
-                          filterable: false,
-                          searchable: false,
-                          visible: true,
-                          is_active: true,
-                        });
-                        setNewAttrPreset({
-                          is_required: false,
-                          is_visible: true,
-                          is_filterable: false,
-                          is_searchable: false,
-                          is_variant_option: false,
-                        });
-                      }}
-                      disabled={
-                        updateAttrsMutation.isPending ||
-                        createAndAssignAttrMutation.isPending
-                      }
-                    >
-                      <Ico
-                        d={D.plus}
-                        className="w-3.5 h-3.5"
-                      />
-                      Add New Attribute
-                    </Button>
-                    <Button
-                      primary
-                      onClick={() =>
-                        openAssignAttr(null)
-                      }
-                      disabled={
-                        updateAttrsMutation.isPending ||
-                        createAndAssignAttrMutation.isPending
-                      }
-                    >
-                      <Ico
-                        d={D.plus}
-                        className="w-3.5 h-3.5"
-                      />
-                      Assign Attribute
-                    </Button>
-                  </div>
-                }
+                action={null}
               />
 
               <div className="p-4 space-y-4">
@@ -2030,99 +1977,42 @@ export default function CategoryDetailPage() {
                                       {attr.description}
                                     </p>
                                   )}
-                                  <div className="flex flex-wrap gap-1 mt-2">
-                                    {attr.category_config?.is_required && (
-                                      <span
-                                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                        style={{
-                                          backgroundColor:
-                                            "rgba(239,68,68,.10)",
-                                          color: "#f87171",
-                                          border:
-                                            "1px solid rgba(239,68,68,.25)",
-                                        }}
-                                      >
-                                        Required
-                                      </span>
-                                    )}
-                                    {attr.category_config?.is_filterable && (
-                                      <span
-                                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                        style={{
-                                          backgroundColor:
-                                            "rgba(16,185,129,.10)",
-                                          color: "#34d399",
-                                          border:
-                                            "1px solid rgba(16,185,129,.25)",
-                                        }}
-                                      >
-                                        Filter
-                                      </span>
-                                    )}
-                                    {attr.category_config?.is_searchable && (
-                                      <span
-                                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                        style={{
-                                          backgroundColor:
-                                            "rgba(245,158,11,.10)",
-                                          color: "#fbbf24",
-                                          border:
-                                            "1px solid rgba(245,158,11,.25)",
-                                        }}
-                                      >
-                                        Search
-                                      </span>
-                                    )}
-                                    {attr.category_config?.is_visible === false && (
-                                      <span
-                                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
-                                        style={{
-                                          backgroundColor:
-                                            "rgba(148,163,184,.10)",
-                                          color: "#cbd5e1",
-                                          border:
-                                            "1px solid rgba(148,163,184,.25)",
-                                        }}
-                                      >
-                                        Hidden
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
 
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openAssignAttr(attr)
-                                    }
-                                    className="min-w-[36px] min-h-[36px] p-1.5 rounded-md transition hover:bg-white/5"
-                                    style={{
-                                      color: "var(--text-secondary)",
-                                    }}
-                                    title="Edit"
-                                  >
-                                    <Ico
-                                      d={D.edit}
-                                      className="w-3.5 h-3.5"
-                                    />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      removeAttribute(attr)
-                                    }
-                                    disabled={
-                                      updateAttrsMutation.isPending
-                                    }
-                                    className="min-w-[36px] min-h-[36px] p-1.5 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-40"
-                                    title="Remove"
-                                  >
-                                    <Ico
-                                      d={D.trash}
-                                      className="w-3.5 h-3.5"
-                                    />
-                                  </button>
+                                  {Array.isArray(attr.values) && attr.values.length > 0 && (
+                                    <div className="mt-2">
+                                      <p
+                                        className="text-[9px] font-semibold uppercase tracking-wide mb-1.5"
+                                        style={{
+                                          color:
+                                            "var(--text-muted)",
+                                        }}
+                                      >
+                                        Options / Values ({attr.values.length})
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {attr.values.map((v, vi) => {
+                                          const label = typeof v === "string" ? v : (v?.label || v?.value || "");
+                                          if (!label) return null;
+                                          return (
+                                            <span
+                                              key={`${attr._id}-${label}-${vi}`}
+                                              className="text-[10px] px-1.5 py-0.5 rounded"
+                                              style={{
+                                                backgroundColor:
+                                                  "var(--bg-card)",
+                                                color:
+                                                  "var(--text-secondary)",
+                                                border:
+                                                  "1px solid var(--border-color)",
+                                              }}
+                                            >
+                                              {label}
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -2914,20 +2804,6 @@ export default function CategoryDetailPage() {
                   >
                     Select Attribute *
                   </label>
-                  <input
-                    type="text"
-                    value={attrSearch}
-                    onChange={(e) =>
-                      setAttrSearch(e.target.value)
-                    }
-                    placeholder="Search by name or code..."
-                    className="w-full h-9 px-3 rounded-lg text-[12px] outline-none mb-2"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  />
                   <div
                     className="rounded-lg overflow-hidden"
                     style={{

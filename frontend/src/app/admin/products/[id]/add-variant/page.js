@@ -86,17 +86,29 @@ export default function AddVariantPage() {
     retry: false,
   });
 
+  const { data: categoryAttributes = [] } = useQuery({
+    queryKey: ["category-attributes", product?.category_id?._id || product?.category_id],
+    queryFn: () => attributeApi.getByCategory(product?.category_id?._id || product?.category_id),
+    enabled: !!(product?.category_id?._id || product?.category_id),
+    retry: false,
+  });
+
   const ATTRIBUTE_PRESETS = useMemo(() => {
-    if (!rawAttributes.length) return [];
-    return rawAttributes
-      .filter((a) => a.is_active && a.variant_allowed && a.attribute_values?.length)
+    const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
+    if (!source.length) return [];
+    return source
+      .filter((a) => a.is_active && a.values?.length)
       .map((a) => ({
         name: a.name,
         code: a.code,
         data_type: a.data_type,
-        values: a.attribute_values.map((v) => v.value),
+        // For multi_select data_type the category may assign an array of allowed values
+        // via the category_config.value (Multi Select → array of selected options).
+        values: (a.data_type === "multi_select" && Array.isArray(a.category_config?.value) && a.category_config.value.length)
+          ? a.category_config.value
+          : (a.values || []).map((v) => v.label || v.value),
       }));
-  }, [rawAttributes]);
+  }, [rawAttributes, categoryAttributes]);
 
   // ----------------------------------------------------------------
   // Update Mutation
@@ -136,11 +148,19 @@ export default function AddVariantPage() {
       quantity: String(v.quantity ?? 0),
       min_qnt: String(v.min_qnt ?? 0),
       max_qnt: String(v.max_qnt ?? 0),
-      attributes: Object.entries(v.attributes || {}).map(([name, value]) => ({
-        name,
-        value: String(value),
-        isCustom: false,
-      })),
+      attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
+        const strValue = String(value);
+        // For multi-select attributes the saved value is comma-separated.
+        const presetForName = rawAttributes.find((a) => a.name === name);
+        const isMulti = presetForName?.data_type === "multi_select";
+        return {
+          name,
+          value: isMulti
+            ? strValue.split(",").map((s) => s.trim()).filter(Boolean)
+            : strValue,
+          isCustom: false,
+        };
+      }),
       images: (v.images || []).map((img) => ({
         existing: true,
         metadata: img,
@@ -427,7 +447,13 @@ export default function AddVariantPage() {
         const attributes = {};
         (variant.attributes || []).forEach((attribute) => {
           const name = (attribute.name || "").trim();
-          if (name) attributes[name] = attribute.value || "";
+          if (!name) return;
+          if (Array.isArray(attribute.value)) {
+            if (attribute.value.length === 0) return;
+            attributes[name] = attribute.value.join(",");
+          } else {
+            attributes[name] = attribute.value || "";
+          }
         });
 
         const existingImages = (variant.images || [])
@@ -702,6 +728,38 @@ export default function AddVariantPage() {
                             (p) => p.name === attr.name
                           );
                           const isCustom = !!attr.isCustom;
+                          const isMultiSelect = preset?.data_type === "multi_select";
+                          const selectedArr = Array.isArray(attr.value)
+                            ? attr.value
+                            : (typeof attr.value === "string" && attr.value.length
+                                ? attr.value.split(",").map((s) => s.trim()).filter(Boolean)
+                                : []);
+
+const toggleMulti = (val) => {
+                            setFormData((prev) => {
+                              const variants = [...prev.variants];
+                              const attributes = [...variants[index].attributes];
+                              const current = Array.isArray(attributes[ai].value)
+                                ? attributes[ai].value
+                                : (typeof attributes[ai].value === "string" && attributes[ai].value
+                                    ? attributes[ai].value.split(",").map((s) => s.trim()).filter(Boolean)
+                                    : []);
+                              const next = current.includes(val)
+                                ? current.filter((x) => x !== val)
+                                : [...current, val];
+                              attributes[ai] = {
+                                ...attributes[ai],
+                                isCustom: false,
+                                value: next,
+                              };
+                              variants[index] = { ...variants[index], attributes };
+                              return { ...prev, variants };
+                            });
+                          };
+                              variants[index] = { ...variants[index], attributes };
+                              return { ...prev, variants };
+                            });
+                          };
 
                           return (
                             <div key={ai} className="flex flex-wrap items-center gap-2">
@@ -714,7 +772,7 @@ export default function AddVariantPage() {
                                     attributes[ai] = {
                                       ...attributes[ai],
                                       name: ev.target.value,
-                                      value: "",
+                                      value: preset?.data_type === "multi_select" ? [] : "",
                                       isCustom: false,
                                     };
                                     variants[index] = {
@@ -724,7 +782,7 @@ export default function AddVariantPage() {
                                     return { ...prev, variants };
                                   });
                                 }}
-                                className="h-9 px-3 rounded-lg text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                className="h-9 px-3 rounded-md text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
                                 style={inputStyle}
                               >
                                 <option value="">Select attribute</option>
@@ -736,72 +794,99 @@ export default function AddVariantPage() {
                               </select>
 
                               {preset ? (
-                                <>
-                                  <select
-                                    value={isCustom ? "__custom__" : attr.value}
-                                    onChange={(ev) => {
-                                      const value = ev.target.value;
-                                      setFormData((prev) => {
-                                        const variants = [...prev.variants];
-                                        const attributes = [...variants[index].attributes];
-                                        attributes[ai] = {
-                                          ...attributes[ai],
-                                          isCustom: value === "__custom__",
-                                          value:
-                                            value === "__custom__"
-                                              ? preset.name === "Color"
-                                                ? "#000000"
-                                                : ""
-                                              : value,
-                                        };
-                                        variants[index] = {
-                                          ...variants[index],
-                                          attributes,
-                                        };
-                                        return { ...prev, variants };
-                                      });
-                                    }}
-                                    className="h-9 px-3 rounded-lg text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                    style={inputStyle}
-                                  >
-                                    {preset.values.map((v) => (
-                                      <option key={v} value={v}>
-                                        {v}
-                                      </option>
-                                    ))}
-                                    <option value="__custom__">+ Custom Value</option>
-                                  </select>
+                                isMultiSelect ? (
+                                  <div className="flex-1 min-w-[200px] flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md min-h-[40px]"
+                                    style={inputStyle}>
+                                    {selectedArr.length === 0 && (
+                                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                        Select values...
+                                      </span>
+                                    )}
+                                    {preset.values.map((v) => {
+                                      const active = selectedArr.includes(v);
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={v}
+                                          onClick={() => toggleMulti(v)}
+                                          className="px-2 py-1 rounded text-[11px] font-medium border"
+                                          style={active
+                                            ? { backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", borderColor: "rgba(16,185,129,0.4)" }
+                                            : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", borderColor: "var(--border-color)" }}
+                                        >
+                                          {v}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <select
+                                      value={isCustom ? "__custom__" : attr.value}
+                                      onChange={(ev) => {
+                                        const value = ev.target.value;
+                                        setFormData((prev) => {
+                                          const variants = [...prev.variants];
+                                          const attributes = [...variants[index].attributes];
+                                          attributes[ai] = {
+                                            ...attributes[ai],
+                                            isCustom: value === "__custom__",
+                                            value:
+                                              value === "__custom__"
+                                                ? preset.name === "Color"
+                                                  ? "#000000"
+                                                  : ""
+                                                : value,
+                                          };
+                                          variants[index] = {
+                                            ...variants[index],
+                                            attributes,
+                                          };
+                                          return { ...prev, variants };
+                                        });
+                                      }}
+                                      className="h-9 px-3 rounded-md text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                      style={inputStyle}
+                                    >
+                                      {preset.values.map((v) => (
+                                        <option key={v} value={v}>
+                                          {v}
+                                        </option>
+                                      ))}
+                                      <option value="__custom__">+ Custom Value</option>
+                                    </select>
 
-                                  {isCustom && preset.name === "Color" ? (
-                                    <div className="flex items-center gap-2 flex-1">
+                                    {isCustom && preset.name === "Color" ? (
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <input
+                                          type="color"
+                                          value={attr.value || "#000000"}
+                                          onChange={(ev) =>
+                                            updateAttribute(index, ai, "value", ev.target.value)
+                                          }
+                                          className="w-9 h-9 cursor-pointer rounded-md border border-[var(--border-color)] bg-transparent"
+                                        />
+                                        <span
+                                          className="text-xs font-mono"
+                                          style={{ color: "var(--text-muted)" }}
+                                        >
+                                          {attr.value || "#000000"}
+                                        </span>
+                                      </div>
+                                    ) : isCustom ? (
                                       <input
-                                        type="color"
-                                        value={attr.value || "#000000"}
+                                        type="text"
+                                        placeholder="Enter custom value..."
+                                        value={attr.value}
                                         onChange={(ev) =>
                                           updateAttribute(index, ai, "value", ev.target.value)
                                         }
-                                        className="w-9 h-9 cursor-pointer rounded-lg border border-[var(--border-color)] bg-transparent"
+                                        className="h-9 px-3 rounded-md text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                        style={inputStyle}
                                       />
-                                      <span
-                                        className="text-xs font-mono"
-                                        style={{ color: "var(--text-muted)" }}
-                                      >
-                                        {attr.value || "#000000"}
-                                      </span>
-                                    </div>
-                                  ) : isCustom ? (
-                                    <input
-                                      type="text"
-                                      placeholder="Enter custom value..."
-                                      value={attr.value}
-                                      onChange={(ev) =>
-                                        updateAttribute(index, ai, "value", ev.target.value)
-                                      }
-                                      className="h-9 px-3 rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                      style={inputStyle}
-                                    />
-                                  ) : null}
-                                </>
+                                    ) : null}
+                                  </>
+                                )
                               ) : (
                                 <input
                                   type="text"
@@ -810,7 +895,7 @@ export default function AddVariantPage() {
                                   onChange={(ev) =>
                                     updateAttribute(index, ai, "value", ev.target.value)
                                   }
-                                  className="h-9 px-3 rounded-lg text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                                  className="h-9 px-3 rounded-md text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
                                   style={inputStyle}
                                 />
                               )}
@@ -819,7 +904,7 @@ export default function AddVariantPage() {
                                 type="button"
                                 title="Remove Attribute"
                                 onClick={() => removeAttribute(index, ai)}
-                                className="w-9 h-9 rounded-lg flex items-center justify-center transition hover:bg-red-500/10"
+                                className="w-9 h-9 rounded-md flex items-center justify-center hover:bg-red-500/10"
                                 style={{
                                   color: "#f87171",
                                   background: "none",
@@ -836,7 +921,7 @@ export default function AddVariantPage() {
                         <button
                           type="button"
                           onClick={() => addAttribute(index)}
-                          className="flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md hover:bg-[var(--bg-tertiary)] transition"
+                          className="flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md hover:bg-[var(--bg-tertiary)]"
                           style={{
                             color: "var(--accent)",
                             background: "none",
