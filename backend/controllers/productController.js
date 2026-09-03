@@ -116,7 +116,6 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 
   const category = await Category.findOne({
     _id: categoryId,
-    tenant_id: tenantId,
     is_deleted: false,
   }).lean();
 

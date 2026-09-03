@@ -36,11 +36,9 @@ const normalizeArrayResponse = (response) => {
   return [];
 };
 
-// ✅ ROBUST ID EXTRACTOR: Handles Objects, Strings, and Proxies
 const getId = (item) => {
   if (!item) return "";
   if (typeof item === 'object') {
-    // Try common ID fields, convert to string immediately
     return String(item._id || item.id || "");
   }
   return String(item);
@@ -183,15 +181,15 @@ export default function DealsPage() {
   const typeMenuRef = useRef(null);
   const { markSelfAction } = useDealSocketSync();
 
-  // ✅ FIX 2: DEFAULT VALUES FOR BUY X GET Y
+  // ✅ UPDATED: Empty defaults for Buy X Get Y
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
     target_type: "all",
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
-    buy_quantity: "1",       // Default to 1
-    get_quantity: "1",       // Default to 1
-    get_discount_value: "100", // Default to 100 (Free)
+    buy_quantity: "",       
+    get_quantity: "",       
+    get_discount_value: "", 
     bundle_price: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
     status: "active", is_featured: false,
@@ -219,7 +217,7 @@ export default function DealsPage() {
       name: "", code: "", description: "", target_type: "all",
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
-      buy_quantity: "1", get_quantity: "1", get_discount_value: "100", bundle_price: "",
+      buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
       status: "active", is_featured: false,
     });
@@ -277,7 +275,6 @@ export default function DealsPage() {
     setFormData({
       name: deal?.name || "", code: deal?.code || "", description: deal?.description || "",
       target_type: deal?.applyTo || "all",
-      // ✅ FIX 1: Ensure IDs are extracted as strings when editing
       selected_product_ids: Array.isArray(deal?.productIds) ? deal.productIds.map(getId) : [],
       selected_category_ids: Array.isArray(deal?.categoryIds) ? deal.categoryIds.map(getId) : [],
       selected_brand_ids: Array.isArray(deal?.brandIds) ? deal.brandIds.map(getId) : [],
@@ -285,10 +282,9 @@ export default function DealsPage() {
       value_type: deal?.type || "percentage",
       value: deal?.discountValue ?? "",
       min_order_value: deal?.minOrderValue ?? "",
-      // ✅ FIX 2: Load existing values or fallback to defaults
-      buy_quantity: deal?.buyQuantity ?? "1",
-      get_quantity: deal?.getQuantity ?? "1",
-      get_discount_value: deal?.getDiscountValue ?? "100",
+      buy_quantity: deal?.buyQuantity ?? "",
+      get_quantity: deal?.getQuantity ?? "",
+      get_discount_value: deal?.getDiscountValue ?? "",
       bundle_price: deal?.bundlePrice ?? "",
       start_at: toDateInput(deal?.startDate),
       end_at: toDateInput(deal?.endDate),
@@ -302,7 +298,6 @@ export default function DealsPage() {
     setShowModal(true);
   };
 
-  // ✅ FIX 1: SUBMIT HANDLER CLEANUP
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
@@ -313,6 +308,12 @@ export default function DealsPage() {
       if (formData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
     }
 
+    // ✅ UPDATED: Validation for Buy X Get Y quantities
+    if (formData.value_type === "buy_x_get_y") {
+      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
+      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+    }
+
     if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
     if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
     if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
@@ -321,7 +322,6 @@ export default function DealsPage() {
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
-    // ✅ CRITICAL FIX: Deep clean all IDs to strings before sending
     const cleanProductIds = formData.selected_product_ids.map(id => String(id?._id || id));
     const cleanCategoryIds = formData.selected_category_ids.map(id => String(id?._id || id));
     const cleanBrandIds = formData.selected_brand_ids.map(id => String(id?._id || id));
@@ -338,7 +338,7 @@ export default function DealsPage() {
       minOrderValue: formData.min_order_value ? Number(formData.min_order_value) : 0,
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
-      getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
+      getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100, // Fallback for backend compatibility
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
@@ -579,20 +579,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
   const [itemSearch, setItemSearch] = useState("");
   const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
 
-  // ✅ FIX: Force defaults for Buy X Get Y when opening a NEW deal
-  useEffect(() => {
-    if (!editingDeal && formData.value_type === "buy_x_get_y") {
-      // Only update if values are empty or missing to avoid overwriting user input during re-renders
-      if (!formData.buy_quantity || !formData.get_quantity || !formData.get_discount_value) {
-        setFormData(prev => ({
-          ...prev,
-          buy_quantity: "1",
-          get_quantity: "1",
-          get_discount_value: "100"
-        }));
-      }
-    }
-  }, [formData.value_type, editingDeal, setFormData, formData.buy_quantity, formData.get_quantity, formData.get_discount_value]);
+  // ✅ REMOVED: The useEffect that was forcing default values of 1, 1, and 100
 
   const selConfig = {
     product: { key: "selected_product_ids", items: products, label: "Products" },
@@ -617,6 +604,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
       [sel.key]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
     }));
   };
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
@@ -658,12 +646,11 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
               {formData.value_type === "fixed_amount" && <Field label="Discount Amount (Rs.) *" type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" inputStyle={inputStyle} />}
               {formData.value_type === "free_shipping" && <Field label="Min Order Value (Rs.)" type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 2000" inputStyle={inputStyle} />}
               
-              {/* ✅ FIX 2: BUY X GET Y FIELDS WITH DEFAULTS */}
+              {/* ✅ UPDATED: Buy X Get Y fields with empty defaults, 2-column grid, and Get Discount removed */}
               {formData.value_type === "buy_x_get_y" && (
-                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                  <Field label="Buy Quantity (X) *" type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="1" inputStyle={inputStyle} />
-                  <Field label="Get Quantity (Y) *" type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="1" inputStyle={inputStyle} />
-                  <Field label="Get Discount (%) *" type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" inputStyle={inputStyle} />
+                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  <Field label="Buy Quantity (X) *" type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="Enter quantity" inputStyle={inputStyle} />
+                  <Field label="Get Quantity (Y) *" type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="Enter quantity" inputStyle={inputStyle} />
                 </div>
               )}
               {formData.value_type === "bundle" && (
@@ -777,7 +764,6 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
 /* ==================== SELECTION MODAL ==================== */
 function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
-  // ✅ FIX 1: Initialize draftIds as pure strings
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
   
   const filtered = useMemo(() => {

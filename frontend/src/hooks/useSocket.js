@@ -26,36 +26,27 @@ function getSocket() {
   const SOCKET_URL = getSocketURL();
 
   globalSocket = io(SOCKET_URL, {
-    withCredentials: true, // ✅ Cookies automatically bhejega
-    transports: ["websocket", "polling"], // ✅ WebSocket pehle (faster)
+    withCredentials: true,       // ✅ Cookies bhejne ke liye zaroori
+    transports: ["websocket", "polling"], // ✅ WebSocket pehle try karo
     reconnection: true,
-    reconnectionAttempts: 10, // ✅ Infinite ki jagah 10 try (spam kam)
-    reconnectionDelay: 2000,
-    reconnectionDelayMax: 10000,
-    timeout: 20000,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
     autoConnect: true,
+    timeout: 20000,
   });
 
   globalSocket.on("connect", () => {
-    errorLogged = false; // ✅ Error flag reset
-    console.log("✅ Socket connected successfully");
+    console.log("✅ Socket connected:", globalSocket.id);
   });
 
   globalSocket.on("disconnect", (reason) => {
-    if (reason !== "io client disconnect") {
-      console.warn("⚠️ Socket disconnected:", reason);
-    }
+    console.log("❌ Socket disconnected:", reason);
   });
 
   globalSocket.on("connect_error", (err) => {
-    // ✅ Sirf ek baar log karo — spam mat karo
-    if (!errorLogged) {
-      console.warn(
-        "⚠️ Socket connection failed. Backend may be offline.",
-        { url: SOCKET_URL, message: err.message }
-      );
-      errorLogged = true;
-    }
+    console.error("⚠️ Socket Connection Error:", err.message);
+    console.error("Backend URL:", SOCKET_URL);
   });
 
   return globalSocket;
