@@ -168,7 +168,7 @@ const placeOrder = async (req, res) => {
       );
     }
 
-       const shipping_method = reqShippingMethod === "express" ? "express" : "standard";
+    const shipping_method = reqShippingMethod === "express" ? "express" : "standard";
     const hasFreeShippingDeal = orderItems.some(i => i.deal_type === "free_shipping");
     let shipping;
     if (hasFreeShippingDeal) {
@@ -356,11 +356,12 @@ const updateOrderStatus = async (req, res) => {
 
 // ==========================================
 // PUT /api/orders/:id/edit — Edit Pending Order (Qty + Address)
+// ✅ FIXED: Supports address_override for "order only" mode
 // ==========================================
 const editOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { items, address_id } = req.body;
+    const { items, address_id, address_override } = req.body;
 
     const order = await Order.findById(id);
     if (!order) {
@@ -407,8 +408,26 @@ const editOrder = async (req, res) => {
       order.total = order.subtotal + order.shipping + order.tax;
     }
 
-    // ✅ Update Address
-    if (address_id) {
+    // ✅ Update Address — FIXED: supports address_override
+    if (address_override && typeof address_override === "object") {
+      // 🆕 Custom snapshot — address book UNTOUCHED (order-only mode)
+      order.address_snapshot = {
+        full_name: address_override.full_name || "",
+        phone: address_override.phone || "",
+        country: address_override.country || "",
+        street_address1: address_override.street_address1 || "",
+        street_address2: address_override.street_address2 || "",
+        city: address_override.city || "",
+        state: address_override.state || "",
+        zip_code: address_override.zip_code || "",
+        delivery_instructions: address_override.delivery_instructions || "",
+      };
+      // Optional: link to address_id if provided (for reference)
+      if (address_id) {
+        order.address_id = address_id;
+      }
+    } else if (address_id) {
+      // ✅ Existing: use saved address
       const address = await Address.findOne({ _id: address_id, user_id: req.user._id });
       if (!address) {
         return res.status(400).json({ success: false, message: "Address not found" });
@@ -423,6 +442,7 @@ const editOrder = async (req, res) => {
         city: address.city,
         state: address.state,
         zip_code: address.zip_code,
+        delivery_instructions: address.delivery_instructions || "",
       };
     }
 

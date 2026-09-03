@@ -1,19 +1,18 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import Cookies from "js-cookie";
 
 let globalSocket = null;
+let errorLogged = false; // ✅ Spam rokne ke liye
 
-// ✅ DYNAMIC URL — jis host par frontend khula hai, wahi backend (5000) use karo
 const getSocketURL = () => {
-  // SSR ke liye env fallback
   if (typeof window === "undefined") {
     return (
       process.env.NEXT_PUBLIC_SOCKET_URL ||
-      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") 
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "")
     );
   }
-  // Browser mein — current hostname + backend port 5000
   return (
     process.env.NEXT_PUBLIC_SOCKET_URL ||
     `http://${window.location.hostname}:5000`
@@ -21,6 +20,7 @@ const getSocketURL = () => {
 };
 
 function getSocket() {
+  // ✅ Agar socket already connected hai, wahi use karo
   if (globalSocket && globalSocket.connected) return globalSocket;
 
   const SOCKET_URL = getSocketURL();
@@ -50,6 +50,15 @@ function getSocket() {
   });
 
   return globalSocket;
+}
+
+// ✅ Login ke baad socket refresh karne ke liye
+export function reconnectSocket() {
+  if (globalSocket) {
+    globalSocket.disconnect();
+    globalSocket = null;
+  }
+  return getSocket();
 }
 
 export function useSocket() {

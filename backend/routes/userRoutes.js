@@ -19,6 +19,8 @@ const {
   deleteCheckoutDraft,
   getWishlist,
   toggleWishlist,
+  updateProfileREST,
+  changePasswordREST,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
@@ -64,6 +66,8 @@ router.delete("/checkout-drafts/:id", authMiddleware, deleteCheckoutDraft);
 // ✅ NEW: Wishlist routes
 router.get("/wishlist", authMiddleware, getWishlist);
 router.put("/wishlist/toggle", authMiddleware, toggleWishlist);
+router.put("/profile", authMiddleware, updateProfileREST);
+router.post("/change-password", authMiddleware, changePasswordREST);
 // ==========================================
 // 🛡️ 404 HANDLER
 // ==========================================

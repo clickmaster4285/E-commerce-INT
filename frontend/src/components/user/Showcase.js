@@ -9,8 +9,7 @@ import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "./ProductCard";
 
-// ✅ ARROW — dark semi-transparent circular button on the outer carousel edge,
-//    vertically centered, fully visible (offsets < section padding, never clipped)
+// ✅ ARROW — dark semi-transparent circular button on the outer carousel edge
 function ArrowBtn({ dir, onClick, disabled, onHover }) {
   return (
     <button
@@ -51,14 +50,17 @@ function RowSkeleton() {
   );
 }
 
-// ✅ Generic product row — title + FIXED arrows + horizontal slide
+// ✅ Generic product row — title + arrows + horizontal slide
 function ProductRow({ title, subtitle, href, products }) {
   const scrollRef = useRef(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+
   // ✅ Continuous hover-scroll state (per-frame drift while hovering an arrow)
-  const hoverRef = useRef(null); // { dir, vel, max }
+  const hoverRef = useRef(null);      // { dir, vel, max }
+  const hoverDirRef = useRef(null);   // currently-hovered arrow direction
   const rafRef = useRef(0);
+  const resumeRef = useRef(0);        // timeout to resume drift after a click-push
 
   // ✅ Stop hover-scroll smoothly — brief momentum glide-out, never a hard cut
   const stopHoverScroll = () => {
@@ -92,7 +94,7 @@ function ProductRow({ title, subtitle, href, products }) {
     hoverRef.current = {
       dir,
       vel: prev && prev.dir === dir ? prev.vel : 0,
-      max: cardStep / 110, // ≈ one card every ~1.8s @ 60fps — slow & steady
+      max: cardStep / 110,
     };
     const tick = () => {
       const st = hoverRef.current;
@@ -111,6 +113,14 @@ function ProductRow({ title, subtitle, href, products }) {
     rafRef.current = requestAnimationFrame(tick);
   };
 
+  // ✅ Hover handler — track direction so click can resume drift afterwards
+  const handleHover = (dir) => {
+    hoverDirRef.current = dir;
+    clearTimeout(resumeRef.current);
+    if (dir) startHoverScroll(dir);
+    else stopHoverScroll();
+  };
+
   const updateArrows = () => {
     const el = scrollRef.current;
     if (!el) return;
@@ -127,18 +137,34 @@ function ProductRow({ title, subtitle, href, products }) {
       if (el) el.removeEventListener("scroll", updateArrows);
       window.removeEventListener("resize", updateArrows);
       cancelAnimationFrame(rafRef.current);
+      clearTimeout(resumeRef.current);
     };
   }, [products]);
 
+  // ✅ CLICK — instant smooth push, hover-drift resumes after it lands
   const scroll = (dir) => {
     const el = scrollRef.current;
     if (!el) return;
-    stopHoverScroll(); // click takes over from hover scrolling
+
+    // Click takes over: kill the hover loop INSTANTLY (no glide) so the
+    // native smooth scroll is never interrupted by per-frame writes.
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = 0;
+    hoverRef.current = null;
+    el.style.scrollBehavior = ""; // restore CSS smooth for scrollBy
+
     const card = el.querySelector("a");
-    // ✅ Move 2 products per click (card width + flex gap, doubled)
     const gap = parseFloat(getComputedStyle(el).columnGap) || 16;
     const step = card ? (card.offsetWidth + gap) * 2 : 480;
     el.scrollBy({ left: dir === "left" ? -step : step, behavior: "smooth" });
+
+    // If the arrow is still hovered, resume the continuous drift once the push lands
+    if (hoverDirRef.current) {
+      clearTimeout(resumeRef.current);
+      resumeRef.current = setTimeout(() => {
+        if (hoverDirRef.current) startHoverScroll(hoverDirRef.current);
+      }, 550);
+    }
   };
 
   if (!products || products.length === 0) return null;
@@ -167,7 +193,7 @@ function ProductRow({ title, subtitle, href, products }) {
           dir="left"
           onClick={() => scroll("left")}
           disabled={!canLeft}
-          onHover={(d) => (d ? startHoverScroll(d) : stopHoverScroll())}
+          onHover={handleHover}
         />
         <div
           ref={scrollRef}
@@ -183,7 +209,7 @@ function ProductRow({ title, subtitle, href, products }) {
           dir="right"
           onClick={() => scroll("right")}
           disabled={!canRight}
-          onHover={(d) => (d ? startHoverScroll(d) : stopHoverScroll())}
+          onHover={handleHover}
         />
       </div>
     </section>

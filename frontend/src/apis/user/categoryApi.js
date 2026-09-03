@@ -9,9 +9,10 @@ const list = (res) => {
 };
 
 export const categoryApi = {
-  // ✅ PUBLIC — bina login (User GUI)
-  getAll: () => axiosInstance.get("/categories").then(list),
+  // ✅ PUBLIC — naye /public endpoint pe (bina login)
+  getAll: () => axiosInstance.get("/categories/public").then(list),
 
+  // Admin-only — abhi bhi auth ke saath
   getById: (id) =>
     axiosInstance.get(`/categories/${id}`).then((res) => res.data?.data || res.data),
 };

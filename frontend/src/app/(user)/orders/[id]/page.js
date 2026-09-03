@@ -1,6 +1,6 @@
 "use client";
 
-import { use, Fragment, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,21 +8,23 @@ import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { addressApi } from "@/apis/user/addressApi";
+import { Country, State, City } from "country-state-city";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
-  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck, 
-  Tag, Headphones, Download, Pencil, Plus, Minus, Save, X, Trash2, AlertTriangle
+  Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck,
+  Tag, Headphones, Download, Pencil, Save, X, ChevronDown, Sparkles, TrendingUp,
+  Box, MessageCircle, Lock
 } from "lucide-react";
 
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 const STATUS_CONFIG = {
-  pending:    { label: "Pending",    icon: Clock,        color: "text-amber-500",   bg: "bg-amber-500/10",   border: "border-amber-500/30",   desc: "Order received, awaiting confirmation" },
-  confirmed:  { label: "Confirmed",  icon: CheckCircle2, color: "text-blue-500",    bg: "bg-blue-500/10",    border: "border-blue-500/30",    desc: "Order has been confirmed" },
-  processing: { label: "Processing", icon: Package,      color: "text-cyan-500",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30",    desc: "Order is being packed" },
-  shipped:    { label: "Shipped",    icon: Truck,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/30",  desc: "Order is out for delivery" },
-  delivered:  { label: "Delivered",  icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30", desc: "Order has been successfully delivered" },
-  cancelled:  { label: "Cancelled",  icon: XCircle,      color: "text-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30",     desc: "Order has been cancelled" },
+  pending:    { label: "Pending",    icon: Clock,        desc: "We've received your order and are preparing it" },
+  confirmed:  { label: "Confirmed",  icon: CheckCircle2, desc: "Your order has been confirmed" },
+  processing: { label: "Processing", icon: Package,      desc: "Your items are being carefully packed" },
+  shipped:    { label: "Shipped",    icon: Truck,        desc: "Your order is on its way to you" },
+  delivered:  { label: "Delivered",  icon: CheckCircle2, desc: "Your order has been successfully delivered" },
+  cancelled:  { label: "Cancelled",  icon: XCircle,      desc: "This order has been cancelled" },
 };
 
 const PAYMENT_CONFIG = {
@@ -38,17 +40,21 @@ const getImgUrl = (img) => {
   if (raw.startsWith("http")) return raw;
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
+const fmt = (n) => `Rs. ${Math.round(n).toLocaleString()}`;
 
-const DetailStepper = ({ status }) => {
+/* ============ MONOCHROME TIMELINE (no halo) ============ */
+const OrderTimeline = ({ status }) => {
   if (status === "cancelled") {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-red-500/5 border border-red-500/20 p-4">
-        <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-          <XCircle size={20} className="text-red-500" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-red-500">Order Cancelled</p>
-          <p className="text-xs text-red-500/70 mt-0.5">This order has been cancelled and will not be processed.</p>
+      <div className="rounded-2xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center shrink-0">
+            <XCircle size={22} className="text-white" />
+          </div>
+          <div>
+            <p className="text-base font-black text-[var(--user-danger)]">Order Cancelled</p>
+            <p className="text-xs text-[var(--user-text-muted)] mt-1">Items have been restored to stock.</p>
+          </div>
         </div>
       </div>
     );
@@ -57,242 +63,241 @@ const DetailStepper = ({ status }) => {
   const idx = STATUS_FLOW.indexOf(status);
 
   return (
-    <div className="relative py-4 px-2">
-      <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-[var(--user-border)] -translate-y-1/2 rounded-full" />
-      <div 
-        className="absolute left-0 top-1/2 h-0.5 bg-[var(--user-accent)] -translate-y-1/2 rounded-full transition-all duration-700"
-        style={{ width: `${(idx / (STATUS_FLOW.length - 1)) * 100}%` }}
-      />
-      <div className="relative flex items-start justify-between">
-        {STATUS_FLOW.map((step, index) => {
-          const isCompleted = index <= idx;
-          const isCurrent = index === idx;
-          const cfg = STATUS_CONFIG[step];
-          
-          return (
-            <div key={step} className="flex flex-col items-center flex-1 relative z-10">
-              <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                isCompleted 
-                  ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-white shadow-lg shadow-[var(--user-accent)]/30" 
-                  : "bg-[var(--user-bg-card)] border-[var(--user-border)]"
-              } ${isCurrent ? "ring-4 ring-[var(--user-accent)]/20 scale-110" : ""}`}>
-                {isCompleted && index < idx && <CheckCircle2 size={10} strokeWidth={3} />}
-              </div>
-              <span className={`mt-3 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
-                isCurrent ? cfg.color : isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"
-              }`}>
-                {cfg.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ✅ EDIT MODAL - Qty + Address
-const EditOrderModal = ({ order, addresses, onClose, onSuccess }) => {
-  const [editingItems, setEditingItems] = useState(order.items.map(item => ({
-    id: item._id,
-    qty: item.qty,
-    name: item.name,
-    price: item.price,
-    image: item.image,
-  })));
-  const [selectedAddressId, setSelectedAddressId] = useState(String(order.address_id || ""));
-  const [saving, setSaving] = useState(false);
-  const queryClient = useQueryClient();
-
-  const handleQtyChange = (index, delta) => {
-    setEditingItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, qty: Math.max(1, item.qty + delta) } : item
-    ));
-  };
-
-  const newTotal = editingItems.reduce((sum, item) => sum + (Number(item.price) || 0) * item.qty, 0);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await axiosInstance.put(`/orders/${order._id}/edit`, {
-        items: editingItems.map(i => ({ id: i.id, qty: i.qty })),
-        address_id: selectedAddressId,
-      });
-      queryClient.invalidateQueries({ queryKey: ["order", order._id] });
-      queryClient.invalidateQueries({ queryKey: ["myOrders"] });
-      toast.success("Order updated successfully!");
-      onSuccess();
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update order");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--user-border)]">
-          <div>
-            <h2 className="text-lg font-bold text-[var(--user-text)]">Edit Order</h2>
-            <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{order.order_number}</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-[var(--user-bg-hover)] rounded-lg transition">
-            <X size={18} className="text-[var(--user-text-muted)]" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
-          <div>
-            <h3 className="text-xs font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-3">Update Quantities</h3>
-            <div className="space-y-3">
-              {editingItems.map((item, index) => (
-                <div key={item.id || index} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)]">
-                  {getImgUrl(item.image) ? (
-                    <img src={getImgUrl(item.image)} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-[var(--user-border)] bg-white shrink-0" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
-                      <Package size={16} className="text-[var(--user-text-subtle)]" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-[var(--user-text)] truncate">{item.name}</p>
-                    <p className="text-[11px] text-[var(--user-text-muted)]">Rs. {(Number(item.price) || 0).toLocaleString()} each</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button 
-                      onClick={() => handleQtyChange(index, -1)}
-                      className="w-8 h-8 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text)] hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] transition"
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <span className="w-8 text-center text-sm font-bold text-[var(--user-text)]">{item.qty}</span>
-                    <button 
-                      onClick={() => handleQtyChange(index, 1)}
-                      className="w-8 h-8 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text)] hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] transition"
-                    >
-                      <Plus size={14} />
-                    </button>
+    <>
+      <div className="lg:hidden relative">
+        <div className="absolute left-[21px] top-6 bottom-6 w-[2px] bg-[var(--user-border)] rounded-full" />
+        <div className="absolute left-[21px] top-6 w-[2px] bg-[var(--user-accent)] rounded-full transition-all duration-700"
+          style={{ height: `calc((100% - 48px) * ${idx / (STATUS_FLOW.length - 1)})` }} />
+        <div className="space-y-7">
+          {STATUS_FLOW.map((step, i) => {
+            const isCompleted = i < idx;
+            const isCurrent = i === idx;
+            const cfg = STATUS_CONFIG[step];
+            const Icon = cfg.icon;
+            return (
+              <div key={step} className="flex gap-4 relative">
+                <div className="relative z-10 shrink-0">
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 transition-all ${
+                    isCompleted ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)]"
+                    : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-text)] shadow-md"
+                    : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-subtle)]"
+                  }`}>
+                    {isCompleted ? <CheckCircle2 size={19} /> : <Icon size={18} />}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-3">Delivery Address</h3>
-            <select 
-              value={selectedAddressId}
-              onChange={(e) => setSelectedAddressId(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl text-sm bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text)] outline-none focus:ring-2 focus:ring-[var(--user-accent)]/40 cursor-pointer"
-            >
-              {addresses.map((a) => (
-                <option key={a._id} value={String(a._id)}>
-                  {a.full_name} — {a.street_address1}, {a.city}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30">
-            <span className="text-sm font-semibold text-[var(--user-text)]">New Estimated Total</span>
-            <span className="text-lg font-black text-[var(--user-accent)]">Rs. {newTotal.toLocaleString()}</span>
-          </div>
-
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              <span className="font-bold">Note:</span> You can only modify this order while it is pending. Once confirmed, changes cannot be made.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--user-border)]">
-          <button 
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-[var(--user-border)] text-sm font-semibold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold hover:opacity-90 transition disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save Changes
-          </button>
+                <div className="flex-1 min-w-0 pt-1">
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
+                    {isCurrent && <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                  </div>
+                  <p className="text-xs text-[var(--user-text-muted)] mt-1 leading-relaxed">{cfg.desc}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
+
+      <div className="hidden lg:block relative">
+        <div className="absolute left-[10%] right-[10%] top-[24px] h-[2px] -translate-y-1/2 bg-[var(--user-border)] rounded-full" />
+        <div className="absolute left-[10%] top-[24px] h-[2px] -translate-y-1/2 bg-[var(--user-accent)] rounded-full transition-all duration-700"
+          style={{ width: `${(idx / (STATUS_FLOW.length - 1)) * 80}%` }} />
+        <div className="relative flex items-start">
+          {STATUS_FLOW.map((step, i) => {
+            const isCompleted = i < idx;
+            const isCurrent = i === idx;
+            const cfg = STATUS_CONFIG[step];
+            const Icon = cfg.icon;
+            return (
+              <div key={step} className="flex-1 flex flex-col items-center relative z-10">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all ${
+                  isCompleted ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)]"
+                  : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-text)] shadow-md"
+                  : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-subtle)]"
+                }`}>
+                  {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={19} />}
+                </div>
+                <p className={`mt-3 text-xs font-black uppercase tracking-wider ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
+                {isCurrent && <span className="mt-1.5 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 };
 
-// ✅ DELETE CONFIRM MODAL (Admin-style, Centered)
-const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => {
+/* ============ ✅ SIMPLIFIED ADDRESS MODAL (Edit Current Only) ============ */
+const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
+  const queryClient = useQueryClient();
+  const currentAddress = addresses.find(a => String(a._id) === String(order.address_id));
+  const [saving, setSaving] = useState(false);
+  const [actionType, setActionType] = useState(null);
+
+  // ✅ Pre-fill form with current address
+  const [form, setForm] = useState({
+    full_name: currentAddress?.full_name || "",
+    phone: currentAddress?.phone || "",
+    country: currentAddress?.country || "",
+    state: currentAddress?.state || "",
+    city: currentAddress?.city || "",
+    street_address1: currentAddress?.street_address1 || "",
+    street_address2: currentAddress?.street_address2 || "",
+    zip_code: currentAddress?.zip_code || "",
+    delivery_instructions: currentAddress?.delivery_instructions || "",
+    is_default: currentAddress?.is_default || false,
+  });
+
+  const allCountries = Country.getAllCountries();
+  const allStates = (() => { const c = allCountries.find(x => x.name === form.country); return c ? State.getStatesOfCountry(c.isoCode) : []; })();
+  const allCities = (() => { const c = allCountries.find(x => x.name === form.country); const s = allStates.find(x => x.name === form.state); return c && s ? City.getCitiesOfState(c.isoCode, s.isoCode) : []; })();
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["addresses"] });
+    queryClient.invalidateQueries({ queryKey: ["order", order._id] });
+    queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+  };
+
+  const handleSave = async (type) => {
+    setSaving(true); setActionType(type);
+    try {
+      const required = form.full_name.trim() && form.phone.trim() && form.country && form.state && form.city && form.street_address1.trim();
+      if (!required) { toast.error("Please fill all required fields"); setSaving(false); setActionType(null); return; }
+
+      if (type === "update_saved") {
+        // Update saved address + order snapshot
+        if (currentAddress) await addressApi.update(currentAddress._id, form);
+        await axiosInstance.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id });
+      } else {
+        // Order only — custom snapshot, address book untouched
+        await axiosInstance.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id, address_override: form });
+      }
+
+      invalidateAll();
+      toast.success(type === "order_only" ? "Delivery address updated for this order" : "Address updated in your address book & this order");
+      onSuccess();
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to update address");
+    } finally { setSaving(false); setActionType(null); }
+  };
+
+  const inputCls = "w-full h-11 px-3 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
+  const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
+  const textareaCls = "w-full px-3 py-2 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] resize-none";
+
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-5" onClick={e => e.stopPropagation()}>
-        
-        {/* Icon + Title */}
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-            <AlertTriangle size={18} className="text-red-500" />
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-[var(--user-bg-card)] border-t-2 sm:border-2 border-[var(--user-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
+          <div>
+            <h2 className="text-base font-black text-[var(--user-text)]">Edit Delivery Address</h2>
+            <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{order.order_number}</p>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-[var(--user-text)] leading-snug">
-              Delete "{orderNumber}"?
-            </h3>
-            <p className="text-xs text-[var(--user-text-muted)] mt-1">This action cannot be undone.</p>
-          </div>
+          <button onClick={onClose} className="p-2 rounded-xl border border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"><X size={16} /></button>
         </div>
 
-        {/* Buttons */}
-        <div className="flex gap-3 mt-5">
-          <button 
-            onClick={onClose}
-            className="flex-1 h-10 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] hover:opacity-80 transition"
-          >
-            Cancel
-          </button>
-          <button 
-            onClick={onConfirm}
-            disabled={deleting}
-            className="flex-1 h-10 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            Delete
-          </button>
+        {/* Form (current address pre-filled) */}
+        <div className="p-5 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label className={labelCls}>Full Name *</label><input value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} placeholder="Ahsan Khan" className={inputCls} /></div>
+            <div><label className={labelCls}>Phone *</label><input type="tel" value={form.phone} maxLength={14} onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g,"").slice(0,14)})} placeholder="03001234567" className={inputCls} /></div>
+          </div>
+          <div><label className={labelCls}>Country *</label>
+            <div className="relative"><select value={form.country} onChange={e => setForm({...form, country: e.target.value, state:"", city:""})} className={inputCls+" appearance-none pr-10 cursor-pointer"}><option value="">Select country</option>{allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label className={labelCls}>State *</label><div className="relative"><select value={form.state} onChange={e => setForm({...form, state: e.target.value, city:""})} disabled={!form.country} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allStates.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div></div>
+            <div><label className={labelCls}>City *</label><div className="relative"><select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!form.state} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div></div>
+            <div><label className={labelCls}>ZIP</label><input value={form.zip_code} onChange={e => setForm({...form, zip_code: e.target.value})} placeholder="54000" className={inputCls} /></div>
+          </div>
+          <div><label className={labelCls}>Street Address *</label><textarea value={form.street_address1} onChange={e => setForm({...form, street_address1: e.target.value})} rows="2" placeholder="Street address" className={textareaCls} /></div>
+          <div><label className={labelCls}>Delivery Instructions</label><textarea value={form.delivery_instructions} onChange={e => setForm({...form, delivery_instructions: e.target.value})} rows="2" placeholder="Notes, access codes" className={textareaCls} /></div>
+        </div>
+
+        {/* ✅ COMPACT ACTION BAR — Left: Cancel | Right: 2 buttons */}
+        <div className="sticky bottom-0 px-5 py-3 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            {/* LEFT: Cancel */}
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="h-10 px-4 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* RIGHT: 2 action buttons (compact) */}
+            <button
+              onClick={() => handleSave("order_only")}
+              disabled={saving}
+              className="h-10 px-3 sm:px-4 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] sm:text-xs font-black flex items-center gap-1.5 hover:opacity-90 transition disabled:opacity-50"
+            >
+              {saving && actionType === "order_only" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              <span className="whitespace-nowrap">Order only</span>
+            </button>
+
+            <button
+              onClick={() => handleSave("update_saved")}
+              disabled={saving}
+              className="h-10 px-3 sm:px-4 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-[11px] sm:text-xs font-bold hover:border-[var(--user-accent)]/40 transition disabled:opacity-40 flex items-center gap-1.5"
+            >
+              {saving && actionType === "update_saved" ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+              <span className="whitespace-nowrap">Save to address book</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
+/* ============ CANCEL MODAL ============ */
+const CancelConfirmModal = ({ orderNumber, canceling, onClose, onConfirm }) => (
+  <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+      <div className="flex flex-col items-center text-center mb-5">
+        <div className="w-16 h-16 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center mb-4">
+          <XCircle size={28} className="text-white" />
+        </div>
+        <h3 className="text-lg font-black text-[var(--user-text)]">Cancel "{orderNumber}"?</h3>
+        <p className="text-xs text-[var(--user-text-muted)] mt-2 leading-relaxed">Items will be restored to stock. This cannot be undone.</p>
+      </div>
+      <div className="flex gap-3">
+        <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] transition">Keep Order</button>
+        <button onClick={onConfirm} disabled={canceling} className="flex-1 h-11 rounded-xl bg-[var(--user-danger)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
+          {canceling ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />} Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+/* ============ MAIN ============ */
 export default function OrderDetailPage({ params }) {
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [canceling, setCanceling] = useState(false);
 
-  const { data: order, isLoading } = useQuery({
-    queryKey: ["order", id],
-    queryFn: () => orderApi.getById(id),
-    retry: false,
-  });
-
-  const { data: addresses = [] } = useQuery({
-    queryKey: ["addresses"],
-    queryFn: addressApi.getAll,
-    enabled: !!order && order.status === "pending",
-  });
+  const { data: order, isLoading } = useQuery({ queryKey: ["order", id], queryFn: () => orderApi.getById(id), retry: false });
+  const { data: addresses = [] } = useQuery({ queryKey: ["addresses"], queryFn: addressApi.getAll, enabled: !!order && order.status === "pending" });
 
   if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="animate-spin text-[var(--user-accent)]" size={32} />
+      <div className="max-w-[1100px] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
+        <div className="h-4 w-32 bg-[var(--user-bg-hover)] rounded" />
+        <div className="h-72 bg-[var(--user-bg-card)] rounded-3xl border border-[var(--user-border)]" />
+        <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+          <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" />
+          <div className="space-y-5"><div className="h-52 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /><div className="h-64 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /></div>
+        </div>
       </div>
     );
   }
@@ -300,14 +305,12 @@ export default function OrderDetailPage({ params }) {
   if (!order) {
     return (
       <div className="max-w-[500px] mx-auto px-4 py-24 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
-          <Package size={28} className="text-[var(--user-text-subtle)]" />
+        <div className="w-24 h-24 mx-auto rounded-3xl bg-[var(--user-accent)] flex items-center justify-center mb-6 shadow-2xl">
+          <Package size={40} className="text-[var(--user-accent-text)]" />
         </div>
-        <h1 className="text-xl font-bold text-[var(--user-text)] mb-2">Order Not Found</h1>
-        <p className="text-sm text-[var(--user-text-muted)] mb-6">The order you are looking for does not exist or has been removed.</p>
-        <Link href="/orders" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-5 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">
-          <ArrowLeft size={16} /> Back to Orders
-        </Link>
+        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Order Not Found</h1>
+        <p className="text-sm text-[var(--user-text-muted)] mb-7">This order does not exist or has been removed.</p>
+        <Link href="/orders" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition"><ArrowLeft size={16} /> Back to Orders</Link>
       </div>
     );
   }
@@ -316,130 +319,142 @@ export default function OrderDetailPage({ params }) {
   const StatusIcon = cfg.icon;
   const pay = PAYMENT_CONFIG[order.payment?.method] || PAYMENT_CONFIG.cod;
   const PayIcon = pay.icon;
-  const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  const canCancel = order.status === "pending";
 
-  const canEdit = order.status === "pending";
-  
   const totalSavings = order.items.reduce((sum, i) => {
-    const original = Number(i.original_price || 0);
-    const paid = Number(i.price || 0);
-    const qty = Number(i.qty) || 1;
-    const priceSaved = (original - paid) * qty;
-    const dealSaved = Number(i.deal_savings || 0);
-    return sum + (priceSaved > 0 ? priceSaved : 0) + dealSaved;
+    const priceSaved = (Number(i.original_price || 0) - Number(i.price || 0)) * (Number(i.qty) || 1);
+    return sum + (priceSaved > 0 ? priceSaved : 0) + Number(i.deal_savings || 0);
   }, 0);
 
-  // ✅ DELETE ORDER (No more window.confirm)
-  const handleDelete = async () => {
-    setDeleting(true);
+  const handleCancel = async () => {
+    setCanceling(true);
     try {
       await axiosInstance.delete(`/orders/${order._id}`);
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
-      toast.success("Order deleted successfully!");
+      toast.success("Order cancelled successfully!");
       router.push("/orders");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete order");
-      setDeleting(false);
-      setShowDeleteModal(false);
-    }
+    } catch (e) { toast.error(e.response?.data?.message || "Failed to cancel order"); setCanceling(false); setShowCancelModal(false); }
   };
 
+  const estimatedDelivery = order.shipping_method === "express" ? "1–2" : "2–4";
+
   return (
-    <main className="max-w-[1100px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-24 md:pb-10">
-      <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition mb-6 group">
+    <main className="max-w-[1100px] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-8 lg:py-10 pb-40 md:pb-10">
+      <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition mb-4 sm:mb-5 group">
         <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Back to Orders
       </Link>
 
-      {/* ✅ HERO CARD */}
-      <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 lg:p-8 mb-6 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-          
-          {/* Left: Order Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-3 mb-3">
-              <h1 className="text-xl lg:text-2xl font-black text-[var(--user-text)] tracking-tight">{order.order_number}</h1>
-              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border ${cfg.bg} ${cfg.border}`}>
-                <StatusIcon size={14} className={cfg.color} />
-                <span className={`text-xs font-bold uppercase tracking-wider ${cfg.color}`}>{cfg.label}</span>
-              </div>
+      {/* HERO */}
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--user-border)] bg-[var(--user-bg-card)] mb-5 sm:mb-6 shadow-lg">
+        <div className="h-1 bg-[var(--user-accent)]" />
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md">
+                <StatusIcon size={14} />
+                <span className="text-xs font-black uppercase tracking-wider">{cfg.label}</span>
+              </span>
+              {totalSavings > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 text-[var(--user-success)]">
+                  <Sparkles size={12} /><span className="text-[10px] font-black">Saved {fmt(totalSavings)}</span>
+                </span>
+              )}
             </div>
-            <p className="text-sm text-[var(--user-text-muted)] flex items-center gap-2">
-              <Calendar size={14} className="text-[var(--user-text-subtle)]" /> 
-              Placed on {date}
-            </p>
-          </div>
-          
-          {/* Right: Total + Savings + Actions */}
-          <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
-            
-            {/* Order Total */}
-            <div className="text-left lg:text-right">
-              <p className="text-xs font-semibold text-[var(--user-text-muted)] uppercase tracking-wider mb-1">Order Total</p>
-              <p className="text-3xl font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</p>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)]">
+              <Calendar size={13} /> {date}
             </div>
-            
-            {/* Savings Badge */}
-            {totalSavings > 0 && (
-              <p className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-2.5 py-1 rounded-full border border-[var(--user-success)]/20">
-                <Tag size={12} /> You saved Rs. {totalSavings.toLocaleString()}
-              </p>
-            )}
-            
-            {/* Edit + Delete Buttons */}
-            {canEdit ? (
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setShowEditModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 transition shadow-lg shadow-[var(--user-accent)]/20"
-                >
-                  <Pencil size={14} /> Edit Order
-                </button>
-                <button 
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-bold hover:bg-[var(--user-danger)]/10 transition"
-                >
-                  <Trash2 size={14} /> Delete
-                </button>
-              </div>
-            ) : (
-              order.status !== "cancelled" && (
-                <p className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1.5">
-                  <ShieldCheck size={12} /> Order locked - cannot be modified
-                </p>
-              )
-            )}
           </div>
-        </div>
 
-        <div className="mt-8">
-          <DetailStepper status={order.status} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start mb-6">
+            <div>
+              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Number</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--user-text)] tracking-tight break-all">{order.order_number}</h1>
+              <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mt-2 leading-relaxed max-w-md">{cfg.desc}</p>
+            </div>
+            <div className="sm:text-right sm:flex sm:flex-col sm:items-end">
+              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Total</p>
+              <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-[var(--user-text)]">{fmt(order.total)}</p>
+              <p className="text-xs text-[var(--user-text-muted)] mt-2 font-semibold inline-flex items-center gap-1.5">
+                <PayIcon size={13} className="text-[var(--user-accent)]" /> {pay.label}
+                {order.payment?.status === "paid" && <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20">Paid</span>}
+              </p>
+              <div className="hidden sm:block mt-4">
+                {canCancel ? (
+                  <button onClick={() => setShowCancelModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-black hover:bg-[var(--user-danger)]/10 transition">
+                    <XCircle size={14} /> Cancel Order
+                  </button>
+                ) : (
+                  order.status !== "cancelled" && <p className="text-[10px] text-[var(--user-text-muted)] inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {canCancel && (
+            <div className="sm:hidden mb-5">
+              <button onClick={() => setShowCancelModal(true)} className="w-full h-11 rounded-xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-black hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-2">
+                <XCircle size={14} /> Cancel Order
+              </button>
+            </div>
+          )}
+
           {order.status !== "cancelled" && order.status !== "delivered" && (
-            <p className="text-center text-xs text-[var(--user-text-muted)] mt-6 flex items-center justify-center gap-2 bg-[var(--user-bg-hover)] py-2.5 rounded-xl border border-[var(--user-border)]">
-              <Truck size={14} className="text-[var(--user-accent)]" />
-              {cfg.desc} · Estimated delivery: <span className="font-semibold text-[var(--user-text)]">{order.shipping_method === "express" ? "1–2" : "2–4"} working days</span>
-            </p>
+            <div className="rounded-2xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] p-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--user-accent)] flex items-center justify-center shrink-0">
+                  <Truck size={22} className="text-[var(--user-accent-text)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Estimated Delivery</p>
+                  <p className="text-base lg:text-lg font-black text-[var(--user-text)] mt-0.5">{estimatedDelivery} working days</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping</p>
+                  <p className="text-sm font-black text-[var(--user-text)] mt-0.5 inline-flex items-center gap-1">
+                    {order.shipping_method === "express" ? <><Zap size={14} /> Express</> : <><Truck size={14} /> Standard</>}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
+
           {order.status === "delivered" && (
-            <p className="text-center text-xs font-bold text-[var(--user-success)] mt-6 flex items-center justify-center gap-2 bg-[var(--user-success)]/5 py-2.5 rounded-xl border border-[var(--user-success)]/20">
-              <ShieldCheck size={14} /> Delivered successfully — thank you for shopping with us!
-            </p>
+            <div className="rounded-2xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 p-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--user-success)] flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={22} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-base lg:text-lg font-black text-[var(--user-success)]">Delivered Successfully!</p>
+                  <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Thank you for shopping with us.</p>
+                </div>
+              </div>
+            </div>
           )}
+
+          <OrderTimeline status={order.status} />
         </div>
       </div>
 
-      {/* ✅ 2-COLUMN LAYOUT */}
-      <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
-        {/* LEFT — Items */}
+      {/* GRID */}
+      <div className="grid lg:grid-cols-[1fr_380px] gap-5 lg:gap-6 items-start">
+        {/* ITEMS */}
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--user-border)] bg-[var(--user-bg-hover)]/30">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)]">
-              <Package size={16} className="text-[var(--user-accent)]" /> Order Items ({order.items.length})
-            </h2>
-            <button className="text-xs font-semibold text-[var(--user-accent)] hover:opacity-80 flex items-center gap-1 transition">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
+                <Box size={18} className="text-[var(--user-accent-text)]" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-[var(--user-text)]">Order Items</h2>
+                <p className="text-[10px] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
+              </div>
+            </div>
+            <button className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 px-3 py-1.5 rounded-lg transition">
               <Download size={14} /> Invoice
             </button>
           </div>
-          
           <div className="divide-y divide-[var(--user-border)]">
             {order.items.map((i, idx) => {
               const originalPrice = Number(i.original_price || 0);
@@ -447,65 +462,30 @@ export default function OrderDetailPage({ params }) {
               const qty = Number(i.qty) || 1;
               const freeItems = Number(i.free_items || 0);
               const payableItems = Number(i.payable_items || qty);
-              const dealSavings = Number(i.deal_savings || 0);
               const hasDiscount = originalPrice > 0 && originalPrice > paidPrice;
-              const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + dealSavings;
-              
+              const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + Number(i.deal_savings || 0);
               return (
-                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors">
-                  <div className="shrink-0">
+                <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
+                  <div className="shrink-0 relative">
                     {getImgUrl(i.image) ? (
-                      <img src={getImgUrl(i.image)} alt={i.name} className="w-20 h-20 rounded-xl object-cover border border-[var(--user-border)] bg-white" />
+                      <img src={getImgUrl(i.image)} alt={i.name} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
                     ) : (
-                      <div className="w-20 h-20 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-                        <Package size={24} className="text-[var(--user-text-subtle)]" />
-                      </div>
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
                     )}
+                    <div className="absolute -top-2 -right-2 min-w-[22px] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
                   </div>
-                  
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
-                    {i.variantTitle && (
-                      <p className="text-[11px] text-[var(--user-text-muted)] mt-1 flex items-center gap-1.5">
-                        <span className="w-1 h-1 rounded-full bg-[var(--user-text-subtle)]" />
-                        {i.variantTitle}
-                      </p>
-                    )}
-                    
-                    {i.deal_id && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md">
-                          <Tag size={10} /> 
-                          {i.deal_type === 'buy_x_get_y' 
-                            ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` 
-                            : (i.deal_name || 'Active Deal')}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-3 mt-2">
-                      <span className="text-[11px] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-2 py-1 rounded border border-[var(--user-border)]">
-                        Qty: {qty}
-                      </span>
-                      {freeItems > 0 && (
-                        <span className="text-[11px] font-bold text-[var(--user-success)]">+{freeItems} FREE</span>
-                      )}
+                    <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
+                    {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {i.deal_id && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
+                      {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
                     </div>
                   </div>
-                  
-                  <div className="text-right sm:min-w-[120px] shrink-0">
-                    {hasDiscount && (
-                      <p className="text-[11px] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {(originalPrice * qty).toLocaleString()}</p>
-                    )}
-                    <p className="text-base font-black text-[var(--user-text)]">Rs. {(paidPrice * payableItems).toLocaleString()}</p>
-                    {itemSavings > 0 && (
-                      <p className="text-[10px] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1">
-                        <Tag size={10} /> Save Rs. {itemSavings.toLocaleString()}
-                      </p>
-                    )}
-                    {payableItems < qty && (
-                      <p className="text-[10px] text-[var(--user-text-muted)] mt-1">Paying for {payableItems}</p>
-                    )}
+                  <div className="text-right shrink-0">
+                    {hasDiscount && <p className="text-[11px] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
+                    <p className="text-sm sm:text-lg font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
+                    {itemSavings > 0 && <p className="text-[10px] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
                   </div>
                 </div>
               );
@@ -513,122 +493,87 @@ export default function OrderDetailPage({ params }) {
           </div>
         </div>
 
-        {/* RIGHT — Info stack */}
+        {/* RIGHT */}
         <div className="space-y-5">
+          {/* ADDRESS — Pencil opens Edit Modal */}
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)] mb-4">
-              <MapPin size={16} className="text-[var(--user-accent)]" /> Delivery Address
-            </h2>
-            <div className="space-y-3">
-              <p className="text-sm text-[var(--user-text)] leading-relaxed">
-                <span className="font-bold">{order.address_snapshot?.full_name}</span><br />
-                {order.address_snapshot?.street_address1}
-                {order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}<br />
-                {order.address_snapshot?.city}, {order.address_snapshot?.state}<br />
-                {order.address_snapshot?.country} {order.address_snapshot?.zip_code}
-              </p>
-              <p className="flex items-center gap-2 text-sm text-[var(--user-text-muted)] pt-2 border-t border-[var(--user-border)]">
-                <Phone size={14} className="text-[var(--user-accent)]" /> {order.address_snapshot?.phone}
-              </p>
-              {order.address_snapshot?.delivery_instructions && (
-                <div className="flex items-start gap-2 text-xs text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] rounded-xl p-3">
-                  <FileText size={14} className="text-[var(--user-accent)] shrink-0 mt-0.5" /> 
-                  <span>{order.address_snapshot.delivery_instructions}</span>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><MapPin size={18} className="text-[var(--user-accent-text)]" /></div>
+                <div>
+                  <h2 className="text-sm font-black text-[var(--user-text)]">Delivery Address</h2>
+                  <p className="text-[10px] text-[var(--user-text-muted)]">Shipping to</p>
                 </div>
-              )}
-              <div className="flex items-center gap-2 pt-3 border-t border-[var(--user-border)]">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-3 py-1.5 rounded-lg">
-                  {order.shipping_method === "express" ? <Zap size={12} className="text-amber-500" /> : <Truck size={12} className="text-[var(--user-accent)]" />}
-                  {order.shipping_method === "express" ? "Express Delivery (1–2 days)" : "Standard Delivery (2–4 days)"}
-                </span>
               </div>
+              {canCancel && (
+                <button onClick={() => setShowAddressModal(true)} className="w-9 h-9 rounded-xl text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center" title="Edit delivery address"><Pencil size={15} /></button>
+              )}
             </div>
+            <p className="text-sm font-bold text-[var(--user-text)]">{order.address_snapshot?.full_name}</p>
+            <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
+              {order.address_snapshot?.street_address1}{order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}<br />
+              {order.address_snapshot?.city}, {order.address_snapshot?.state}<br />
+              {order.address_snapshot?.country} {order.address_snapshot?.zip_code}
+            </p>
+            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-[var(--user-border)]">
+              <Phone size={14} className="text-[var(--user-accent)]" />
+              <span className="text-sm font-semibold text-[var(--user-text)]">{order.address_snapshot?.phone}</span>
+            </div>
+            {order.address_snapshot?.delivery_instructions && (
+              <div className="flex items-start gap-2 text-xs text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] rounded-xl p-3 mt-3">
+                <FileText size={14} className="text-[var(--user-accent)] shrink-0 mt-0.5" /><span className="leading-relaxed">{order.address_snapshot.delivery_instructions}</span>
+              </div>
+            )}
           </div>
 
+          {/* PAYMENT */}
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--user-text)] mb-4">
-              <CreditCard size={16} className="text-[var(--user-accent)]" /> Payment & Summary
-            </h2>
-            
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] mb-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-text)]">
-                <PayIcon size={16} className="text-[var(--user-accent)]" /> {pay.label}
-              </p>
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
-                order.payment?.status === "paid"
-                  ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/30"
-                  : "text-amber-600 bg-amber-500/10 border-amber-500/30"
-              }`}>
-                {order.payment?.status || "Pending"}
-              </span>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between text-[var(--user-text-muted)]">
-                <span>Subtotal</span>
-                <span className="font-semibold text-[var(--user-text)]">Rs. {order.subtotal.toLocaleString()}</span>
-              </div>
-              {totalSavings > 0 && (
-                <div className="flex justify-between text-[var(--user-success)]">
-                  <span className="flex items-center gap-1.5"><Tag size={14}/> Total Savings</span>
-                  <span className="font-bold">-Rs. {totalSavings.toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-[var(--user-text-muted)]">
-                <span>Shipping</span>
-                <span className="font-semibold text-[var(--user-text)]">{order.shipping === 0 ? "FREE" : `Rs. ${order.shipping.toLocaleString()}`}</span>
-              </div>
-              {order.tax > 0 && (
-                <div className="flex justify-between text-[var(--user-text-muted)]">
-                  <span>Tax</span>
-                  <span className="font-semibold text-[var(--user-text)]">Rs. {order.tax.toLocaleString()}</span>
-                </div>
-              )}
-              <div className="flex justify-between pt-4 mt-2 border-t-2 border-[var(--user-border)]">
-                <span className="text-base font-bold text-[var(--user-text)]">Total</span>
-                <span className="text-xl font-black text-[var(--user-accent)]">Rs. {order.total.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-                <Headphones size={18} className="text-[var(--user-accent)]" />
-              </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><CreditCard size={18} className="text-[var(--user-accent-text)]" /></div>
               <div>
-                <h3 className="text-sm font-bold text-[var(--user-text)]">Need Help?</h3>
-                <p className="text-xs text-[var(--user-text-muted)] mt-1 mb-3">
-                  Have a question about this order? Our support team is here to help.
-                </p>
-                <button className="text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1">
-                  Contact Support <ArrowLeft size={12} className="rotate-180" />
-                </button>
+                <h2 className="text-sm font-black text-[var(--user-text)]">Payment Summary</h2>
+                <p className="text-[10px] text-[var(--user-text-muted)]">{pay.label}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] mb-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-text)]"><PayIcon size={16} className="text-[var(--user-accent)]" /> {pay.label}</p>
+              <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${order.payment?.status === "paid" ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/20" : "text-amber-600 bg-amber-500/10 border-amber-500/20"}`}>{order.payment?.status || "Pending"}</span>
+            </div>
+            <div className="space-y-2.5 text-sm">
+              <div className="flex justify-between text-[var(--user-text-muted)]"><span>Subtotal</span><span className="font-semibold text-[var(--user-text)]">{fmt(order.subtotal)}</span></div>
+              {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="flex items-center gap-1.5 font-semibold"><Sparkles size={14} /> You Saved</span><span className="font-bold">-{fmt(totalSavings)}</span></div>}
+              <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-semibold text-[var(--user-text)]">{order.shipping === 0 ? <span className="text-[var(--user-success)] font-bold">FREE</span> : fmt(order.shipping)}</span></div>
+              {order.tax > 0 && <div className="flex justify-between text-[var(--user-text-muted)]"><span>Tax</span><span className="font-semibold text-[var(--user-text)]">{fmt(order.tax)}</span></div>}
+              <div className="flex justify-between pt-3 mt-3 border-t-2 border-[var(--user-border)]"><span className="text-base font-bold text-[var(--user-text)]">Total Paid</span><span className="text-2xl font-black text-[var(--user-text)]">{fmt(order.total)}</span></div>
+            </div>
+          </div>
+
+          {/* HELP */}
+          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center shrink-0"><Headphones size={20} className="text-[var(--user-accent-text)]" /></div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-black text-[var(--user-text)]">Need Help?</h3>
+                <p className="text-xs text-[var(--user-text-muted)] mt-1 leading-relaxed">Questions about this order? Our support team is here 24/7.</p>
+                <button className="mt-3 inline-flex items-center gap-1.5 text-xs font-black text-[var(--user-accent)] hover:gap-2.5 transition-all"><MessageCircle size={14} /> Contact Support <ArrowLeft size={12} className="rotate-180" /></button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ✅ EDIT MODAL */}
-      {showEditModal && (
-        <EditOrderModal 
-          order={order} 
-          addresses={addresses}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={() => setShowEditModal(false)}
-        />
-      )}
+      {/* MOBILE STICKY BAR */}
+      <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+        <div className="flex gap-3">
+          <button className="flex-1 h-12 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition"><MessageCircle size={16} /> Help</button>
+          {canCancel && (
+            <button onClick={() => setShowCancelModal(true)} className="flex-1 h-12 rounded-xl bg-[var(--user-danger)] text-white text-sm font-black flex items-center justify-center gap-2 active:scale-[0.98] transition"><XCircle size={16} /> Cancel Order</button>
+          )}
+        </div>
+      </div>
 
-      {/* ✅ DELETE CONFIRM MODAL */}
-      {showDeleteModal && (
-        <DeleteConfirmModal 
-          orderNumber={order.order_number}
-          deleting={deleting}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={handleDelete}
-        />
-      )}
+      {showAddressModal && <AddressModal order={order} addresses={addresses} onClose={() => setShowAddressModal(false)} onSuccess={() => setShowAddressModal(false)} />}
+      {showCancelModal && <CancelConfirmModal orderNumber={order.order_number} canceling={canceling} onClose={() => setShowCancelModal(false)} onConfirm={handleCancel} />}
     </main>
   );
 }

@@ -884,7 +884,29 @@ const deleteCheckoutDraft = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+const updateProfileREST = async (req, res) => {
+  try {
+    const { name, username } = req.body;
+    const update = {};
+    if (name) update.name = name;
+    if (username) update.username = username;
+    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    res.json({ success: true, user });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
 
+const changePasswordREST = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(400).json({ success: false, message: "Current password is incorrect" });
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+    res.json({ success: true, message: "Password changed successfully" });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
 module.exports = {
   createUser,
   loginUser,
@@ -899,6 +921,8 @@ module.exports = {
   getProfileInfo,
   updateProfileInfo,
   changePasswordSocket,
+  updateProfileREST,
+  changePasswordREST,
   googleLogin,
   updatePhone,
   createCheckoutDraft,

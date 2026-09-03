@@ -12,6 +12,7 @@ import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import Cookies from "js-cookie";
+import LoginModal from "./LoginModal";
 
 import {
   Menu,
@@ -42,7 +43,6 @@ import {
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
-// ✅ Smart category icon
 const getIcon = (name) => {
   if (!name) return <FolderOpen size={17} />;
   const n = name.toLowerCase();
@@ -59,7 +59,6 @@ const getIcon = (name) => {
   return <FolderOpen size={17} />;
 };
 
-// ✅ PILL SEARCH BOX — rounded-full, inner icon + accent button
 function SearchBox({ value, onChange, onSubmit }) {
   return (
     <div className="relative flex w-full items-center">
@@ -83,7 +82,6 @@ function SearchBox({ value, onChange, onSubmit }) {
   );
 }
 
-// ✅ Avatar — Google image safe + fallback letter
 function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
   const [failed, setFailed] = useState(false);
   const url = user?.avatar || user?.picture || null;
@@ -108,7 +106,6 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
   );
 }
 
-// ✅ Store Logo — dynamic + fallback letter
 function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
   const [failed, setFailed] = useState(false);
   const logoUrl = store?.logo?.img_url
@@ -140,18 +137,18 @@ export default function Header() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState("dark");
+  const [isMobile, setIsMobile] = useState(false);
   const { count, setIsCartOpen } = useCart();
   const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
 
-   
-
-  // ✅ BODY SCROLL LOCK
   useEffect(() => {
-    if (open || profileOpen) {
+    if (open || profileOpen || loginOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -159,24 +156,28 @@ export default function Header() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [open, profileOpen]);
+  }, [open, profileOpen, loginOpen]);
 
-  // ✅ SCROLL SHADOW
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ✅ THEME: Cookies se load
   useEffect(() => {
     const saved = Cookies.get("user-theme") || "dark";
     setTheme(saved);
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", saved === "light");
   }, []);
-
-  // ✅ THEME TOGGLE
+// ✅ Mobile detect — cart ko page vs drawer decide karne ke liye
+useEffect(() => {
+  const mq = window.matchMedia("(max-width: 767px)");
+  setIsMobile(mq.matches);
+  const onChange = (e) => setIsMobile(e.matches);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}, []);
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -190,7 +191,6 @@ export default function Header() {
     if (el) el.classList.toggle("light", next === "light");
   };
 
-  // ✅ Current user
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
@@ -201,35 +201,30 @@ export default function Header() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Store info
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Categories
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Brands
   const { data: brands = [] } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ Products (count ke liye)
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: productApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
 
-  // ✅ TOP 5 CATEGORIES
   const topCategories = useMemo(() => {
     const counts = {};
     products.forEach((p) => {
@@ -242,7 +237,6 @@ export default function Header() {
       .slice(0, 5);
   }, [categories, products]);
 
-  // ✅ TOP 5 BRANDS
   const topBrands = useMemo(() => {
     return [...brands]
       .sort((a, b) => (b.products?.length || 0) - (a.products?.length || 0))
@@ -263,6 +257,7 @@ export default function Header() {
     if (searchTerm.trim()) {
       router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
       setSearchTerm("");
+      setMobileSearchOpen(false);
     }
   };
 
@@ -276,43 +271,39 @@ export default function Header() {
 
   const storeName = store?.store_name || "";
 
-  // ✅ Unified icon button class
+  // ✅ TIGHTER DESKTOP SPACING — smaller buttons + less gap
   const iconBtn =
-    "relative w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition";
+    "relative w-9 h-9 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition";
 
   return (
     <>
       <style>{`@keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }`}</style>
 
-      {/* OVERLAY */}
       {open && (
         <div onClick={() => setOpen(false)} className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" />
       )}
 
-      {/* ==========================================
-          ✅ HEADER — Clean, icon-only, theme-safe
-      ========================================== */}
-          <header
+      <header
         className={`sticky top-0 z-50 border-b border-[var(--user-border)] transition-shadow duration-300 ${
           scrolled ? "shadow-[var(--user-shadow-md)]" : ""
         }`}
       >
-        {/* ✅ Blur alag layer par — taake fixed overlay poori screen cover kare */}
         <div className="absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md pointer-events-none" />
 
         <div className="relative max-w-[1400px] mx-auto px-4 lg:px-6">
-          <div className="h-14 lg:h-16 flex items-center gap-2 lg:gap-4">
-            {/* LEFT — Menu + Logo */}
-            <div className="flex items-center gap-1 lg:gap-2 shrink-0">
+          {/* ✅ TIGHTER: lg:gap-3 (was lg:gap-4) */}
+          <div className="h-14 lg:h-16 flex items-center gap-1.5 lg:gap-3">
+            {/* LEFT — Menu + Logo — ✅ TIGHTER: lg:gap-1.5 */}
+            <div className="flex items-center gap-0.5 lg:gap-1.5 shrink-0">
               <button
                 onClick={() => setOpen(true)}
                 aria-label="Open menu"
-                className="w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
+                className="w-9 h-9 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
               >
-                <Menu size={20} />
+                <Menu size={19} />
               </button>
 
-              <Link href="/" className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-1.5">
                 <StoreLogo store={store} />
                 <span className="font-black text-sm lg:text-lg tracking-wide text-[var(--user-text)] hidden sm:block">
                   {storeName}
@@ -320,7 +311,7 @@ export default function Header() {
               </Link>
             </div>
 
-            {/* CENTER — Search (desktop) */}
+            {/* CENTER — Search (desktop only, unchanged) */}
             <div className="hidden md:block flex-1 max-w-2xl mx-auto">
               <SearchBox
                 value={searchTerm}
@@ -329,25 +320,34 @@ export default function Header() {
               />
             </div>
 
-            {/* RIGHT — Theme (desktop) | Wishlist | Cart (icon only) | Account */}
-            <div className="flex items-center gap-0.5 lg:gap-1.5 ml-auto shrink-0">
-              {/* ✅ THEME TOGGLE — desktop only (mobile: sidebar mein) */}
+            {/* ✅ RIGHT — TIGHTER GAP: lg:gap-0.5 (was lg:gap-1.5) */}
+            <div className="flex items-center gap-0 lg:gap-0.5 ml-auto shrink-0">
+              {/* MOBILE SEARCH TOGGLE */}
+              <button
+                onClick={() => setMobileSearchOpen((v) => !v)}
+                aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+                className={`${iconBtn} md:hidden`}
+              >
+                {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
+              </button>
+
+              {/* THEME — desktop only */}
               <button
                 onClick={toggleTheme}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 aria-label="Toggle theme"
                 className={`${iconBtn} hidden md:flex`}
               >
-                {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
               </button>
 
-              {/* ✅ WISHLIST — icon + badge */}
+              {/* WISHLIST */}
               <Link href="/wishlist" title="My Wishlist" aria-label="My Wishlist" className={iconBtn}>
-                <Heart size={19} />
+                <Heart size={18} />
                 {wishlistCount > 0 && (
                   <span
                     key={wishlistCount}
-                    className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {wishlistCount}
@@ -355,18 +355,18 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* ✅ CART — sirf icon + badge (koi text nahi) */}
-              <button
-                onClick={() => setIsCartOpen(true)}
-                title="Cart"
-                aria-label={`Open cart, ${count} items`}
-                className={iconBtn}
-              >
-                <ShoppingCart size={19} />
+              {/* CART */}
+             <button
+  onClick={() => (isMobile ? router.push("/cart") : setIsCartOpen(true))}
+  title="Cart"
+  aria-label={`Open cart, ${count} items`}
+  className={iconBtn}
+>
+                <ShoppingCart size={18} />
                 {count > 0 && (
                   <span
                     key={count}
-                    className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {count}
@@ -374,28 +374,25 @@ export default function Header() {
                 )}
               </button>
 
-              {/* ✅ ACCOUNT / LOGIN */}
-                       {/* ✅ ACCOUNT / LOGIN */}
-                           {user ? (
+              {/* ACCOUNT / LOGIN */}
+              {user ? (
                 <div className="relative">
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
                     aria-label="Account menu"
-                    className="flex items-center gap-1.5 pl-1 pr-1 lg:pr-2 py-1 rounded-xl hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
+                    className="flex items-center gap-1 pl-0.5 pr-0.5 lg:pr-1.5 py-0.5 rounded-lg hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
                   >
                     <Avatar user={user} sizeClass="w-8 h-8 lg:w-9 lg:h-9" textClass="text-xs lg:text-sm" />
                     <ChevronDown
-                      size={13}
+                      size={12}
                       className={`hidden lg:block text-[var(--user-text-muted)] transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
-                                   {profileOpen && (
+                  {profileOpen && (
                     <>
-                      {/* ✅ Full-screen overlay — bahar ka click sirf band karega */}
                       <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-                      <div className="absolute right-0 top-12 w-60 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl shadow-[var(--user-shadow-lg)] z-50 p-2">
-                        
+                      <div className="absolute right-0 top-11 w-60 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl shadow-[var(--user-shadow-lg)] z-50 p-2">
                         <div className="px-3 py-2.5 border-b border-[var(--user-border)] mb-1">
                           <p className="text-[var(--user-text)] text-sm font-semibold truncate">
                             {user.name || user.username}
@@ -426,42 +423,41 @@ export default function Header() {
                           <LogOut size={16} />
                           Logout
                         </button>
-                                       </div>
+                      </div>
                     </>
                   )}
                 </div>
               ) : (
                 <button
-                  onClick={() => router.push("/login")}
-                  className="flex items-center gap-1.5 h-9 px-3 lg:px-4 ml-1 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 active:scale-95 transition"
+                  onClick={() => setLoginOpen(true)}
+                  className="flex items-center gap-1 h-8 px-2.5 lg:px-3 ml-1 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 active:scale-95 transition"
                 >
-                  <User size={14} />
+                  <User size={13} />
                   Login
                 </button>
               )}
             </div>
           </div>
 
-          {/* Mobile search */}
-          <div className="md:hidden pb-3">
-            <SearchBox
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onSubmit={handleSearch}
-            />
-          </div>
+          {/* MOBILE SEARCH — expandable */}
+          {mobileSearchOpen && (
+            <div className="md:hidden pb-3">
+              <SearchBox
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onSubmit={handleSearch}
+              />
+            </div>
+          )}
         </div>
       </header>
 
-      {/* ==========================================
-          ✅ SIDEBAR
-      ========================================== */}
+      {/* SIDEBAR (unchanged) */}
       <div
         className={`fixed top-0 left-0 h-full w-[85%] max-w-[320px] bg-[var(--user-bg-elevated)] z-50 shadow-[var(--user-shadow-lg)] transition-transform duration-300 flex flex-col ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* TOP */}
         <div className="p-5 border-b border-[var(--user-border)] shrink-0">
           <div className="flex items-center justify-between mb-5">
             <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
@@ -481,7 +477,6 @@ export default function Header() {
 
           {user ? (
             <div>
-              {/* USER INFO */}
               <div className="flex items-center gap-3 mb-4">
                 <Avatar user={user} sizeClass="w-11 h-11" textClass="text-base" />
                 <div className="flex-1 min-w-0">
@@ -492,7 +487,6 @@ export default function Header() {
                 </div>
               </div>
 
-              {/* QUICK ACTIONS */}
               <div className="space-y-2">
                 <Link
                   href="/account"
@@ -531,21 +525,18 @@ export default function Header() {
             <div>
               <p className="text-[var(--user-text-muted)] text-xs mb-3">Login to manage orders & account</p>
               <div className="grid grid-cols-2 my-3 gap-2">
-                <Link
-                  href="/login"
-                  onClick={() => setOpen(false)}
-                  className="h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold flex items-center justify-center hover:opacity-90 transition"
+                <button
+                  onClick={() => { setOpen(false); setLoginOpen(true); }}
+                  className="h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold flex items-center justify-center hover:opacity-90 transition w-full"
                 >
                   Login
-                </Link>
+                </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* SCROLLABLE */}
         <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-7">
-          {/* ✅ THEME TOGGLE ROW — mobile only */}
           <div className="md:hidden">
             <button
               onClick={toggleTheme}
@@ -569,7 +560,6 @@ export default function Header() {
             </button>
           </div>
 
-          {/* TOP 5 CATEGORIES */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--user-text-subtle)] mb-3">
               Top Categories
@@ -597,7 +587,6 @@ export default function Header() {
             </div>
           </div>
 
-          {/* TOP 5 BRANDS */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--user-text-subtle)] mb-3">
               Top Brands
@@ -633,11 +622,12 @@ export default function Header() {
           </div>
         </div>
 
-        {/* FOOTER */}
         <div className="p-4 border-t border-[var(--user-border)] shrink-0">
           <p className="text-[10px] text-[var(--user-text-subtle)] text-center">© 2026 {storeName}</p>
         </div>
       </div>
+
+      <LoginModal isOpen={loginOpen} onClose={() => setLoginOpen(false)} />
     </>
   );
 }
