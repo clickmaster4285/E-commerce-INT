@@ -8,7 +8,6 @@ import { dealApi } from "../../../apis/admin/dealApi";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
-// ✅ FIX: Importing the new socket sync hook
 import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
 
 /* ==================== ICONS ==================== */
@@ -29,7 +28,7 @@ const FolderIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fi
 const AwardIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>);
 const GlobeIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 
-/* ==================== HELPERS (FIXED FOR BACKEND SCHEMA) ==================== */
+/* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
@@ -37,12 +36,13 @@ const normalizeArrayResponse = (response) => {
   return [];
 };
 
-// ✅ Helper to safely extract ID string from object or primitive
+// ✅ ROBUST ID EXTRACTOR: Handles Objects, Strings, and Proxies
 const getId = (item) => {
   if (!item) return "";
-  // If it's an object with _id or id, return that as string
-  if (typeof item === 'object') return String(item._id || item.id || "");
-  // If it's already a string/primitive, just return it as string
+  if (typeof item === 'object') {
+    // Try common ID fields, convert to string immediately
+    return String(item._id || item.id || "");
+  }
   return String(item);
 };
 
@@ -53,56 +53,37 @@ const getName = (item, type) => {
   return item?.name || "Unnamed";
 };
 
-// FIXED: Status logic based on isActive and dates
 const getDealStatus = (deal) => {
   if (!deal?.isActive) return "disabled";
-  
   const now = new Date();
   const start = deal?.startDate ? new Date(deal.startDate) : null;
   const end = deal?.endDate ? new Date(deal.endDate) : null;
-  
   if (start && start > now) return "scheduled";
   if (end && end < now) return "expired";
   return "active";
 };
 
-// FIXED: Maps backend 'applyTo' values to readable text
 const formatTarget = (target) => {
   if (!target) return "All Products";
-  const map = {
-    all: "All Products",
-    product: "Specific Products",
-    category: "Categories",
-    brand: "Brands",
-    collection: "Collections",
-  };
+  const map = { all: "All Products", product: "Specific Products", category: "Categories", brand: "Brands", collection: "Collections" };
   return map[target] || target;
 };
 
-// FIXED: Uses 'discountValue' from backend schema
 const formatDealValue = (deal) => {
   const type = deal?.type || "";
-  // Backend field is 'discountValue'
   const value = Number(deal?.discountValue ?? 0); 
-
   switch (type) {
-    case "percentage":
-      return `${value}% OFF`;
-    case "fixed_amount": 
-    case "fixed":
-      return `Rs. ${value} OFF`;
+    case "percentage": return `${value}% OFF`;
+    case "fixed_amount": case "fixed": return `Rs. ${value} OFF`;
     case "buy_x_get_y": {
       const buy = deal?.buyQuantity ?? 1;
       const get = deal?.getQuantity ?? 1;
       const disc = deal?.getDiscountValue ?? 100;
       return `Buy ${buy} Get ${get} (${disc === 100 ? "Free" : `${disc}% Off`})`;
     }
-    case "free_shipping":
-      return "Free Shipping";
-    case "bundle":
-      return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
-    default:
-      return value > 0 ? `${value}` : "-";
+    case "free_shipping": return "Free Shipping";
+    case "bundle": return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
+    default: return value > 0 ? `${value}` : "-";
   }
 };
 
@@ -139,6 +120,50 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+/* ==================== CUSTOM MODAL SELECT ==================== */
+const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value);
+  const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}
+        className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
+        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
+        <span className="truncate">{displayValue}</span>
+        <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute z-[100] mt-1 w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100" 
+             style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+          ) : (
+            options.map((opt) => (
+              <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5 transition-colors"
+                style={{ color: value === opt.value ? "var(--accent)" : "var(--text-primary)", backgroundColor: value === opt.value ? "rgba(16,185,129,0.05)" : "transparent" }}>
+                {opt.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const queryClient = useQueryClient();
@@ -147,34 +172,33 @@ export default function DealsPage() {
   
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [targetFilter, setTargetFilter] = useState("all_targets"); // Default changed to avoid conflict
-  const [viewMode, setViewMode] = useState("list"); // ✅ Added view mode state like Brands
+  const [targetFilter, setTargetFilter] = useState("all_targets");
+  const [viewMode, setViewMode] = useState("list");
   const [showModal, setShowModal] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
-
-  // ✅ Same pattern as Discounts page: "New Deal" dropdown -> related form
-  const [activeFormType, setActiveFormType] = useState(null); // 'all' | 'product' | 'category' | 'brand' | null
+  const [activeFormType, setActiveFormType] = useState(null);
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const typeMenuRef = useRef(null);
-
-  // ✅ FIX: Using the dedicated socket sync hook for real-time updates
   const { markSelfAction } = useDealSocketSync();
 
+  // ✅ FIX 2: DEFAULT VALUES FOR BUY X GET Y
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
-    target_type: "all", // Matches backend 'applyTo' default
+    target_type: "all",
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
-    buy_quantity: "", get_quantity: "", get_discount_value: "100", bundle_price: "",
+    buy_quantity: "1",       // Default to 1
+    get_quantity: "1",       // Default to 1
+    get_discount_value: "100", // Default to 100 (Free)
+    bundle_price: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
     status: "active", is_featured: false,
   });
 
   const { data: dealsResponse, isLoading } = useQuery({ queryKey: ["deals"], queryFn: dealApi.getAll });
   const deals = useMemo(() => normalizeArrayResponse(dealsResponse), [dealsResponse]);
-  
   const { data: productsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
   const { data: categoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
@@ -182,15 +206,12 @@ export default function DealsPage() {
   const { data: brandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
-  // ✅ Close the "New Deal" dropdown when clicking outside (same as Discounts)
   useEffect(() => {
     const handleOutsideClick = (event) => {
-      if (typeMenuRef.current && !typeMenuRef.current.contains(event.target)) {
-        setIsTypeMenuOpen(false);
-      }
+      if (typeMenuRef.current && !typeMenuRef.current.contains(event.target)) setIsTypeMenuOpen(false);
     };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
 
   const resetForm = () => {
@@ -198,7 +219,7 @@ export default function DealsPage() {
       name: "", code: "", description: "", target_type: "all",
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
-      buy_quantity: "", get_quantity: "", get_discount_value: "100", bundle_price: "",
+      buy_quantity: "1", get_quantity: "1", get_discount_value: "100", bundle_price: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
       status: "active", is_featured: false,
     });
@@ -207,19 +228,12 @@ export default function DealsPage() {
     setActiveFormType(null);
   };
 
-  // ✅ Navigation Handler for View Details
-  const handleViewDeal = (id) => {
-    router.push(`${pathname}/${id}`);
-  };
+  const handleViewDeal = (id) => router.push(`${pathname}/${id}`);
 
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => (id ? dealApi.update(id, data) : dealApi.create(data)),
-    onMutate: (_, variables) => {
-      // ✅ Mark self action to prevent duplicate refreshes from socket
-      markSelfAction(variables.id ? "update" : "create");
-    },
+    onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
     onSuccess: (_, variables) => {
-      // Note: invalidateQueries is handled by the hook, but keeping this as fallback/safety
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       toast.success(variables.id ? "Deal updated successfully" : "Deal created successfully");
       setShowModal(false);
@@ -230,10 +244,7 @@ export default function DealsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (ids) => await Promise.all(ids.map((id) => dealApi.delete(id))),
-    onMutate: () => {
-      // ✅ Mark self action for delete
-      markSelfAction("delete");
-    },
+    onMutate: () => markSelfAction("delete"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       setDeleteTarget(null);
@@ -247,14 +258,10 @@ export default function DealsPage() {
     return deals.filter((deal) => {
       const name = String(deal?.name || "").toLowerCase();
       const matchSearch = !term || name.includes(term);
-      
       const status = getDealStatus(deal);
       const matchStatus = statusFilter === "all" || status === statusFilter;
-      
-      // Filter by applyTo (Fixed for 'all_targets' vs 'all')
       const rawTarget = deal?.applyTo || "all";
       const matchTarget = targetFilter === "all_targets" || rawTarget === targetFilter;
-                           
       return matchSearch && matchStatus && matchTarget;
     });
   }, [deals, search, statusFilter, targetFilter]);
@@ -266,42 +273,36 @@ export default function DealsPage() {
     disabled: deals.filter((d) => getDealStatus(d) === "disabled").length,
   }), [deals]);
 
-  // FIXED: Edit Logic mapping backend fields to form state
   const openEdit = (deal) => {
     setFormData({
-      name: deal?.name || "", 
-      code: deal?.code || "", 
-      description: deal?.description || "",
-      target_type: deal?.applyTo || "all", // Backend field
-      
-      selected_product_ids: Array.isArray(deal?.productIds) ? deal.productIds.map(String) : [],
-      selected_category_ids: Array.isArray(deal?.categoryIds) ? deal.categoryIds.map(String) : [],
-      selected_brand_ids: Array.isArray(deal?.brandIds) ? deal.brandIds.map(String) : [],
+      name: deal?.name || "", code: deal?.code || "", description: deal?.description || "",
+      target_type: deal?.applyTo || "all",
+      // ✅ FIX 1: Ensure IDs are extracted as strings when editing
+      selected_product_ids: Array.isArray(deal?.productIds) ? deal.productIds.map(getId) : [],
+      selected_category_ids: Array.isArray(deal?.categoryIds) ? deal.categoryIds.map(getId) : [],
+      selected_brand_ids: Array.isArray(deal?.brandIds) ? deal.brandIds.map(getId) : [],
       
       value_type: deal?.type || "percentage",
-      value: deal?.discountValue ?? "", // Backend field
-      
+      value: deal?.discountValue ?? "",
       min_order_value: deal?.minOrderValue ?? "",
-      buy_quantity: deal?.buyQuantity ?? "",
-      get_quantity: deal?.getQuantity ?? "",
+      // ✅ FIX 2: Load existing values or fallback to defaults
+      buy_quantity: deal?.buyQuantity ?? "1",
+      get_quantity: deal?.getQuantity ?? "1",
       get_discount_value: deal?.getDiscountValue ?? "100",
       bundle_price: deal?.bundlePrice ?? "",
-      
       start_at: toDateInput(deal?.startDate),
       end_at: toDateInput(deal?.endDate),
-      
       usage_limit: deal?.usageLimit ?? "",
       per_user_limit: deal?.perUserLimit ?? "",
-      
       status: deal?.isActive ? "active" : "disabled",
       is_featured: Boolean(deal?.isFeatured),
     });
     setEditingDeal(deal);
-    setActiveFormType(deal?.applyTo || "all"); // ✅ Same as Discounts: edit opens the related form
+    setActiveFormType(deal?.applyTo || "all");
     setShowModal(true);
   };
 
-  // ✅ FIXED SUBMIT HANDLER TO PREVENT PROXY OBJECT ERROR
+  // ✅ FIX 1: SUBMIT HANDLER CLEANUP
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
@@ -320,7 +321,7 @@ export default function DealsPage() {
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
-    // ✅ CRITICAL FIX: Clean IDs before sending to backend to avoid Proxy/Object errors
+    // ✅ CRITICAL FIX: Deep clean all IDs to strings before sending
     const cleanProductIds = formData.selected_product_ids.map(id => String(id?._id || id));
     const cleanCategoryIds = formData.selected_category_ids.map(id => String(id?._id || id));
     const cleanBrandIds = formData.selected_brand_ids.map(id => String(id?._id || id));
@@ -328,29 +329,20 @@ export default function DealsPage() {
     const payload = {
       name: String(formData.name).trim(),
       description: String(formData.description || "").trim() || undefined,
-      
-      applyTo: formData.target_type, // Backend field
-      
-      // ✅ Use cleaned arrays here
+      applyTo: formData.target_type,
       productIds: formData.target_type === "product" ? cleanProductIds : [],
       categoryIds: formData.target_type === "category" ? cleanCategoryIds : [],
       brandIds: formData.target_type === "brand" ? cleanBrandIds : [],
-      
       type: formData.value_type,
-      discountValue: ["percentage", "fixed_amount"].includes(formData.value_type) ? dealValue : 0, // Backend field
-      
+      discountValue: ["percentage", "fixed_amount"].includes(formData.value_type) ? dealValue : 0,
       minOrderValue: formData.min_order_value ? Number(formData.min_order_value) : 0,
-      buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 0,
-      getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 0,
+      buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
+      getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
-
-      startDate,
-      endDate,
-      
+      startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
       perUserLimit: formData.per_user_limit !== "" ? Number(formData.per_user_limit) : null,
-      
       isActive: formData.status === "active",
       isFeatured: Boolean(formData.is_featured),
     };
@@ -375,32 +367,11 @@ export default function DealsPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  // ✅ Deal type options for the "New Deal" dropdown (same UX as Discounts page)
   const dealTypes = [
-    {
-      key: "all",
-      title: "All Products Deal",
-      desc: "Apply deal on all products",
-      icon: GlobeIcon,
-    },
-    {
-      key: "product",
-      title: "Product Deal",
-      desc: "Apply deal on specific products",
-      icon: BoxIcon,
-    },
-    {
-      key: "category",
-      title: "Category Deal",
-      desc: "Apply deal on entire categories",
-      icon: FolderIcon,
-    },
-    {
-      key: "brand",
-      title: "Brand Deal",
-      desc: "Apply deal on specific brands",
-      icon: AwardIcon,
-    },
+    { key: "all", title: "All Products Deal", desc: "Apply deal on all products", icon: GlobeIcon },
+    { key: "product", title: "Product Deal", desc: "Apply deal on specific products", icon: BoxIcon },
+    { key: "category", title: "Category Deal", desc: "Apply deal on entire categories", icon: FolderIcon },
+    { key: "brand", title: "Brand Deal", desc: "Apply deal on specific brands", icon: AwardIcon },
   ];
 
   const openDealForm = (type) => {
@@ -411,19 +382,11 @@ export default function DealsPage() {
     setShowModal(true);
   };
 
-  // ✅ Action Buttons Component with Eye Icon & Stop Propagation
   const ActionButtons = ({ deal }) => (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
-      {/* ✅ VIEW BUTTON ADDED */}
-      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
-        <EyeIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
-        <EditIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
-        <TrashIcon className="w-4 h-4" />
-      </button>
+      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
+      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
+      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
     </div>
   );
 
@@ -437,15 +400,13 @@ export default function DealsPage() {
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage professional deals for your store.</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            {/* ✅ View Mode Toggles Added */}
             <div className="flex items-center gap-1">
               <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
               <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
             </div>
             <div className="relative shrink-0" ref={typeMenuRef}>
               <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                <PlusIcon /> New Deal
-                <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                <PlusIcon /> New Deal <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {isTypeMenuOpen && (
                 <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
@@ -479,33 +440,8 @@ export default function DealsPage() {
         </div>
         
         <div className="flex flex-wrap gap-3">
-          {/* Status Filter */}
-          <Select 
-            value={statusFilter} 
-            onChange={setStatusFilter} 
-            inputStyle={inputStyle} 
-            options={[
-              ["all", "All Status"], 
-              ["active", "Active"], 
-              ["scheduled", "Scheduled"], 
-              ["disabled", "Disabled"], 
-              ["expired", "Expired"]
-            ]} 
-          />
-
-          {/* Target Filter - Value 'all_targets' karne se conflict khatam ho jayega */}
-          <Select 
-            value={targetFilter} 
-            onChange={setTargetFilter} 
-            inputStyle={inputStyle} 
-            options={[
-              ["all_targets", "All Targets"], 
-              ["all", "All Products"], 
-              ["product", "Specific Products"], 
-              ["category", "Categories"], 
-              ["brand", "Brands"]
-            ]} 
-          />
+          <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+          <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
         </div>
 
         {/* TABLE / GRID DISPLAY */}
@@ -517,7 +453,6 @@ export default function DealsPage() {
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No deals found" : "No deals created yet"}</p>
           </div>
         ) : viewMode === "list" ? (
-          /* ✅ LIST VIEW WITH CLICK NAVIGATION */
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -545,20 +480,10 @@ export default function DealsPage() {
                             </div>
                           </div>
                         </td>
-                        {/* FIXED: Applies To Column */}
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
-                          {formatTarget(deal?.applyTo)}
-                        </td>
-                        {/* FIXED: Offer Column */}
-                        <td className="px-4 py-3">
-                          <span className="font-bold text-emerald-500">
-                            {formatDealValue(deal)}
-                          </span>
-                        </td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(deal?.applyTo)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatDealValue(deal)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
-                        <td className="px-4 py-3 whitespace-nowrap w-1">
-                          <ActionButtons deal={deal} />
-                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons deal={deal} /></td>
                       </tr>
                     );
                   })}
@@ -567,7 +492,6 @@ export default function DealsPage() {
             </div>
           </div>
         ) : (
-          /* ✅ GRID VIEW WITH CLICK NAVIGATION */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {filteredDeals.map((deal) => (
               <div key={deal._id || deal.id} onClick={() => handleViewDeal(deal._id || deal.id)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
@@ -630,22 +554,10 @@ function StatCard({ title, value, valueClass = "", cardStyle }) {
 function Select({ value, onChange, options, inputStyle }) {
   return (
     <div className="relative">
-      <select 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" 
-        style={inputStyle}
-      >
-        {options.map(([val, label]) => (
-          // FIX: Key ko unique banaya label ke sath combine karke
-          <option key={`${val}-${label}`} value={val}>
-            {label}
-          </option>
-        ))}
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" style={inputStyle}>
+        {options.map(([val, label]) => (<option key={`${val}-${label}`} value={val}>{label}</option>))}
       </select>
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
-        <ChevronDownIcon className="w-3.5 h-3.5" />
-      </span>
+      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
     </div>
   );
 }
@@ -657,53 +569,31 @@ function Field({ label, value, onChange, type = "text", placeholder, inputStyle 
   </div>);
 }
 
-function SelectionField({ label, items, onClick, onRemove }) {
-  return (<div className="mt-3">
-    <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{label}</label>
-    <div className="rounded-md p-3 flex flex-wrap gap-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-      {items.length === 0 ? (<span className="text-xs" style={{ color: "var(--text-muted)" }}>No {label.toLowerCase()} selected</span>) : (
-        items.slice(0, 5).map((item) => (<span key={getId(item)} className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          {getName(item, label === "Products" ? "product" : label === "Categories" ? "category" : "brand")}
-          <button type="button" onClick={() => onRemove(getId(item))} className="text-red-500"><CloseIcon className="w-3 h-3" /></button>
-        </span>))
-      )}
-      <button type="button" onClick={onClick} className="h-7 px-2.5 rounded text-[11px] font-medium flex items-center gap-1" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <PlusIcon className="w-3 h-3" /> {items.length ? "Manage" : "Select"}
-      </button>
-      {items.length > 5 && (<span className="text-[11px]" style={{ color: "var(--text-muted)" }}>+{items.length - 5} more</span>)}
-    </div>
-  </div>);
-}
-
 /* ==================== DEAL FORM MODAL ==================== */
-// ✅ Same as Discounts: har deal type ka apna tailored form
-const DEAL_TYPE_LABELS = {
-  all: "All Products Deal",
-  product: "Product Deal",
-  category: "Category Deal",
-  brand: "Brand Deal",
-};
-
-const DEAL_TYPE_SUBTITLES = {
-  all: "This deal will apply to all products in your store",
-  product: "Apply deal on specific products",
-  category: "Apply deal on entire categories",
-  brand: "Apply deal on specific brands",
-};
-
-// ✅ Discount page jaisa initials helper
-const getInitials = (name) => {
-  if (!name) return "??";
-  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
-};
+const DEAL_TYPE_LABELS = { all: "All Products Deal", product: "Product Deal", category: "Category Deal", brand: "Brand Deal" };
+const DEAL_TYPE_SUBTITLES = { all: "This deal will apply to all products in your store", product: "Apply deal on specific products", category: "Apply deal on entire categories", brand: "Apply deal on specific brands" };
+const getInitials = (name) => { if (!name) return "??"; return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase(); };
 
 function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
   const [isSelectionOpen, setIsSelectionOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-
   const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
 
-  // ✅ Same as Discounts: sirf us type ka selection section dikhta hai jo dropdown se chuna gaya
+  // ✅ FIX: Force defaults for Buy X Get Y when opening a NEW deal
+  useEffect(() => {
+    if (!editingDeal && formData.value_type === "buy_x_get_y") {
+      // Only update if values are empty or missing to avoid overwriting user input during re-renders
+      if (!formData.buy_quantity || !formData.get_quantity || !formData.get_discount_value) {
+        setFormData(prev => ({
+          ...prev,
+          buy_quantity: "1",
+          get_quantity: "1",
+          get_discount_value: "100"
+        }));
+      }
+    }
+  }, [formData.value_type, editingDeal, setFormData, formData.buy_quantity, formData.get_quantity, formData.get_discount_value]);
+
   const selConfig = {
     product: { key: "selected_product_ids", items: products, label: "Products" },
     category: { key: "selected_category_ids", items: categories, label: "Categories" },
@@ -755,22 +645,25 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Type</label>
-                <select value={formData.value_type} onChange={(e) => setFormData({ ...formData, value_type: e.target.value })} className="h-10 md:h-9 w-full px-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle}>
-                  <option value="percentage">Percentage Discount (%)</option>
-                  <option value="fixed_amount">Fixed Amount Discount (Rs.)</option>
-                  <option value="buy_x_get_y">Buy X Get Y</option>
-                  <option value="bundle">Bundle Deal</option>
-                  <option value="free_shipping">Free Shipping</option>
-                </select>
+                <CustomModalSelect value={formData.value_type} onChange={(val) => setFormData({ ...formData, value_type: val })}
+                  options={[
+                    { value: "percentage", label: "Percentage Discount (%)" },
+                    { value: "fixed_amount", label: "Fixed Amount Discount (Rs.)" },
+                    { value: "buy_x_get_y", label: "Buy X Get Y" },
+                    { value: "bundle", label: "Bundle Deal" },
+                    { value: "free_shipping", label: "Free Shipping" },
+                  ]} placeholder="Select Discount Type" />
               </div>
               {formData.value_type === "percentage" && <Field label="Discount Percentage *" type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" inputStyle={inputStyle} />}
               {formData.value_type === "fixed_amount" && <Field label="Discount Amount (Rs.) *" type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" inputStyle={inputStyle} />}
               {formData.value_type === "free_shipping" && <Field label="Min Order Value (Rs.)" type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 2000" inputStyle={inputStyle} />}
+              
+              {/* ✅ FIX 2: BUY X GET Y FIELDS WITH DEFAULTS */}
               {formData.value_type === "buy_x_get_y" && (
                 <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                  <Field label="Buy Quantity (X) *" type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="e.g., 2" inputStyle={inputStyle} />
-                  <Field label="Get Quantity (Y) *" type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="e.g., 1" inputStyle={inputStyle} />
-                  <Field label="Get Discount (%) *" type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100 for Free" inputStyle={inputStyle} />
+                  <Field label="Buy Quantity (X) *" type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="1" inputStyle={inputStyle} />
+                  <Field label="Get Quantity (Y) *" type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="1" inputStyle={inputStyle} />
+                  <Field label="Get Discount (%) *" type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" inputStyle={inputStyle} />
                 </div>
               )}
               {formData.value_type === "bundle" && (
@@ -781,7 +674,6 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
             </div>
           </div>
 
-          {/* ✅ Selection Section (same as Discounts) — sirf product/category/brand par dikhta hai */}
           {sel && (
             <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <button type="button" onClick={() => setIsSelectionOpen((open) => !open)} aria-expanded={isSelectionOpen} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[var(--bg-tertiary)]" style={{ borderBottom: isSelectionOpen ? "1px solid var(--border-color)" : "none" }}>
@@ -791,18 +683,14 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                 </span>
                 <span className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{isSelectionOpen ? "Close" : "Choose"}<ChevronDownIcon className={`h-4 w-4 transition-transform ${isSelectionOpen ? "rotate-180" : ""}`} /></span>
               </button>
-
               {isSelectionOpen && (
                 <>
-                  {/* Search */}
                   <div className="p-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
                       <input type="text" value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder={`Search ${sel.label.toLowerCase()}...`} className="h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
                     </div>
                   </div>
-
-                  {/* Selected Chips */}
                   {selectedItems.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 px-3 py-2.5" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                       {selectedItems.map((item) => {
@@ -810,16 +698,12 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                         return (
                           <span key={id} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
                             <span className="max-w-[120px] truncate">{getName(item, formType)}</span>
-                            <button type="button" onClick={() => toggleItem(id)} className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition">
-                              <CloseIcon className="w-3 h-3" />
-                            </button>
+                            <button type="button" onClick={() => toggleItem(id)} className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition"><CloseIcon className="w-3 h-3" /></button>
                           </span>
                         );
                       })}
                     </div>
                   )}
-
-                  {/* Items List */}
                   <div className="max-h-[220px] overflow-y-auto">
                     {filteredItems.length === 0 ? (
                       <p className="py-8 text-center text-xs" style={{ color: "var(--text-muted)" }}>No {sel.label.toLowerCase()} found</p>
@@ -829,15 +713,9 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                           const id = getId(item);
                           const isSelected = ids.includes(id);
                           return (
-                            <button
-                              key={id}
-                              type="button"
-                              onClick={() => toggleItem(id)}
-                              className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition"
-                              style={{ backgroundColor: isSelected ? "var(--accent-soft)" : "transparent" }}
+                            <button key={id} type="button" onClick={() => toggleItem(id)} className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition" style={{ backgroundColor: isSelected ? "var(--accent-soft)" : "transparent" }}
                               onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }}
-                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
-                            >
+                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
                               <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${isSelected ? "" : "border-slate-600"}`}
                                 style={isSelected ? { backgroundColor: "var(--accent)", borderColor: "var(--accent)", color: "#0a0a0a" } : {}}>
                                 {isSelected && <CheckIcon className="w-3 h-3" />}
@@ -874,10 +752,8 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="h-10 md:h-9 w-full px-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle}>
-                  <option value="active">Active</option>
-                  <option value="disabled">Disabled</option>
-                </select>
+                <CustomModalSelect value={formData.status} onChange={(val) => setFormData({ ...formData, status: val })}
+                  options={[{ value: "active", label: "Active" }, { value: "disabled", label: "Disabled" }]} placeholder="Select Status" />
               </div>
               <label className="h-9 mt-6 px-3 rounded-md flex items-center gap-2 cursor-pointer text-xs" style={inputStyle}>
                 <input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })} className="w-4 h-4" style={{ accentColor: "var(--accent)" }} />
@@ -901,7 +777,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
 /* ==================== SELECTION MODAL ==================== */
 function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
-  // ✅ Ensure draftIds are always strings to prevent proxy issues
+  // ✅ FIX 1: Initialize draftIds as pure strings
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
   
   const filtered = useMemo(() => {
