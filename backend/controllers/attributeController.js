@@ -33,6 +33,21 @@ const normalizeValues = (rawValues) => {
   return out;
 };
 
+const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select"];
+
+// Legacy data types that previously existed in the system. Treat them as
+// multi_select so the existing records continue to work as dropdowns after
+// the data_type list was restricted.
+const LEGACY_DATA_TYPE_MAP = {
+  select: "multi_select",
+  color: "multi_select",
+  boolean: "text",
+  date: "text",
+  datetime: "text",
+  url: "text",
+  measurement: "decimal",
+};
+
 const sanitizePayload = (body) => {
   const allowed = [
     "name", "code", "data_type", "unit", "description", "values",
@@ -44,7 +59,16 @@ const sanitizePayload = (body) => {
   }
   if (out.code) out.code = String(out.code).toLowerCase().trim();
   if (out.name) out.name = String(out.name).trim();
-  if (out.data_type) out.data_type = String(out.data_type).trim();
+  if (out.data_type !== undefined) {
+    const normalized = String(out.data_type).toLowerCase().trim();
+    if (VALID_DATA_TYPES.includes(normalized)) {
+      out.data_type = normalized;
+    } else if (LEGACY_DATA_TYPE_MAP[normalized]) {
+      out.data_type = LEGACY_DATA_TYPE_MAP[normalized];
+    } else {
+      out.data_type = "text";
+    }
+  }
   if (out.unit !== undefined) out.unit = String(out.unit || "").trim();
   if (out.description !== undefined) out.description = String(out.description || "").trim();
   if (out.values !== undefined) out.values = normalizeValues(out.values);

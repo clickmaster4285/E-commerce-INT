@@ -20,31 +20,21 @@ const attributeSchema = new mongoose.Schema(
     },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, lowercase: true },
+    // data_type is constrained by the attributeController to one of:
+    //   text | number | decimal | multi_select
+    // Existing records created before this restriction (e.g. "select",
+    // "boolean", "color") continue to load fine — only new writes are
+    // validated in the controller.
     data_type: {
       type: String,
       required: true,
-      enum: [
-        "text",
-        "number",
-        "decimal",
-        "boolean",
-        "date",
-        "datetime",
-        "select",
-        "multi_select",
-        "color",
-        "url",
-        "measurement",
-      ],
       default: "text",
     },
     unit: { type: String, trim: true, default: "" },
     description: { type: String, trim: true, default: "" },
     values: { type: [attributeValueSchema], default: [] },
     variant_allowed: { type: Boolean, default: false },
-    filterable: { type: Boolean, default: false },
-    searchable: { type: Boolean, default: false },
-    visible: { type: Boolean, default: true },
+ 
     is_active: { type: Boolean, default: true },
     is_deleted: { type: Boolean, default: false },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

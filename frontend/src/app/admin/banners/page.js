@@ -346,6 +346,9 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 export default function BannersPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -875,34 +878,34 @@ export default function BannersPage() {
                   </div>
                 </FormSection>
 
-                     <div className="space-y-4">
-                        <h4 className="text-sm font-semibold" style={{color: "var(--text-primary)"}}>Linked Deal</h4>
-                        <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
-                           <div className="flex gap-2">
-                              <Select value={form.linkedDealId || ""} onChange={(e) => {
-                                 if(e.target.value === "CREATE_NEW") {
-                                    setShowDealCreator(true);
-                                 } else {
-                                    updateForm("linkedDealId", e.target.value);
-                                 }
-                              }}>
-                                <option value="">No Deal Linked</option>
-                                {deals.map(deal => (
-                                   <option key={deal._id || deal.id} value={deal._id || deal.id}>
-                                      {deal.name} ({deal.type === 'percentage' ? `${deal.discountValue}%` : `$${deal.discountValue}`})
-                                   </option>
-                                ))}
-                                <option value="CREATE_NEW" className="font-bold text-emerald-600">+ Create New Deal...</option>
-                              </Select>
-                           </div>
-                        </FormField>
-                        {form.linkedDealId && (
-                           <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
-                              <TagIcon className="w-4 h-4 text-emerald-500" />
-                              <span>Deal is linked. Button will redirect to deal page if configured.</span>
-                           </div>
-                        )}
-                     </div>
+                {/* 4.5 Linked Deal Section - FIXED */}
+                <FormSection number="4.5" title="Linked Deal" description="Attach a deal to this banner">
+                  <div className="space-y-4">
+                    <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
+                      <div className="flex gap-2">
+                        <Select value={form.linkedDealId || ""} onChange={(e) => {
+                          if(e.target.value === "CREATE_NEW") {
+                            setShowDealCreator(true);
+                          } else {
+                            updateForm("linkedDealId", e.target.value);
+                          }
+                        }}>
+                          <option value="">No Deal Linked</option>
+                          {deals.map(deal => (
+                            <option key={deal._id || deal.id} value={deal._id || deal.id}>
+                              {deal.name} ({deal.type === 'percentage' ? `${deal.discountValue}%` : `$${deal.discountValue}`})
+                            </option>
+                          ))}
+                          <option value="CREATE_NEW" className="font-bold text-emerald-600">+ Create New Deal...</option>
+                        </Select>
+                      </div>
+                    </FormField>
+                    {form.linkedDealId && (
+                      <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
+                        <TagIcon className="w-4 h-4 text-emerald-500" />
+                        <span>Deal is linked. Button will redirect to deal page if configured.</span>
+                      </div>
+                    )}
                   </div>
                 </FormSection>
 

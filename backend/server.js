@@ -13,6 +13,9 @@ const User = require("./models/User");
 const Store = require("./models/Store");
 const { initSocket } = require("./utils/socket");
 
+// ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
+const { seedAttributes } = require("./scripts/seedAttributes");
+
 // ==========================================
 // ROUTES IMPORT
 // ==========================================
@@ -32,19 +35,15 @@ const bannerScheduler = require("./utils/bannerScheduler");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const stockRoutes = require("./routes/stockRoutes");
-const shippingRoutes = require("./routes/shippingRoutes"); // ✅ SHIPPING ROUTES
-
+const shippingRoutes = require("./routes/shippingRoutes");
 const attributeRoutes = require("./routes/attributeRoutes");
 
 // ==========================================
-// APP & SERVER
+// APP & SERVER SETUP
 // ==========================================
 const app = express();
 const server = http.createServer(app);
 
-// ==========================================
-// ENVIRONMENT CONFIG
-// ==========================================
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
 const CLIENT_URL = process.env.CLIENT_URL || "";
@@ -59,7 +58,7 @@ const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE || "admin";
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE || "Backend server is running";
 
 // ==========================================
-// CORS
+// MIDDLEWARES
 // ==========================================
 if (!CLIENT_URL) console.warn("⚠️ CLIENT_URL is not configured in .env");
 
@@ -72,13 +71,10 @@ const buildAllowedOrigins = () => {
   return [...origins];
 };
 
-const allowedOrigins = buildAllowedOrigins();
-console.log("🌐 Allowed Origins:", allowedOrigins.length ? allowedOrigins.join(", ") : "None configured");
-
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (buildAllowedOrigins().includes(origin)) return callback(null, true);
     
     if (NODE_ENV !== "production") {
       try {
@@ -96,35 +92,24 @@ app.use(cors({
         if (isPrivate) return callback(null, true);
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
-
-    console.error(`❌ CORS blocked origin: ${origin}`);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
 
-// ==========================================
-// BODY MIDDLEWARE
-// ==========================================
 app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
 app.use(cookieParser());
 
-// ==========================================
-// UPLOAD DIRECTORY & STATIC FILES
-// ==========================================
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
 app.use("/uploads", express.static(uploadDir, { maxAge: UPLOAD_CACHE_MAX_AGE, etag: true }));
 
-// ==========================================
-// SOCKET.IO
-// ==========================================
 const io = initSocket(server);
 app.use((req, res, next) => { req.io = io; next(); });
 
 // ==========================================
-// API ROUTES (NO DUPLICATES)
+// ROUTES
 // ==========================================
 app.use(`${API_PREFIX}/categories`, categoryRoutes);
 app.use(`${API_PREFIX}/brands`, brandRoutes);
@@ -142,90 +127,78 @@ app.use(`${API_PREFIX}/orders`, orderRoutes);
 app.use(`${API_PREFIX}/cart`, cartRoutes);
 app.use(`${API_PREFIX}/stock`, stockRoutes);
 app.use(`${API_PREFIX}/attributes`, attributeRoutes);
-app.use(`${API_PREFIX}/shipping`, shippingRoutes); // ✅ SHIPPING
+app.use(`${API_PREFIX}/shipping`, shippingRoutes);
 
-// ==========================================
-// ROOT & HEALTH CHECK
-// ==========================================
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
   res.status(200).json({ success: true, message: "API is running", environment: NODE_ENV, timestamp: new Date() });
 });
-
-// ==========================================
-// 404 HANDLER
-// ==========================================
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found", path: req.originalUrl });
 });
 
 // ==========================================
-// SEED DEFAULT DATA
-// ==========================================
-const seedDefaultData = async () => {
-  try {
-    const storeName = process.env.DEFAULT_STORE_NAME;
-    if (!storeName) { console.warn("⚠️ DEFAULT_STORE_NAME is missing"); return; }
-
-    let defaultStore = await Store.findOne({ store_name: storeName });
-    if (!defaultStore) {
-      defaultStore = await Store.create({
-        store_name: storeName,
-        tagline: process.env.DEFAULT_STORE_TAGLINE,
-        email: process.env.DEFAULT_STORE_EMAIL,
-        phone: process.env.DEFAULT_STORE_PHONE,
-        support_email: process.env.DEFAULT_STORE_SUPPORT_EMAIL,
-        support_phone: process.env.DEFAULT_STORE_SUPPORT_PHONE,
-        country: process.env.DEFAULT_STORE_COUNTRY,
-        state: process.env.DEFAULT_STORE_STATE,
-        city: process.env.DEFAULT_STORE_CITY,
-        zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
-        address: process.env.DEFAULT_STORE_ADDRESS,
-        currency: process.env.DEFAULT_STORE_CURRENCY,
-        tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE) || 0,
-        weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
-        store_status: process.env.DEFAULT_STORE_STATUS,
-        primary_color: process.env.DEFAULT_STORE_PRIMARY_COLOR,
-      });
-      console.log("✅ Default store seeded:", storeName);
-    }
-
-    const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
-    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-    const adminUsername = process.env.DEFAULT_ADMIN_USERNAME;
-    const adminName = process.env.DEFAULT_ADMIN_NAME;
-
-    if (!adminEmail || !adminPassword) { console.warn("⚠️ Default admin credentials are missing"); return; }
-
-    const adminSearch = [{ email: adminEmail }];
-    if (adminUsername) adminSearch.push({ username: adminUsername });
-
-    let admin = await User.findOne({ $or: adminSearch });
-    if (!admin) {
-      const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
-      admin = await User.create({
-        name: adminName, username: adminUsername, email: adminEmail,
-        password: hashedPassword, role: DEFAULT_ADMIN_ROLE, storeId: defaultStore._id,
-      });
-      console.log("✅ Default admin seeded:", adminEmail);
-    } else {
-      let updated = false;
-      if (!admin.storeId) { admin.storeId = defaultStore._id; updated = true; }
-      if (admin.role !== DEFAULT_ADMIN_ROLE) { admin.role = DEFAULT_ADMIN_ROLE; updated = true; }
-      if (updated) { await admin.save(); console.log("🔄 Existing admin updated"); }
-    }
-  } catch (error) {
-    console.error("❌ Seed Error:", error.message);
-    throw error;
-  }
-};
-
-// ==========================================
-// CREATE DIRECTORIES
+// DIRECTORIES & SEEDING
 // ==========================================
 const createUploadDirectories = () => {
-  if (!fs.existsSync(uploadDir)) { fs.mkdirSync(uploadDir, { recursive: true }); console.log("📁 Upload directory created:", uploadDir); }
-  if (!fs.existsSync(storeUploadDir)) { fs.mkdirSync(storeUploadDir, { recursive: true }); console.log("📁 Store upload directory created:", storeUploadDir); }
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+  if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
+};
+
+const seedDefaultData = async () => {
+  try {
+    // 1. Store Seed
+    const storeName = process.env.DEFAULT_STORE_NAME;
+    if (storeName) {
+      let defaultStore = await Store.findOne({ store_name: storeName });
+      if (!defaultStore) {
+        await Store.create({
+          store_name: storeName,
+          tagline: process.env.DEFAULT_STORE_TAGLINE,
+          email: process.env.DEFAULT_STORE_EMAIL,
+          phone: process.env.DEFAULT_STORE_PHONE,
+          support_email: process.env.DEFAULT_STORE_SUPPORT_EMAIL,
+          support_phone: process.env.DEFAULT_STORE_SUPPORT_PHONE,
+          country: process.env.DEFAULT_STORE_COUNTRY,
+          state: process.env.DEFAULT_STORE_STATE,
+          city: process.env.DEFAULT_STORE_CITY,
+          zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
+          address: process.env.DEFAULT_STORE_ADDRESS,
+          currency: process.env.DEFAULT_STORE_CURRENCY,
+          tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE) || 0,
+          weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
+          store_status: process.env.DEFAULT_STORE_STATUS,
+          primary_color: process.env.DEFAULT_STORE_PRIMARY_COLOR,
+        });
+        console.log("✅ Default Store Created");
+      }
+
+      // 2. Admin Seed
+      const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
+      const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+      if (adminEmail && adminPassword) {
+        let admin = await User.findOne({ email: adminEmail });
+        if (!admin) {
+          const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+          await User.create({
+            name: process.env.DEFAULT_ADMIN_NAME,
+            username: process.env.DEFAULT_ADMIN_USERNAME,
+            email: adminEmail,
+            password: hashedPassword,
+            role: DEFAULT_ADMIN_ROLE,
+            storeId: defaultStore._id,
+          });
+          console.log("✅ Default Admin User Created");
+        }
+      }
+    }
+
+    // ✅ 3. Attributes Auto-Seed (Imported Function Call)
+    await seedAttributes(); 
+
+  } catch (error) {
+    console.error("❌ Seed Error:", error.message);
+  }
 };
 
 // ==========================================
@@ -235,30 +208,20 @@ const startServer = async () => {
   try {
     await connectDB();
     createUploadDirectories();
-    await seedDefaultData();
     
-    if (typeof bannerScheduler === 'function') {
-      bannerScheduler();
-    } else if (bannerScheduler && typeof bannerScheduler.start === 'function') {
-      bannerScheduler.start();
-    } else {
-      console.log("⚠️ Banner Scheduler initialized but not started automatically");
-    }
+    // Yahan sab kuch auto-run hoga
+    await seedDefaultData(); 
+    
+    if (typeof bannerScheduler === 'function') bannerScheduler();
+    else if (bannerScheduler?.start) bannerScheduler.start();
     
     server.listen(PORT, HOST, () => {
       const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
-      console.log("");
       console.log("==========================================");
-      console.log(`🚀 ${STARTUP_MESSAGE}`);
+      console.log(` ${STARTUP_MESSAGE}`);
       console.log("==========================================");
       console.log(`🌐 Server: http://${displayHost}:${PORT}`);
       console.log(`🔗 API: http://${displayHost}:${PORT}${API_PREFIX}`);
-      console.log(`❤️ Health: http://${displayHost}:${PORT}${API_PREFIX}/health`);
-      console.log(`🏷️ Tags: ${API_PREFIX}/tags`);
-      console.log(`🚚 Shipping: ${API_PREFIX}/shipping`);
-      console.log(`🌍 Environment: ${NODE_ENV}`);
-      console.log(`🔐 CORS Origins: ${allowedOrigins.length ? allowedOrigins.join(", ") : "Development localhost enabled"}`);
-      console.log("🚀 Socket.IO Ready");
       console.log("==========================================");
     });
   } catch (error) {

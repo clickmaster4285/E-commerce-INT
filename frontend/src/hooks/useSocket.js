@@ -26,23 +26,27 @@ function getSocket() {
   const SOCKET_URL = getSocketURL();
 
   globalSocket = io(SOCKET_URL, {
-    withCredentials: true,
-    transports: ["polling", "websocket"],
+    withCredentials: true,       // ✅ Cookies bhejne ke liye zaroori
+    transports: ["websocket", "polling"], // ✅ WebSocket pehle try karo
     reconnection: true,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     autoConnect: true,
+    timeout: 20000,
   });
 
   globalSocket.on("connect", () => {
+    console.log("✅ Socket connected:", globalSocket.id);
   });
 
   globalSocket.on("disconnect", (reason) => {
+    console.log("❌ Socket disconnected:", reason);
   });
 
   globalSocket.on("connect_error", (err) => {
     console.error("⚠️ Socket Connection Error:", err.message);
+    console.error("Backend URL:", SOCKET_URL);
   });
 
   return globalSocket;

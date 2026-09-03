@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
+import { buildSeedAttributeConfigs, CATEGORY_ATTRIBUTE_SEED } from "@/lib/categoryAttributeSeed";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -45,6 +46,34 @@ const getId = (value) => {
 
 const getAttributeId = (attribute) => String(attribute?.attribute_id || attribute?._id || "");
 
+const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
+
+const sanitizeOptionLabels = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const item of raw) {
+    if (item === undefined || item === null) continue;
+    let label;
+    if (typeof item === "string") label = item;
+    else if (typeof item === "object") {
+      if (typeof item.label === "string") label = item.label;
+      else if (typeof item.value === "string") label = item.value;
+      else if (typeof item.name === "string") label = item.name;
+      else continue;
+    } else continue;
+    if (typeof label !== "string") continue;
+    const trimmed = label.trim();
+    if (!trimmed) continue;
+    if (OBJECT_ID_RE.test(trimmed)) continue;
+    if (/^\d+$/.test(trimmed)) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+};
+
 // ✅ FIX: Robust normalization to STRICTLY preserve values during edit
 const normalizeConfig = (attribute, index = 0) => {
   const config = attribute?.category_config || attribute || {};
@@ -74,17 +103,20 @@ const FIXED_CATEGORIES = [
   { name: "Clothing", code: "clothing" },
 ];
 
-const CATEGORY_ATTRIBUTE_MAP = {
-  Mobile: ["ram", "rom", "storage", "screen_size", "color", "battery", "camera", "processor", "brand", "model"],
-  PC: ["ram", "storage", "processor", "gpu", "graphics", "screen_size", "screen_resolution", "os", "operating_system", "color", "brand", "model"],
-  Clothing: ["size", "color", "fabric", "fit", "pattern", "gender", "sleeve_type", "brand"]
+const CATEGORY_TYPE_KEY = {
+  Mobile: "mobile",
+  PC: "pc",
+  Clothing: "clothing",
 };
 
-/* ================= PROFESSIONAL DROPDOWN COMPONENT ================= */
-const ProfessionalDropdown = ({ attribute, value, onChange, onAddNewValue }) => {
+const getCategoryTypeKey = (type) => CATEGORY_TYPE_KEY[type] || "";
+
+/* ================= PROFESSIONAL MULTI-SELECT DROPDOWN COMPONENT ================= */
+const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [newVal, setNewVal] = useState("");
+  const [newOption, setNewOption] = useState("");
+  const [adding, setAdding] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -95,15 +127,38 @@ const ProfessionalDropdown = ({ attribute, value, onChange, onAddNewValue }) => 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredValues = (attribute.values || []).filter(v => 
-    v.label.toLowerCase().includes(search.toLowerCase())
+  const rawSelected = Array.isArray(value) ? value : [];
+  const options = sanitizeOptionLabels(attribute?.values);
+  const validSelectedSet = new Set(options);
+  const selected = sanitizeOptionLabels(rawSelected).filter((item) => validSelectedSet.has(item));
+  const filteredValues = options.filter((label) =>
+    label.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAdd = () => {
-    if (newVal.trim() && !filteredValues.some(v => v.label.toLowerCase() === newVal.trim().toLowerCase())) {
-      onAddNewValue(attribute._id, newVal.trim());
-      setNewVal("");
+  const toggleOption = (label) => {
+    if (typeof label !== "string" || !validSelectedSet.has(label)) return;
+    const exists = selected.includes(label);
+    const next = exists ? selected.filter((item) => item !== label) : [...selected, label];
+    onChange(next);
+  };
+
+  const handleAddNewOption = async () => {
+    const trimmed = newOption.trim();
+    if (!trimmed || !onAddNewOption) return;
+    if (options.some((opt) => opt.toLowerCase() === trimmed.toLowerCase())) {
+      setNewOption("");
+      return;
+    }
+    try {
+      setAdding(true);
+      await onAddNewOption(trimmed);
+      if (!selected.includes(trimmed)) onChange([...selected, trimmed]);
+      setNewOption("");
       setSearch("");
+    } catch (err) {
+      console.error("Failed to add option:", err);
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -112,17 +167,36 @@ const ProfessionalDropdown = ({ attribute, value, onChange, onAddNewValue }) => 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-9 px-3 rounded-md text-sm flex items-center justify-between outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}
+        className="w-full min-h-[40px] px-3 py-1.5 rounded-md text-sm flex items-center justify-between outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
       >
-        <span className="truncate">{value || `Select ${attribute.name}...`}</span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <div className="flex flex-wrap items-center gap-1.5 text-left">
+          {selected.length === 0 ? (
+            <span className="truncate" style={{ color: "var(--text-muted)" }}>Select {attribute.name}...</span>
+          ) : (
+            selected.map((item) => (
+              <span key={item} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium"
+                style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }}>
+                {item}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); toggleOption(item); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleOption(item); } }}
+                  className="cursor-pointer"
+                  style={{ color: "#34d399" }}
+                >×</span>
+              </span>
+            ))
+          )}
+        </div>
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
         <div className="absolute z-50 mt-1 w-full rounded-md shadow-lg overflow-hidden"
           style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          
+
           <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
             <input
               type="text"
@@ -136,36 +210,138 @@ const ProfessionalDropdown = ({ attribute, value, onChange, onAddNewValue }) => 
           </div>
 
           <div className="max-h-40 overflow-y-auto py-1">
-            {filteredValues.map((val, idx) => (
-              <button key={idx} type="button"
-                onClick={() => { onChange(val.label); setIsOpen(false); }}
-                className="w-full px-3 py-1.5 text-left text-xs hover:bg-emerald-500/10 transition flex items-center gap-2"
-                style={{ color: value === val.label ? "var(--accent)" : "var(--text-primary)" }}
-              >
-                {value === val.label && <CheckIcon className="w-3 h-3" />}
-                {val.label}
-              </button>
-            ))}
-            
+            {filteredValues.map((label, idx) => {
+              const isSelected = selected.includes(label);
+              return (
+                <button key={`${label}-${idx}`} type="button"
+                  onClick={() => toggleOption(label)}
+                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-emerald-500/10 transition flex items-center gap-2"
+                  style={{ color: isSelected ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isSelected ? "bg-emerald-500 border-emerald-500" : ""}`}
+                    style={!isSelected ? { borderColor: "var(--border-color)" } : {}}>
+                    {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
+                  </span>
+                  {label}
+                </button>
+              );
+            })}
+
             {filteredValues.length === 0 && (
               <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No values found</div>
             )}
           </div>
 
-          <div className="p-2 border-t flex gap-2" style={{ borderColor: "var(--border-color)" }}>
+          {onAddNewOption && (
+            <div className="p-2 border-t flex gap-2" style={{ borderColor: "var(--border-color)" }}>
+              <input
+                type="text"
+                placeholder="+ Add new option"
+                value={newOption}
+                onChange={(e) => setNewOption(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddNewOption(); } }}
+                disabled={adding}
+                className="flex-1 h-7 px-2 text-xs rounded outline-none disabled:opacity-50"
+                style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+              />
+              <button
+                type="button"
+                onClick={handleAddNewOption}
+                disabled={adding || !newOption.trim()}
+                className="h-7 px-2 rounded text-[10px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {adding ? <Spinner className="w-3 h-3" /> : <PlusIcon className="w-3 h-3" />}
+                Add
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ================= PROFESSIONAL SINGLE-SELECT DROPDOWN COMPONENT ================= */
+const ProfessionalSingleSelect = ({ value, onChange, placeholder = "Select...", disabled = false, icon, options: propOptions }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const rawOptions = propOptions || FIXED_CATEGORIES.map((cat) => cat.name);
+  const options = sanitizeOptionLabels(rawOptions);
+  const filteredOptions = options.filter((label) =>
+    label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className="w-full min-h-[40px] h-10 px-3 rounded-md text-sm flex items-center justify-between outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {icon && <span className="shrink-0" style={{ color: "var(--text-muted)" }}>{icon}</span>}
+          <span className="truncate" style={{ color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
+            {value || placeholder}
+          </span>
+        </div>
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute z-50 mt-1 w-full rounded-md shadow-lg overflow-hidden"
+          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+
+          <div className="p-2 border-b" style={{ borderColor: "var(--border-color)" }}>
             <input
               type="text"
-              placeholder="Add new value..."
-              value={newVal}
-              onChange={(e) => setNewVal(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              className="flex-1 h-7 px-2 text-xs rounded outline-none"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-7 px-2 text-xs rounded outline-none"
               style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+              autoFocus
             />
-            <button type="button" onClick={handleAdd}
-              className="h-7 px-2 rounded text-[10px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition">
-              Add
-            </button>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filteredOptions.map((label) => {
+              const isSelected = value === label;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    onChange(label);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-emerald-500/10 transition flex items-center gap-2"
+                  style={{ color: isSelected ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isSelected ? "bg-emerald-500 border-emerald-500" : ""}`}
+                    style={!isSelected ? { borderColor: "var(--border-color)" } : {}}>
+                    {isSelected && <CheckIcon className="w-3 h-3 text-white" />}
+                  </span>
+                  {label}
+                </button>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options found</div>
+            )}
           </div>
         </div>
       )}
@@ -188,15 +364,11 @@ export default function CategoriesPage() {
   const itemsPerPage = 20;
 
   const [showModal, setShowModal] = useState(false);
-  const [showAttributeDropdown, setShowAttributeDropdown] = useState(false);
-  const [showAddAttrModal, setShowAddAttrModal] = useState(false);
-  const [newAttrForm, setNewAttrForm] = useState({ name: "", code: "", data_type: "text", unit: "" });
-  const [editingAttrId, setEditingAttrId] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [attributeSearch, setAttributeSearch] = useState("");
-  
+
   const [activeTab, setActiveTab] = useState("details");
+  const [openAttributeKey, setOpenAttributeKey] = useState(null);
 
   const [formData, setFormData] = useState({
     category_code: "",
@@ -219,28 +391,18 @@ export default function CategoriesPage() {
     staleTime: 0, 
   });
 
-  const { data: availableAttributes = [], isLoading: attributesLoading, refetch: refetchAttributes } = useQuery({
-    queryKey: ["active-attributes"],
-    queryFn: () => attributeApi.getAll().then((items) => items.filter((item) => item.is_active !== false && item.is_deleted !== true)),
-    enabled: showModal || showAddAttrModal,
-    staleTime: 5 * 60 * 1000,
-  });
-
   // ✅ FIX: Robust Mutation with forced refetch and safe toast handling
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => id ? categoryApi.update(id, data) : categoryApi.create(data),
     onSuccess: async (_, variables) => {
       try {
-        // Force immediate refetch instead of just invalidation
         await queryClient.refetchQueries({ queryKey: ["admin-categories"], type: "active" });
         await queryClient.refetchQueries({ queryKey: ["categories"], type: "active" });
-        
-        // Safe toast that works even if response structure varies
+
         toast.success(variables.id ? "Category updated successfully" : "Category created successfully");
         closeModal();
       } catch (err) {
         console.error("Post-save refresh failed:", err);
-        // Fallback: still show success and close modal since mutation succeeded
         toast.success(variables.id ? "Category updated" : "Category created");
         closeModal();
       }
@@ -249,18 +411,6 @@ export default function CategoriesPage() {
       console.error("Save mutation error:", error);
       toast.error(error.response?.data?.message || error.message || "Category save failed");
     },
-  });
-
-  const createOrUpdateAttrMutation = useMutation({
-    mutationFn: ({ id, data }) => id ? attributeApi.update(id, data) : attributeApi.create(data),
-    onSuccess: (updatedAttr) => {
-      toast.success(`"${updatedAttr.name}" ${editingAttrId ? 'updated' : 'created'} & assigned!`);
-      setShowAddAttrModal(false);
-      setNewAttrForm({ name: "", code: "", data_type: "text", unit: "" });
-      setEditingAttrId(null);
-      refetchAttributes().then(() => toggleAttribute(updatedAttr));
-    },
-    onError: (err) => toast.error(err.response?.data?.message || "Failed to process attribute"),
   });
 
   const deleteMutation = useMutation({
@@ -325,15 +475,28 @@ export default function CategoriesPage() {
     if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
     if (!formData.category_type) { toast.error("Please select a Category Type"); return; }
 
-    const attributes = (formData.attributes || []).map((attribute, index) => ({
-      attribute_id: attribute.attribute_id,
-      is_required: Boolean(attribute.is_required),
-      is_visible: attribute.is_visible !== false,
-      is_filterable: Boolean(attribute.is_filterable),
-      is_searchable: Boolean(attribute.is_searchable),
-      sort_order: Number.isFinite(Number(attribute.sort_order)) ? Number(attribute.sort_order) : index,
-      value: attribute.value || "",
-    }));
+    const isAssigned = (attribute) => {
+      const v = attribute.value;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === "string") return v.trim().length > 0;
+      return v !== undefined && v !== null && v !== "";
+    };
+
+    const attributes = (formData.attributes || [])
+      .filter(isAssigned)
+      .map((attribute, index) => ({
+        attribute_id: attribute.attribute_id || null,
+        seed_code: attribute.seed_code,
+        seed_name: attribute.seed_name,
+        seed_type: attribute.seed_type,
+        seed_options: attribute.seed_options,
+        is_required: Boolean(attribute.is_required),
+        is_visible: attribute.is_visible !== false,
+        is_filterable: Boolean(attribute.is_filterable),
+        is_searchable: Boolean(attribute.is_searchable),
+        sort_order: Number.isFinite(Number(attribute.sort_order)) ? Number(attribute.sort_order) : index,
+        value: attribute.value || "",
+      }));
 
     const payload = {
       category_code: formData.category_code.trim(),
@@ -348,10 +511,7 @@ export default function CategoriesPage() {
   };
 
   // ✅ FIX: Robust Edit Handler with fallback type detection
-  const handleEdit = (category) => {
-    const directAttributes = (category.attributes || []).map((attribute, index) => normalizeConfig(attribute, index));
-
-    // Detect type with multiple fallbacks
+  const handleEdit = async (category) => {
     const normalizeKey = (s) => String(s || "").trim().toLowerCase();
     let detectedType = category.category_type;
 
@@ -363,13 +523,95 @@ export default function CategoriesPage() {
       const codeMatch = FIXED_CATEGORIES.find((c) => normalizeKey(c.code) === normalizeKey(category.category_code));
       if (codeMatch) detectedType = codeMatch.name;
     }
-    // Final validation
     if (detectedType && !FIXED_CATEGORIES.some((c) => c.name === detectedType)) {
       const recovery = FIXED_CATEGORIES.find((c) => normalizeKey(c.name) === normalizeKey(detectedType));
       detectedType = recovery ? recovery.name : "";
     }
 
-    setEditingCategory(category);
+    const typeKey = getCategoryTypeKey(detectedType);
+    const seeds = CATEGORY_ATTRIBUTE_SEED[typeKey] || [];
+
+    // Build a lookup of all known attributes by code so we can resolve each
+    // saved category.attributes entry (which only carries attribute_id + value)
+    // back to its code/seed.
+    let attributeByCode = new Map();
+    let attributeById = new Map();
+    try {
+      const allAttrs = await attributeApi.getAll("");
+      attributeByCode = new Map((allAttrs || []).map((a) => [String(a.code || "").toLowerCase(), a]));
+      attributeById = new Map((allAttrs || []).map((a) => [String(a._id || ""), a]));
+    } catch (err) {
+      console.error("Failed to load attributes for edit:", err);
+    }
+
+    const existingByCode = new Map();
+    const existingById = new Map();
+    (category.attributes || []).forEach((a) => {
+      const attrId = String(a.attribute_id || a._id || "");
+      const attrRecord = attributeById.get(attrId) || attributeByCode.get(String(a?.code || "").toLowerCase());
+      const code = String(attrRecord?.code || a?.code || "").toLowerCase();
+      const config = normalizeConfig(a);
+      if (attrId) existingById.set(attrId, { ...config, attrRecord, attrId });
+      if (code) existingByCode.set(code, { ...config, attrRecord, attrId, code });
+    });
+
+    const mergedAttributes = seeds
+      .map((seed, index) => {
+        const seedCode = `${typeKey}_${seed.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+        const existingEntry = existingByCode.get(seedCode);
+        if (!existingEntry) return null;
+        const baseConfig = existingEntry;
+        const validOptionLabels = sanitizeOptionLabels(seed.options || []);
+        const validValue = Array.isArray(baseConfig.value)
+          ? sanitizeOptionLabels(baseConfig.value)
+          : "";
+        return {
+          attribute_id: baseConfig.attrId || null,
+          seed_code: seedCode,
+          seed_name: seed.name,
+          seed_type: seed.type,
+          seed_options: validOptionLabels,
+          is_required: Boolean(baseConfig.is_required),
+          is_visible: baseConfig.is_visible !== false,
+          is_filterable: Boolean(baseConfig.is_filterable),
+          is_searchable: Boolean(baseConfig.is_searchable),
+          sort_order: Number.isFinite(Number(baseConfig.sort_order)) ? Number(baseConfig.sort_order) : index,
+          value: validValue,
+        };
+      })
+      .filter(Boolean);
+
+    // Preserve any existing attributes that don't have a seed counterpart
+    const seedCodes = new Set(seeds.map((s) => `${typeKey}_${s.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "_")));
+    const extraAttributes = (category.attributes || [])
+      .filter((a) => {
+        const attrId = String(a.attribute_id || a._id || "");
+        const attrRecord = existingById.get(attrId)?.attrRecord;
+        const code = String(attrRecord?.code || a?.code || "").toLowerCase();
+        return !seedCodes.has(code);
+      })
+      .map((a, index) => {
+        const attrId = String(a.attribute_id || a._id || "");
+        const existing = existingById.get(attrId) || {};
+        const config = existing.config || normalizeConfig(a);
+        const attrRecord = existing.attrRecord;
+        const seedOptions = sanitizeOptionLabels(attrRecord?.values);
+        return {
+          attribute_id: config.attribute_id,
+          seed_code: String(attrRecord?.code || a?.code || "").toLowerCase(),
+          seed_name: attrRecord?.name || config.attribute_id || `Attribute ${index + 1}`,
+          seed_type: attrRecord?.data_type || "text",
+          seed_options: seedOptions,
+          is_required: Boolean(config.is_required),
+          is_visible: config.is_visible !== false,
+          is_filterable: Boolean(config.is_filterable),
+          is_searchable: Boolean(config.is_searchable),
+          sort_order: Number.isFinite(Number(config.sort_order)) ? Number(config.sort_order) : mergedAttributes.length + index,
+          value: Array.isArray(config.value) ? sanitizeOptionLabels(config.value) : "",
+        };
+      });
+
+    setEditingCategory(category); setOpenAttributeKey(null);
     setFormData({
       category_code: category.category_code || "",
       category_type: detectedType || "",
@@ -377,7 +619,7 @@ export default function CategoriesPage() {
       description: category.description || "",
       parent_category_id: getId(category.parent_category_id),
       status: category.status || "active",
-      attributes: directAttributes,
+      attributes: [...mergedAttributes, ...extraAttributes],
     });
     setAutoCode(category.category_code || "");
     setActiveTab("details");
@@ -385,7 +627,7 @@ export default function CategoriesPage() {
   };
 
   const handleOpenAddModal = async () => {
-    setEditingCategory(null);
+    setEditingCategory(null); setOpenAttributeKey(null);
     setFormData({ category_code: "", category_type: "", name: "", description: "", parent_category_id: "", status: "active", attributes: [] });
     setActiveTab("details");
     setShowModal(true);
@@ -420,9 +662,9 @@ export default function CategoriesPage() {
   };
 
   const closeModal = () => {
-    setShowModal(false); setShowAttributeDropdown(false); setEditingCategory(null);
+    setShowModal(false); setEditingCategory(null); setOpenAttributeKey(null);
     setFormData({ category_code: "", category_type: "", name: "", description: "", parent_category_id: "", status: "active", attributes: [] });
-    setAutoCode(""); setAttributeSearch("");
+    setAutoCode("");
   };
 
   const fetchNextCode = async () => {
@@ -434,70 +676,106 @@ export default function CategoriesPage() {
     } catch { setAutoCode(""); } finally { setLoadingCode(false); }
   };
 
-  const handleParentChange = (parentId) => setFormData((previous) => ({ ...previous, parent_category_id: parentId }));
-
-  const toggleAttribute = (attribute) => {
-    const attributeId = String(attribute._id);
+  const handleCategoryTypeChange = (newType) => {
+    setOpenAttributeKey(null);
     setFormData((previous) => {
-      const current = previous.attributes || [];
-      const existing = current.find((item) => getAttributeId(item) === attributeId);
-      if (existing) return { ...previous, attributes: current.filter((item) => getAttributeId(item) !== attributeId) };
-      return { ...previous, attributes: [...current, { attribute_id: attribute._id, is_required: false, is_visible: true, is_filterable: attribute.filterable || false, is_searchable: attribute.searchable || false, sort_order: current.length, value: "" }] };
+      const wasSameType = previous.category_type === newType;
+      if (wasSameType) return { ...previous, category_type: newType };
+
+      const seeds = buildSeedAttributeConfigs(newType).map((cfg, index) => ({
+        ...cfg,
+        sort_order: index,
+      }));
+
+      return {
+        ...previous,
+        category_type: newType,
+        attributes: seeds,
+      };
     });
   };
 
-  const updateAttributeConfig = (attributeId, field, value) => {
+  const handleParentChange = (parentId) => setFormData((previous) => ({ ...previous, parent_category_id: parentId }));
+
+  const updateAttributeConfig = (attributeKey, field, value) => {
     setFormData((previous) => ({
       ...previous,
       attributes: (previous.attributes || []).map((item) => {
-        if (getAttributeId(item) !== String(attributeId)) return item;
+        if (getAttributeId(item) !== String(attributeKey) && item.seed_code !== String(attributeKey)) return item;
         return { ...item, [field]: value };
       }),
     }));
   };
 
-  const handleEditAttribute = (attribute) => {
-    setEditingAttrId(attribute._id);
-    setNewAttrForm({ name: attribute.name, code: attribute.code, data_type: attribute.data_type, unit: attribute.unit || "" });
-    setShowAddAttrModal(true);
-  };
+  const handleAddNewAttributeOption = async (inputKey, optionLabel) => {
+    const trimmed = String(optionLabel || "").trim();
+    if (!trimmed) return;
 
-  const handleAddAttributeValue = async (attrId, newValueLabel) => {
-    const attr = availableAttributes.find(a => String(a._id) === String(attrId));
-    if (!attr) return;
-    
-    const updatedValues = [...(attr.values || []), { label: newValueLabel, value: newValueLabel.toLowerCase().replace(/\s+/g, '_'), sort_order: attr.values.length, is_active: true }];
-    
+    const target = (formData.attributes || []).find(
+      (item) => getAttributeId(item) === String(inputKey) || item.seed_code === String(inputKey)
+    );
+    if (!target) return;
+
+    const existingOptions = Array.isArray(target.seed_options) ? target.seed_options : [];
+    if (existingOptions.some((opt) => String(opt).toLowerCase() === trimmed.toLowerCase())) {
+      toast.info(`"${trimmed}" already exists in ${target.seed_name}`);
+      return;
+    }
+
     try {
-      await attributeApi.update(attrId, { values: updatedValues });
-      toast.success(`Added "${newValueLabel}" to ${attr.name}`);
-      refetchAttributes();
+      let attributeId = target.attribute_id ? String(target.attribute_id) : null;
+
+      if (!attributeId && target.seed_code) {
+        const allAttrs = await attributeApi.getAll("");
+        const match = (allAttrs || []).find((a) => String(a.code || "").toLowerCase() === String(target.seed_code).toLowerCase());
+        if (match) {
+          attributeId = String(match._id);
+        } else {
+          const created = await attributeApi.create({
+            name: target.seed_name || target.seed_code,
+            code: target.seed_code,
+            data_type: "multi_select",
+            values: existingOptions.map((opt) => ({ label: String(opt), value: String(opt) })),
+            variant_allowed: true,
+            filterable: true,
+            searchable: true,
+            visible: true,
+            is_active: true,
+          });
+          const createdId = created?._id || created?.data?._id;
+          if (!createdId) throw new Error("Failed to create attribute");
+          attributeId = String(createdId);
+        }
+      }
+
+      if (!attributeId) throw new Error("Attribute id is required");
+
+      const updatedValues = [
+        ...existingOptions.map((opt) => ({ label: String(opt), value: String(opt) })),
+        { label: trimmed, value: trimmed },
+      ];
+
+      await attributeApi.update(attributeId, { values: updatedValues });
+
+      setFormData((previous) => ({
+        ...previous,
+        attributes: (previous.attributes || []).map((item) => {
+          if (getAttributeId(item) !== String(inputKey) && item.seed_code !== String(inputKey)) return item;
+          return {
+            ...item,
+            attribute_id: attributeId || item.attribute_id,
+            seed_options: [...existingOptions, trimmed],
+          };
+        }),
+      }));
+
+      toast.success(`Added "${trimmed}" to ${target.seed_name}`);
     } catch (err) {
-      toast.error("Failed to add value");
+      toast.error(err.response?.data?.message || err.message || "Failed to add option");
+      throw err;
     }
   };
 
-  const selectedAttributeIds = new Set((formData.attributes || []).map((attribute) => getAttributeId(attribute)));
-  
-  // ✅ FIX: Always show assigned attributes regardless of type filter
-  const filteredAttributes = useMemo(() => {
-    const text = attributeSearch.trim().toLowerCase();
-    let allowedCodes = [];
-    if (formData.category_type && CATEGORY_ATTRIBUTE_MAP[formData.category_type]) {
-      allowedCodes = CATEGORY_ATTRIBUTE_MAP[formData.category_type];
-    }
-
-    return availableAttributes.filter((attribute) => {
-      const matchesSearch = !text || attribute.name?.toLowerCase().includes(text) || attribute.code?.toLowerCase().includes(text);
-      const attrCode = attribute.code?.toLowerCase();
-      const isAlreadyAssigned = selectedAttributeIds.has(String(attribute._id));
-
-      // Show if: matches search AND (no type filter OR matches type OR already assigned)
-      const matchesCategory = !formData.category_type || allowedCodes.length === 0 || allowedCodes.includes(attrCode) || isAlreadyAssigned;
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [availableAttributes, attributeSearch, formData.category_type, selectedAttributeIds]);
   useEffect(() => { if (categoriesError) toast.error("Unable to load categories"); }, [categoriesError]);
 
   /* ---------- Reusable styles ---------- */
@@ -691,70 +969,69 @@ export default function CategoriesPage() {
 
       {/* ===== PROFESSIONAL ADD/EDIT MODAL ===== */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          {/* Increased max-width for better margins and professional look */}
-          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden rounded-lg shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             
             {/* Modal Header */}
-            <div className="px-8 py-5 flex items-center justify-between border-b" style={{ borderColor: "var(--border-color)" }}>
+            <div className="px-6 py-4 flex items-center justify-between border-b" style={{ borderColor: "var(--border-color)" }}>
               <div>
-                <h3 className="text-xl font-bold">{editingCategory ? "Edit Category" : "Create New Category"}</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Configure details and assign specific attributes</p>
+                <h3 className="text-lg font-bold">{editingCategory ? "Edit Category" : "Create New Category"}</h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Configure details and assign specific attributes</p>
               </div>
-              <button onClick={closeModal} className="p-2 rounded-full hover:bg-white/5 transition"><CloseIcon className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="p-2 rounded-md hover:bg-white/5 transition"><CloseIcon className="w-5 h-5" /></button>
             </div>
 
             {/* Professional Tabs */}
-            <div className="flex border-b px-8 gap-8" style={{ borderColor: "var(--border-color)" }}>
+            <div className="flex border-b px-6 gap-6" style={{ borderColor: "var(--border-color)" }}>
               <button 
                 type="button"
                 onClick={() => setActiveTab("details")}
-                className={`pb-4 text-sm font-medium flex items-center gap-2 border-b-2 transition ${activeTab === "details" ? "border-emerald-500 text-emerald-500" : "border-transparent text-gray-400 hover:text-gray-200"}`}
+                className={`py-3.5 text-sm font-medium flex items-center gap-2 border-b-2 transition ${activeTab === "details" ? "border-emerald-500 text-emerald-500" : "border-transparent text-gray-400 hover:text-gray-200"}`}
               >
                 <TagIcon className="w-4 h-4" /> Category Details
               </button>
               <button 
                 type="button"
                 onClick={() => setActiveTab("attributes")}
-                className={`pb-4 text-sm font-medium flex items-center gap-2 border-b-2 transition ${activeTab === "attributes" ? "border-emerald-500 text-emerald-500" : "border-transparent text-gray-400 hover:text-gray-200"}`}
+                className={`py-3.5 text-sm font-medium flex items-center gap-2 border-b-2 transition ${activeTab === "attributes" ? "border-emerald-500 text-emerald-500" : "border-transparent text-gray-400 hover:text-gray-200"}`}
               >
                 <SettingsIcon className="w-4 h-4" /> Attributes & Features
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} className="px-6 py-6 overflow-y-auto flex-1">
               
               {/* TAB 1: DETAILS — Professional 2-Column Layout */}
               {activeTab === "details" && (
-                <div className="space-y-6 max-w-3xl mx-auto">
+                <div className="space-y-5">
 
                   {/* ROW 1: Category Code (left) | Category Name (right) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Category Code</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Category Code</label>
                       <div className="relative">
                         <input
                           type="text"
                           value={formData.category_code}
                           onChange={(e) => setFormData({ ...formData, category_code: e.target.value })}
                           readOnly={!!editingCategory}
-                          className="h-11 px-4 rounded-md text-sm w-full outline-none font-mono transition-all duration-200"
+                          className="h-10 px-3 rounded-md text-sm w-full outline-none font-mono"
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                           placeholder="AUTO-GENERATED"
                         />
-                        {loadingCode && <span className="absolute right-4 top-1/2 -translate-y-1/2"><Spinner className="w-4 h-4" /></span>}
+                        {loadingCode && <span className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner className="w-4 h-4" /></span>}
                       </div>
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{editingCategory ? "Code cannot be changed" : "Automatically generated"}</p>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Category Name <span style={{ color: "var(--danger)" }}>*</span></label>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Category Name <span style={{ color: "var(--danger)" }}>*</span></label>
                       <input
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         required
-                        className="h-11 px-4 rounded-md text-sm w-full outline-none transition-all duration-200"
+                        className="h-10 px-3 rounded-md text-sm w-full outline-none"
                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                         placeholder="e.g. Smartphones, Laptops, T-Shirts"
                       />
@@ -762,69 +1039,66 @@ export default function CategoriesPage() {
                   </div>
 
                   {/* ROW 2: Category Type (left) | Parent Category (right) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Category Type <span style={{ color: "var(--danger)" }}>*</span></label>
-                      <select
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Category Type <span style={{ color: "var(--danger)" }}>*</span></label>
+                      <ProfessionalSingleSelect
                         value={formData.category_type}
-                        onChange={(e) => setFormData({ ...formData, category_type: e.target.value })}
-                        required
+                        onChange={handleCategoryTypeChange}
+                        placeholder="Select Type"
                         disabled={!!editingCategory}
-                        className="h-11 px-4 rounded-md text-sm w-full outline-none appearance-none cursor-pointer transition-all duration-200"
-                        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                      >
-                        <option value="">Select Type</option>
-                        {FIXED_CATEGORIES.map((cat) => (<option key={cat.code} value={cat.name}>{cat.name}</option>))}
-                      </select>
+                        icon={<TagIcon className="w-3.5 h-3.5" />}
+                      />
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Determines available attributes</p>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Parent Category</label>
-                      <select
-                        value={formData.parent_category_id}
-                        onChange={(e) => handleParentChange(e.target.value)}
-                        className="h-11 px-4 rounded-md text-sm w-full outline-none appearance-none cursor-pointer transition-all duration-200"
-                        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                      >
-                        <option value="">Root</option>
-                        {categories.filter((c) => String(c._id) !== String(editingCategory?._id)).map((c) => (
-                          <option key={c._id} value={c._id}>{c.name}</option>
-                        ))}
-                      </select>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Parent Category</label>
+                      <ProfessionalSingleSelect
+                        value={(() => {
+                          const found = categories.find((c) => String(c._id) === String(formData.parent_category_id));
+                          return found ? found.name : "";
+                        })()}
+                        onChange={(name) => {
+                          const found = categories.find((c) => c.name === name);
+                          handleParentChange(found ? String(found._id) : "");
+                        }}
+                        placeholder="Root"
+                        options={["", ...categories.filter((c) => String(c._id) !== String(editingCategory?._id)).map((c) => c.name)]}
+                      />
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Leave empty for Root category</p>
                     </div>
                   </div>
 
                   {/* ROW 3: Description (full width) */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Description</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Description</label>
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      rows="4"
-                      className="px-4 py-3 rounded-md text-sm w-full outline-none resize-none transition-all duration-200"
+                      rows="3"
+                      className="px-3 py-2 rounded-md text-sm w-full outline-none resize-none"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                       placeholder="Brief description about this category..."
                     />
                   </div>
 
                   {/* ROW 4: Active toggle (full width) */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Status</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Status</label>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, status: formData.status === "active" ? "inactive" : "active" })}
-                      className="h-11 px-4 rounded-md text-sm w-full outline-none flex items-center justify-between transition-all duration-200"
+                      className="h-10 px-3 rounded-md text-sm w-full outline-none flex items-center justify-between"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
                     >
                       <span style={{ color: "var(--text-primary)" }}>{formData.status === "active" ? "Active" : "Inactive"}</span>
                       <span
-                        className="relative inline-block w-10 h-5 rounded-full transition-colors"
+                        className="relative inline-block w-10 h-5 rounded-full"
                         style={{ backgroundColor: formData.status === "active" ? "#10b981" : "#6b7280" }}
                       >
                         <span
-                          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white"
                           style={{ transform: formData.status === "active" ? "translateX(20px)" : "translateX(0)" }}
                         />
                       </span>
@@ -836,149 +1110,102 @@ export default function CategoriesPage() {
 
               {/* TAB 2: ATTRIBUTES */}
               {activeTab === "attributes" && (
-                <div className="space-y-6 max-w-4xl mx-auto">
+                <div className="space-y-5">
                   {!formData.category_type ? (
                     <div className="text-center py-16 rounded-lg border border-dashed" style={{ borderColor: "var(--border-color)" }}>
                       <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>Please select a Category Type first</p>
                       <button type="button" onClick={() => setActiveTab("details")} className="text-xs font-bold underline hover:opacity-80" style={{ color: "var(--accent)" }}>Go to Details Tab</button>
                     </div>
                   ) : (
-                    <>
-                      <div className="rounded-lg p-5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-sm font-bold">Available Attributes for {formData.category_type}</h4>
-                          <span className="text-[10px] px-2.5 py-1 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>{formData.attributes.length} Assigned</span>
-                        </div>
-                        
-                        <div className="flex gap-3 mb-4">
-                          <div className="relative flex-1">
-                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} />
-                            <input 
-                              value={attributeSearch} 
-                              onChange={(e) => setAttributeSearch(e.target.value)} 
-                              placeholder="Search attributes..." 
-                              className="w-full h-10 pl-10 pr-3 rounded-md text-sm outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
-                              style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                            />
-                          </div>
-                          <button type="button" onClick={() => { setEditingAttrId(null); setNewAttrForm({ name: "", code: "", data_type: "text", unit: "" }); setShowAddAttrModal(true); }} className="h-10 px-4 rounded-md text-xs font-bold flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                            <PlusIcon className="w-3.5 h-3.5" /> Create New
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                          {filteredAttributes.map((attribute) => {
-                            const isSelected = selectedAttributeIds.has(String(attribute._id));
-                            return (
-                              <button 
-                                type="button" 
-                                key={attribute._id} 
-                                onClick={() => toggleAttribute(attribute)}
-                                className={`h-10 px-3 rounded-md text-xs font-medium flex items-center justify-between transition border ${isSelected ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-500" : "bg-transparent border-transparent hover:bg-white/5"}`}
-                              >
-                                <span className="truncate">{attribute.name}</span>
-                                {isSelected && <CheckIcon className="w-3.5 h-3.5 shrink-0" />}
-                              </button>
-                            );
-                          })}
-                        </div>
+                    <div className="rounded-lg p-5 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold">Attributes for {formData.category_type}</h4>
+                        <span className="text-[10px] px-2.5 py-1 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>{formData.attributes.length} Available</span>
                       </div>
+                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        Click an attribute to open its dropdown and select one or more values.
+                      </p>
 
                       {formData.attributes.length > 0 ? (
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Configured Attributes</h4>
+                        <div className="space-y-2.5 pt-2">
                           {formData.attributes.map((config, index) => {
-                            const attribute = availableAttributes.find((item) => String(item._id) === getAttributeId(config));
-                            if (!attribute) return null;
-                            const uniqueKey = `${getAttributeId(config)}-${index}`;
-                            const isDropdown = ["select", "multi_select", "color"].includes(attribute.data_type);
+                            const seedName = config.seed_name || `Attribute ${index + 1}`;
+                            const inputKey = config.attribute_id ? getAttributeId(config) : (config.seed_code || `seed-${index}`);
+                            const isOpen = openAttributeKey === inputKey;
+                            const selectedValues = Array.isArray(config.value) ? config.value : [];
 
                             return (
-                              <div key={uniqueKey} className="rounded-lg p-5 relative group transition-all hover:border-emerald-500/30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleEditAttribute(attribute); }} className="absolute top-4 right-4 p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition opacity-0 group-hover:opacity-100" title="Edit Attribute Definition"><EditIcon className="w-3.5 h-3.5" /></button>
-
-                                <div className="flex items-center gap-3 pr-8">
-                                  <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
-                                    {index + 1}
+                              <div key={`${inputKey}-${index}`} className="rounded-md" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenAttributeKey(isOpen ? null : inputKey)}
+                                  className="w-full px-3 py-2.5 flex items-center justify-between text-left transition hover:bg-white/5"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-7 h-7 rounded flex items-center justify-center text-[11px] font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+                                      {index + 1}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>{seedName}</p>
+                                      <p className="text-[10px] font-mono truncate" style={{ color: "var(--text-muted)" }}>
+                                        {selectedValues.length > 0 ? `${selectedValues.length} selected` : "Click to select values"}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold truncate">{attribute.name}</p>
-                                    <p className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{attribute.code} • {attribute.data_type}</p>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {selectedValues.length > 0 && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }}>
+                                        {selectedValues.length}
+                                      </span>
+                                    )}
+                                    <ChevronDownIcon className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                                   </div>
-                                </div>
+                                </button>
 
-                                {/* Attribute value/details input — same control as the
-                                    previous "Default Value" but framed as the category-level
-                                    attribute value that flows into the product form. */}
-                                <div className="mt-4">
-                                  <label className="block text-[10px] font-bold uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>Attribute Value</label>
-                                  {isDropdown ? (
-                                    <ProfessionalDropdown
-                                      attribute={attribute}
-                                      value={config.value}
-                                      onChange={(val) => updateAttributeConfig(getAttributeId(config), "value", val)}
-                                      onAddNewValue={handleAddAttributeValue}
+                                {isOpen && (
+                                  <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: "var(--border-color)" }}>
+                                    <label className="block text-[10px] font-bold uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
+                                      Selected Values (Multiple)
+                                    </label>
+                                    <ProfessionalMultiSelect
+                                      attribute={{ name: seedName, values: config.seed_options || [] }}
+                                      value={selectedValues}
+                                      onChange={(val) => updateAttributeConfig(inputKey, "value", val)}
+                                      onAddNewOption={(label) => handleAddNewAttributeOption(inputKey, label)}
                                     />
-                                  ) : (
-                                    <input
-                                      type={attribute.data_type === "number" ? "number" : "text"}
-                                      value={config.value || ""}
-                                      onChange={(e) => updateAttributeConfig(getAttributeId(config), "value", e.target.value)}
-                                      placeholder={`e.g. ${attribute.name === "RAM" ? "8GB" : attribute.name === "ROM" ? "128GB" : attribute.name === "Color" || attribute.name === "Colour" ? "Black" : attribute.name}`}
-                                      className="w-full h-10 px-3 rounded-md text-sm outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                                      style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                                    />
-                                  )}
-                                </div>
-
-                                {/* Toggles */}
-                                <div className="grid grid-cols-3 gap-3 mt-4">
-                                  <label className="flex items-center gap-2 p-2.5 rounded cursor-pointer transition hover:bg-white/5" style={{ border: "1px solid var(--border-color)" }}>
-                                    <input type="checkbox" checked={Boolean(config.is_required)} onChange={(e) => updateAttributeConfig(getAttributeId(config), "is_required", e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                                    <span className="text-xs font-medium">Required</span>
-                                  </label>
-                                  <label className="flex items-center gap-2 p-2.5 rounded cursor-pointer transition hover:bg-white/5" style={{ border: "1px solid var(--border-color)" }}>
-                                    <input type="checkbox" checked={config.is_visible !== false} onChange={(e) => updateAttributeConfig(getAttributeId(config), "is_visible", e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                                    <span className="text-xs font-medium">Visible</span>
-                                  </label>
-                                  <label className="flex items-center gap-2 p-2.5 rounded cursor-pointer transition hover:bg-white/5" style={{ border: "1px solid var(--border-color)" }}>
-                                    <input type="checkbox" checked={Boolean(config.is_filterable)} onChange={(e) => updateAttributeConfig(getAttributeId(config), "is_filterable", e.target.checked)} className="w-4 h-4 rounded accent-emerald-500" />
-                                    <span className="text-xs font-medium">Filterable</span>
-                                  </label>
-                                </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <div className="text-center py-12 rounded-lg border border-dashed" style={{ borderColor: "var(--border-color)" }}>
-                          <p className="text-sm" style={{ color: "var(--text-muted)" }}>No attributes assigned yet. Select some from above.</p>
+                        <div className="text-center py-12 rounded-md border border-dashed" style={{ borderColor: "var(--border-color)" }}>
+                          <p className="text-sm" style={{ color: "var(--text-muted)" }}>No attributes available for this category type.</p>
                         </div>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
               )}
 
               {/* Footer Actions - STEPPER LOGIC IMPLEMENTED HERE */}
-              <div className="flex items-center justify-between pt-6 mt-8 border-t" style={{ borderColor: "var(--border-color)" }}>
-                <button type="button" onClick={closeModal} className="h-11 px-6 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <div className="flex items-center justify-between pt-5 mt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={closeModal} className="h-10 px-5 rounded-md text-sm font-medium hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
                 
                 <div className="flex gap-3">
-                   {/* ✅ LOGIC: Only show "Next" button on Details tab */}
                    {activeTab === "details" && (
-                     <button type="button" onClick={() => setActiveTab("attributes")} className="h-11 px-8 rounded-md text-sm font-bold transition hover:opacity-90 flex items-center gap-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                     <button type="button" onClick={() => setActiveTab("attributes")} className="h-10 px-6 rounded-md text-sm font-semibold hover:opacity-90 flex items-center gap-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                        Next: Attributes <ChevronRightIcon className="w-4 h-4" />
                      </button>
                    )}
 
-                   {/* ✅ LOGIC: Only show "Back" and "Submit" buttons on Attributes tab */}
                    {activeTab === "attributes" && (
                      <>
-                       <button type="button" onClick={() => setActiveTab("details")} className="h-11 px-6 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                       <button type="button" onClick={() => setActiveTab("details")} className="h-10 px-5 rounded-md text-sm font-medium hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                          Back to Details
                        </button>
-                       <button type="submit" disabled={isSubmitting || loadingCode} className="h-11 px-8 rounded-md text-sm font-bold transition disabled:opacity-50 hover:opacity-90 shadow-lg shadow-emerald-500/20" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                       <button type="submit" disabled={isSubmitting || loadingCode} className="h-10 px-6 rounded-md text-sm font-semibold disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                          {isSubmitting ? "Saving..." : editingCategory ? "Update Category" : "Create Category"}
                        </button>
                      </>
@@ -990,37 +1217,10 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Add/Edit Attribute Modal */}
-      {showAddAttrModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl border border-gray-700" style={{backgroundColor: "var(--bg-card)"}}>
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-base font-bold text-white">{editingAttrId ? "Edit Attribute" : "Quick Add Attribute"}</h3>
-              <button onClick={() => { setShowAddAttrModal(false); setEditingAttrId(null); }} className="text-gray-400 hover:text-white transition"><CloseIcon /></button>
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Name *</label><input autoFocus required value={newAttrForm.name} onChange={e => setNewAttrForm({...newAttrForm, name: e.target.value})} className="w-full h-10 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition" style={inputStyle} placeholder="e.g. RAM" /></div>
-                <div><label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Code *</label><input required value={newAttrForm.code} onChange={e => setNewAttrForm({...newAttrForm, code: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')})} className="w-full h-10 px-3 rounded-lg text-sm outline-none font-mono focus:ring-2 focus:ring-emerald-500/50 transition" style={inputStyle} placeholder="e.g. ram" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Type</label><select value={newAttrForm.data_type} onChange={e => setNewAttrForm({...newAttrForm, data_type: e.target.value})} className="w-full h-10 px-3 rounded-lg text-sm outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500/50 transition appearance-none" style={inputStyle}><option value="text">Text</option><option value="number">Number</option><option value="select">Select</option><option value="multi_select">Multi Select</option><option value="color">Color</option><option value="boolean">Boolean</option></select></div>
-                <div><label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1.5">Unit</label><input value={newAttrForm.unit} onChange={e => setNewAttrForm({...newAttrForm, unit: e.target.value})} className="w-full h-10 px-3 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition" style={inputStyle} placeholder="Optional" /></div>
-              </div>
-              <div className="pt-2 flex gap-3">
-                <button type="button" onClick={() => { setShowAddAttrModal(false); setEditingAttrId(null); }} className="flex-1 h-10 rounded-lg border border-gray-600 text-xs font-semibold hover:bg-white/5 transition text-gray-300">Cancel</button>
-                <button type="button" disabled={createOrUpdateAttrMutation.isPending || !newAttrForm.name || !newAttrForm.code} onClick={() => createOrUpdateAttrMutation.mutate({ id: editingAttrId, data: newAttrForm })} className="flex-1 h-10 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5">{createOrUpdateAttrMutation.isPending ? <><Spinner className="w-3 h-3" /> Saving...</> : (editingAttrId ? "Update Attribute" : "Create & Assign")}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
-          <div className="w-full max-w-sm rounded-xl p-6" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+          <div className="w-full max-w-sm rounded-lg p-6" style={cardStyle}>
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
               <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? `Delete "${deleteTarget.categories[0].name}"?` : `Delete ${deleteTarget.categories.length} categories?`}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The category(ies) will be permanently removed.</p></div>
@@ -1030,8 +1230,8 @@ export default function CategoriesPage() {
               <div className="min-w-0"><p className="text-sm font-medium truncate">{deleteTarget.categories[0].name}</p><p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.categories.length === 1 ? deleteTarget.categories[0].category_code || "—" : `+ ${deleteTarget.categories.length - 1} more`}</p></div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{isDeleting ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}</button>
+              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-semibold text-white disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{isDeleting ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}</button>
             </div>
           </div>
         </div>

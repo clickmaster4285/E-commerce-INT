@@ -23,6 +23,7 @@ import {
   Trash2,
   Upload,
   X,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
@@ -117,7 +118,7 @@ function normalizeId(value) {
 
 /* =========================================================
    MAIN COMPONENT
-========================================================= */
+   ========================================================= */
 export default function ProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -142,16 +143,21 @@ export default function ProductsPage() {
   const [brandLogoPreview, setBrandLogoPreview] = useState("");
   const [loadingBrandCode, setLoadingBrandCode] = useState(false);
 
+  const [showNewAttributeModal, setShowNewAttributeModal] = useState(false);
+  const [attributeFormData, setAttributeFormData] = useState({
+    name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true
+  });
+  const [loadingAttributeCode, setLoadingAttributeCode] = useState(false);
+
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [expandedVariant, setExpandedVariant] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-  
+
   const [categoryAttributes, setCategoryAttributes] = useState([]);
   const [loadingAttributes, setLoadingAttributes] = useState(false);
-  const [productSpecs, setProductSpecs] = useState({});
 
   const [formData, setFormData] = useState({
     category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
@@ -171,7 +177,6 @@ export default function ProductsPage() {
       fetchCategoryAttributes(formData.category_id);
     } else {
       setCategoryAttributes([]);
-      setProductSpecs({});
     }
   }, [formData.category_id]);
 
@@ -181,22 +186,6 @@ export default function ProductsPage() {
       const res = await attributeApi.getByCategory(catId);
       const list = res || [];
       setCategoryAttributes(list);
-
-      // ✅ FIX: Seed productSpecs from category-level attribute values
-      // (e.g. Mobile → RAM "8GB", Color "Black") so the product form
-      // pre-fills the same value/details entered at the category level.
-      // User can still change them per product.
-      setProductSpecs((prev) => {
-        const next = { ...prev };
-        list.forEach((attr) => {
-          if (!attr || !attr.code) return;
-          const saved = attr.category_config?.value;
-          if (saved !== undefined && saved !== null && saved !== "" && next[attr.code] === undefined) {
-            next[attr.code] = saved;
-          }
-        });
-        return next;
-      });
     } catch (error) {
       console.error("Failed to fetch attributes", error);
     } finally {
@@ -204,8 +193,23 @@ export default function ProductsPage() {
     }
   };
 
+  const getAssignedOptionList = (attr) => {
+    const config = attr?.category_config;
+    const assigned = config?.value;
+    if (Array.isArray(assigned) && assigned.length > 0) {
+      return assigned.map((v) => (typeof v === "string" ? v : v?.value || v?.label || String(v)));
+    }
+    if (typeof assigned === "string" && assigned.trim()) return [assigned];
+    return [];
+  };
+
   const variantAllowedAttributes = useMemo(() => {
-    return categoryAttributes.filter(attr => attr.variant_allowed || attr.category_config?.is_variant_option);
+    return categoryAttributes.filter((attr) => {
+      const config = attr.category_config;
+      const assigned = Boolean(config && config.attribute_id);
+      const visible = config?.is_visible !== false;
+      return assigned && visible;
+    });
   }, [categoryAttributes]);
 
   useEffect(() => {
@@ -223,6 +227,58 @@ export default function ProductsPage() {
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
   const createCategoryMutation = useMutation({ mutationFn: (data) => categoryApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["categories"] }); const nc = res?.data || res; if (nc?._id) { setFormData((p) => ({ ...p, category_id: String(nc._id) })); toast.success("Category created and selected!"); } else { toast.success("Category created successfully"); } setShowNewCategoryModal(false); resetCategoryForm(); }, onError: (e) => handlePermissionError(e, "Failed to create category", "category") });
   const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
+  const assignAttributeToCategoryMutation = useMutation({
+    mutationFn: ({ categoryId, attributes }) => categoryApi.updateAttributes(categoryId, attributes),
+  });
+
+  const createAttributeMutation = useMutation({
+    mutationFn: (data) => attributeApi.create(data),
+    onSuccess: async (res) => {
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      const created = res?.data || res;
+      const categoryId = formData.category_id;
+      if (created?._id && categoryId) {
+        const alreadyAssigned = categoryAttributes.some(
+          (a) => String(a?.category_config?.attribute_id || a?._id) === String(created._id)
+        );
+        if (!alreadyAssigned) {
+          const nextAttributes = categoryAttributes.map((a) => {
+            const aid = a?.category_config?.attribute_id || a?._id;
+            return {
+              attribute_id: aid,
+              is_required: Boolean(a?.category_config?.is_required),
+              is_visible: a?.category_config?.is_visible !== false,
+              is_filterable: Boolean(a?.category_config?.is_filterable),
+              is_searchable: Boolean(a?.category_config?.is_searchable),
+              is_variant_option: a?.category_config?.is_variant_option !== false,
+              sort_order: a?.category_config?.sort_order ?? 0,
+              value: a?.category_config?.value ?? "",
+            };
+          });
+          nextAttributes.push({
+            attribute_id: created._id,
+            is_required: false,
+            is_visible: true,
+            is_filterable: false,
+            is_searchable: false,
+            is_variant_option: true,
+            sort_order: nextAttributes.length,
+            value: "",
+          });
+          try {
+            await assignAttributeToCategoryMutation.mutateAsync({ categoryId, attributes: nextAttributes });
+          } catch (e) {
+            handlePermissionError(e, "Attribute created but failed to assign to category", "category");
+          }
+        }
+      }
+      toast.success("Attribute created successfully!");
+      setShowNewAttributeModal(false);
+      resetAttributeForm();
+      if (formData.category_id) fetchCategoryAttributes(formData.category_id);
+    },
+    onError: (e) => handlePermissionError(e, "Failed to create attribute", "attribute")
+  });
 
   /* Handlers */
   const openProductDetails = (p) => router.push(`/admin/products/${p._id}`);
@@ -239,7 +295,6 @@ export default function ProductsPage() {
       const result = await variantApi.getNextSku();
       const nextSku = result?.sku || result?.data?.sku || "";
       setFormData({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant(nextSku)] });
-      setProductSpecs({});
       setCategoryAttributes([]);
       setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
       setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
@@ -331,9 +386,6 @@ export default function ProductsPage() {
 
   /* Edit Product */
   const handleEdit = (product) => {
-    const specs = product.specifications || {};
-    setProductSpecs(specs);
-
     const variants = product?.variants?.length
       ? product.variants.map((v) => ({
           _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
@@ -373,16 +425,6 @@ export default function ProductsPage() {
     if (!formData.category_id) { toast.error("Please select category"); return; }
     if (!formData.brand_id) { toast.error("Please select brand"); return; }
     if (!formData.name.trim()) { toast.error("Product name is required"); return; }
-    
-    const missingSpecs = categoryAttributes.filter(attr => 
-      (attr.is_required || attr.category_config?.is_required) && !productSpecs[attr.code]
-    );
-    
-    if (missingSpecs.length > 0) {
-      toast.error(`Please fill required specifications: ${missingSpecs.map(a => a.name).join(", ")}`);
-      return;
-    }
-
     setCurrentStep(2);
   };
 
@@ -410,9 +452,6 @@ export default function ProductsPage() {
     data.append("description", formData.description || "");
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
-    
-    data.append("specifications", JSON.stringify(productSpecs));
-    
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
 
     const imageVariantIndexes = [];
@@ -447,13 +486,11 @@ export default function ProductsPage() {
     e?.preventDefault();
     const val = tagInput.trim().toLowerCase();
     if (!val) return;
-    
     if (formData.tag_names.includes(val)) {
       toast.info("Tag already added");
       setTagInput("");
       return;
     }
-    
     setFormData(prev => ({ ...prev, tag_names: [...prev.tag_names, val] }));
     setTagInput("");
   };
@@ -529,6 +566,53 @@ export default function ProductsPage() {
     fd.append("is_active", String(brandFormData.is_active));
     if (brandLogoFile) fd.append("logo", brandLogoFile);
     createBrandMutation.mutate(fd);
+  };
+
+  /* Attribute Logic */
+  const resetAttributeForm = () => {
+    setAttributeFormData({ name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true });
+    setLoadingAttributeCode(false);
+  };
+  const fetchNextAttributeCode = async () => {
+    try {
+      setLoadingAttributeCode(true);
+      const res = await attributeApi.getNextCode?.();
+      const code = res?.nextCode || res?.data?.nextCode;
+      if (code && typeof code === "string") { setAttributeFormData((p) => ({ ...p, code: code })); return; }
+      throw new Error("Invalid code format");
+    } catch (e) {
+      setAttributeFormData((p) => ({ ...p, code: `attr_${Date.now().toString(36)}` }));
+    } finally { setLoadingAttributeCode(false); }
+  };
+  const handleOpenAttributeModal = () => { resetAttributeForm(); setShowNewAttributeModal(true); fetchNextAttributeCode(); };
+  const handleAddAttributeValue = () => {
+    setAttributeFormData(prev => ({ ...prev, values: [...prev.values, { label: "", value: "" }] }));
+  };
+  const handleRemoveAttributeValue = (index) => {
+    setAttributeFormData(prev => ({ ...prev, values: prev.values.filter((_, i) => i !== index) }));
+  };
+  const handleAttributeValueChange = (index, field, val) => {
+    setAttributeFormData(prev => {
+      const newValues = [...prev.values];
+      newValues[index] = { ...newValues[index], [field]: val };
+      return { ...prev, values: newValues };
+    });
+  };
+  const handleAttributeSubmit = (e) => {
+    e.preventDefault();
+    if (!attributeFormData.name.trim()) { toast.error("Attribute name is required"); return; }
+    if (!attributeFormData.code.trim()) { toast.error("Attribute code is required"); return; }
+    
+    const payload = {
+      ...attributeFormData,
+      name: attributeFormData.name.trim(),
+      code: attributeFormData.code.trim().toLowerCase(),
+      values: attributeFormData.data_type === "select"
+        ? attributeFormData.values.filter(v => v.label.trim() && v.value.trim())
+        : []
+    };
+    
+    createAttributeMutation.mutate(payload);
   };
 
   /* Filters & Stats */
@@ -627,7 +711,6 @@ export default function ProductsPage() {
                   const min = Number(fv?.min_qnt || 0);
                   const low = qty <= min;
                   const img = fv?.images?.[0]?.img_url;
-                  
                   const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
                   
                   return (
@@ -772,62 +855,6 @@ export default function ProductsPage() {
                       </div>
                     </Field>
                   </div>
-                  
-                  {/* DYNAMIC SPECIFICATIONS SECTION */}
-                  {formData.category_id && (
-                    <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                      <h4 className="text-sm font-semibold flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} />
-                        Product Specifications
-                      </h4>
-                      
-                      {loadingAttributes ? (
-                        <div className="flex items-center justify-center py-4">
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-                          <span className="ml-2 text-xs text-gray-500">Loading attributes...</span>
-                        </div>
-                      ) : categoryAttributes.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {categoryAttributes.map((attr) => (
-                            <Field key={attr._id} label={`${attr.name} ${(attr.is_required || attr.category_config?.is_required) ? '*' : ''}`}>
-                              {attr.data_type === 'select' ? (
-                                <select
-                                  value={productSpecs[attr.code] || ""}
-                                  onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
-                                  className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                  style={inputStyle}
-                                >
-                                  <option value="">Select {attr.name}</option>
-                                  {(attr.values || []).map(val => <option key={val.value} value={val.value}>{val.value}</option>)}
-                                </select>
-                              ) : attr.data_type === 'color' ? (
-                                 <div className="flex items-center gap-2">
-                                   <input 
-                                     type="color" 
-                                     value={productSpecs[attr.code] || '#000000'}
-                                     onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
-                                     className="h-9 w-12 cursor-pointer rounded border p-1"
-                                   />
-                                   <span className="text-xs">{productSpecs[attr.code]}</span>
-                                 </div>
-                              ) : (
-                                <input
-                                  type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'}
-                                  value={productSpecs[attr.code] || ""}
-                                  onChange={(e) => setProductSpecs(prev => ({ ...prev, [attr.code]: e.target.value }))}
-                                  placeholder={`Enter ${attr.name}`}
-                                  className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                  style={inputStyle}
-                                />
-                              )}
-                            </Field>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500 italic">No specific attributes configured for this category.</p>
-                      )}
-                    </div>
-                  )}
 
                   {/* TAG INPUT */}
                   <Field label="Tags">
@@ -845,7 +872,6 @@ export default function ProductsPage() {
                         <Plus className="h-4 w-4" />
                       </button>
                     </div>
-                    
                     {formData.tag_names.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {formData.tag_names.map(tag => (
@@ -873,13 +899,19 @@ export default function ProductsPage() {
 
               {currentStep === 2 && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} /> Variants ({formData.variants.length})</h4>
-                      <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, options and images</p>
+                      <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, options and images</p>
                     </div>
-                    <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                        <Settings2 className="h-3.5 w-3.5" /> Add Attribute
+                      </button>
+                      <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
+                    </div>
                   </div>
+                  
                   <div className="space-y-3">
                     {formData.variants.map((variant, index) => (
                       <div key={variant._id || `new-${index}`} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
@@ -894,56 +926,77 @@ export default function ProductsPage() {
                             <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
                           </div>
                         </div>
+                        
                         {expandedVariant === index && (
-                          <div className="space-y-4 p-4">
+                          <div className="space-y-5 p-4">
                             <div>
                               <SectionTitle>Identification</SectionTitle>
                               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <Field label="SKU *"><input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={e => updateVariant(index, "sku", e.target.value)} className={`h-9 w-full rounded-md px-3 text-sm ${editingProduct && variant._id ? "cursor-not-allowed opacity-60" : ""}`} style={inputStyle} /></Field>
-                                <Field label="Variant Title *"><input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={e => updateVariant(index, "title", e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
+                                <Field label="SKU *">
+                                  <input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={e => updateVariant(index, "sku", e.target.value)} className={`h-9 w-full rounded-md px-3 text-sm ${editingProduct && variant._id ? "cursor-not-allowed opacity-60" : ""}`} style={inputStyle} />
+                                </Field>
+                                <Field label="Variant Title *">
+                                  <input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={e => updateVariant(index, "title", e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} />
+                                </Field>
                               </div>
-                              <div className="mt-3"><Field label="Variant Description"><textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={e => updateVariant(index, "description", e.target.value)} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field></div>
+                              <div className="mt-3">
+                                <Field label="Variant Description">
+                                  <textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={e => updateVariant(index, "description", e.target.value)} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} />
+                                </Field>
+                              </div>
                             </div>
 
-                            {/* VARIANT OPTIONS SECTION */}
+                            {/* VARIANT ATTRIBUTES SECTION */}
                             {variantAllowedAttributes.length > 0 && (
-                              <div>
-                                <SectionTitle>Variant Options</SectionTitle>
+                              <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                                <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
+                                  <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                                  Variant Attributes
+                                </h5>
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                  {variantAllowedAttributes.map(attr => (
-                                    <Field key={attr.code} label={attr.name}>
-                                      {attr.data_type === 'select' ? (
-                                        <select
-                                          value={variant.option_values[attr.code] || ""}
-                                          onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                          className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                          style={inputStyle}
-                                        >
-                                          <option value="">Select {attr.name}</option>
-                                          {(attr.values || []).map(val => <option key={val.value} value={val.value}>{val.value}</option>)}
-                                        </select>
-                                      ) : attr.data_type === 'color' ? (
-                                        <div className="flex items-center gap-2">
-                                          <input 
-                                            type="color" 
-                                            value={variant.option_values[attr.code] || '#000000'}
+                                  {variantAllowedAttributes.map(attr => {
+                                    const assignedOptions = getAssignedOptionList(attr);
+                                    const hasAssignedOptions = assignedOptions.length > 0;
+                                    const isMultiSelectType = attr.data_type === 'select' || attr.data_type === 'multi_select' || attr.data_type === 'multi-select';
+                                    const renderAsDropdown = isMultiSelectType || hasAssignedOptions;
+                                    return (
+                                      <Field key={attr._id} label={attr.name}>
+                                        {renderAsDropdown ? (
+                                          <select
+                                            value={variant.option_values[attr.code] || ""}
                                             onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                            className="h-9 w-12 cursor-pointer rounded border p-1"
+                                            className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                            style={inputStyle}
+                                          >
+                                            <option value="">Select {attr.name}</option>
+                                            {assignedOptions.map((opt) => (
+                                              <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                          </select>
+                                        ) : attr.data_type === 'color' ? (
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              type="color"
+                                              value={variant.option_values[attr.code] || '#000000'}
+                                              onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
+                                              className="h-9 w-12 cursor-pointer rounded border p-1"
+                                              style={{ borderColor: "var(--border-color)" }}
+                                            />
+                                            <span className="text-xs font-mono">{variant.option_values[attr.code] || '#000000'}</span>
+                                          </div>
+                                        ) : (
+                                          <input
+                                            type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'}
+                                            value={variant.option_values[attr.code] || ""}
+                                            onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
+                                            placeholder={`Enter ${attr.name}`}
+                                            className="h-9 w-full rounded-md px-3 text-sm outline-none"
+                                            style={inputStyle}
                                           />
-                                          <span className="text-xs">{variant.option_values[attr.code]}</span>
-                                        </div>
-                                      ) : (
-                                        <input
-                                          type="text"
-                                          value={variant.option_values[attr.code] || ""}
-                                          onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                          placeholder={`Enter ${attr.name}`}
-                                          className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                          style={inputStyle}
-                                        />
-                                      )}
-                                    </Field>
-                                  ))}
+                                        )}
+                                      </Field>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -1017,7 +1070,6 @@ export default function ProductsPage() {
                     <input type="text" value={categoryFormData.category_code} onChange={e => setCategoryFormData(p => ({ ...p, category_code: e.target.value }))} required disabled={createCategoryMutation.isPending || loadingCategoryCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingCategoryCode ? "Generating..." : "CAT-001"} />
                     {loadingCategoryCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
                   </div>
-                  {!loadingCategoryCode && categoryFormData.category_code && <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Auto-generated • You can change it</p>}
                 </Field>
                 <Field label="Category Name *"><input type="text" value={categoryFormData.name} onChange={e => setCategoryFormData(p => ({ ...p, name: e.target.value }))} required disabled={createCategoryMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Electronics" /></Field>
               </div>
@@ -1080,6 +1132,68 @@ export default function ProductsPage() {
               <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
                 <button type="button" onClick={() => { setShowNewBrandModal(false); resetBrandForm(); }} disabled={createBrandMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
                 <button type="submit" disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createBrandMutation.isPending ? "Creating..." : "Create & Select"}</button>
+              </div>
+            </form>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* ATTRIBUTE MODAL */}
+      {showNewAttributeModal && (
+        <ModalOverlay zIndex="z-[70]">
+          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
+            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              <h3 className="text-base font-semibold">Create New Attribute</h3>
+              <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending || loadingAttributeCode} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
+            </div>
+            <form onSubmit={handleAttributeSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Attribute Name *">
+                  <input type="text" value={attributeFormData.name} onChange={e => setAttributeFormData(p => ({ ...p, name: e.target.value }))} required disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="e.g. Color, RAM" />
+                </Field>
+                <Field label="Attribute Code *">
+                  <div className="relative">
+                    <input type="text" value={attributeFormData.code} onChange={e => setAttributeFormData(p => ({ ...p, code: e.target.value.toLowerCase() }))} required disabled={createAttributeMutation.isPending || loadingAttributeCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingAttributeCode ? "Generating..." : "color"} />
+                    {loadingAttributeCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
+                  </div>
+                </Field>
+              </div>
+              
+              <Field label="Data Type *">
+                <select value={attributeFormData.data_type} onChange={e => setAttributeFormData(p => ({ ...p, data_type: e.target.value }))} disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="multi_select">Multi Select</option>
+                  <option value="decimal">Decimal</option>
+                </select>
+              </Field>
+
+              {attributeFormData.data_type === "select" && (
+                <div className="space-y-2 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Allowed Values</label>
+                    <button type="button" onClick={handleAddAttributeValue} className="flex items-center gap-1 text-[11px] font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}><Plus className="h-3 w-3" /> Add Value</button>
+                  </div>
+                  <div className="space-y-2">
+                    {attributeFormData.values.map((val, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input type="text" placeholder="Label (e.g. Red)" value={val.label} onChange={e => handleAttributeValueChange(idx, "label", e.target.value)} className="h-8 flex-1 rounded-md px-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                        <input type="text" placeholder="Value (e.g. #FF0000 or red)" value={val.value} onChange={e => handleAttributeValueChange(idx, "value", e.target.value)} className="h-8 flex-1 rounded-md px-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                        <button type="button" onClick={() => handleRemoveAttributeValue(idx)} className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition hover:bg-red-500/10"><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="flex h-9 cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={attributeFormData.variant_allowed} onChange={e => setAttributeFormData(p => ({ ...p, variant_allowed: e.target.checked }))} disabled={createAttributeMutation.isPending} className="h-4 w-4 rounded" style={{ accentColor: "var(--accent)" }} />
+                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Allow this attribute to be used in Variants</span>
+              </label>
+
+              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={createAttributeMutation.isPending || loadingAttributeCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}</button>
               </div>
             </form>
           </div>

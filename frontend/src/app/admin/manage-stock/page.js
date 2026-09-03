@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
@@ -178,6 +178,21 @@ export default function ManageStockPage() {
   const [adjustError, setAdjustError] = useState("");
   const itemsPerPage = 20;
 
+  // Custom Dropdown State & Ref
+  const dropdownRef = useRef(null);
+  const [isReasonOpen, setIsReasonOpen] = useState(false);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsReasonOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   /* ================= Queries ================= */
   const { data: stockItems = [], isLoading: loading, isError, error } = useQuery({
     queryKey: ["stock"],
@@ -275,9 +290,10 @@ export default function ManageStockPage() {
     setAdjustForm({ type: "add", quantity: "", reason: "", customReason: "" });
     setAdjustError("");
     setAdjustTarget(item);
+    setIsReasonOpen(false);
   };
 
-  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); };
+  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setIsReasonOpen(false); };
 
   const validateAdjust = () => {
     const qtyRaw = adjustForm.quantity.trim();
@@ -362,7 +378,7 @@ export default function ManageStockPage() {
         {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: "Total Products / Variants", value: summary.totalVariants, sub: `Across ${summary.totalProducts} products` },
+            { label: "Total Variants", value: summary.totalVariants, sub: `Across ${summary.totalProducts} products` },
             { label: "In Stock", value: summary.inStock, color: "#34d399" },
             { label: "Low Stock", value: summary.lowStock, color: "#f59e0b" },
             { label: "Out of Stock", value: summary.outOfStock, color: "var(--danger)" },
@@ -564,7 +580,7 @@ export default function ManageStockPage() {
                     ].map((opt) => {
                       const isActive = adjustForm.type === opt.value;
                       return (
-                        <button key={opt.value} type="button" onClick={() => { setAdjustError(""); setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); }} disabled={adjustMutation.isPending} className="relative flex flex-col items-center gap-1 py-3 px-2 rounded-lg text-center transition disabled:opacity-50" style={{ backgroundColor: isActive ? "var(--bg-tertiary)" : "var(--bg-card)", border: `1.5px solid ${isActive ? opt.color : "var(--border-color)"}`, color: isActive ? opt.color : "var(--text-secondary)" }}>
+                        <button key={opt.value} type="button" onClick={() => { setAdjustError(""); setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); setIsReasonOpen(false); }} disabled={adjustMutation.isPending} className="relative flex flex-col items-center gap-1 py-3 px-2 rounded-lg text-center transition disabled:opacity-50" style={{ backgroundColor: isActive ? "var(--bg-tertiary)" : "var(--bg-card)", border: `1.5px solid ${isActive ? opt.color : "var(--border-color)"}`, color: isActive ? opt.color : "var(--text-secondary)" }}>
                           <span className="text-[16px] font-bold leading-none">{opt.icon}</span>
                           <span className="text-[11px] font-medium leading-tight mt-0.5">{opt.label}</span>
                         </button>
@@ -601,41 +617,81 @@ export default function ManageStockPage() {
                   )}
                 </div>
 
-                {/* Context-Aware Reason Dropdown */}
+                {/* Context-Aware Reason Dropdown & Explanation */}
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Reason</p>
                   
-                  <div className="relative">
-                    <select
-                      value={adjustForm.reason}
-                      onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value, customReason: "" })}
+                  {/* Custom Dropdown (Fixes mouse release closing issue) */}
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsReasonOpen(!isReasonOpen)}
                       disabled={adjustMutation.isPending}
-                      className="h-10 px-3 pr-8 rounded-lg text-[13px] w-full outline-none transition appearance-none disabled:opacity-50 cursor-pointer"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                      className="h-10 px-3 pr-8 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50 flex items-center justify-between"
+                      style={{ 
+                        backgroundColor: "var(--bg-tertiary)", 
+                        border: `1px solid ${isReasonOpen ? "var(--accent)" : "var(--border-color)"}`, 
+                        color: adjustForm.reason ? "var(--text-primary)" : "var(--text-muted)" 
+                      }}
                     >
-                      <option value="" disabled>Select a reason...</option>
-                      {(adjustForm.type === "add" ? ADD_REASONS : REMOVE_REASONS).map((r) => (
-                        <option key={r} value={r}>{r === "__OTHER__" ? "Other (Specify below)" : r}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
-                      <ChevronDownIcon className="w-4 h-4" />
-                    </div>
+                      <span className="truncate">
+                        {adjustForm.reason ? (adjustForm.reason === "__OTHER__" ? "Other (Specify below)" : adjustForm.reason) : "Select a reason..."}
+                      </span>
+                      <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isReasonOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {isReasonOpen && (
+                      <div className="absolute z-50 w-full mt-1 rounded-lg shadow-xl border overflow-hidden" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+                        <div className="max-h-60 overflow-y-auto py-1">
+                          {(adjustForm.type === "add" ? ADD_REASONS : REMOVE_REASONS).map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAdjustForm({ ...adjustForm, reason: r, customReason: r === "__OTHER__" ? adjustForm.customReason : "" });
+                                setIsReasonOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"
+                              style={{ 
+                                backgroundColor: adjustForm.reason === r ? "var(--bg-tertiary)" : "transparent",
+                                color: "var(--text-primary)"
+                              }}
+                            >
+                              {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                              <span className={adjustForm.reason === r ? "font-medium" : ""}>
+                                {r === "__OTHER__" ? "Other (Specify below)" : r}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Custom Reason Input (Conditional) */}
-                  {adjustForm.reason === "__OTHER__" && (
-                    <input
-                      type="text"
+                  {/* Explanation Field (Always visible below dropdown) */}
+                  <div className="mt-3">
+                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                      Explanation <span style={{ color: adjustForm.reason === "__OTHER__" ? "var(--danger)" : "var(--text-muted)" }}>
+                        {adjustForm.reason === "__OTHER__" ? "*" : "(Optional)"}
+                      </span>
+                    </label>
+                    <textarea
                       value={adjustForm.customReason}
                       onChange={(e) => setAdjustForm({ ...adjustForm, customReason: e.target.value })}
                       disabled={adjustMutation.isPending}
-                      className="mt-2 h-10 px-3 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50"
-                      style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                      placeholder="Enter custom reason..."
-                      autoFocus
+                      rows={3}
+                      className="w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition disabled:opacity-50 resize-none"
+                      style={{ 
+                        backgroundColor: "var(--bg-card)", 
+                        border: `1px solid ${adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}`, 
+                        color: "var(--text-primary)" 
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                      onBlur={(e) => e.target.style.borderColor = adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}
+                      placeholder={adjustForm.reason === "__OTHER__" ? "Please specify the custom reason..." : "Add any additional notes or context (optional)"}
                     />
-                  )}
+                  </div>
                 </div>
 
                 {/* Validation Error */}

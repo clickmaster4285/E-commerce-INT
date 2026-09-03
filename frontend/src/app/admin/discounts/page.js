@@ -460,42 +460,35 @@ export default function DiscountsPage() {
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5 p-4 md:p-0">
-        {/* ===== Header ===== */}
+        {/* ===== Header (Updated to match DealsPage design) ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Discount Management</h1>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
           </div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><ListIcon /></button>
-            <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><GridIcon /></button>
-          </div>
-        </div>
-
-        {/* ===== Discount Type Action ===== */}
-        <div className="flex items-center justify-between gap-3 rounded-xl p-3 sm:p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div>
-            <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Create a discount</p>
-            <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Choose where the discount should apply.</p>
-          </div>
-          <div className="relative shrink-0" ref={typeMenuRef}>
-            <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition hover:bg-[var(--accent-hover)]" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <PlusIcon className="h-3.5 w-3.5" /> New Discount
-              <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
-            </button>
-            {isTypeMenuOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
-                {discountTypes.map((dt) => {
-                  const Icon = dt.icon;
-                  return (
-                    <button key={dt.key} type="button" onClick={() => openForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
-                      <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+            </div>
+            <div className="relative shrink-0" ref={typeMenuRef}>
+              <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                <PlusIcon className="w-4 h-4" /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {isTypeMenuOpen && (
+                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                  {discountTypes.map((dt) => {
+                    const Icon = dt.icon;
+                    return (
+                      <button key={dt.key} type="button" onClick={() => openForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                        <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
