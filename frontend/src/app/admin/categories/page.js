@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
-import { buildSeedAttributeConfigs, CATEGORY_ATTRIBUTE_SEED } from "@/lib/categoryAttributeSeed";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -72,23 +71,6 @@ const sanitizeOptionLabels = (raw) => {
     result.push(trimmed);
   }
   return result;
-};
-
-// ✅ FIX: Robust normalization to STRICTLY preserve values during edit
-const normalizeConfig = (attribute, index = 0) => {
-  const config = attribute?.category_config || attribute || {};
-  const has = (key) => config[key] !== undefined && config[key] !== null;
-
-  return {
-    attribute_id: attribute?.attribute_id || attribute?._id,
-    is_required: has("is_required") ? Boolean(config.is_required) : false,
-    is_visible: has("is_visible") ? Boolean(config.is_visible) : true,
-    is_filterable: has("is_filterable") ? Boolean(config.is_filterable) : false,
-    is_searchable: has("is_searchable") ? Boolean(config.is_searchable) : false,
-    sort_order: Number.isFinite(Number(config.sort_order)) ? Number(config.sort_order) : index,
-    // Critical: Preserve 'value' exactly as stored in DB
-    value: has("value") ? config.value : "",
-  };
 };
 
 const getCategoryName = (categoryId, categories) => {
@@ -186,7 +168,7 @@ const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption })
                   className="cursor-pointer"
                   style={{ color: "#34d399" }}
                 >×</span>
-              </span>
+                </span>
             ))
           )}
         </div>
@@ -383,7 +365,6 @@ export default function CategoriesPage() {
   const [autoCode, setAutoCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
   
-  // ✅ FIX: Set staleTime to 0 to ensure fresh data on every render/refetch
   const { data: categories = [], isLoading: categoriesLoading, isError: categoriesError, refetch: refetchCategories } = useQuery({
     queryKey: ["admin-categories"], 
     queryFn: categoryApi.getAllAdmin, 
@@ -391,14 +372,12 @@ export default function CategoriesPage() {
     staleTime: 0, 
   });
 
-  // ✅ FIX: Robust Mutation with forced refetch and safe toast handling
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => id ? categoryApi.update(id, data) : categoryApi.create(data),
     onSuccess: async (_, variables) => {
       try {
         await queryClient.refetchQueries({ queryKey: ["admin-categories"], type: "active" });
         await queryClient.refetchQueries({ queryKey: ["categories"], type: "active" });
-
         toast.success(variables.id ? "Category updated successfully" : "Category created successfully");
         closeModal();
       } catch (err) {
@@ -510,7 +489,7 @@ export default function CategoriesPage() {
     saveMutation.mutate({ id: editingCategory?._id, data: payload });
   };
 
-  // ✅ FIX: Robust Edit Handler with fallback type detection
+  // ✅ UPDATED: Edit Handler now fetches from backend instead of hardcoded seeds
   const handleEdit = async (category) => {
     const normalizeKey = (s) => String(s || "").trim().toLowerCase();
     let detectedType = category.category_type;
@@ -528,90 +507,44 @@ export default function CategoriesPage() {
       detectedType = recovery ? recovery.name : "";
     }
 
-    const typeKey = getCategoryTypeKey(detectedType);
-    const seeds = CATEGORY_ATTRIBUTE_SEED[typeKey] || [];
-
-    // Build a lookup of all known attributes by code so we can resolve each
-    // saved category.attributes entry (which only carries attribute_id + value)
-    // back to its code/seed.
-    let attributeByCode = new Map();
-    let attributeById = new Map();
+    let allAttrs = [];
     try {
-      const allAttrs = await attributeApi.getAll("");
-      attributeByCode = new Map((allAttrs || []).map((a) => [String(a.code || "").toLowerCase(), a]));
-      attributeById = new Map((allAttrs || []).map((a) => [String(a._id || ""), a]));
+      const res = await attributeApi.getAll("");
+      allAttrs = res || [];
     } catch (err) {
       console.error("Failed to load attributes for edit:", err);
     }
 
-    const existingByCode = new Map();
-    const existingById = new Map();
-    (category.attributes || []).forEach((a) => {
+    const attributeById = new Map(allAttrs.map((a) => [String(a._id || ""), a]));
+    const attributeByCode = new Map(allAttrs.map((a) => [String(a.code || "").toLowerCase(), a]));
+
+    const mergedAttributes = (category.attributes || []).map((a, index) => {
       const attrId = String(a.attribute_id || a._id || "");
-      const attrRecord = attributeById.get(attrId) || attributeByCode.get(String(a?.code || "").toLowerCase());
-      const code = String(attrRecord?.code || a?.code || "").toLowerCase();
-      const config = normalizeConfig(a);
-      if (attrId) existingById.set(attrId, { ...config, attrRecord, attrId });
-      if (code) existingByCode.set(code, { ...config, attrRecord, attrId, code });
+      const attrRecord = attributeById.get(attrId) || attributeByCode.get(String(a.code || "").toLowerCase());
+      
+      const validOptionLabels = (attrRecord?.values || []).map(v => v.label || v.value);
+      const savedValue = a.value !== undefined ? a.value : "";
+      const validValue = Array.isArray(savedValue) 
+        ? savedValue.filter(v => validOptionLabels.includes(v)) 
+        : savedValue;
+
+      return {
+        attribute_id: attrId || null,
+        seed_code: String(attrRecord?.code || a.code || "").toLowerCase(),
+        seed_name: attrRecord?.name || a.seed_name || `Attribute ${index + 1}`,
+        seed_type: attrRecord?.data_type || a.seed_type || "text",
+        seed_options: validOptionLabels,
+        is_required: Boolean(a.is_required),
+        is_visible: a.is_visible !== false,
+        is_filterable: Boolean(a.is_filterable),
+        is_searchable: Boolean(a.is_searchable),
+        sort_order: Number.isFinite(Number(a.sort_order)) ? Number(a.sort_order) : index,
+        value: validValue,
+      };
     });
 
-    const mergedAttributes = seeds
-      .map((seed, index) => {
-        const seedCode = `${typeKey}_${seed.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-        const existingEntry = existingByCode.get(seedCode);
-        if (!existingEntry) return null;
-        const baseConfig = existingEntry;
-        const validOptionLabels = sanitizeOptionLabels(seed.options || []);
-        const validValue = Array.isArray(baseConfig.value)
-          ? sanitizeOptionLabels(baseConfig.value)
-          : "";
-        return {
-          attribute_id: baseConfig.attrId || null,
-          seed_code: seedCode,
-          seed_name: seed.name,
-          seed_type: seed.type,
-          seed_options: validOptionLabels,
-          is_required: Boolean(baseConfig.is_required),
-          is_visible: baseConfig.is_visible !== false,
-          is_filterable: Boolean(baseConfig.is_filterable),
-          is_searchable: Boolean(baseConfig.is_searchable),
-          sort_order: Number.isFinite(Number(baseConfig.sort_order)) ? Number(baseConfig.sort_order) : index,
-          value: validValue,
-        };
-      })
-      .filter(Boolean);
-
-    // Preserve any existing attributes that don't have a seed counterpart
-    const seedCodes = new Set(seeds.map((s) => `${typeKey}_${s.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "_")));
-    const extraAttributes = (category.attributes || [])
-      .filter((a) => {
-        const attrId = String(a.attribute_id || a._id || "");
-        const attrRecord = existingById.get(attrId)?.attrRecord;
-        const code = String(attrRecord?.code || a?.code || "").toLowerCase();
-        return !seedCodes.has(code);
-      })
-      .map((a, index) => {
-        const attrId = String(a.attribute_id || a._id || "");
-        const existing = existingById.get(attrId) || {};
-        const config = existing.config || normalizeConfig(a);
-        const attrRecord = existing.attrRecord;
-        const seedOptions = sanitizeOptionLabels(attrRecord?.values);
-        return {
-          attribute_id: config.attribute_id,
-          seed_code: String(attrRecord?.code || a?.code || "").toLowerCase(),
-          seed_name: attrRecord?.name || config.attribute_id || `Attribute ${index + 1}`,
-          seed_type: attrRecord?.data_type || "text",
-          seed_options: seedOptions,
-          is_required: Boolean(config.is_required),
-          is_visible: config.is_visible !== false,
-          is_filterable: Boolean(config.is_filterable),
-          is_searchable: Boolean(config.is_searchable),
-          sort_order: Number.isFinite(Number(config.sort_order)) ? Number(config.sort_order) : mergedAttributes.length + index,
-          value: Array.isArray(config.value) ? sanitizeOptionLabels(config.value) : "",
-        };
-      });
-
-    setEditingCategory(category); setOpenAttributeKey(null);
+    setEditingCategory(category); 
+    setOpenAttributeKey(null);
     setFormData({
       category_code: category.category_code || "",
       category_type: detectedType || "",
@@ -619,7 +552,7 @@ export default function CategoriesPage() {
       description: category.description || "",
       parent_category_id: getId(category.parent_category_id),
       status: category.status || "active",
-      attributes: [...mergedAttributes, ...extraAttributes],
+      attributes: mergedAttributes,
     });
     setAutoCode(category.category_code || "");
     setActiveTab("details");
@@ -676,25 +609,42 @@ export default function CategoriesPage() {
     } catch { setAutoCode(""); } finally { setLoadingCode(false); }
   };
 
-  const handleCategoryTypeChange = (newType) => {
+  // ✅ UPDATED: Fetches attributes dynamically from backend instead of local seed
+    // ✅ UPDATED: Fetches attributes dynamically using proper query params object
+    // ✅ FIXED: All attributes and their values are now selected by default
+  const handleCategoryTypeChange = async (newType) => {
     setOpenAttributeKey(null);
-    setFormData((previous) => {
-      const wasSameType = previous.category_type === newType;
-      if (wasSameType) return { ...previous, category_type: newType };
-
-      const seeds = buildSeedAttributeConfigs(newType).map((cfg, index) => ({
-        ...cfg,
-        sort_order: index,
-      }));
-
-      return {
-        ...previous,
-        category_type: newType,
-        attributes: seeds,
-      };
-    });
+    setFormData((previous) => ({ ...previous, category_type: newType, attributes: [] }));
+    
+    try {
+      const res = await attributeApi.getAll({ category: newType.toLowerCase() });
+      
+      const attrs = (res || []).map((attr, index) => {
+        // Extract all valid option labels from the database response
+        const allOptions = (attr.values || []).map(v => v.label || v.value);
+        
+        return {
+          attribute_id: attr._id,
+          seed_code: attr.code,
+          seed_name: attr.name,
+          seed_type: attr.data_type,
+          seed_options: allOptions,
+          is_required: false,
+          is_visible: true,
+          is_filterable: true,
+          is_searchable: true,
+          sort_order: index,
+          // ✅ FIX: Assign ALL options to 'value' so they appear selected by default
+          value: allOptions, 
+        };
+      });
+      
+      setFormData(prev => ({ ...prev, category_type: newType, attributes: attrs }));
+    } catch (err) {
+      console.error("Failed to fetch attributes for type", newType, err);
+      toast.error("Failed to load attributes for this category type");
+    }
   };
-
   const handleParentChange = (parentId) => setFormData((previous) => ({ ...previous, parent_category_id: parentId }));
 
   const updateAttributeConfig = (attributeKey, field, value) => {
@@ -799,14 +749,10 @@ export default function CategoriesPage() {
     </div>
   );
 
-  // ✅ UPDATED: Action Buttons with Eye Icon
   const ActionButtons = ({ category }) => (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
-      {/* Eye/View Button */}
       <button onClick={(e) => { e.stopPropagation(); handleViewDetail(category); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
-      {/* Edit Button */}
       <button onClick={(e) => { e.stopPropagation(); handleEdit(category); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
-      {/* Delete Button */}
       <button onClick={(e) => { e.stopPropagation(); handleDelete(category); }} disabled={isDeleting} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
     </div>
   );
@@ -905,7 +851,6 @@ export default function CategoriesPage() {
                         </td>
                         <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{category.description || "—"}</p></td>
                         <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "Root category" ? "—" : parentName}</td>
-                        {/* ✅ ADDED: Status Column */}
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase" 
                             style={isActive 
@@ -1001,11 +946,9 @@ export default function CategoriesPage() {
 
             <form onSubmit={handleSubmit} className="px-6 py-6 overflow-y-auto flex-1">
               
-              {/* TAB 1: DETAILS — Professional 2-Column Layout */}
+              {/* TAB 1: DETAILS */}
               {activeTab === "details" && (
                 <div className="space-y-5">
-
-                  {/* ROW 1: Category Code (left) | Category Name (right) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Category Code</label>
@@ -1038,7 +981,6 @@ export default function CategoriesPage() {
                     </div>
                   </div>
 
-                  {/* ROW 2: Category Type (left) | Parent Category (right) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Category Type <span style={{ color: "var(--danger)" }}>*</span></label>
@@ -1070,7 +1012,6 @@ export default function CategoriesPage() {
                     </div>
                   </div>
 
-                  {/* ROW 3: Description (full width) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Description</label>
                     <textarea
@@ -1083,7 +1024,6 @@ export default function CategoriesPage() {
                     />
                   </div>
 
-                  {/* ROW 4: Active toggle (full width) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Status</label>
                     <button
@@ -1189,7 +1129,7 @@ export default function CategoriesPage() {
                 </div>
               )}
 
-              {/* Footer Actions - STEPPER LOGIC IMPLEMENTED HERE */}
+              {/* Footer Actions */}
               <div className="flex items-center justify-between pt-5 mt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
                 <button type="button" onClick={closeModal} className="h-10 px-5 rounded-md text-sm font-medium hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
                 

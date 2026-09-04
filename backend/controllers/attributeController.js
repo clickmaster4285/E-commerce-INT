@@ -1,9 +1,6 @@
-// backend/controllers/attributeController.js
 const Attribute = require("../models/Attribute");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
-
-// ❌ REMOVED: const getTenantId = (req) => req.user?.tenant_id || req.user?.storeId;
 
 const emitSocket = (event, data) => {
   try {
@@ -33,11 +30,8 @@ const normalizeValues = (rawValues) => {
   return out;
 };
 
-const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select"];
+const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select", "select", "color"];
 
-// Legacy data types that previously existed in the system. Treat them as
-// multi_select so the existing records continue to work as dropdowns after
-// the data_type list was restricted.
 const LEGACY_DATA_TYPE_MAP = {
   select: "multi_select",
   color: "multi_select",
@@ -50,7 +44,7 @@ const LEGACY_DATA_TYPE_MAP = {
 
 const sanitizePayload = (body) => {
   const allowed = [
-    "name", "code", "data_type", "unit", "description", "values",
+    "name", "code", "data_type", "unit", "description", "values", "category",
     "variant_allowed", "filterable", "searchable", "visible", "is_active",
   ];
   const out = {};
@@ -82,10 +76,7 @@ const sanitizePayload = (body) => {
 
 const getAttributes = async (req, res) => {
   try {
-    // const tenantId = getTenantId(req); // ❌ Removed
-    const { search } = req.query;
-
-    // ✅ FIX: Removed tenant_id from filter
+    const { search, category } = req.query;
     const filter = { is_deleted: { $ne: true } };
     
     if (search) {
@@ -95,28 +86,26 @@ const getAttributes = async (req, res) => {
       ];
     }
 
-    const attributes = await Attribute.find(filter).sort({ name: 1 }).lean();
+    // ✅ Safely filter by category if provided
+    if (category) {
+      filter.category = { $regex: new RegExp(`^${category}$`, 'i') };
+    }
+
+    const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).lean();
     res.status(200).json({ success: true, data: attributes });
   } catch (error) {
+    console.error("Error in getAttributes:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 const createAttribute = async (req, res) => {
   try {
-    // const tenantId = getTenantId(req); // ❌ Removed
     const data = sanitizePayload(req.body || {});
-
     if (!data.name || !data.code) {
       return res.status(400).json({ success: false, message: "Name and Code are required" });
     }
-
-    const attribute = await Attribute.create({
-      ...data,
-      // tenant_id: tenantId, // ❌ Removed
-      createdby: req.user?._id || null,
-    });
-
+    const attribute = await Attribute.create({ ...data, createdby: req.user?._id || null });
     emitSocket("attributeCreated", attribute.toObject());
 
     const io = req.io || getIO();
@@ -131,7 +120,6 @@ const createAttribute = async (req, res) => {
       },
       req.user?._id || null
     );
-
     res.status(201).json({ success: true, data: attribute });
   } catch (error) {
     if (error.code === 11000) {
@@ -143,20 +131,15 @@ const createAttribute = async (req, res) => {
 
 const updateAttribute = async (req, res) => {
   try {
-    // const tenantId = getTenantId(req); // ❌ Removed
     const data = sanitizePayload(req.body || {});
-
-    // ✅ FIX: Removed tenant_id from findOneAndUpdate filter
     const attribute = await Attribute.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { ...data, updatedby: req.user?._id || null },
       { new: true }
     );
-
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });
     }
-
     emitSocket("attributeUpdated", attribute.toObject());
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {

@@ -20,11 +20,10 @@ const attributeSchema = new mongoose.Schema(
     },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, lowercase: true },
-    // data_type is constrained by the attributeController to one of:
-    //   text | number | decimal | multi_select
-    // Existing records created before this restriction (e.g. "select",
-    // "boolean", "color") continue to load fine — only new writes are
-    // validated in the controller.
+    
+    // ✅ ADDED: Category field to properly filter attributes by type
+    category: { type: String, trim: true, lowercase: true, index: true },
+    
     data_type: {
       type: String,
       required: true,
@@ -34,7 +33,6 @@ const attributeSchema = new mongoose.Schema(
     description: { type: String, trim: true, default: "" },
     values: { type: [attributeValueSchema], default: [] },
     variant_allowed: { type: Boolean, default: false },
- 
     is_active: { type: Boolean, default: true },
     is_deleted: { type: Boolean, default: false },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -43,7 +41,6 @@ const attributeSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-// Unique code per tenant
 attributeSchema.index({ tenant_id: 1, code: 1, is_deleted: 1 }, { unique: true });
 
 module.exports = mongoose.model("Attribute", attributeSchema);

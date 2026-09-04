@@ -11,9 +11,7 @@ import { dealApi } from "../../../apis/admin/dealApi";
 // ==========================================
 // API SETUP
 // ==========================================
-const API_BASE =
-  process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
-
+const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 const API_URL = `${API_BASE}/api`;
 
 const bannerAxios = axios.create({
@@ -67,10 +65,6 @@ const adminBannerApi = {
   },
   delete: async (id) => {
     await bannerAxios.delete(`/banners/${id}`);
-  },
-  toggle: async (id) => {
-    const res = await bannerAxios.patch(`/banners/${id}/toggle`);
-    return res.data.data;
   },
   duplicate: async (id) => {
     const res = await bannerAxios.post(`/banners/${id}/duplicate`);
@@ -263,7 +257,7 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     name: "",
     discountValue: "",
-    type: "percentage", // percentage or fixed_amount
+    type: "percentage",
     startDate: "",
     endDate: "",
   });
@@ -273,6 +267,7 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
     mutationFn: (data) => dealApi.create(data),
     onSuccess: (newDeal) => {
       queryClient.invalidateQueries({ queryKey: ["adminDeals"] });
+      queryClient.invalidateQueries({ queryKey: ["banner-deal-options"] });
       toast.success("New deal created successfully!");
       onSuccess(newDeal);
     },
@@ -283,13 +278,12 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
     e.preventDefault();
     if (!formData.name || !formData.discountValue) return toast.error("Name and Value are required");
     
-    // Basic payload construction matching typical deal schema
     const payload = {
       name: formData.name,
       discountValue: Number(formData.discountValue),
       type: formData.type,
       isActive: true,
-      applyTo: "all", // Defaulting to all products for quick creation
+      applyTo: "all",
       startDate: formData.startDate ? new Date(formData.startDate).toISOString() : new Date().toISOString(),
       endDate: formData.endDate ? new Date(formData.endDate).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
@@ -342,10 +336,6 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
   );
 };
 
-
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -365,9 +355,8 @@ export default function BannersPage() {
   const [editingBanner, setEditingBanner] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  
-  // ✅ New States for Deal Selection
   const [showDealCreator, setShowDealCreator] = useState(false);
+  
   const itemsPerPage = 20;
 
   const defaultForm = {
@@ -375,11 +364,10 @@ export default function BannersPage() {
     desktopImage: null, tabletImage: null, mobileImage: null,
     altText: "", backgroundColor: "#ffffff",
     eyebrow: "", heading: "", description: "",
-    primaryButton: { text: "", linkType: "custom_url", link: "" },
+    primaryButton: { text: "", linkType: "custom_url", link: "", dealId: "" },
     startDate: "", endDate: "", autoPublish: false, autoDisable: true,
-    // Removed displayRules.pages as requested
     displayRules: { devices: ["desktop", "tablet", "mobile"] },
-    linkedDealId: "" // New field for Deal
+    linkedDealId: ""
   };
 
   const [form, setForm] = useState(defaultForm);
@@ -396,7 +384,6 @@ export default function BannersPage() {
     retry: false,
   });
 
-  // ✅ Deals list — for linking a banner button to a Deal
   const { data: deals = [] } = useQuery({
     queryKey: ["banner-deal-options"],
     queryFn: dealApi.getAll,
@@ -476,10 +463,36 @@ export default function BannersPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     const fd = new FormData();
+
     Object.entries(form).forEach(([key, value]) => {
-      if (value instanceof File) fd.append(key, value);
-      else if (typeof value === "object" && value !== null) fd.append(key, JSON.stringify(value));
-      else if (value !== null && value !== undefined) fd.append(key, value);
+      // 1. Skip existing image strings. Backend will retain them if not replaced by a new File.
+      if (['desktopImage', 'tabletImage', 'mobileImage'].includes(key) && typeof value === 'string') {
+        return;
+      }
+
+      // 2. FIX: Handle nested primaryButton object to remove empty dealId (Prevents MongoDB ObjectId cast error)
+      if (key === 'primaryButton' && typeof value === 'object' && value !== null) {
+        const cleanPrimaryButton = { ...value };
+        if (!cleanPrimaryButton.dealId || String(cleanPrimaryButton.dealId).trim() === '') {
+          delete cleanPrimaryButton.dealId;
+        }
+        fd.append(key, JSON.stringify(cleanPrimaryButton));
+        return;
+      }
+
+      // 3. FIX: Skip empty linkedDealId to prevent MongoDB ObjectId cast errors
+      if (key === 'linkedDealId' && (!value || String(value).trim() === '')) {
+        return;
+      }
+
+      // 4. Append valid values
+      if (value instanceof File) {
+        fd.append(key, value);
+      } else if (typeof value === "object" && value !== null) {
+        fd.append(key, JSON.stringify(value));
+      } else if (value !== null && value !== undefined) {
+        fd.append(key, value);
+      }
     });
 
     bannerMutation.mutate({ data: fd, id: editingBanner?._id });
@@ -492,8 +505,12 @@ export default function BannersPage() {
       ...banner,
       startDate: formatDateInput(banner.startDate),
       endDate: formatDateInput(banner.endDate),
-      primaryButton: banner.primaryButton || { text: "", linkType: "custom_url", link: "" },
-      // Ensure displayRules exists even if old banner didn't have it
+      primaryButton: {
+        text: banner.primaryButton?.text || "",
+        linkType: banner.primaryButton?.linkType || "custom_url",
+        link: banner.primaryButton?.link || "",
+        dealId: banner.primaryButton?.dealId || ""
+      },
       displayRules: banner.displayRules || { devices: ["desktop", "tablet", "mobile"] },
       linkedDealId: banner.linkedDealId || "",
     });
@@ -518,12 +535,11 @@ export default function BannersPage() {
   const getImagePreview = (file) => {
     if (!file) return null;
     if (file instanceof File) return URL.createObjectURL(file);
-    return `${API_BASE}/${file}`;
+    const cleanPath = file.startsWith('/') ? file : `/${file}`;
+    return `${API_BASE}${cleanPath}`;
   };
 
-  // ✅ Handler when a new deal is created in the mini modal
   const handleNewDealCreated = (newDeal) => {
-    // Assuming newDeal has an _id
     setForm(prev => ({ ...prev, linkedDealId: newDeal._id || newDeal.id }));
     setShowDealCreator(false);
   };
@@ -648,7 +664,7 @@ export default function BannersPage() {
             <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
+              <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger, #ef4444)" }}>
                 <TrashIcon className="w-3.5 h-3.5" /> Delete Selected
               </button>
             </div>
@@ -697,7 +713,7 @@ export default function BannersPage() {
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(banner._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                         </td>
                         <td className="px-4 py-2.5">
-                          <img src={`${API_BASE}/${banner.desktopImage}`} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
+                          <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
                         </td>
                         <td className="px-4 py-2.5 font-medium text-[13px]">{banner.title}</td>
                         <td className="px-4 py-2.5 capitalize text-[13px]" style={{ color: "var(--text-secondary)" }}>{banner.bannerType.replace("_", " ")}</td>
@@ -720,7 +736,7 @@ export default function BannersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {paginatedBanners.map((banner) => (
               <div key={banner._id} onClick={() => router.push(`${pathname}/${banner._id}`)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
-                <img src={`${API_BASE}/${banner.desktopImage}`} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
+                <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
                     <p className="font-semibold text-[13px] truncate">{banner.title}</p>
@@ -840,7 +856,7 @@ export default function BannersPage() {
                   </div>
                 </FormSection>
 
-                             {/* 4. Call to Action */}
+                {/* 4. Call to Action */}
                 <FormSection number="4" title="Call to Action" description="Button, link & deal configuration">
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -864,7 +880,7 @@ export default function BannersPage() {
                           >
                             <option value="">— Choose a deal —</option>
                             {deals.map((d) => (
-                              <option key={d._id} value={d._id}>
+                              <option key={d._id || d.id} value={d._id || d.id}>
                                 {d.name}{d.isActive ? "" : " (disabled)"}
                               </option>
                             ))}
@@ -877,9 +893,11 @@ export default function BannersPage() {
                         </FormField>
                       )}
                     </div>
+                  </div>
+                </FormSection>
 
-                {/* 4.5 Linked Deal Section - FIXED */}
-                <FormSection number="4.5" title="Linked Deal" description="Attach a deal to this banner">
+                {/* 4.5 Linked Deal Section */}
+                <FormSection number="4.5" title="Linked Deal" description="Attach a deal to this banner for tracking/analytics">
                   <div className="space-y-4">
                     <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
                       <div className="flex gap-2">
@@ -900,7 +918,7 @@ export default function BannersPage() {
                         </Select>
                       </div>
                     </FormField>
-                    {form.linkedDealId && (
+                    {form.linkedDealId && form.linkedDealId !== "CREATE_NEW" && (
                       <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
                         <TagIcon className="w-4 h-4 text-emerald-500" />
                         <span>Deal is linked. Button will redirect to deal page if configured.</span>
