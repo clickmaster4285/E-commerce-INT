@@ -62,6 +62,12 @@ const AlertTriangleIcon = () => (
   </svg>
 );
 
+const InfoIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
 const Spinner = ({ className = "w-4 h-4" }) => (
   <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
@@ -102,7 +108,6 @@ const ADD_REASONS = [
   "Customer Return",
   "Inventory Correction",
   "Supplier Bonus",
-  "__OTHER__", 
 ];
 
 const REMOVE_REASONS = [
@@ -111,7 +116,6 @@ const REMOVE_REASONS = [
   "Expired",
   "Lost / Stolen",
   "Internal Use / Sample",
-  "__OTHER__",
 ];
 
 const formatDateTime = (date) => {
@@ -167,7 +171,6 @@ export default function ManageStockPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [adjustTarget, setAdjustTarget] = useState(null);
   
-  // Updated form state: removed 'set', added customReason handling
   const [adjustForm, setAdjustForm] = useState({
     type: "add",
     quantity: "",
@@ -178,11 +181,9 @@ export default function ManageStockPage() {
   const [adjustError, setAdjustError] = useState("");
   const itemsPerPage = 20;
 
-  // Custom Dropdown State & Ref
   const dropdownRef = useRef(null);
   const [isReasonOpen, setIsReasonOpen] = useState(false);
 
-  // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -305,7 +306,6 @@ export default function ManageStockPage() {
       return `Cannot remove ${qty} units. Only ${adjustTarget.quantity} in stock.`;
     }
     
-    // Reason validation
     if (!adjustForm.reason) return "Please select a reason for this adjustment";
     if (adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim()) {
       return "Please specify the custom reason";
@@ -576,14 +576,42 @@ export default function ManageStockPage() {
                   <div className="grid grid-cols-2 gap-3 mb-3.5">
                     {[
                       { value: "add", label: "Add Stock", icon: "+", color: "#34d399" },
-                      { value: "remove", label: "Remove Stock", icon: "\u2212", color: "#ef4444" },
+                      { value: "remove", label: "Remove Stock", icon: "−", color: "#ef4444" },
                     ].map((opt) => {
                       const isActive = adjustForm.type === opt.value;
+                      const currentStock = Number(adjustTarget.quantity ?? 0);
+                      const isRemoveDisabled = currentStock === 0;
+                      
                       return (
-                        <button key={opt.value} type="button" onClick={() => { setAdjustError(""); setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); setIsReasonOpen(false); }} disabled={adjustMutation.isPending} className="relative flex flex-col items-center gap-1 py-3 px-2 rounded-lg text-center transition disabled:opacity-50" style={{ backgroundColor: isActive ? "var(--bg-tertiary)" : "var(--bg-card)", border: `1.5px solid ${isActive ? opt.color : "var(--border-color)"}`, color: isActive ? opt.color : "var(--text-secondary)" }}>
-                          <span className="text-[16px] font-bold leading-none">{opt.icon}</span>
-                          <span className="text-[11px] font-medium leading-tight mt-0.5">{opt.label}</span>
-                        </button>
+                        <div key={opt.value} className="relative group">
+                          <button 
+                            key={opt.value} 
+                            type="button" 
+                            onClick={() => { 
+                              setAdjustError(""); 
+                              setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); 
+                              setIsReasonOpen(false); 
+                            }} 
+                            disabled={opt.value === "remove" ? (isRemoveDisabled || adjustMutation.isPending) : adjustMutation.isPending} 
+                            className="relative w-full flex flex-col items-center gap-1 py-3 px-2 rounded-lg text-center transition disabled:opacity-40 disabled:cursor-not-allowed" 
+                            style={{ 
+                              backgroundColor: isActive ? "var(--bg-tertiary)" : "var(--bg-card)", 
+                              border: `1.5px solid ${isActive ? opt.color : "var(--border-color)"}`, 
+                              color: isActive ? opt.color : "var(--text-secondary)" 
+                            }}
+                          >
+                            <span className="text-[16px] font-bold leading-none">{opt.icon}</span>
+                            <span className="text-[11px] font-medium leading-tight mt-0.5">{opt.label}</span>
+                          </button>
+                          
+                          {/* Tooltip for Remove Stock when disabled */}
+                          {opt.value === "remove" && isRemoveDisabled && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10" style={{ backgroundColor: "var(--danger)", color: "#fff", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
+                              No stock available to remove
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent" style={{ borderTopColor: "var(--danger)" }} />
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -591,10 +619,39 @@ export default function ManageStockPage() {
                   {/* Quantity Input */}
                   <div>
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Quantity <span style={{ color: "var(--danger)" }}>*</span></label>
-                    <input type="number" min={1} step="1" value={adjustForm.quantity} onChange={(e) => { setAdjustError(""); setAdjustForm({ ...adjustForm, quantity: e.target.value }); }} disabled={adjustMutation.isPending} className="h-10 px-3 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} onFocus={(e) => e.target.style.borderColor = "var(--accent)"} onBlur={(e) => e.target.style.borderColor = "var(--border-color)"} placeholder={adjustForm.type === "add" ? "Units to add" : "Units to remove"} />
+                    <input 
+                      type="number" 
+                      min={1} 
+                      max={adjustForm.type === "remove" ? (adjustTarget.quantity ?? 0) : undefined}
+                      step="1" 
+                      value={adjustForm.quantity} 
+                      onChange={(e) => { 
+                        setAdjustError(""); 
+                        const val = e.target.value;
+                        const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
+                        if (val === "" || Number(val) <= maxStock) {
+                          setAdjustForm({ ...adjustForm, quantity: val });
+                        }
+                      }} 
+                      disabled={adjustMutation.isPending} 
+                      className="h-10 px-3 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50" 
+                      style={{ 
+                        backgroundColor: "var(--bg-tertiary)", 
+                        border: "1px solid var(--border-color)", 
+                        color: "var(--text-primary)" 
+                      }} 
+                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"} 
+                      onBlur={(e) => e.target.style.borderColor = "var(--border-color)"} 
+                      placeholder={adjustForm.type === "add" ? "Units to add" : "Units to remove"} 
+                    />
                     
                     {adjustForm.type === "remove" && (
-                      <p className="text-[11px] mt-1.5" style={{ color: "var(--text-muted)" }}>Maximum removable: {adjustTarget.quantity} units</p>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <InfoIcon className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          Maximum removable: <span className="font-semibold" style={{ color: "#f59e0b" }}>{adjustTarget.quantity} units</span>
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -605,7 +662,7 @@ export default function ManageStockPage() {
                         <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>New Stock</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.quantity}</span>
                         <span className="text-[11px] font-semibold" style={{ color: adjustForm.type === "add" ? "#34d399" : "#ef4444" }}>
-                          {adjustForm.type === "add" ? `+${Number(adjustForm.quantity.trim())}` : `\u2212${Number(adjustForm.quantity.trim())}`}
+                          {adjustForm.type === "add" ? `+${Number(adjustForm.quantity.trim())}` : `−${Number(adjustForm.quantity.trim())}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -621,7 +678,7 @@ export default function ManageStockPage() {
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Reason</p>
                   
-                  {/* Custom Dropdown (Fixes mouse release closing issue) */}
+                  {/* Custom Dropdown */}
                   <div className="relative" ref={dropdownRef}>
                     <button
                       type="button"
@@ -669,7 +726,7 @@ export default function ManageStockPage() {
                     )}
                   </div>
 
-                  {/* Explanation Field (Always visible below dropdown) */}
+                  {/* Explanation Field */}
                   <div className="mt-3">
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                       Explanation <span style={{ color: adjustForm.reason === "__OTHER__" ? "var(--danger)" : "var(--text-muted)" }}>

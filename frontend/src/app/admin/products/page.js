@@ -41,7 +41,7 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") |
 function createEmptyVariant(sku = "") {
   return {
     _id: null, sku, title: "", description: "", cost_price: "", selling_price: "",
-    quantity: "0", min_qnt: "0", max_qnt: "0", 
+    quantity: "0", min_qnt: "0", max_qnt: "0",
     option_values: {},
     images: [],
   };
@@ -118,7 +118,7 @@ function normalizeId(value) {
 
 /* =========================================================
    MAIN COMPONENT
-   ========================================================= */
+========================================================= */
 export default function ProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -147,7 +147,6 @@ export default function ProductsPage() {
   const [attributeFormData, setAttributeFormData] = useState({
     name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true
   });
-  const [loadingAttributeCode, setLoadingAttributeCode] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -162,7 +161,7 @@ export default function ProductsPage() {
   const [formData, setFormData] = useState({
     category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
   });
-  
+
   const [tagInput, setTagInput] = useState("");
 
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
@@ -171,7 +170,7 @@ export default function ProductsPage() {
   const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({ queryKey: ["products"], queryFn: productApi.getAll, retry: false });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
-  
+
   useEffect(() => {
     if (formData.category_id) {
       fetchCategoryAttributes(formData.category_id);
@@ -193,24 +192,73 @@ export default function ProductsPage() {
     }
   };
 
+  // ✅ FIXED: Directly reads from attr.values instead of old category_config
   const getAssignedOptionList = (attr) => {
-    const config = attr?.category_config;
-    const assigned = config?.value;
-    if (Array.isArray(assigned) && assigned.length > 0) {
-      return assigned.map((v) => (typeof v === "string" ? v : v?.value || v?.label || String(v)));
-    }
-    if (typeof assigned === "string" && assigned.trim()) return [assigned];
-    return [];
+    if (!attr || !Array.isArray(attr.values)) return [];
+    return attr.values.map(v => v.label || v.value || String(v)).filter(Boolean);
   };
 
+  // ✅ FIXED: Filters based on actual values array existence
   const variantAllowedAttributes = useMemo(() => {
     return categoryAttributes.filter((attr) => {
-      const config = attr.category_config;
-      const assigned = Boolean(config && config.attribute_id);
-      const visible = config?.is_visible !== false;
-      return assigned && visible;
+      const hasValues = Array.isArray(attr.values) && attr.values.length > 0;
+      const isVisible = attr.is_visible !== false;
+      return hasValues && isVisible;
     });
   }, [categoryAttributes]);
+
+  // ✅ FIXED: Works with direct values array and updates local state correctly
+  const handleAddVariantAttributeValue = async (attr, optionLabel, variantIndex) => {
+    const trimmed = String(optionLabel || "").trim();
+    if (!trimmed || !attr) return;
+
+    const existingLabels = getAssignedOptionList(attr);
+    if (existingLabels.some((opt) => String(opt).toLowerCase() === trimmed.toLowerCase())) {
+      toast.info(`"${trimmed}" already exists in ${attr.name}`);
+      if (variantIndex !== undefined) {
+        updateVariantOption(variantIndex, attr.code, trimmed);
+      }
+      return;
+    }
+
+    const attributeId = attr?._id;
+    if (!attributeId) {
+      toast.error("Cannot add value: attribute id not found");
+      return;
+    }
+
+    const previousValues = Array.isArray(attr.values) ? attr.values : [];
+    const updatedValues = [
+      ...previousValues.map((v) => ({
+        label: v?.label || v?.value || String(v),
+        value: v?.value || v?.label || String(v),
+      })),
+      { label: trimmed, value: trimmed },
+    ];
+
+    try {
+      await attributeApi.update(String(attributeId), { values: updatedValues });
+
+      // Update local state immediately so UI reflects change without refetch
+      setCategoryAttributes((prev) =>
+        prev.map((a) => {
+          if (String(a?._id) === String(attributeId)) {
+            return { ...a, values: updatedValues };
+          }
+          return a;
+        })
+      );
+
+      toast.success(`Added "${trimmed}" to ${attr.name}`);
+      if (variantIndex !== undefined) {
+        updateVariantOption(variantIndex, attr.code, trimmed);
+      }
+    } catch (err) {
+      console.error("Add value error:", err);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add value");
+      throw err;
+    }
+  };
 
   useEffect(() => {
     if (!productsError || !productsErrorMsg) return;
@@ -239,37 +287,11 @@ export default function ProductsPage() {
       const categoryId = formData.category_id;
       if (created?._id && categoryId) {
         const alreadyAssigned = categoryAttributes.some(
-          (a) => String(a?.category_config?.attribute_id || a?._id) === String(created._id)
+          (a) => String(a?._id) === String(created._id)
         );
         if (!alreadyAssigned) {
-          const nextAttributes = categoryAttributes.map((a) => {
-            const aid = a?.category_config?.attribute_id || a?._id;
-            return {
-              attribute_id: aid,
-              is_required: Boolean(a?.category_config?.is_required),
-              is_visible: a?.category_config?.is_visible !== false,
-              is_filterable: Boolean(a?.category_config?.is_filterable),
-              is_searchable: Boolean(a?.category_config?.is_searchable),
-              is_variant_option: a?.category_config?.is_variant_option !== false,
-              sort_order: a?.category_config?.sort_order ?? 0,
-              value: a?.category_config?.value ?? "",
-            };
-          });
-          nextAttributes.push({
-            attribute_id: created._id,
-            is_required: false,
-            is_visible: true,
-            is_filterable: false,
-            is_searchable: false,
-            is_variant_option: true,
-            sort_order: nextAttributes.length,
-            value: "",
-          });
-          try {
-            await assignAttributeToCategoryMutation.mutateAsync({ categoryId, attributes: nextAttributes });
-          } catch (e) {
-            handlePermissionError(e, "Attribute created but failed to assign to category", "category");
-          }
+          const nextAttributes = [...categoryAttributes, created];
+          setCategoryAttributes(nextAttributes);
         }
       }
       toast.success("Attribute created successfully!");
@@ -347,15 +369,11 @@ export default function ProductsPage() {
   const updateVariantOption = (vi, attrCode, value) => {
     setFormData((prev) => {
       const v = [...prev.variants];
-      v[vi] = { 
-        ...v[vi], 
-        option_values: { ...v[vi].option_values, [attrCode]: value } 
-      };
+      v[vi] = { ...v[vi], option_values: { ...v[vi].option_values, [attrCode]: value } };
       return { ...prev, variants: v };
     });
   };
 
-  /* Images */
   const handleImageUpload = async (vi, event) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -384,33 +402,26 @@ export default function ProductsPage() {
     });
   };
 
-  /* Edit Product */
   const handleEdit = (product) => {
     const variants = product?.variants?.length
       ? product.variants.map((v) => ({
-          _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
-          cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
-          quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
-          option_values: v.attributes || {},
-          images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
-        }))
+        _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
+        cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
+        quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
+        option_values: v.attributes || {},
+        images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
+      }))
       : [createEmptyVariant()];
 
-    const currentTagNames = (product.tag_ids || [])
-      .map(t => typeof t === 'object' ? t.name : t)
-      .filter(Boolean);
+    const currentTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
 
     setFormData({
       category_id: normalizeId(product?.category_id), brand_id: normalizeId(product?.brand_id),
       name: product?.name || "", description: product?.description || "", tax: String(product?.tax ?? 0),
-      status: product?.status || "active", 
-      tag_names: currentTagNames,
-      variants,
+      status: product?.status || "active", tag_names: currentTagNames, variants,
     });
-    
-    if (product?.category_id) {
-      fetchCategoryAttributes(normalizeId(product?.category_id));
-    }
+
+    if (product?.category_id) fetchCategoryAttributes(normalizeId(product?.category_id));
 
     setTagInput("");
     setEditingProduct(product); setCurrentStep(1); setExpandedVariant(0);
@@ -481,16 +492,11 @@ export default function ProductsPage() {
     else createMutation.mutate(data);
   };
 
-  /* TAG HANDLERS */
   const addTag = (e) => {
     e?.preventDefault();
     const val = tagInput.trim().toLowerCase();
     if (!val) return;
-    if (formData.tag_names.includes(val)) {
-      toast.info("Tag already added");
-      setTagInput("");
-      return;
-    }
+    if (formData.tag_names.includes(val)) { toast.info("Tag already added"); setTagInput(""); return; }
     setFormData(prev => ({ ...prev, tag_names: [...prev.tag_names, val] }));
     setTagInput("");
   };
@@ -499,7 +505,6 @@ export default function ProductsPage() {
     setFormData(prev => ({ ...prev, tag_names: prev.tag_names.filter(t => t !== tagName) }));
   };
 
-  /* Category Logic */
   const resetCategoryForm = () => { setCategoryFormData({ category_code: "", name: "", description: "" }); setLoadingCategoryCode(false); };
   const fetchNextCategoryCode = async () => {
     try {
@@ -526,7 +531,6 @@ export default function ProductsPage() {
     createCategoryMutation.mutate({ ...categoryFormData, category_code: categoryFormData.category_code.trim(), name: categoryFormData.name.trim(), description: categoryFormData.description.trim() });
   };
 
-  /* Brand Logic */
   const resetBrandForm = () => {
     if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
     setBrandFormData({ brand_code: "", name: "", description: "", country: "", is_active: true });
@@ -568,23 +572,15 @@ export default function ProductsPage() {
     createBrandMutation.mutate(fd);
   };
 
-  /* Attribute Logic */
   const resetAttributeForm = () => {
     setAttributeFormData({ name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true });
-    setLoadingAttributeCode(false);
   };
-  const fetchNextAttributeCode = async () => {
-    try {
-      setLoadingAttributeCode(true);
-      const res = await attributeApi.getNextCode?.();
-      const code = res?.nextCode || res?.data?.nextCode;
-      if (code && typeof code === "string") { setAttributeFormData((p) => ({ ...p, code: code })); return; }
-      throw new Error("Invalid code format");
-    } catch (e) {
-      setAttributeFormData((p) => ({ ...p, code: `attr_${Date.now().toString(36)}` }));
-    } finally { setLoadingAttributeCode(false); }
+
+  const handleOpenAttributeModal = () => {
+    resetAttributeForm();
+    setShowNewAttributeModal(true);
   };
-  const handleOpenAttributeModal = () => { resetAttributeForm(); setShowNewAttributeModal(true); fetchNextAttributeCode(); };
+
   const handleAddAttributeValue = () => {
     setAttributeFormData(prev => ({ ...prev, values: [...prev.values, { label: "", value: "" }] }));
   };
@@ -598,24 +594,26 @@ export default function ProductsPage() {
       return { ...prev, values: newValues };
     });
   };
+
   const handleAttributeSubmit = (e) => {
     e.preventDefault();
     if (!attributeFormData.name.trim()) { toast.error("Attribute name is required"); return; }
-    if (!attributeFormData.code.trim()) { toast.error("Attribute code is required"); return; }
-    
+
+    const finalCode = attributeFormData.code.trim() || attributeFormData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
     const payload = {
-      ...attributeFormData,
       name: attributeFormData.name.trim(),
-      code: attributeFormData.code.trim().toLowerCase(),
-      values: attributeFormData.data_type === "select"
+      code: finalCode,
+      data_type: attributeFormData.data_type,
+      variant_allowed: true,
+      values: (attributeFormData.data_type === "select" || attributeFormData.data_type === "multi_select")
         ? attributeFormData.values.filter(v => v.label.trim() && v.value.trim())
         : []
     };
-    
+
     createAttributeMutation.mutate(payload);
   };
 
-  /* Filters & Stats */
   const getCategoryName = (p) => {
     const cid = normalizeId(p?.category_id);
     return p?.category_id?.name || categories.find((c) => String(c._id) === cid)?.name || "Unknown";
@@ -712,7 +710,7 @@ export default function ProductsPage() {
                   const low = qty <= min;
                   const img = fv?.images?.[0]?.img_url;
                   const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
-                  
+
                   return (
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
@@ -856,21 +854,10 @@ export default function ProductsPage() {
                     </Field>
                   </div>
 
-                  {/* TAG INPUT */}
                   <Field label="Tags">
                     <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && addTag()}
-                        placeholder="Type tag name & press Enter"
-                        className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
-                        style={inputStyle}
-                      />
-                      <button type="button" onClick={addTag} className="flex h-9 w-9 items-center justify-center rounded-md transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                        <Plus className="h-4 w-4" />
-                      </button>
+                      <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag()} placeholder="Type tag name & press Enter" className="h-9 flex-1 rounded-md px-3 text-sm outline-none" style={inputStyle} />
+                      <button type="button" onClick={addTag} className="flex h-9 w-9 items-center justify-center rounded-md transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><Plus className="h-4 w-4" /></button>
                     </div>
                     {formData.tag_names.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -904,14 +891,9 @@ export default function ProductsPage() {
                       <h4 className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} /> Variants ({formData.variants.length})</h4>
                       <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, options and images</p>
                     </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                        <Settings2 className="h-3.5 w-3.5" /> Add Attribute
-                      </button>
-                      <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
-                    </div>
+                    <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
                   </div>
-                  
+
                   <div className="space-y-3">
                     {formData.variants.map((variant, index) => (
                       <div key={variant._id || `new-${index}`} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
@@ -926,7 +908,7 @@ export default function ProductsPage() {
                             <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
                           </div>
                         </div>
-                        
+
                         {expandedVariant === index && (
                           <div className="space-y-5 p-4">
                             <div>
@@ -946,14 +928,23 @@ export default function ProductsPage() {
                               </div>
                             </div>
 
-                            {/* VARIANT ATTRIBUTES SECTION */}
-                            {variantAllowedAttributes.length > 0 && (
-                              <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                                <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
-                                  <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                                  Variant Attributes
-                                </h5>
-                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {/* PROFESSIONAL VARIANT ATTRIBUTES SECTION */}
+                            <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b" style={{ borderColor: "var(--border-color)" }}>
+                                <div>
+                                  <h4 className="flex items-center gap-2 text-sm font-bold">
+                                    <Settings2 className="h-4 w-4" style={{ color: "var(--accent)" }} />
+                                    Variant Attributes
+                                  </h4>
+                                  <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>Define specific options for this product's variants</p>
+                                </div>
+                                <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                                  <Plus className="h-3.5 w-3.5" /> Add Attribute
+                                </button>
+                              </div>
+
+                              {variantAllowedAttributes.length > 0 ? (
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                   {variantAllowedAttributes.map(attr => {
                                     const assignedOptions = getAssignedOptionList(attr);
                                     const hasAssignedOptions = assignedOptions.length > 0;
@@ -962,44 +953,38 @@ export default function ProductsPage() {
                                     return (
                                       <Field key={attr._id} label={attr.name}>
                                         {renderAsDropdown ? (
-                                          <select
+                                          <DropdownWithAddValue
+                                            attr={attr}
+                                            assignedOptions={assignedOptions}
                                             value={variant.option_values[attr.code] || ""}
-                                            onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                            className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                            style={inputStyle}
-                                          >
-                                            <option value="">Select {attr.name}</option>
-                                            {assignedOptions.map((opt) => (
-                                              <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                          </select>
+                                            onChange={(val) => updateVariantOption(index, attr.code, val)}
+                                            onAddValue={(attr, val) => handleAddVariantAttributeValue(attr, val, index)}
+                                            inputStyle={inputStyle}
+                                          />
                                         ) : attr.data_type === 'color' ? (
                                           <div className="flex items-center gap-2">
-                                            <input
-                                              type="color"
-                                              value={variant.option_values[attr.code] || '#000000'}
-                                              onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                              className="h-9 w-12 cursor-pointer rounded border p-1"
-                                              style={{ borderColor: "var(--border-color)" }}
-                                            />
+                                            <input type="color" value={variant.option_values[attr.code] || '#000000'} onChange={(e) => updateVariantOption(index, attr.code, e.target.value)} className="h-9 w-12 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
                                             <span className="text-xs font-mono">{variant.option_values[attr.code] || '#000000'}</span>
+                                            <AddAttributeValueControl attr={attr} onAdd={(attr, val) => handleAddVariantAttributeValue(attr, val, index)} />
                                           </div>
                                         ) : (
-                                          <input
-                                            type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'}
-                                            value={variant.option_values[attr.code] || ""}
-                                            onChange={(e) => updateVariantOption(index, attr.code, e.target.value)}
-                                            placeholder={`Enter ${attr.name}`}
-                                            className="h-9 w-full rounded-md px-3 text-sm outline-none"
-                                            style={inputStyle}
-                                          />
+                                          <div className="flex items-center gap-2">
+                                            <input type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'} value={variant.option_values[attr.code] || ""} onChange={(e) => updateVariantOption(index, attr.code, e.target.value)} placeholder={`Enter ${attr.name}`} className="h-9 flex-1 rounded-md px-3 text-sm outline-none" style={inputStyle} />
+                                            <AddAttributeValueControl attr={attr} onAdd={(attr, val) => handleAddVariantAttributeValue(attr, val, index)} />
+                                          </div>
                                         )}
                                       </Field>
                                     );
                                   })}
                                 </div>
-                              </div>
-                            )}
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg" style={{ borderColor: "var(--border-color)" }}>
+                                  <Settings2 className="h-8 w-8 mb-2 opacity-30" style={{ color: "var(--text-muted)" }} />
+                                  <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>No attributes assigned to this category yet.</p>
+                                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Click "Add Attribute" to create and assign one.</p>
+                                </div>
+                              )}
+                            </div>
 
                             <div>
                               <SectionTitle>Pricing & Stock</SectionTitle>
@@ -1017,7 +1002,7 @@ export default function ProductsPage() {
                                 </div>
                               )}
                             </div>
-                            
+
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
                               <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
@@ -1138,29 +1123,54 @@ export default function ProductsPage() {
         </ModalOverlay>
       )}
 
-      {/* ATTRIBUTE MODAL */}
+      {/* ✅ FIXED ATTRIBUTE MODAL: Clean & Error-Free */}
       {showNewAttributeModal && (
         <ModalOverlay zIndex="z-[70]">
           <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
             <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <h3 className="text-base font-semibold">Create New Attribute</h3>
-              <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending || loadingAttributeCode} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}>
+                <X className="h-5 w-5" />
+              </button>
             </div>
+            
             <form onSubmit={handleAttributeSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
+              {/* Name and Code fields side by side */}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Attribute Name *">
-                  <input type="text" value={attributeFormData.name} onChange={e => setAttributeFormData(p => ({ ...p, name: e.target.value }))} required disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="e.g. Color, RAM" />
+                  <input 
+                    type="text" 
+                    value={attributeFormData.name} 
+                    onChange={e => setAttributeFormData(p => ({ ...p, name: e.target.value }))} 
+                    required 
+                    disabled={createAttributeMutation.isPending} 
+                    className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                    placeholder="e.g. Color, RAM, Size" 
+                  />
                 </Field>
-                <Field label="Attribute Code *">
-                  <div className="relative">
-                    <input type="text" value={attributeFormData.code} onChange={e => setAttributeFormData(p => ({ ...p, code: e.target.value.toLowerCase() }))} required disabled={createAttributeMutation.isPending || loadingAttributeCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingAttributeCode ? "Generating..." : "color"} />
-                    {loadingAttributeCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
-                  </div>
+
+                <Field label="Attribute Code">
+                  <input 
+                    type="text" 
+                    value={attributeFormData.code} 
+                    onChange={e => setAttributeFormData(p => ({ ...p, code: e.target.value.toLowerCase() }))} 
+                    disabled={createAttributeMutation.isPending} 
+                    className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                    placeholder="e.g. color, ram_size" 
+                  />
                 </Field>
               </div>
-              
+
               <Field label="Data Type *">
-                <select value={attributeFormData.data_type} onChange={e => setAttributeFormData(p => ({ ...p, data_type: e.target.value }))} disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                <select 
+                  value={attributeFormData.data_type} 
+                  onChange={e => setAttributeFormData(p => ({ ...p, data_type: e.target.value }))} 
+                  disabled={createAttributeMutation.isPending} 
+                  className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                >
                   <option value="text">Text</option>
                   <option value="number">Number</option>
                   <option value="multi_select">Multi Select</option>
@@ -1168,32 +1178,46 @@ export default function ProductsPage() {
                 </select>
               </Field>
 
+              {/* Only show Allowed Values section for "select" type, NOT for "multi_select" */}
               {attributeFormData.data_type === "select" && (
                 <div className="space-y-2 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Allowed Values</label>
-                    <button type="button" onClick={handleAddAttributeValue} className="flex items-center gap-1 text-[11px] font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}><Plus className="h-3 w-3" /> Add Value</button>
+                    <button type="button" onClick={handleAddAttributeValue} className="flex items-center gap-1 text-[11px] font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}>
+                      <Plus className="h-3 w-3" /> Add Value
+                    </button>
                   </div>
                   <div className="space-y-2">
                     {attributeFormData.values.map((val, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <input type="text" placeholder="Label (e.g. Red)" value={val.label} onChange={e => handleAttributeValueChange(idx, "label", e.target.value)} className="h-8 flex-1 rounded-md px-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                        <input type="text" placeholder="Value (e.g. #FF0000 or red)" value={val.value} onChange={e => handleAttributeValueChange(idx, "value", e.target.value)} className="h-8 flex-1 rounded-md px-2 text-xs outline-none" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                        <button type="button" onClick={() => handleRemoveAttributeValue(idx)} className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition hover:bg-red-500/10"><X className="h-3.5 w-3.5" /></button>
+                        <input 
+                          type="text" 
+                          placeholder="Label (e.g. Red)" 
+                          value={val.label} 
+                          onChange={e => handleAttributeValueChange(idx, "label", e.target.value)} 
+                          className="h-8 flex-1 rounded-md px-2 text-xs outline-none" 
+                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="Value (e.g. #FF0000)" 
+                          value={val.value} 
+                          onChange={e => handleAttributeValueChange(idx, "value", e.target.value)} 
+                          className="h-8 flex-1 rounded-md px-2 text-xs outline-none" 
+                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                        />
+                        <button type="button" onClick={() => handleRemoveAttributeValue(idx)} className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition hover:bg-red-500/10">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <label className="flex h-9 cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={attributeFormData.variant_allowed} onChange={e => setAttributeFormData(p => ({ ...p, variant_allowed: e.target.checked }))} disabled={createAttributeMutation.isPending} className="h-4 w-4 rounded" style={{ accentColor: "var(--accent)" }} />
-                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Allow this attribute to be used in Variants</span>
-              </label>
-
               <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
                 <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={createAttributeMutation.isPending || loadingAttributeCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}</button>
+                <button type="submit" disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}</button>
               </div>
             </form>
           </div>
@@ -1269,5 +1293,79 @@ function TagList({ names }) {
         </>
       ) : <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>—</span>}
     </div>
+  );
+}
+
+function AddAttributeValueControl({ attr, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+
+  if (!attr || !onAdd) return null;
+
+  const handleSave = async () => {
+    const trimmed = String(value || "").trim();
+    if (!trimmed || adding) return;
+    try {
+      setAdding(true);
+      await onAdd(attr, trimmed);
+      setValue("");
+      setOpen(false);
+    } catch { } finally { setAdding(false); }
+  };
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={`Add a new value to ${attr.name}`}>
+        <Plus className="h-3 w-3" /> Add Value
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input type="text" autoFocus value={value} onChange={(ev) => setValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setOpen(false); setValue(""); } }} placeholder="New value..." disabled={adding} className="h-9 px-2.5 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} />
+      <button type="button" onClick={handleSave} disabled={adding || !String(value || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold inline-flex items-center gap-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "#10b981", cursor: adding || !String(value || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{adding ? "..." : "Add"}</button>
+      <button type="button" onClick={() => { setOpen(false); setValue(""); }} disabled={adding} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: adding ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
+    </div>
+  );
+}
+
+function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddValue, inputStyle }) {
+  const [adding, setAdding] = useState(false);
+  const [newValue, setNewValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (!attr) return null;
+
+  const handleSave = async () => {
+    const trimmed = String(newValue || "").trim();
+    if (!trimmed || saving) return;
+    try {
+      setSaving(true);
+      await onAddValue(attr, trimmed);
+      setNewValue("");
+      setAdding(false);
+    } catch { } finally { setSaving(false); }
+  };
+
+  if (adding) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input type="text" autoFocus value={newValue} onChange={(ev) => setNewValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setAdding(false); setNewValue(""); } }} placeholder={`New ${attr.name} value...`} disabled={saving} className="h-9 flex-1 rounded-md px-3 text-sm outline-none disabled:opacity-50" style={inputStyle} />
+        <button type="button" onClick={handleSave} disabled={saving || !String(newValue || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "#10b981", cursor: saving || !String(newValue || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{saving ? "..." : "Add"}</button>
+        <button type="button" onClick={() => { setAdding(false); setNewValue(""); }} disabled={saving} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
+      </div>
+    );
+  }
+
+  return (
+    <select value={value || ""} onChange={(e) => { const v = e.target.value; if (v === "__add_new__") { setAdding(true); return; } onChange(v); }} className="h-9 w-full rounded-md px-3 text-sm outline-none" style={inputStyle}>
+      <option value="">Select {attr.name}</option>
+      {assignedOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
+      <option value="__add_new__" style={{ color: "#34d399", fontWeight: 600 }}>+ Add new value...</option>
+    </select>
   );
 }
