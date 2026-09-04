@@ -8,20 +8,16 @@ import {
 } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
 import {
-  Plus,
   Trash2,
   Upload,
   X,
   AlertTriangle,
   Check,
-  Copy,
-  ChevronDown,
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 import { variantApi } from "@/apis/admin/variantApi";
-import { attributeApi } from "@/apis/admin/attributeApi";
 
 const API_ORIGIN =
   process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -42,7 +38,6 @@ const createEmptyVariant = (sku = "") => ({
   quantity: "0",
   min_qnt: "0",
   max_qnt: "0",
-  attributes: [{ name: "Color", value: "Black", isCustom: false }],
   images: [],
 });
 
@@ -64,7 +59,6 @@ export default function AddVariantPage() {
   const isEditMode = !!editVariantId;
 
   const [formData, setFormData] = useState(null);
-  const [expandedVariant, setExpandedVariant] = useState(0);
   const [initialized, setInitialized] = useState(false);
 
   // ----------------------------------------------------------------
@@ -79,34 +73,6 @@ export default function AddVariantPage() {
     queryFn: () => productApi.getById(id),
     enabled: !!id,
   });
-
-  const { data: rawAttributes = [] } = useQuery({
-    queryKey: ["attributes"],
-    queryFn: () => attributeApi.getAll(),
-    retry: false,
-  });
-
-  const { data: categoryAttributes = [] } = useQuery({
-    queryKey: ["category-attributes", product?.category_id?._id || product?.category_id],
-    queryFn: () => attributeApi.getByCategory(product?.category_id?._id || product?.category_id),
-    enabled: !!(product?.category_id?._id || product?.category_id),
-    retry: false,
-  });
-
-  const ATTRIBUTE_PRESETS = useMemo(() => {
-    const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
-    if (!source.length) return [];
-    return source
-      .filter((a) => a.is_active && a.values?.length)
-      .map((a) => ({
-        name: a.name,
-        code: a.code,
-        data_type: a.data_type,
-        values: (a.data_type === "multi_select" && Array.isArray(a.category_config?.value) && a.category_config.value.length)
-          ? a.category_config.value
-          : (a.values || []).map((v) => v.label || v.value),
-      }));
-  }, [rawAttributes, categoryAttributes]);
 
   // ----------------------------------------------------------------
   // Update Mutation
@@ -145,18 +111,6 @@ export default function AddVariantPage() {
       quantity: String(v.quantity ?? 0),
       min_qnt: String(v.min_qnt ?? 0),
       max_qnt: String(v.max_qnt ?? 0),
-      attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
-        const strValue = String(value);
-        const presetForName = rawAttributes.find((a) => a.name === name);
-        const isMulti = presetForName?.data_type === "multi_select";
-        return {
-          name,
-          value: isMulti
-            ? strValue.split(",").map((s) => s.trim()).filter(Boolean)
-            : strValue,
-          isCustom: false,
-        };
-      }),
       images: (v.images || []).map((img) => ({
         existing: true,
         metadata: img,
@@ -165,18 +119,14 @@ export default function AddVariantPage() {
     }));
 
     let finalVariants;
-    let expandIndex;
 
     if (isEditMode) {
       const selectedVariant = existingVariants.find(
         (v) => String(v._id) === String(editVariantId)
       );
       finalVariants = selectedVariant ? [selectedVariant] : [];
-      expandIndex = 0;
     } else {
-      const newVariant = createEmptyVariant("");
-      finalVariants = [newVariant];
-      expandIndex = 0;
+      finalVariants = [createEmptyVariant("")];
     }
 
     setFormData({
@@ -189,7 +139,6 @@ export default function AddVariantPage() {
       variants: finalVariants,
     });
 
-    setExpandedVariant(expandIndex);
     setInitialized(true);
 
     if (!isEditMode) {
@@ -214,79 +163,12 @@ export default function AddVariantPage() {
   }, [product, initialized, isEditMode, editVariantId]);
 
   // ----------------------------------------------------------------
-  // Duplicate / Remove / Update helpers
+  // Update helpers
   // ----------------------------------------------------------------
-  const duplicateVariant = async (index) => {
-    try {
-      const result = await variantApi.getNextSku();
-      const old = formData.variants[index];
-      const copy = {
-        ...old,
-        _id: null,
-        sku: result.sku,
-        attributes: old.attributes.map((item) => ({ ...item })),
-        images: [],
-      };
-      setFormData((prev) => {
-        const variants = [...prev.variants];
-        variants.splice(index + 1, 0, copy);
-        return { ...prev, variants };
-      });
-      setExpandedVariant(index + 1);
-    } catch (error) {
-      console.error("Duplicate Error:", error);
-      toast.error("Unable to generate SKU");
-    }
-  };
-
-  const removeVariant = (index) => {
-    if (formData.variants.length === 1) {
-      toast.error("At least one variant is required");
-      return;
-    }
-    setFormData((prev) => ({
-      ...prev,
-      variants: prev.variants.filter((_, i) => i !== index),
-    }));
-    if (expandedVariant === index) setExpandedVariant(-1);
-  };
-
-  const updateVariant = (index, field, value) => {
+  const updateVariant = (field, value) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-      variants[index] = { ...variants[index], [field]: value };
-      return { ...prev, variants };
-    });
-  };
-
-  const addAttribute = (vi) => {
-    setFormData((prev) => {
-      const variants = [...prev.variants];
-      variants[vi] = {
-        ...variants[vi],
-        attributes: [...variants[vi].attributes, { name: "", value: "", isCustom: false }],
-      };
-      return { ...prev, variants };
-    });
-  };
-
-  const updateAttribute = (vi, ai, field, value) => {
-    setFormData((prev) => {
-      const variants = [...prev.variants];
-      const attributes = [...variants[vi].attributes];
-      attributes[ai] = { ...attributes[ai], [field]: value };
-      variants[vi] = { ...variants[vi], attributes };
-      return { ...prev, variants };
-    });
-  };
-
-  const removeAttribute = (vi, ai) => {
-    setFormData((prev) => {
-      const variants = [...prev.variants];
-      variants[vi] = {
-        ...variants[vi],
-        attributes: variants[vi].attributes.filter((_, i) => i !== ai),
-      };
+      variants[0] = { ...variants[0], [field]: value };
       return { ...prev, variants };
     });
   };
@@ -340,7 +222,7 @@ export default function AddVariantPage() {
       image.src = imageUrl;
     });
 
-  const handleImageUpload = async (vi, e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     const valid = files.filter((file) =>
@@ -358,7 +240,7 @@ export default function AddVariantPage() {
       }));
       setFormData((prev) => {
         const variants = [...prev.variants];
-        variants[vi] = { ...variants[vi], images: [...variants[vi].images, ...imgs] };
+        variants[0] = { ...variants[0], images: [...variants[0].images, ...imgs] };
         return { ...prev, variants };
       });
       toast.success("Image optimized");
@@ -369,14 +251,14 @@ export default function AddVariantPage() {
     e.target.value = "";
   };
 
-  const removeImage = (vi, ii) => {
+  const removeImage = (ii) => {
     setFormData((prev) => {
       const variants = [...prev.variants];
-      const image = variants[vi].images[ii];
+      const image = variants[0].images[ii];
       if (image.preview?.startsWith("blob:")) URL.revokeObjectURL(image.preview);
-      variants[vi] = {
-        ...variants[vi],
-        images: variants[vi].images.filter((_, i) => i !== ii),
+      variants[0] = {
+        ...variants[0],
+        images: variants[0].images.filter((_, i) => i !== ii),
       };
       return { ...prev, variants };
     });
@@ -397,32 +279,25 @@ export default function AddVariantPage() {
     }
 
     try {
-      const skuSet = new Set();
-      for (const variant of formData.variants) {
-        const sku = (variant.sku || "").trim();
-        if (!sku) {
-          toast.error("SKU is required");
-          return;
-        }
-        if (skuSet.has(sku)) {
-          toast.error(`Duplicate SKU: ${sku}`);
-          return;
-        }
-        skuSet.add(sku);
+      const variant = formData.variants[0];
+      const sku = (variant.sku || "").trim();
+      if (!sku) {
+        toast.error("SKU is required");
+        return;
+      }
 
-        const title = (variant.title || "").trim();
-        if (!title) {
-          toast.error("Variant title is required");
-          return;
-        }
-        if (variant.cost_price === "" || variant.selling_price === "") {
-          toast.error("Cost & Selling price required");
-          return;
-        }
-        if (Number(variant.selling_price) <= Number(variant.cost_price)) {
-          toast.error(`Selling Price must be greater than Cost Price for "${title}"`);
-          return;
-        }
+      const title = (variant.title || "").trim();
+      if (!title) {
+        toast.error("Variant title is required");
+        return;
+      }
+      if (variant.cost_price === "" || variant.selling_price === "") {
+        toast.error("Cost & Selling price required");
+        return;
+      }
+      if (Number(variant.selling_price) <= Number(variant.cost_price)) {
+        toast.error(`Selling Price must be greater than Cost Price for "${title}"`);
+        return;
       }
 
       const data = new FormData();
@@ -435,54 +310,43 @@ export default function AddVariantPage() {
 
       const imageVariantIndexes = [];
 
-      const variants = formData.variants.map((variant, index) => {
-        const attributes = {};
-        (variant.attributes || []).forEach((attribute) => {
-          const name = (attribute.name || "").trim();
-          if (!name) return;
-          if (Array.isArray(attribute.value)) {
-            if (attribute.value.length === 0) return;
-            attributes[name] = attribute.value.join(",");
-          } else {
-            attributes[name] = attribute.value || "";
-          }
-        });
-
-        const existingImages = (variant.images || [])
+      // ✅ FIXED: Ensure attributes object is explicitly sent as empty {}
+      const variantsPayload = [variant].map((v, index) => {
+        const existingImages = (v.images || [])
           .filter((image) => image.existing)
           .map((image) => image.metadata);
 
-        (variant.images || [])
+        (v.images || [])
           .filter((image) => !image.existing && image.file)
           .forEach((image) => {
             data.append("images", image.file);
             imageVariantIndexes.push(index);
           });
 
-        let finalSku = (variant.sku || "").trim();
+        let finalSku = (v.sku || "").trim();
         if (product) {
           const original = product.variants?.find(
-            (orig) => orig._id && String(orig._id) === String(variant._id)
+            (orig) => orig._id && String(orig._id) === String(v._id)
           );
           if (original) finalSku = original.sku;
         }
 
         return {
-          _id: variant._id || undefined,
+          _id: v._id || undefined,
           sku: finalSku,
-          title: (variant.title || "").trim(),
-          description: variant.description || "",
-          cost_price: Number(variant.cost_price || 0),
-          selling_price: Number(variant.selling_price || 0),
-          quantity: Number(variant.quantity || 0),
-          min_qnt: Number(variant.min_qnt || 0),
-          max_qnt: Number(variant.max_qnt || 0),
-          attributes,
+          title: (v.title || "").trim(),
+          description: v.description || "",
+          cost_price: Number(v.cost_price || 0),
+          selling_price: Number(v.selling_price || 0),
+          quantity: Number(v.quantity || 0),
+          min_qnt: Number(v.min_qnt || 0),
+          max_qnt: Number(v.max_qnt || 0),
+          attributes: {}, // Explicitly send empty attributes object
           existing_images: existingImages,
         };
       });
 
-      data.append("variants", JSON.stringify(variants));
+      data.append("variants", JSON.stringify(variantsPayload));
       data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
       updateMutation.mutate({ id, data });
@@ -541,6 +405,8 @@ export default function AddVariantPage() {
     );
   }
 
+  const variant = formData.variants[0];
+
   // ----------------------------------------------------------------
   // Main Render
   // ----------------------------------------------------------------
@@ -571,420 +437,186 @@ export default function AddVariantPage() {
             className="flex-1 overflow-y-auto custom-scrollbar"
           >
             <div className="p-6 space-y-6">
-              {formData.variants.length > 0 && (() => {
-                const variant = formData.variants[0];
-                const index = 0;
+              
+              {/* Identification */}
+              <div className="space-y-3">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Identification
+                </p>
 
-                return (
-                  <div className="space-y-6">
-                    {/* Identification */}
-                    <div className="space-y-3">
-                      <p
-                        className="text-[10px] font-bold uppercase tracking-wider"
-                        style={{ color: "var(--text-muted)" }}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="block text-xs mb-1.5 font-medium"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      SKU <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. sku_4"
+                      value={variant.sku}
+                      readOnly={!!variant._id}
+                      onChange={(ev) => updateVariant("sku", ev.target.value)}
+                      className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="block text-xs mb-1.5 font-medium"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Variant Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="e.g. Black - Large"
+                      value={variant.title}
+                      onChange={(ev) => updateVariant("title", ev.target.value)}
+                      className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    className="block text-xs mb-1.5 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Variant Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Optional description..."
+                    value={variant.description}
+                    onChange={(ev) => updateVariant("description", ev.target.value)}
+                    className="px-3 py-2 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Pricing & Stock */}
+              <div className="space-y-3">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Pricing & Stock
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {[
+                    { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
+                    { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
+                    { l: "Quantity", f: "quantity", p: "0", req: false },
+                    { l: "Min Qty", f: "min_qnt", p: "0", req: false },
+                    { l: "Max Qty", f: "max_qnt", p: "0", req: false },
+                  ].map(({ l, f, p: placeholder, req }) => (
+                    <div key={f}>
+                      <label
+                        className="block text-xs mb-1.5 font-medium"
+                        style={{ color: "var(--text-secondary)" }}
                       >
-                        Identification
+                        {l}
+                        {req && <span className="text-red-500"> *</span>}
+                      </label>
+                      <input
+                        required={req}
+                        type="number"
+                        min="0"
+                        placeholder={placeholder}
+                        value={variant[f]}
+                        onChange={(ev) => updateVariant(f, ev.target.value)}
+                        className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                        style={inputStyle}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {variant.cost_price !== "" &&
+                  variant.selling_price !== "" &&
+                  Number(variant.selling_price) <= Number(variant.cost_price) && (
+                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                      <p className="text-xs font-medium text-red-500">
+                        Selling Price must be greater than Cost Price
                       </p>
+                    </div>
+                  )}
+              </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label
-                            className="block text-xs mb-1.5 font-medium"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            SKU <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            required
-                            type="text"
-                            placeholder="e.g. sku_4"
-                            value={variant.sku}
-                            readOnly={!!variant._id}
-                            onChange={(ev) =>
-                              updateVariant(index, "sku", ev.target.value)
-                            }
-                            className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                            style={inputStyle}
-                          />
-                        </div>
+              {/* Product Images */}
+              <div className="space-y-3">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Product Images
+                </p>
 
-                        <div>
-                          <label
-                            className="block text-xs mb-1.5 font-medium"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            Variant Title <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            required
-                            type="text"
-                            placeholder="e.g. Black - Large"
-                            value={variant.title}
-                            onChange={(ev) =>
-                              updateVariant(index, "title", ev.target.value)
-                            }
-                            className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                            style={inputStyle}
-                          />
-                        </div>
-                      </div>
+                <label
+                  className="block cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/50"
+                  style={{ borderColor: "var(--border-color)" }}
+                >
+                  <input
+                    hidden
+                    multiple
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                  />
 
-                      <div>
-                        <label
-                          className="block text-xs mb-1.5 font-medium"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          Variant Description
-                        </label>
-                        <textarea
-                          rows={2}
-                          placeholder="Optional description..."
-                          value={variant.description}
-                          onChange={(ev) =>
-                            updateVariant(index, "description", ev.target.value)
-                          }
-                          className="px-3 py-2 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
-                          style={inputStyle}
+                  <Upload
+                    className="mx-auto mb-2 w-5 h-5"
+                    style={{ color: "var(--text-muted)" }}
+                  />
+
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Click to select images
+                  </p>
+
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    JPG, PNG or WebP • Auto-optimized
+                  </p>
+                </label>
+
+                {variant.images.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {variant.images.map((image, imageIndex) => (
+                      <div key={imageIndex} className="relative group">
+                        <img
+                          src={image.preview}
+                          alt=""
+                          className="h-20 w-20 rounded-lg object-cover border border-[var(--border-color)]"
                         />
-                      </div>
-                    </div>
-
-                    {/* Pricing & Stock */}
-                    <div className="space-y-3">
-                      <p
-                        className="text-[10px] font-bold uppercase tracking-wider"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        Pricing & Stock
-                      </p>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {[
-                          { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
-                          { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
-                          { l: "Quantity", f: "quantity", p: "0", req: false },
-                          { l: "Min Qty", f: "min_qnt", p: "0", req: false },
-                          { l: "Max Qty", f: "max_qnt", p: "0", req: false },
-                        ].map(({ l, f, p: placeholder, req }) => (
-                          <div key={f}>
-                            <label
-                              className="block text-xs mb-1.5 font-medium"
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {l}
-                              {req && <span className="text-red-500"> *</span>}
-                            </label>
-                            <input
-                              required={req}
-                              type="number"
-                              min="0"
-                              placeholder={placeholder}
-                              value={variant[f]}
-                              onChange={(ev) =>
-                                updateVariant(index, f, ev.target.value)
-                              }
-                              className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                              style={inputStyle}
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      {variant.cost_price !== "" &&
-                        variant.selling_price !== "" &&
-                        Number(variant.selling_price) <= Number(variant.cost_price) && (
-                          <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20">
-                            <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
-                            <p className="text-xs font-medium text-red-500">
-                              Selling Price must be greater than Cost Price
-                            </p>
-                          </div>
-                        )}
-                    </div>
-
-                    {/* Attributes */}
-                    <div className="space-y-3">
-                      <p
-                        className="text-[10px] font-bold uppercase tracking-wider"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        Attributes
-                      </p>
-
-                      <div className="space-y-3">
-                        {variant.attributes.map((attr, ai) => {
-                          const preset = ATTRIBUTE_PRESETS.find(
-                            (p) => p.name === attr.name
-                          );
-                          const isCustom = !!attr.isCustom;
-                          const isMultiSelect = preset?.data_type === "multi_select";
-                          const selectedArr = Array.isArray(attr.value)
-                            ? attr.value
-                            : (typeof attr.value === "string" && attr.value.length
-                                ? attr.value.split(",").map((s) => s.trim()).filter(Boolean)
-                                : []);
-
-                          const toggleMulti = (val) => {
-                            setFormData((prev) => {
-                              const variants = [...prev.variants];
-                              const attributes = [...variants[index].attributes];
-                              const current = Array.isArray(attributes[ai].value)
-                                ? attributes[ai].value
-                                : (typeof attributes[ai].value === "string" && attributes[ai].value
-                                    ? attributes[ai].value.split(",").map((s) => s.trim()).filter(Boolean)
-                                    : []);
-                              const next = current.includes(val)
-                                ? current.filter((x) => x !== val)
-                                : [...current, val];
-                              attributes[ai] = {
-                                ...attributes[ai],
-                                isCustom: false,
-                                value: next,
-                              };
-                              variants[index] = { ...variants[index], attributes };
-                              return { ...prev, variants };
-                            });
-                          };
-
-                          return (
-                            <div key={ai} className="flex flex-wrap items-center gap-2">
-                              <select
-                                value={attr.name}
-                                onChange={(ev) => {
-                                  setFormData((prev) => {
-                                    const variants = [...prev.variants];
-                                    const attributes = [...variants[index].attributes];
-                                    attributes[ai] = {
-                                      ...attributes[ai],
-                                      name: ev.target.value,
-                                      value: preset?.data_type === "multi_select" ? [] : "",
-                                      isCustom: false,
-                                    };
-                                    variants[index] = {
-                                      ...variants[index],
-                                      attributes,
-                                    };
-                                    return { ...prev, variants };
-                                  });
-                                }}
-                                className="h-9 px-3 rounded-md text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                style={inputStyle}
-                              >
-                                <option value="">Select attribute</option>
-                                {ATTRIBUTE_PRESETS.map((p) => (
-                                  <option key={p.name} value={p.name}>
-                                    {p.name}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {preset ? (
-                                isMultiSelect ? (
-                                  <div className="flex-1 min-w-[200px] flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md min-h-[40px]"
-                                    style={inputStyle}>
-                                    {selectedArr.length === 0 && (
-                                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                                        Select values...
-                                      </span>
-                                    )}
-                                    {preset.values.map((v) => {
-                                      const active = selectedArr.includes(v);
-                                      return (
-                                        <button
-                                          type="button"
-                                          key={v}
-                                          onClick={() => toggleMulti(v)}
-                                          className="px-2 py-1 rounded text-[11px] font-medium border"
-                                          style={active
-                                            ? { backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", borderColor: "rgba(16,185,129,0.4)" }
-                                            : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", borderColor: "var(--border-color)" }}
-                                        >
-                                          {v}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <>
-                                    <select
-                                      value={isCustom ? "__custom__" : attr.value}
-                                      onChange={(ev) => {
-                                        const value = ev.target.value;
-                                        setFormData((prev) => {
-                                          const variants = [...prev.variants];
-                                          const attributes = [...variants[index].attributes];
-                                          attributes[ai] = {
-                                            ...attributes[ai],
-                                            isCustom: value === "__custom__",
-                                            value:
-                                              value === "__custom__"
-                                                ? preset.name === "Color"
-                                                  ? "#000000"
-                                                  : ""
-                                                : value,
-                                          };
-                                          variants[index] = {
-                                            ...variants[index],
-                                            attributes,
-                                          };
-                                          return { ...prev, variants };
-                                        });
-                                      }}
-                                      className="h-9 px-3 rounded-md text-sm min-w-[140px] flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                      style={inputStyle}
-                                    >
-                                      {preset.values.map((v) => (
-                                        <option key={v} value={v}>
-                                          {v}
-                                        </option>
-                                      ))}
-                                      <option value="__custom__">+ Custom Value</option>
-                                    </select>
-
-                                    {isCustom && preset.name === "Color" ? (
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <input
-                                          type="color"
-                                          value={attr.value || "#000000"}
-                                          onChange={(ev) =>
-                                            updateAttribute(index, ai, "value", ev.target.value)
-                                          }
-                                          className="w-9 h-9 cursor-pointer rounded-md border border-[var(--border-color)] bg-transparent"
-                                        />
-                                        <span
-                                          className="text-xs font-mono"
-                                          style={{ color: "var(--text-muted)" }}
-                                        >
-                                          {attr.value || "#000000"}
-                                        </span>
-                                      </div>
-                                    ) : isCustom ? (
-                                      <input
-                                        type="text"
-                                        placeholder="Enter custom value..."
-                                        value={attr.value}
-                                        onChange={(ev) =>
-                                          updateAttribute(index, ai, "value", ev.target.value)
-                                        }
-                                        className="h-9 px-3 rounded-md text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                        style={inputStyle}
-                                      />
-                                    ) : null}
-                                  </>
-                                )
-                              ) : (
-                                <input
-                                  type="text"
-                                  placeholder="Value e.g. Black"
-                                  value={attr.value}
-                                  onChange={(ev) =>
-                                    updateAttribute(index, ai, "value", ev.target.value)
-                                  }
-                                  className="h-9 px-3 rounded-md text-sm flex-1 outline-none focus:ring-1 focus:ring-[var(--accent)]"
-                                  style={inputStyle}
-                                />
-                              )}
-
-                              <button
-                                type="button"
-                                title="Remove Attribute"
-                                onClick={() => removeAttribute(index, ai)}
-                                className="w-9 h-9 rounded-md flex items-center justify-center hover:bg-red-500/10"
-                                style={{
-                                  color: "#f87171",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          );
-                        })}
-
                         <button
                           type="button"
-                          onClick={() => addAttribute(index)}
-                          className="flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-md hover:bg-[var(--bg-tertiary)]"
-                          style={{
-                            color: "var(--accent)",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                          }}
+                          onClick={() => removeImage(imageIndex)}
+                          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-red-600"
                         >
-                          <Plus className="w-3 h-3" />
-                          Add Attribute
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
-                    </div>
-
-                    {/* Product Images */}
-                    <div className="space-y-3">
-                      <p
-                        className="text-[10px] font-bold uppercase tracking-wider"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        Product Images
-                      </p>
-
-                      <label
-                        className="block cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/50"
-                        style={{ borderColor: "var(--border-color)" }}
-                      >
-                        <input
-                          hidden
-                          multiple
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={(ev) => handleImageUpload(index, ev)}
-                        />
-
-                        <Upload
-                          className="mx-auto mb-2 w-5 h-5"
-                          style={{ color: "var(--text-muted)" }}
-                        />
-
-                        <p
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          Click to select images
-                        </p>
-
-                        <p
-                          className="text-xs mt-1"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          JPG, PNG or WebP • Auto-optimized
-                        </p>
-                      </label>
-
-                      {variant.images.length > 0 && (
-                        <div className="flex flex-wrap gap-3">
-                          {variant.images.map((image, imageIndex) => (
-                            <div key={imageIndex} className="relative group">
-                              <img
-                                src={image.preview}
-                                alt=""
-                                className="h-20 w-20 rounded-lg object-cover border border-[var(--border-color)]"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index, imageIndex)}
-                                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-red-600"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                );
-              })()}
+                )}
+              </div>
             </div>
 
             {/* Footer */}

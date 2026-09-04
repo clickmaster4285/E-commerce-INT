@@ -28,7 +28,7 @@ const CATEGORY_ATTRIBUTE_SEED = {
     { name: "Material", type: "multi-select", options: ["Cotton", "Polyester", "Denim", "Wool", "Linen"] },
     { name: "Fit", type: "multi-select", options: ["Slim Fit", "Regular Fit", "Loose Fit", "Oversized"] },
     { name: "Pattern", type: "multi-select", options: ["Plain", "Striped", "Checked", "Printed", "Floral"] },
-    { name: "Gender", type: "multi-select", options: ["Men", "Women", "Unisex"] },
+    { name: "Gender", type: "multi-select", options: ["Men", "Women", ] },
     { name: "Sleeve Type", type: "multi-select", options: ["Full Sleeve", "Half Sleeve", "Sleeveless"] },
     { name: "Season", type: "multi-select", options: ["Summer", "Winter", "Spring", "All Season"] }
   ]

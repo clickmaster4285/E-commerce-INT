@@ -24,6 +24,8 @@ export function useShippingSocketSync() {
     socket.on("shippingRuleUpdated", invalidateAll);
     socket.on("shippingRuleDeleted", invalidateAll);
     socket.on("shippingRuleToggled", invalidateAll);
+    socket.on("shipping:updated", invalidateAll);
+    socket.on("shippingRules:updated", invalidateAll);
 
     return () => {
       socket.off("shippingConfigUpdated", invalidateAll);
@@ -31,6 +33,8 @@ export function useShippingSocketSync() {
       socket.off("shippingRuleUpdated", invalidateAll);
       socket.off("shippingRuleDeleted", invalidateAll);
       socket.off("shippingRuleToggled", invalidateAll);
+      socket.off("shipping:updated", invalidateAll);
+      socket.off("shippingRules:updated", invalidateAll);
     };
   }, [socket, queryClient]);
 }

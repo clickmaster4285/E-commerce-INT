@@ -10,13 +10,14 @@ const unwrap = (res) => {
 const unwrapObject = (res) => res?.data?.data || res?.data;
 
 export const attributeApi = {
-  getAll: (search = "") =>
-    axiosInstance.get("/attributes", { params: { search } }).then(unwrap),
+  // ✅ FIXED: Accepts query params object to prevent Regex crash
+  getAll: (queryParams = {}) => {
+    const params = typeof queryParams === 'string' ? { search: queryParams } : queryParams;
+    return axiosInstance.get("/attributes", { params }).then(unwrap);
+  },
 
   getByCategory: (categoryId) =>
-    axiosInstance
-      .get(`/categories/${categoryId}/attributes`)
-      .then(unwrap),
+    axiosInstance.get(`/categories/${categoryId}/attributes`).then(unwrap),
 
   create: (data) =>
     axiosInstance.post("/attributes", data).then(unwrapObject),
