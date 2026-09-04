@@ -10,4 +10,7 @@ export const orderApi = {
     
   updateStatus: (id, data) => 
     axiosInstance.patch(`/orders/admin/${id}/status`, data).then((res) => res.data),
+
+    updatePayment: (id, data) =>
+    axiosInstance.patch(`/orders/admin/${id}/payment`, data).then((res) => res.data),
 };

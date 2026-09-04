@@ -7,10 +7,18 @@ const Deal = require("../models/Deal");
 const discountController = require("./discountController");
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
+const emitOrderEvent = (event, data) => {
+  try {
+    const io = require("../utils/socket").getIO();
+    if (io) io.emit(event, data);
+  } catch (e) {}
+};
+
 const DELIVERY_FEE = 200;
 
-// ==========================================
+/// ==========================================
 // POST /api/orders — Place Order
+// ✅ FIXED: Trust frontend snapshot, no re-calculation
 // ==========================================
 const placeOrder = async (req, res) => {
   try {
@@ -28,21 +36,6 @@ const placeOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Address not found" });
     }
 
-    // ✅ Active discounts fetch karo
-    const now = new Date();
-    let activeDiscounts = [];
-    try {
-      activeDiscounts = await Discount.find({
-        is_deleted: false,
-        isActive: true,
-        status: "active",
-        startDate: { $lte: now },
-        endDate: { $gte: now },
-      }).sort({ priority: -1 });
-    } catch (e) {
-      activeDiscounts = [];
-    }
-
     let subtotal = 0;
     let taxTotal = 0;
     const orderItems = [];
@@ -53,12 +46,9 @@ const placeOrder = async (req, res) => {
       const rawId = item.id || item.productId || item._id || keyParts[0] || null;
       const rawVariantId = item.variant_id || (keyParts[1] !== "default" ? keyParts[1] : null);
 
+      // ✅ Product/Variant fetch — sirf validation + snapshot ke liye
       let product = null;
-      try {
-        product = await Product.findById(rawId);
-      } catch (e) {
-        product = null;
-      }
+      try { product = await Product.findById(rawId); } catch (e) { product = null; }
       if (!product || product.is_deleted) {
         console.error("❌ [placeOrder] Product not found | id:", rawId, "| item:", item.name);
         return res.status(400).json({
@@ -78,22 +68,36 @@ const placeOrder = async (req, res) => {
         return res.status(400).json({ success: false, message: "Variant not found" });
       }
 
-      // ✅ PAID QTY (jo customer ne add kiya — poora payment)
-      const qty = Math.max(1, Number(item.qty || 1));
+      // =====================================================
+      // ✅ TRUST FRONTEND SNAPSHOT — no re-calculation
+      // Frontend ne already calculate kiya hai (checkout pe):
+      //   - displayPrice (final discounted price)
+      //   - originalPrice (before discount)
+      //   - savings (per item discount savings)
+      //   - dealSavings (buy X get Y savings)
+      //   - freeItems / payableItems
+      // =====================================================
 
-      // ✅ Deal info pehle nikalo (stock check se pehle)
+      // Frontend se aaye calculated values
+      const displayPrice = Number(item.displayPrice || item.price || variant.selling_price || 0);
+      const originalPrice = Number(item.originalPrice || item.dealOriginalPrice || variant.selling_price || 0);
+      const perItemSavings = Number(item.savings || 0);
+      const dealSavings = Number(item.dealSavings || 0);
+      const freeItems = Number(item.freeItems || 0);
+      const qty = Math.max(1, Number(item.qty || 1));  // paid qty
+      const payableItems = Number(item.payableItems || qty);
+      const totalItems = payableItems + freeItems;  // total ship hone wale
+
+      // Deal info (frontend se)
       const dealId = item.dealId || null;
       const dealType = item.dealType || "";
       const dealName = item.dealName || "";
+      const dealBadge = item.dealBadge || "";
       const dealBuyQuantity = Number(item.dealBuyQuantity || 0);
       const dealGetQuantity = Number(item.dealGetQuantity || 0);
 
-      // ✅ Free items = UPAR se (paid qty ke hisab se)
-      let freeItems = 0;
-      if (dealType === "buy_x_get_y" && dealBuyQuantity > 0 && dealGetQuantity > 0) {
-        freeItems = Math.floor(qty / dealBuyQuantity) * dealGetQuantity;
-      }
-      const totalItems = qty + freeItems; // ✅ TOTAL jo ship hoga
+      // Discount name (frontend se ya product se fallback)
+      const discountName = item.discountName || "";
 
       // ✅ Stock check TOTAL (paid + free) par
       if (Number(variant.quantity) < totalItems) {
@@ -103,60 +107,32 @@ const placeOrder = async (req, res) => {
         });
       }
 
-      const originalPrice = Number(variant.selling_price || 0);
-      let price = originalPrice;
-      let discountName = "";
-      let savings = 0;
+      // ✅ Subtotal = PAID qty × FINAL PRICE (frontend calculated)
+      subtotal += displayPrice * payableItems;
+      taxTotal += displayPrice * payableItems * (Number(product.tax || 0) / 100);
 
-      if (typeof calculateDiscountedPrice === "function") {
-        const disc = calculateDiscountedPrice(
-          {
-            _id: product._id,
-            id: product._id,
-            category: product.category_id,
-            brand: product.brand_id,
-            selling_price: originalPrice,
-            price: originalPrice,
-          },
-          activeDiscounts,
-        );
-        price = disc.discountedPrice;
-        discountName = disc.discountName || "";
-        savings = disc.savings || 0;
-      }
-
-      // ✅ Buy X Get Y: payable = POORA paid qty (free UPAR se)
-      let payableItems = qty;
-      let dealSavings = 0;
-      if (dealType === "buy_x_get_y" && dealBuyQuantity > 0 && dealGetQuantity > 0) {
-        dealSavings = freeItems * price;
-        if (dealId) uniqueDealIds.add(dealId);
-      }
-
-      // ✅ Subtotal = PAID qty ka
-      subtotal += price * payableItems;
-      taxTotal += price * payableItems * (Number(product.tax || 0) / 100);
+      if (dealId) uniqueDealIds.add(dealId);
 
       orderItems.push({
         product_id: product._id,
         variant_id: variant._id,
         name: product.name,
-        brand: typeof product.brand_id === "object" ? product.brand_id?.name || "" : "",
+        brand: typeof product.brand_id === "object" ? product.brand_id?.name || "" : (product.brand || ""),
         variantTitle: variant.title || "",
         image: variant.images?.[0]?.img_url || "",
-        price,
-        original_price: originalPrice,
+        price: displayPrice,           // ✅ FRONTEND CALCULATED (final discounted)
+        original_price: originalPrice, // ✅ BEFORE discount
         discount_name: discountName,
-        savings,
-        qty, // ✅ PAID quantity
+        savings: perItemSavings,       // ✅ Per-item discount savings
+        qty: payableItems,             // ✅ PAID quantity (snapshot)
         deal_id: dealId,
         deal_type: dealType,
         deal_name: dealName,
         deal_buy_quantity: dealBuyQuantity,
         deal_get_quantity: dealGetQuantity,
-        free_items: freeItems,       // ✅ FREE items UPAR se
-        payable_items: payableItems, // ✅ PAID = qty
-        deal_savings: dealSavings,
+        free_items: freeItems,         // ✅ FREE items (frontend calculated)
+        payable_items: payableItems,   // ✅ PAID qty
+        deal_savings: dealSavings,     // ✅ DEAL SAVINGS (frontend calculated)
       });
     }
 
@@ -242,6 +218,8 @@ const placeOrder = async (req, res) => {
       await Deal.findByIdAndUpdate(dId, { $inc: { usedCount: 1 } });
     }
 
+    emitOrderEvent("order:created", { success: true, data: order });
+    emitOrderEvent("order:updated", { success: true, data: order });
     res.status(201).json({ success: true, data: order });
   } catch (error) {
     console.error("❌ [placeOrder] Error:", error);
@@ -330,7 +308,7 @@ const getAllOrders = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, cancel_reason } = req.body;
 
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
     if (!validStatuses.includes(status)) {
@@ -342,11 +320,14 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    order.status = status;
+      order.status = status;
     if (notes) order.notes = notes;
+    if (status === "cancelled" && cancel_reason) order.cancel_reason = cancel_reason;
 
     await order.save();
 
+    emitOrderEvent("order:updated", { success: true, data: order });
+    emitOrderEvent("order:statusChanged", { success: true, data: order });
     res.status(200).json({ success: true, message: `Order status updated to ${status}`, data: order });
   } catch (error) {
     console.error("❌ [updateOrderStatus] Error:", error);
@@ -448,6 +429,7 @@ const editOrder = async (req, res) => {
 
     await order.save();
 
+    emitOrderEvent("order:updated", { success: true, data: order });
     res.status(200).json({ success: true, message: "Order updated successfully", data: order });
   } catch (error) {
     console.error("❌ [editOrder] Error:", error);
@@ -487,6 +469,8 @@ const deleteOrder = async (req, res) => {
 
     await Order.findByIdAndDelete(id);
 
+    emitOrderEvent("order:deleted", { success: true, data: { id: req.params.id } });
+    emitOrderEvent("order:updated", { success: true, data: { id: req.params.id, deleted: true } });
     res.status(200).json({ success: true, message: "Order deleted successfully" });
   } catch (error) {
     console.error("❌ [deleteOrder] Error:", error);
@@ -514,6 +498,39 @@ const getOrderByIdAdmin = async (req, res) => {
   }
 };
 
+// ==========================================
+// PATCH /api/orders/admin/:id/payment — Mark Payment Received
+// ==========================================
+const updatePaymentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["paid", "pending", "failed", "refunded"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid payment status" });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    order.payment.status = status;
+    await order.save();
+
+    emitOrderEvent("order:updated", { success: true, data: order });
+    emitOrderEvent("order:paymentUpdated", { success: true, data: order });
+    res.status(200).json({
+      success: true,
+      message: status === "paid" ? "Payment marked as received" : `Payment marked as ${status}`,
+      data: order,
+    });
+  } catch (error) {
+    console.error("❌ [updatePaymentStatus] Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   placeOrder,
   getMyOrders,
@@ -523,4 +540,5 @@ module.exports = {
   editOrder,
   deleteOrder,
   getOrderByIdAdmin,
+  updatePaymentStatus,
 };

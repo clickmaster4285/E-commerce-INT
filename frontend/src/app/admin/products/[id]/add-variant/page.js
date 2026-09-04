@@ -6,7 +6,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Plus,
   Trash2,
@@ -102,8 +102,6 @@ export default function AddVariantPage() {
         name: a.name,
         code: a.code,
         data_type: a.data_type,
-        // For multi_select data_type the category may assign an array of allowed values
-        // via the category_config.value (Multi Select → array of selected options).
         values: (a.data_type === "multi_select" && Array.isArray(a.category_config?.value) && a.category_config.value.length)
           ? a.category_config.value
           : (a.values || []).map((v) => v.label || v.value),
@@ -137,7 +135,6 @@ export default function AddVariantPage() {
   useEffect(() => {
     if (!product || initialized) return;
 
-    // Build existing variants from product
     const existingVariants = (product.variants || []).map((v) => ({
       _id: v._id,
       sku: v.sku || "",
@@ -150,7 +147,6 @@ export default function AddVariantPage() {
       max_qnt: String(v.max_qnt ?? 0),
       attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
         const strValue = String(value);
-        // For multi-select attributes the saved value is comma-separated.
         const presetForName = rawAttributes.find((a) => a.name === name);
         const isMulti = presetForName?.data_type === "multi_select";
         return {
@@ -172,15 +168,12 @@ export default function AddVariantPage() {
     let expandIndex;
 
     if (isEditMode) {
-      // Edit mode: show ONLY the selected variant (pre-filled with its data)
       const selectedVariant = existingVariants.find(
         (v) => String(v._id) === String(editVariantId)
       );
-
       finalVariants = selectedVariant ? [selectedVariant] : [];
       expandIndex = 0;
     } else {
-      // Add mode: show ONLY a new empty variant
       const newVariant = createEmptyVariant("");
       finalVariants = [newVariant];
       expandIndex = 0;
@@ -199,7 +192,6 @@ export default function AddVariantPage() {
     setExpandedVariant(expandIndex);
     setInitialized(true);
 
-    // Auto‑generate SKU for the new variant if not in edit mode
     if (!isEditMode) {
       variantApi
         .getNextSku()
@@ -216,13 +208,13 @@ export default function AddVariantPage() {
         })
         .catch((error) => {
           console.error("SKU Error:", error);
-          toast.error("SKU auto‑generate failed");
+          toast.error("SKU auto-generate failed");
         });
     }
   }, [product, initialized, isEditMode, editVariantId]);
 
   // ----------------------------------------------------------------
-  // Duplicate / Remove / Update helpers (unchanged)
+  // Duplicate / Remove / Update helpers
   // ----------------------------------------------------------------
   const duplicateVariant = async (index) => {
     try {
@@ -493,7 +485,6 @@ export default function AddVariantPage() {
       data.append("variants", JSON.stringify(variants));
       data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
-
       updateMutation.mutate({ id, data });
     } catch (error) {
       console.error("Submission error:", error);
@@ -552,8 +543,6 @@ export default function AddVariantPage() {
 
   // ----------------------------------------------------------------
   // Main Render
-  // Add mode intentionally renders ONLY the variant form.
-  // Existing product variants are never shown above the form.
   // ----------------------------------------------------------------
   return (
     <>
@@ -735,7 +724,7 @@ export default function AddVariantPage() {
                                 ? attr.value.split(",").map((s) => s.trim()).filter(Boolean)
                                 : []);
 
-const toggleMulti = (val) => {
+                          const toggleMulti = (val) => {
                             setFormData((prev) => {
                               const variants = [...prev.variants];
                               const attributes = [...variants[index].attributes];
@@ -752,10 +741,6 @@ const toggleMulti = (val) => {
                                 isCustom: false,
                                 value: next,
                               };
-                              variants[index] = { ...variants[index], attributes };
-                              return { ...prev, variants };
-                            });
-                          };
                               variants[index] = { ...variants[index], attributes };
                               return { ...prev, variants };
                             });

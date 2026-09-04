@@ -9,7 +9,8 @@ const {
   updateOrderStatus,    // ✅ Import
   editOrder,            // ✅ Import
   deleteOrder,          // ✅ Import
-  getOrderByIdAdmin     // ✅ Import
+  getOrderByIdAdmin,   // ✅ Import
+  updatePaymentStatus ,   // ✅ Import
 
 } = require("../controllers/orderController");
 
@@ -28,5 +29,6 @@ router.get("/admin/all", authMiddleware, checkPermission("orders"), getAllOrders
 router.get("/admin/:id", authMiddleware, checkPermission("orders"), getOrderByIdAdmin); // ✅ NEW
 
 router.patch("/admin/:id/status", authMiddleware, checkPermission("orders"), updateOrderStatus);
+router.patch("/admin/:id/payment", authMiddleware, checkPermission("orders"), updatePaymentStatus);
 
 module.exports = router;

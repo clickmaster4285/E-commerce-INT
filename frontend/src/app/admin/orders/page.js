@@ -26,6 +26,9 @@ const CheckCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={classNam
 const HomeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1m-2 0h4" /></svg>);
 const XCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 
+// ✅ NEW: Banknote Icon for Payment Received
+const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
+
 /* ==================== HELPERS ==================== */
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
@@ -155,6 +158,9 @@ export default function OrdersPage() {
   const [expandedRows, setExpandedRows] = useState([]);
   const [actionMenuFor, setActionMenuFor] = useState(null);
   const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
+  const [cancelIds, setCancelIds] = useState([]);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["admin-orders", page, pageSize, statusFilter, search],
@@ -188,6 +194,17 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
     },
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
+  });
+
+  // ✅ NEW: Payment Received Mutation
+  const updatePaymentMutation = useMutation({
+    mutationFn: ({ id }) => orderApi.updatePayment(id, { status: "paid" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
+      toast.success("Payment marked as received");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
   });
 
   const orders = useMemo(() => data?.data || [], [data]);
@@ -257,7 +274,22 @@ export default function OrdersPage() {
       setBulkBusy(false);
     }
   };
+  const openCancelModal = (ids) => { setCancelIds(ids); setCancelReason(""); setBulkCancelConfirm(true); };
 
+  const runCancelWithReason = async () => {
+    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    if (!cancelIds.length) return;
+    setCancelBusy(true);
+    try {
+      await Promise.all(cancelIds.map((id) => orderApi.updateStatus(id, { status: "cancelled", cancel_reason: cancelReason.trim() })));
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
+      toast.success(`${cancelIds.length} order${cancelIds.length > 1 ? "s" : ""} cancelled`);
+      setSelectedIds([]); setBulkCancelConfirm(false); setCancelIds([]);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Bulk cancel failed");
+    } finally { setCancelBusy(false); }
+  };
   const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
 
   const renderPageNumbers = () => {
@@ -295,7 +327,6 @@ export default function OrdersPage() {
     { title: "Cancelled", value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
   ];
 
-  // ✅ Row/card click → Detail PAGE
   const openDetailPage = (order) => router.push(`/admin/orders/${order._id}`);
 
   return (
@@ -384,7 +415,7 @@ export default function OrdersPage() {
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                 <TruckIcon className="w-3.5 h-3.5" /> Mark as Shipped
               </button>
-              <button onClick={() => setBulkCancelConfirm(true)} disabled={bulkBusy}
+                           <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
                 className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
                 <BanIcon className="w-3.5 h-3.5" /> Cancel Selected
@@ -565,9 +596,14 @@ export default function OrdersPage() {
                                     <MenuItem icon={<HomeIcon />} label="Mark as Delivered"
                                       onClick={() => { updateStatusMutation.mutate({ id: order._id, status: "delivered" }); setActionMenuFor(null); }} />
                                   )}
+                                                                  {/* ✅ Payment Received — sirf COD delivered orders ke liye */}
+                                  {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
+                                    <MenuItem icon={<BanknoteIcon />} label="Payment Received"
+                                      onClick={() => { updatePaymentMutation.mutate({ id: order._id }); setActionMenuFor(null); }} />
+                                  )}
                                   {["pending", "confirmed", "processing", "shipped"].includes(order.status) && (
-                                    <MenuItem icon={<BanIcon />} label="Cancel Order" danger
-                                      onClick={() => { runBulkStatus("cancelled", [order._id]); setActionMenuFor(null); }} />
+                                                                        <MenuItem icon={<BanIcon />} label="Cancel Order" danger
+                                      onClick={() => { openCancelModal([order._id]); setActionMenuFor(null); }} />
                                   )}
                                 </div>
                               </>
@@ -622,6 +658,7 @@ export default function OrdersPage() {
                     onViewDetails={() => { openDetailPage(order); setActionMenuFor(null); }}
                     onQuickStatus={(status) => { updateStatusMutation.mutate({ id: order._id, status }); setActionMenuFor(null); }}
                     onCancel={() => { runBulkStatus("cancelled", [order._id]); setActionMenuFor(null); }}
+                    onMarkPayment={() => { updatePaymentMutation.mutate({ id: order._id }); setActionMenuFor(null); }}
                   />
                 );
               })}
@@ -710,16 +747,29 @@ export default function OrdersPage() {
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   Orders will be marked as cancelled:{" "}
                   <span className="font-mono">{orders.filter((o) => selectedIds.includes(o._id)).map((o) => o.order_number).slice(0, 4).join(", ")}</span>
-                  {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
+                                   {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
                 </p>
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
+                    Cancellation Reason <span style={{ color: "#f87171" }}>*</span>
+                  </label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={3}
+                    placeholder="e.g. Stock unavailable, customer request..."
+                    className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                  />
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setBulkCancelConfirm(false)} disabled={bulkBusy}
                 className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border"
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
-              <button onClick={() => runBulkStatus("cancelled")} disabled={bulkBusy}
-                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+              <button onClick={runCancelWithReason} disabled={bulkBusy || cancelBusy || !cancelReason.trim()}
+                                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
                 {bulkBusy ? <><Spinner className="w-3.5 h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
               </button>
@@ -761,7 +811,7 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
   );
 }
 
-function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel }) {
+function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
   return (
     <div className="rounded-lg p-4 space-y-3 cursor-pointer transition box-border max-w-full"
       style={cardStyle} onClick={onOpen}>
@@ -834,6 +884,11 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
               {order.status === "pending" && <MenuItem icon={<CheckIcon />} label="Confirm Order" onClick={() => onQuickStatus("confirmed")} />}
               {(order.status === "confirmed" || order.status === "processing") && <MenuItem icon={<TruckIcon />} label="Mark as Shipped" onClick={() => onQuickStatus("shipped")} />}
               {order.status === "shipped" && <MenuItem icon={<HomeIcon />} label="Mark as Delivered" onClick={() => onQuickStatus("delivered")} />}
+              {/* ✅ NEW: Payment Received Option (Mobile) */}
+                            {/* ✅ Payment Received — sirf COD delivered orders ke liye */}
+              {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
+                <MenuItem icon={<BanknoteIcon />} label="Payment Received" onClick={onMarkPayment} />
+              )}
               {["pending", "confirmed", "processing", "shipped"].includes(order.status) && (
                 <MenuItem icon={<BanIcon />} label="Cancel Order" danger onClick={onCancel} />
               )}

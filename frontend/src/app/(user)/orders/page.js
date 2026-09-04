@@ -518,7 +518,18 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                <div className="p-4">
+                               <div className="p-4">
+                  {order.status === "cancelled" && (
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-3">
+                      <XCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[var(--user-danger)] uppercase tracking-wider">Order Cancelled</p>
+                        <p className="text-xs text-[var(--user-text)] mt-1 leading-relaxed">
+                          <span className="font-bold text-[var(--user-danger)]">Reason:</span> {order.cancel_reason || "No reason provided."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   <ProductScrollList items={order.items} />
                   {!["delivered", "cancelled"].includes(order.status) && (
                     <div className="mt-2 border-t border-[var(--user-border)] border-dashed">

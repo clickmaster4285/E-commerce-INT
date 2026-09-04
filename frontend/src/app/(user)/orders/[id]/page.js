@@ -43,7 +43,7 @@ const getImgUrl = (img) => {
 const fmt = (n) => `Rs. ${Math.round(n).toLocaleString()}`;
 
 /* ============ MONOCHROME TIMELINE (no halo) ============ */
-const OrderTimeline = ({ status }) => {
+const OrderTimeline = ({ status, reason }) => {
   if (status === "cancelled") {
     return (
       <div className="rounded-2xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-5">
@@ -51,9 +51,15 @@ const OrderTimeline = ({ status }) => {
           <div className="w-12 h-12 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center shrink-0">
             <XCircle size={22} className="text-white" />
           </div>
-          <div>
+                   <div className="flex-1 min-w-0">
             <p className="text-base font-black text-[var(--user-danger)]">Order Cancelled</p>
             <p className="text-xs text-[var(--user-text-muted)] mt-1">Items have been restored to stock.</p>
+            {reason && (
+              <div className="mt-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-danger)]/20 p-3">
+                <p className="text-[10px] font-black text-[var(--user-danger)] uppercase tracking-wider mb-1">Cancellation Reason</p>
+                <p className="text-sm text-[var(--user-text)] leading-relaxed">{reason}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -433,67 +439,71 @@ export default function OrderDetailPage({ params }) {
             </div>
           )}
 
-          <OrderTimeline status={order.status} />
+                    <OrderTimeline status={order.status} reason={order.cancel_reason} />
         </div>
       </div>
 
-      {/* GRID */}
-      <div className="grid lg:grid-cols-[1fr_380px] gap-5 lg:gap-6 items-start">
-        {/* ITEMS */}
-        <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                <Box size={18} className="text-[var(--user-accent-text)]" />
+      {/* ✅ GRID — Left = Right height (Need Help tak), phir scroll */}
+      <div className="grid lg:grid-cols-[1fr_380px] gap-5 lg:gap-6">
+        {/* LEFT: ITEMS — right column ke barabar height, phir scroll */}
+        <div className="relative">
+          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm flex flex-col lg:absolute lg:inset-0">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
+                  <Box size={18} className="text-[var(--user-accent-text)]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-[var(--user-text)]">Order Items</h2>
+                  <p className="text-[10px] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm font-black text-[var(--user-text)]">Order Items</h2>
-                <p className="text-[10px] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
-              </div>
+              <button className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 px-3 py-1.5 rounded-lg transition">
+                <Download size={14} /> Invoice
+              </button>
             </div>
-            <button className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 px-3 py-1.5 rounded-lg transition">
-              <Download size={14} /> Invoice
-            </button>
-          </div>
-          <div className="divide-y divide-[var(--user-border)]">
-            {order.items.map((i, idx) => {
-              const originalPrice = Number(i.original_price || 0);
-              const paidPrice = Number(i.price || 0);
-              const qty = Number(i.qty) || 1;
-              const freeItems = Number(i.free_items || 0);
-              const payableItems = Number(i.payable_items || qty);
-              const hasDiscount = originalPrice > 0 && originalPrice > paidPrice;
-              const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + Number(i.deal_savings || 0);
-              return (
-                <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
-                  <div className="shrink-0 relative">
-                    {getImgUrl(i.image) ? (
-                      <img src={getImgUrl(i.image)} alt={i.name} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
-                    ) : (
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
-                    )}
-                    <div className="absolute -top-2 -right-2 min-w-[22px] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
-                    {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      {i.deal_id && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
-                      {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
+
+            {/* ✅ ITEMS LIST — right column tak phailti hai, phir scroll */}
+            <div className="divide-y divide-[var(--user-border)] overflow-y-auto max-h-[420px] sm:max-h-[520px] lg:max-h-none lg:flex-1 lg:min-h-0">
+              {order.items.map((i, idx) => {
+                const originalPrice = Number(i.original_price || 0);
+                const paidPrice = Number(i.price || 0);
+                const qty = Number(i.qty) || 1;
+                const freeItems = Number(i.free_items || 0);
+                const payableItems = Number(i.payable_items || qty);
+                const hasDiscount = originalPrice > 0 && originalPrice > paidPrice;
+                const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + Number(i.deal_savings || 0);
+                return (
+                  <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
+                    <div className="shrink-0 relative">
+                      {getImgUrl(i.image) ? (
+                        <img src={getImgUrl(i.image)} alt={i.name} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
+                      ) : (
+                        <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
+                      )}
+                      <div className="absolute -top-2 -right-2 min-w-[22px] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
+                      {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {i.deal_id && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
+                        {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {hasDiscount && <p className="text-[11px] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
+                      <p className="text-sm sm:text-lg font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
+                      {itemSavings > 0 && <p className="text-[10px] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    {hasDiscount && <p className="text-[11px] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
-                    <p className="text-sm sm:text-lg font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
-                    {itemSavings > 0 && <p className="text-[10px] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT (unchanged) */}
         <div className="space-y-5">
           {/* ADDRESS — Pencil opens Edit Modal */}
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">

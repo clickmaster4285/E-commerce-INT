@@ -11,7 +11,7 @@ import { CartProvider, useCart } from "../../components/user/CartContext";
 import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
-
+import { useUserSocketSync } from "@/hooks/useUserSocketSync";
 function getThemeFromCookie() {
   const cookies = document.cookie.split("; ");
   const themeCookie = cookies.find((cookie) => cookie.startsWith("user-theme="));
@@ -109,6 +109,9 @@ function NavItem({ icon, label, active }) {
 }
 
 export default function UserLayout({ children }) {
+  // ✅ LIVE SOCKET SYNC — admin changes automatically reflect
+  useUserSocketSync();
+
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
@@ -133,7 +136,7 @@ export default function UserLayout({ children }) {
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
         >
           <Header />
-          <main className="flex-1 w-full min-w-0 pb-16 md:pb-0">{children}</main>
+<main className="w-full min-w-0">{children}</main>
           <Footer />
           <CartDrawer />
           <MobileNav />

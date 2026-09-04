@@ -68,7 +68,7 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     notes: { type: String, default: "" },
-
+    cancel_reason: { type: String, default: "" },   // ✅ ADD
     // ✅ NEW: Root level deal tracking
     deal_ids: [{
       type: mongoose.Schema.Types.ObjectId,
