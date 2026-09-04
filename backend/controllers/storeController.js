@@ -120,6 +120,10 @@ const updateStoreInfo = async (req, res) => {
         }, performerId);
     }
 
+    try {
+      io.emit("storeUpdated", updatedStore.toObject());
+    } catch (_) {}
+
     res.status(200).json({
       success: true,
       data: updatedStore.toObject(),

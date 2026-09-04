@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -200,7 +200,44 @@ export default function AccountPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { count: wishlistCount } = useWishlist();
-  const [tab, setTab] = useState("overview");
+  
+  const [tab, setTab] = useState(() => {
+    if (typeof window === "undefined") return "overview";
+    return new URLSearchParams(window.location.search).get("tab") || "overview";
+  });
+
+  // ✅ URL change + event dono suno — FIX APPLIED
+  useEffect(() => {
+    const checkUrlTab = () => {
+      const urlTab = new URLSearchParams(window.location.search).get("tab");
+      if (urlTab && urlTab !== tab) setTab(urlTab);
+    };
+
+    const onTab = (e) => { 
+      if (e.detail && e.detail !== tab) {
+        setTab(e.detail);
+        // URL bhi update karo
+        const url = new URL(window.location);
+        url.searchParams.set("tab", e.detail);
+        window.history.pushState({}, "", url);
+      }
+    };
+
+    // Initial check
+    checkUrlTab();
+
+    // URL change hone pe check karo
+    window.addEventListener("popstate", checkUrlTab);
+    
+    // Custom event suno
+    window.addEventListener("account:tab", onTab);
+    
+    return () => {
+      window.removeEventListener("popstate", checkUrlTab);
+      window.removeEventListener("account:tab", onTab);
+    };
+  }, [tab]);
+
   const [orderFilter, setOrderFilter] = useState("all");
   const [openSection, setOpenSection] = useState(null);
 
@@ -244,7 +281,15 @@ export default function AccountPage() {
   const refreshUser = () => queryClient.invalidateQueries({ queryKey: ["userProfile"] });
   const refreshAddresses = () => queryClient.invalidateQueries({ queryKey: ["addresses"] });
 
-  const navigate = (tabId, filter) => { setTab(tabId); if (filter) setOrderFilter(filter); };
+  const navigate = (tabId, filter) => { 
+    setTab(tabId); 
+    if (filter) setOrderFilter(filter); 
+    // URL update karo
+    const url = new URL(window.location);
+    url.searchParams.set("tab", tabId);
+    if (filter) url.searchParams.set("filter", filter);
+    window.history.pushState({}, "", url);
+  };
   const external = (href) => router.push(href);
 
   const saveProfile = async () => {
@@ -305,7 +350,7 @@ export default function AccountPage() {
   const sidebarProps = { user, avatarLetter, tab, orderFilter, wishlistCount, onNavigate: navigate, onExternal: external, onLogout: handleLogout };
 
   return (
-    <main className="max-w-[1200px] mx-auto px-4 lg:px-6 pt-3 sm:pt-6 lg:pt-10 pb-24 md:pb-10">
+    <main className="max-w-[1200px] mx-auto px-4 lg:px-6 pt-3 sm:pt-6 lg:pt-10 pb-4 md:pb-4">
       <div className="grid lg:grid-cols-[260px_1fr] gap-6 items-start">
         {/* Desktop sidebar (unchanged) */}
         <aside className="hidden lg:block sticky top-24">

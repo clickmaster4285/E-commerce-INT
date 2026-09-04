@@ -1,4 +1,5 @@
 const Discount = require("../models/Discount");
+const Deal = require("../models/Deal");
 const { getIO } = require("../utils/socket");
 
 const emitSocketEvent = (event, data) => {
@@ -522,7 +523,73 @@ exports.getPublicDiscounts = async (req, res) => {
 // HELPER: Calculate Discounted Price for a Product
 // =====================================================
 
-const calculateDiscountedPrice = (product, discounts) => {
+const calculateDiscountedPrice = async (product, discounts) => {
+  const originalPriceSnapshot = Number(product.selling_price || product.price || 0);
+
+  // =====================================================
+  // DEAL PRIORITY: If product belongs to any active deal,
+  // do NOT apply discount on top of the deal's price.
+  // Deal price is already applied separately via the deal system.
+  // =====================================================
+  try {
+    const now = new Date();
+    const productIdStr = String(product._id || product.id || "");
+    const productCategoryId = String(
+      product.category?._id || product.category || product.categoryId || ""
+    );
+    const productBrandId = String(
+      product.brand?._id || product.brand || product.brandId || ""
+    );
+
+    const activeDeal = await Deal.findOne({
+      isActive: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+      $or: [
+        { applyTo: "all" },
+        { applyTo: "product", productIds: product._id },
+        { applyTo: "category", categoryIds: product.category?._id || product.category || product.categoryId },
+        { applyTo: "brand", brandIds: product.brand?._id || product.brand || product.brandId },
+      ],
+    }).lean();
+
+    if (activeDeal) {
+      const dealApplies =
+        activeDeal.applyTo === "all" ||
+        (activeDeal.applyTo === "product" &&
+          Array.isArray(activeDeal.productIds) &&
+          activeDeal.productIds.some(
+            (p) => String(p?._id || p) === productIdStr
+          )) ||
+        (activeDeal.applyTo === "category" &&
+          productCategoryId &&
+          Array.isArray(activeDeal.categoryIds) &&
+          activeDeal.categoryIds.some(
+            (c) => String(c?._id || c) === productCategoryId
+          )) ||
+        (activeDeal.applyTo === "brand" &&
+          productBrandId &&
+          Array.isArray(activeDeal.brandIds) &&
+          activeDeal.brandIds.some(
+            (b) => String(b?._id || b) === productBrandId
+          ));
+
+      if (dealApplies) {
+        return {
+          hasDiscount: false,
+          originalPrice: originalPriceSnapshot,
+          discountedPrice: originalPriceSnapshot,
+          discountValue: 0,
+          discountType: null,
+          discountName: "",
+          savings: 0,
+        };
+      }
+    }
+  } catch (_) {
+    // If deal lookup fails, fall through to normal discount logic.
+  }
+
   if (!discounts || !Array.isArray(discounts) || discounts.length === 0) {
     return {
       hasDiscount: false,

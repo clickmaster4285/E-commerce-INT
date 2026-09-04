@@ -84,8 +84,7 @@ const country = store?.country || "";
   const phoneHref = `tel:${supportPhone.replace(/[^0-9+]/g, "")}`;
 
   return (
-    <footer className="bg-[var(--user-bg-elevated)] border-t border-[var(--user-border)] mt-16">
-      {/* ✅ TRUST BADGES */}
+<footer className="bg-[var(--user-bg-elevated)] border-t border-[var(--user-border)]">      {/* ✅ TRUST BADGES */}
       <div className="border-b border-[var(--user-border)]">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -236,8 +235,8 @@ const country = store?.country || "";
 
       {/* ✅ BOTTOM BAR */}
       <div className="border-t border-[var(--user-border)] bg-[var(--user-bg)]">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-[11px] text-[var(--user-text-subtle)]">
+<div className="max-w-[1400px] mx-auto px-4 lg:px-6 pt-5 pb-20 md:pb-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-[11px] text-[var(--user-text-subtle)]">
             © {new Date().getFullYear()}{" "}
             <span className="text-[var(--user-text-muted)] font-semibold">
               {storeName}

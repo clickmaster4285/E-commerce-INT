@@ -39,6 +39,8 @@ import {
   Moon,
   Heart,
   Package,
+    Settings,
+
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -237,11 +239,21 @@ useEffect(() => {
       .slice(0, 5);
   }, [categories, products]);
 
+    // ✅ Brand products count — products list se calculate
+  const brandCounts = useMemo(() => {
+    const counts = {};
+    products.forEach((p) => {
+      const id = typeof p.brand_id === "object" ? p.brand_id?._id : p.brand_id;
+      if (id) counts[id] = (counts[id] || 0) + 1;
+    });
+    return counts;
+  }, [products]);
+
   const topBrands = useMemo(() => {
     return [...brands]
-      .sort((a, b) => (b.products?.length || 0) - (a.products?.length || 0))
+      .sort((a, b) => (brandCounts[b._id] || 0) - (brandCounts[a._id] || 0))
       .slice(0, 5);
-  }, [brands]);
+  }, [brands, brandCounts]);
 
   const handleLogout = async () => {
     try {
@@ -452,178 +464,272 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* SIDEBAR (unchanged) */}
+         {/* ✅ PREMIUM SIDEBAR — 10x Improved + All Fixes Applied */}
       <div
-        className={`fixed top-0 left-0 h-full w-[85%] max-w-[320px] bg-[var(--user-bg-elevated)] z-50 shadow-[var(--user-shadow-lg)] transition-transform duration-300 flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-[85%] max-w-[340px] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ transformOrigin: "left center" }}
       >
-        <div className="p-5 border-b border-[var(--user-border)] shrink-0">
-          <div className="flex items-center justify-between mb-5">
-            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
-              <StoreLogo store={store} sizeClass="w-8 h-8" />
-              <span className="font-black text-base tracking-wide text-[var(--user-text)]">
-                {storeName}
-              </span>
+        <style>{`
+          @keyframes sidebarSlideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+          .sidebar-item {
+            animation: sidebarSlideIn 0.4s ease-out backwards;
+          }
+          .sidebar-item:nth-child(1) { animation-delay: 0.05s; }
+          .sidebar-item:nth-child(2) { animation-delay: 0.1s; }
+          .sidebar-item:nth-child(3) { animation-delay: 0.15s; }
+          .sidebar-item:nth-child(4) { animation-delay: 0.2s; }
+          .sidebar-item:nth-child(5) { animation-delay: 0.25s; }
+        `}</style>
+
+        {/* HEADER — Logo + Close */}
+        <div className="p-5 border-b border-[var(--user-border)] shrink-0 bg-gradient-to-br from-[var(--user-bg-card)] to-[var(--user-bg-hover)]">
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5 group">
+              <div className="relative">
+                <StoreLogo store={store} sizeClass="w-10 h-10" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[var(--user-success)] rounded-full border-2 border-[var(--user-bg-elevated)]" />
+              </div>
+              <div>
+                <span className="font-black text-base tracking-wide text-[var(--user-text)] block leading-tight">
+                  {storeName}
+                </span>
+                <span className="text-[10px] font-semibold text-[var(--user-text-muted)] uppercase tracking-wider">
+                  Shop Premium
+                </span>
+              </div>
             </Link>
             <button
               onClick={() => setOpen(false)}
               aria-label="Close menu"
-              className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-bg-hover)] hover:rotate-90 transition duration-300"
+              className="w-9 h-9 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90"
             >
-              <X size={16} className="text-[var(--user-text)]" />
+              <X size={16} className="text-[var(--user-text)] hover:text-white" />
             </button>
           </div>
 
+          {/* USER GREETING */}
           {user ? (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <Avatar user={user} sizeClass="w-11 h-11" textClass="text-base" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[var(--user-text)] text-sm font-semibold truncate">
-                    {user.name || user.username}
-                  </p>
-                  <p className="text-[var(--user-text-muted)] text-xs truncate">{user.email}</p>
-                </div>
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20">
+              <Avatar user={user} sizeClass="w-11 h-11" textClass="text-base" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Welcome back,</p>
+                <p className="text-sm font-bold text-[var(--user-text)] truncate">
+                  {user.name || user.username}
+                </p>
               </div>
+              <div className="shrink-0">
+                <div className="w-2 h-2 rounded-full bg-[var(--user-success)] animate-pulse" />
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setOpen(false); setLoginOpen(true); }}
+              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold hover:opacity-90 transition active:scale-95"
+            >
+              <User size={16} />
+              Login / Sign Up
+            </button>
+          )}
+        </div>
 
-              <div className="space-y-2">
+        {/* SCROLLABLE CONTENT */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {/* QUICK ACTIONS GRID */}
+          {user && (
+            <div className="p-5 border-b border-[var(--user-border)]">
+              <div className="grid grid-cols-2 gap-2.5">
                 <Link
                   href="/account"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] transition group"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <User size={16} className="text-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]" />
-                  <span className="text-sm font-semibold text-[var(--user-text-secondary)] group-hover:text-[var(--user-accent-text)] flex-1">
-                    My Account
-                  </span>
-                  <ChevronRight size={14} className="text-[var(--user-text-muted)] group-hover:text-[var(--user-accent-text)]" />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                    <User size={18} className="text-[var(--user-accent)]" />
+                  </div>
+                  <span className="text-xs font-bold text-[var(--user-text)]">Account</span>
                 </Link>
 
                 <Link
                   href="/orders"
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] transition group"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <Package size={16} className="text-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]" />
-                  <span className="text-sm font-semibold text-[var(--user-text-secondary)] group-hover:text-[var(--user-accent-text)] flex-1">
-                    My Orders
-                  </span>
-                  <ChevronRight size={14} className="text-[var(--user-text-muted)] group-hover:text-[var(--user-accent-text)]" />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                    <Package size={18} className="text-[var(--user-accent)]" />
+                  </div>
+                  <span className="text-xs font-bold text-[var(--user-text)]">Orders</span>
+                </Link>
+
+                <Link
+                  href="/wishlist"
+                  onClick={() => setOpen(false)}
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center relative">
+                    <Heart size={18} className="text-[var(--user-accent)]" />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-bold text-[var(--user-text)]">Wishlist</span>
                 </Link>
 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-danger)]/10 hover:border-[var(--user-danger)]/30 transition"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <LogOut size={16} className="text-[var(--user-danger)]" />
-                  <span className="text-sm font-semibold text-[var(--user-danger)] flex-1 text-left">Logout</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p className="text-[var(--user-text-muted)] text-xs mb-3">Login to manage orders & account</p>
-              <div className="grid grid-cols-2 my-3 gap-2">
-                <button
-                  onClick={() => { setOpen(false); setLoginOpen(true); }}
-                  className="h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold flex items-center justify-center hover:opacity-90 transition w-full"
-                >
-                  Login
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-danger)]/10 flex items-center justify-center">
+                    <LogOut size={18} className="text-[var(--user-danger)]" />
+                  </div>
+                  <span className="text-xs font-bold text-[var(--user-danger)]">Logout</span>
                 </button>
               </div>
             </div>
           )}
-        </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-7">
-          <div className="md:hidden">
-            <button
-              onClick={toggleTheme}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:bg-[var(--user-bg-hover)] transition"
-            >
-              {theme === "dark" ? (
-                <Sun size={16} className="text-[var(--user-accent)]" />
-              ) : (
-                <Moon size={16} className="text-[var(--user-accent)]" />
-              )}
-              <span className="text-sm font-semibold text-[var(--user-text-secondary)] flex-1 text-left">
-                {theme === "dark" ? "Light Mode" : "Dark Mode"}
-              </span>
-              <span
-                className={`w-9 h-5 rounded-full relative transition-colors ${theme === "dark" ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`}
-              >
-                <span
-                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${theme === "dark" ? "left-[18px]" : "left-0.5"}`}
-                />
-              </span>
-            </button>
-          </div>
-
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--user-text-subtle)] mb-3">
-              Top Categories
-            </h3>
+          {/* CATEGORIES */}
+          <div className="p-5 border-b border-[var(--user-border)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
+                Top Categories
+              </h3>
+             
+            </div>
             <div className="space-y-1">
-              {topCategories.map((category) => (
+              {topCategories.map((category, idx) => (
                 <Link
                   key={category._id}
                   href={`/category/${category._id}`}
                   onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--user-bg-hover)] transition group"
+                  className="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
+                  style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                 >
-                  <span className="w-9 h-9 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)] transition shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)] group-hover:shadow-md transition-all duration-300 shrink-0">
                     {getIcon(category.name)}
                   </span>
-                  <span className="text-sm text-[var(--user-text-secondary)] flex-1 capitalize truncate">
-                    {category.name}
-                  </span>
-                  <span className="text-[10px] font-bold text-[var(--user-text-subtle)] bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full px-2 py-0.5 shrink-0">
-                    {category.count}
-                  </span>
-                  <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] transition shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-semibold text-[var(--user-text)] group-hover:text-[var(--user-accent)] transition-colors capitalize block truncate">
+                      {category.name}
+                    </span>
+                    <span className="text-[10px] text-[var(--user-text-muted)]">
+                      {category.count} products
+                    </span>
+                  </div>
+                  <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
                 </Link>
               ))}
             </div>
           </div>
 
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--user-text-subtle)] mb-3">
-              Top Brands
-            </h3>
+          {/* BRANDS — ✅ FIXED: Products count from brandCounts */}
+          <div className="p-5 border-b border-[var(--user-border)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
+                Top Brands
+              </h3>
+            
+            </div>
             <div className="space-y-1">
-              {topBrands.map((brand) => {
+              {topBrands.map((brand, idx) => {
                 const logoUrl = getLogoUrl(brand.logo);
+                const productCount = brandCounts?.[brand._id] || brand.products?.length || 0;
                 return (
                   <Link
                     key={brand._id}
                     href={`/brand/${brand._id}`}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-[var(--user-bg-hover)] transition group"
+                    className="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
+                    style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                   >
                     {logoUrl ? (
-                      <span className="w-8 h-8 rounded-full bg-[var(--user-text)] flex items-center justify-center p-1.5 shrink-0">
-                        <img src={logoUrl} alt={brand.name} className="max-h-full max-w-full object-contain" />
+                      <span className="w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                        <img src={logoUrl} alt={brand.name} className="w-full h-full object-contain" />
                       </span>
                     ) : (
-                      <span className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] text-xs font-black shrink-0">
-                        {brand.name?.charAt(0)}
+                      <span className="w-10 h-10 rounded-full bg-[var(--user-accent)] flex items-center justify-center text-[var(--user-accent-text)] text-sm font-black shrink-0 group-hover:shadow-md transition-shadow">
+                        {brand.name?.charAt(0).toUpperCase()}
                       </span>
                     )}
-                    <span className="text-sm text-[var(--user-text-secondary)] flex-1 capitalize truncate">{brand.name}</span>
-                    <span className="text-[10px] font-bold text-[var(--user-text-subtle)] bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full px-2 py-0.5 shrink-0">
-                      {brand.products?.length || 0}
-                    </span>
-                    <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] transition shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-[var(--user-text)] group-hover:text-[var(--user-accent)] transition-colors capitalize block truncate">
+                        {brand.name}
+                      </span>
+                      <span className="text-[10px] text-[var(--user-text-muted)]">
+                        {productCount} products
+                      </span>
+                    </div>
+                    <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
                   </Link>
                 );
               })}
             </div>
           </div>
+
+          {/* THEME TOGGLE — ✅ FIXED: Better visibility in dark mode */}
+          <div className="p-5 border-b border-[var(--user-border)]">
+            <button
+              onClick={toggleTheme}
+              className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] transition-all duration-300 group active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                  {theme === "dark" ? (
+                    <Sun size={18} className="text-[var(--user-accent)]" />
+                  ) : (
+                    <Moon size={18} className="text-[var(--user-accent)]" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-bold text-[var(--user-text)] block">
+                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                  </span>
+                  <span className="text-[10px] text-[var(--user-text-muted)]">
+                    Switch theme appearance
+                  </span>
+                </div>
+              </div>
+              <div className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${theme === "dark" ? "bg-emerald-500" : "bg-slate-300"}`}>
+                <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${theme === "dark" ? "left-6" : "left-1"}`}>
+                  {theme === "dark" ? <Moon size={11} className="text-emerald-500" /> : <Sun size={11} className="text-amber-500" />}
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* ✅ SETTINGS ONLY — Removed Help/About */}
+          <div className="p-5">
+            <Link
+              href="/account?tab=settings"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new CustomEvent("account:tab", { detail: "settings" }));
+              }}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg transition-all duration-300 group active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                <Settings size={18} className="text-[var(--user-accent)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-bold text-[var(--user-text)] block">Settings</span>
+                <span className="text-[10px] text-[var(--user-text-muted)]">Manage your account preferences</span>
+              </div>
+              <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
+            </Link>
+          </div>
         </div>
 
-        <div className="p-4 border-t border-[var(--user-border)] shrink-0">
-          <p className="text-[10px] text-[var(--user-text-subtle)] text-center">© 2026 {storeName}</p>
+        {/* FOOTER */}
+        <div className="p-4 border-t border-[var(--user-border)] shrink-0 bg-[var(--user-bg-card)]">
+          <p className="text-[10px] text-[var(--user-text-subtle)] text-center">
+            © 2026 {storeName}. All rights reserved.
+          </p>
         </div>
       </div>
 

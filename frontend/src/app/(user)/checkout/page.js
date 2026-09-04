@@ -391,8 +391,8 @@ function CheckoutContent() {
     }
     setPlacing(true);
     try {
-      await orderApi.place({ items: activeItems, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod });
-      queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod });
+            queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       setDraftItems([]);
       if (currentDraftId) { await axiosInstance.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {}); setCurrentDraftId(null); }
@@ -589,77 +589,80 @@ function CheckoutContent() {
         <>
           <StepIndicator />
 
-          {/* ============ STEP 1 — Cart only (Selected-Items removed) ============ */}
+                   {/* ============ STEP 1 — Cart (right card tak height, phir scroll) ============ */}
           {step === 1 && (
-            <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
+            <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6">
               {/* LEFT: Your Cart */}
-              <div className={`${cardCls} overflow-hidden`}>
-                <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                      <ShoppingBag size={18} className="text-[var(--user-accent-text)]" />
+              <div className="relative">
+                <div className={`${cardCls} overflow-hidden flex flex-col lg:absolute lg:inset-0`}>
+                  <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
+                        <ShoppingBag size={18} className="text-[var(--user-accent-text)]" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-black text-[var(--user-text)] uppercase tracking-wider">Your Cart</h2>
+                        <p className="text-xs text-[var(--user-text-muted)]">{cart.length} items available</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-sm font-black text-[var(--user-text)] uppercase tracking-wider">Your Cart</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">{cart.length} items available</p>
-                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 rounded" style={{ accentColor: "var(--user-accent)" }} />
+                      <span className="text-xs font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">Select All</span>
+                    </label>
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-4 h-4 rounded" style={{ accentColor: "var(--user-accent)" }} />
-                    <span className="text-xs font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">Select All</span>
-                  </label>
-                </div>
 
-                <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[420px] sm:max-h-[520px] lg:max-h-[calc(100vh-280px)] custom-scrollbar">
-                  {itemsWithDiscounts.map((item) => {
-                    const checked = (selectedKeys || []).includes(item.key);
-                    return (
-                      <label key={item.key} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                        checked ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"
-                      }`}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleKey(item.key)} className="w-4 h-4 rounded mt-1 shrink-0" style={{ accentColor: "var(--user-accent)" }} />
-                        <ItemThumb item={item} size="w-16 h-16" />
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
-                          {item.variantTitle && <p className="text-[10px] sm:text-xs text-[var(--user-text-muted)]">{item.variantTitle}</p>}
-                          {item.dealId && (
-                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                              <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
-                                <Gift size={9} />
-                                {item.dealType === 'buy_x_get_y' ? `Buy ${item.dealBuyQuantity} Get ${item.dealGetQuantity} Free` : (item.dealName || 'Active Deal')}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
-                            {item.hasDiscount && item.originalPrice > item.displayPrice && (
-                              <p className="text-[10px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
+                  {/* ✅ LIST — right card tak phailti hai, phir scroll */}
+                  <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[420px] sm:max-h-[520px] lg:max-h-none lg:flex-1 lg:min-h-0 custom-scrollbar">
+                    {itemsWithDiscounts.map((item) => {
+                      const checked = (selectedKeys || []).includes(item.key);
+                      return (
+                        <label key={item.key} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                          checked ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"
+                        }`}>
+                          <input type="checkbox" checked={checked} onChange={() => toggleKey(item.key)} className="w-4 h-4 rounded mt-1 shrink-0" style={{ accentColor: "var(--user-accent)" }} />
+                          <ItemThumb item={item} size="w-16 h-16" />
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
+                            {item.variantTitle && <p className="text-[10px] sm:text-xs text-[var(--user-text-muted)]">{item.variantTitle}</p>}
+                            {item.dealId && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                <span className="inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
+                                  <Gift size={9} />
+                                  {item.dealType === 'buy_x_get_y' ? `Buy ${item.dealBuyQuantity} Get ${item.dealGetQuantity} Free` : (item.dealName || 'Active Deal')}
+                                </span>
+                              </div>
                             )}
+                            <div className="flex items-center gap-2 mt-2">
+                              <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
+                              {item.hasDiscount && item.originalPrice > item.displayPrice && (
+                                <p className="text-[10px] text-[var(--user-text-subtle)] line-through">Rs. {item.originalPrice.toLocaleString()}</p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="shrink-0 flex flex-col items-end gap-2">
-                          <div className="flex items-center rounded-lg border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
-                              <Minus size={12} />
-                            </button>
-                            <span className="text-xs font-black text-[var(--user-text)] w-8 text-center">{item.qty}</span>
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
-                              <Plus size={12} />
-                            </button>
+                          <div className="shrink-0 flex flex-col items-end gap-2">
+                            <div className="flex items-center rounded-lg border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
+                                <Minus size={12} />
+                              </button>
+                              <span className="text-xs font-black text-[var(--user-text)] w-8 text-center">{item.qty}</span>
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                            <p className="text-sm font-black text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
                           </div>
-                          <p className="text-sm font-black text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+                        </label>
+                      );
+                    })}
+                  </div>
 
-                {/* Slim footer: selected count + subtotal */}
-                <div className="px-5 py-3.5 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 flex items-center justify-between">
-                  <p className="text-xs text-[var(--user-text-muted)] font-semibold">
-                    Selected: <span className="font-black text-[var(--user-text)]">{selectedCartItems.length}</span> / {cart.length}
-                  </p>
-                  <p className="text-lg font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
+                  {/* Slim footer */}
+                  <div className="px-5 py-3.5 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 flex items-center justify-between">
+                    <p className="text-xs text-[var(--user-text-muted)] font-semibold">
+                      Selected: <span className="font-black text-[var(--user-text)]">{selectedCartItems.length}</span> / {cart.length}
+                    </p>
+                    <p className="text-lg font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
 
@@ -677,7 +680,6 @@ function CheckoutContent() {
               } />
             </div>
           )}
-
           {/* Mobile sticky Proceed bar (step 1) */}
           {step === 1 && (
             <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t-2 border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>

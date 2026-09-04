@@ -19,6 +19,7 @@ const XCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} f
 const BanIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>);
 const AlertIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>);
 const LockIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
+const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
 
 /* ==================== HELPERS ==================== */
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -91,25 +92,24 @@ function OrderItemImage({ item, size = 60 }) {
   );
 }
 
-const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
-
+const STATUS_FLOW = ["pending", "confirmed", "shipped", "delivered"];
 function StatusStepper({ order }) {
   const cancelled = order.status === "cancelled";
-  const currentIdx = STATUS_FLOW.indexOf(order.status);
+  const effective = order.status === "processing" ? "confirmed" : order.status;
+  const currentIdx = STATUS_FLOW.indexOf(effective);
+  const paymentDone = order.payment?.status === "paid";
+  const paymentWaiting = !cancelled && effective === "delivered" && !paymentDone;
+
   return (
     <div className="flex items-start flex-wrap gap-y-3">
       {STATUS_FLOW.map((step, i) => {
         const done = !cancelled && currentIdx >= i;
-        const isLast = i === STATUS_FLOW.length - 1;
+        const connectorGreen = !cancelled && (i === STATUS_FLOW.length - 1 ? paymentDone : currentIdx > i);
         return (
           <React.Fragment key={step}>
             <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
               <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
-                style={{
-                  backgroundColor: done ? "#10b981" : "transparent",
-                  borderColor: done ? "#10b981" : "var(--border-color)",
-                  color: "#fff",
-                }}>
+                style={{ backgroundColor: done ? "#10b981" : "transparent", borderColor: done ? "#10b981" : "var(--border-color)", color: "#fff" }}>
                 {done ? <CheckIcon className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--border-color)" }} />}
               </div>
               <span className="text-[10px] font-semibold capitalize text-center leading-tight"
@@ -117,13 +117,28 @@ function StatusStepper({ order }) {
                 {step === "pending" ? "Placed" : step}
               </span>
             </div>
-            {!isLast && (
-              <div className="flex-1 h-0.5 mt-3 mx-1 rounded min-w-[20px]"
-                style={{ backgroundColor: !cancelled && currentIdx > i ? "#10b981" : "var(--border-color)" }} />
-            )}
+            <div className="flex-1 h-0.5 mt-3 mx-1 rounded min-w-[20px]"
+              style={{ backgroundColor: connectorGreen ? "#10b981" : "var(--border-color)" }} />
           </React.Fragment>
         );
       })}
+
+      {/* 💰 Payment Received (last step) */}
+      <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
+          style={{
+            backgroundColor: paymentDone ? "#10b981" : "transparent",
+            borderColor: paymentDone ? "#10b981" : paymentWaiting ? "#fbbf24" : "var(--border-color)",
+            color: paymentDone ? "#fff" : paymentWaiting ? "#fbbf24" : "var(--border-color)",
+          }}>
+          {paymentDone ? <CheckIcon className="w-3 h-3" /> : <BanknoteIcon className="w-3 h-3" />}
+        </div>
+        <span className="text-[10px] font-semibold text-center leading-tight"
+          style={{ color: paymentDone ? "var(--text-primary)" : paymentWaiting ? "#fbbf24" : "var(--text-muted)" }}>
+          Payment
+        </span>
+      </div>
+
       {cancelled && (
         <div className="flex flex-col items-center gap-1.5 min-w-[64px] ml-2">
           <div className="w-6 h-6 rounded-full flex items-center justify-center border-2"
@@ -138,19 +153,9 @@ function StatusStepper({ order }) {
 }
 
 /* ==================== ACTION BUTTONS (Smart by Status) ==================== */
-function OrderActions({ order, onUpdate, onCancel, isPending }) {
+function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending, isPaymentPending }) {
   const status = order.status;
-
-  // Delivered ya Cancelled — locked state
-  if (status === "delivered") {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg"
-        style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
-        <CheckCircleIcon className="w-4 h-4" style={{ color: "#34d399" }} />
-        <span className="text-xs font-semibold" style={{ color: "#34d399" }}>Order completed successfully</span>
-      </div>
-    );
-  }
+  const payStatus = order.payment?.status || "pending";
 
   if (status === "cancelled") {
     return (
@@ -162,12 +167,33 @@ function OrderActions({ order, onUpdate, onCancel, isPending }) {
     );
   }
 
+  // ✅ Delivered — last action = Payment Received
+  if (status === "delivered") {
+    if (payStatus !== "paid") {
+      return (
+        <button
+          onClick={onPaymentReceived}
+          disabled={isPaymentPending}
+          className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
+          style={{ backgroundColor: "#10b981", color: "#fff" }}>
+          {isPaymentPending ? <Spinner className="w-4 h-4" /> : <BanknoteIcon className="w-4 h-4" />}
+          Payment Received
+        </button>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg"
+        style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
+        <CheckCircleIcon className="w-4 h-4" style={{ color: "#34d399" }} />
+        <span className="text-xs font-semibold" style={{ color: "#34d399" }}>Order completed & payment received</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {status === "pending" && (
-        <button
-          onClick={() => onUpdate("confirmed")}
-          disabled={isPending}
+        <button onClick={() => onUpdate("confirmed")} disabled={isPending}
           className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
           style={{ backgroundColor: "#3b82f6", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
@@ -176,9 +202,7 @@ function OrderActions({ order, onUpdate, onCancel, isPending }) {
       )}
 
       {(status === "confirmed" || status === "processing") && (
-        <button
-          onClick={() => onUpdate("shipped")}
-          disabled={isPending}
+        <button onClick={() => onUpdate("shipped")} disabled={isPending}
           className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
           style={{ backgroundColor: "#6366f1", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <TruckIcon className="w-4 h-4" />}
@@ -187,9 +211,7 @@ function OrderActions({ order, onUpdate, onCancel, isPending }) {
       )}
 
       {status === "shipped" && (
-        <button
-          onClick={() => onUpdate("delivered")}
-          disabled={isPending}
+        <button onClick={() => onUpdate("delivered")} disabled={isPending}
           className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "#10b981", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <HomeIcon className="w-4 h-4" />}
@@ -197,9 +219,7 @@ function OrderActions({ order, onUpdate, onCancel, isPending }) {
         </button>
       )}
 
-      <button
-        onClick={onCancel}
-        disabled={isPending}
+      <button onClick={onCancel} disabled={isPending}
         className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
         <BanIcon className="w-4 h-4" />
@@ -215,6 +235,7 @@ export default function OrderDetailPage({ params }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const { data: order, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-order", id],
@@ -226,7 +247,7 @@ export default function OrderDetailPage({ params }) {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => orderApi.updateStatus(id, { status }),
+        mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
@@ -236,9 +257,24 @@ export default function OrderDetailPage({ params }) {
     },
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
   });
+    const updatePaymentMutation = useMutation({
+    mutationFn: ({ id }) => orderApi.updatePayment(id, { status: "paid" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
+      toast.success("Payment marked as received");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
+  });
+
+  const handlePaymentReceived = () => updatePaymentMutation.mutate({ id });
 
   const handleUpdate = (status) => updateStatusMutation.mutate({ id, status });
-  const handleCancel = () => handleUpdate("cancelled");
+  const handleCancel = () => {
+    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    updateStatusMutation.mutate({ id, status: "cancelled", cancel_reason: cancelReason.trim() });
+  };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const savings = useMemo(() => (order?.items || []).reduce((s, it) => s + Number(it.savings || 0), 0), [order]);
@@ -295,11 +331,13 @@ export default function OrderDetailPage({ params }) {
             </div>
           </div>
           <div>
-            <OrderActions
+                      <OrderActions
               order={order}
               onUpdate={handleUpdate}
               onCancel={() => setCancelConfirm(true)}
+              onPaymentReceived={handlePaymentReceived}
               isPending={updateStatusMutation.isPending}
+              isPaymentPending={updatePaymentMutation.isPending}
             />
           </div>
         </div>
@@ -428,9 +466,22 @@ export default function OrderDetailPage({ params }) {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">Cancel Order {order.order_number}?</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   This will mark the order as cancelled and restore stock. This action cannot be undone.
                 </p>
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
+                    Cancellation Reason <span style={{ color: "#f87171" }}>*</span>
+                  </label>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={3}
+                    placeholder="e.g. Stock unavailable, customer request..."
+                    className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                  />
+                </div>
               </div>
             </div>
             <div className="flex gap-2 mt-5">
@@ -439,7 +490,7 @@ export default function OrderDetailPage({ params }) {
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>
                 Keep Order
               </button>
-              <button onClick={handleCancel} disabled={updateStatusMutation.isPending}
+                           <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
                 className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
                 {updateStatusMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Cancelling...</> : "Yes, Cancel"}

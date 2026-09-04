@@ -61,6 +61,50 @@ export function useDiscounts() {
     (product, variantPrice) => {
       const originalPrice = Number(variantPrice ?? product?.price ?? product?.selling_price ?? 0);
       
+      // STEP 0: DEAL PRIORITY GUARD — if product belongs to any active deal,
+      // skip ALL discounts and return the original selling price so the deal
+      // price (applied separately by the deal system) is not further reduced.
+      const productId = String(product?._id || product?.id || "");
+      const categoryId = String(product?.category_id?._id || product?.category_id || "");
+      const brandId = String(product?.brand_id?._id || product?.brand_id || "");
+      const now = new Date();
+
+      if (deals && Array.isArray(deals)) {
+        for (const deal of deals) {
+          if (!deal.isActive) continue;
+          const startDate = new Date(deal.startDate);
+          const endDate = new Date(deal.endDate);
+          if (startDate > now || endDate < now) continue;
+
+          let dealApplies = false;
+          if (deal.applyTo === "all") {
+            dealApplies = true;
+          } else if (deal.applyTo === "product" || deal.applyTo === "specific_products") {
+            const ids = deal.productIds || deal.selectedProducts || [];
+            dealApplies = ids.some((p) => String(p?._id || p) === productId);
+          } else if (deal.applyTo === "category" || deal.applyTo === "specific_categories") {
+            const ids = deal.categoryIds || deal.selectedCategories || [];
+            dealApplies = categoryId && ids.some((c) => String(c?._id || c) === categoryId);
+          } else if (deal.applyTo === "brand" || deal.applyTo === "specific_brands") {
+            const ids = deal.brandIds || deal.selectedBrands || [];
+            dealApplies = brandId && ids.some((b) => String(b?._id || b) === brandId);
+          }
+
+          if (dealApplies) {
+            return {
+              hasDiscount: false,
+              originalPrice,
+              discountedPrice: originalPrice,
+              savings: 0,
+              discountName: "",
+              discountType: null,
+              discountValue: 0,
+              matchedDeal: deal,
+            };
+          }
+        }
+      }
+
       // STEP 1: Check Old System (Direct Product Discount)
       const productDiscountPct = Number(product?.discount || 0);
       let bestPrice = productDiscountPct > 0 ? originalPrice * (1 - productDiscountPct / 100) : originalPrice;
@@ -68,11 +112,6 @@ export function useDiscounts() {
       let bestType = productDiscountPct > 0 ? "percentage" : null;
       let bestValue = productDiscountPct;
       let matchedDeal = null;
-
-      const productId = String(product?._id || product?.id || "");
-      const categoryId = String(product?.category_id?._id || product?.category_id || "");
-      const brandId = String(product?.brand_id?._id || product?.brand_id || "");
-      const now = new Date();
 
       const checkApplies = (item) => {
         if (item.applyTo === "all") return true;

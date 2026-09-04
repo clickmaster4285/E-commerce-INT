@@ -8,6 +8,8 @@ import Navbar from '../../components/adminComponents/Navbar';
 import axiosInstance from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
+import { useShippingSocketSync } from '../../hooks/useShippingSocketSync';
+import { useOrderSocketSync } from '../../hooks/useOrderSocketSync';
 import { io } from 'socket.io-client';
 
 // ==========================================
@@ -109,6 +111,16 @@ export default function AdminLayout({ children }) {
   // STORE SOCKET SYNC
   // ==========================================
   useStoreSocketSync();
+
+  // ==========================================
+  // SHIPPING SOCKET SYNC
+  // ==========================================
+  useShippingSocketSync();
+
+  // ==========================================
+  // ORDER SOCKET SYNC
+  // ==========================================
+  useOrderSocketSync();
 
   // ==========================================
   // USER QUERY

@@ -96,6 +96,7 @@ const updateShippingConfig = async (req, res) => {
 
     await config.save();
     emit("shipping:updated", config);
+    emit("shippingConfigUpdated", config);
     res.json({ success: true, message: "Shipping settings updated", data: config });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -126,6 +127,7 @@ const createShippingRule = async (req, res) => {
       is_active, note,
     });
     emit("shippingRules:updated", rule);
+    emit("shippingRuleCreated", rule);
     res.status(201).json({ success: true, data: rule });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -147,6 +149,7 @@ const updateShippingRule = async (req, res) => {
 
     await rule.save();
     emit("shippingRules:updated", rule);
+    emit("shippingRuleUpdated", rule);
     res.json({ success: true, data: rule });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -157,6 +160,7 @@ const deleteShippingRule = async (req, res) => {
   try {
     await ShippingRule.findByIdAndDelete(req.params.id);
     emit("shippingRules:updated", { id: req.params.id });
+    emit("shippingRuleDeleted", { id: req.params.id });
     res.json({ success: true, message: "Rule deleted" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -170,6 +174,7 @@ const toggleShippingRule = async (req, res) => {
     rule.is_active = !rule.is_active;
     await rule.save();
     emit("shippingRules:updated", rule);
+    emit("shippingRuleToggled", rule);
     res.json({ success: true, data: rule });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
