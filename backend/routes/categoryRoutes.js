@@ -10,6 +10,7 @@ const {
   updateCategory,
   deleteCategory,
   getCategoryAttributes,
+  getCategoryAttributesHierarchical,
   assignCategoryAttributes,
 } = require("../controllers/categoryController");
 

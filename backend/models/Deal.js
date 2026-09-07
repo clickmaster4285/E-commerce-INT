@@ -5,11 +5,11 @@ const dealSchema = new mongoose.Schema(
     // ==========================================
     // BASIC INFORMATION
     // ==========================================
-
     name: {
       type: String,
-      required: true,
+      required: [true, "Deal name is required"],
       trim: true,
+      maxlength: 100,
     },
 
     description: {
@@ -24,77 +24,53 @@ const dealSchema = new mongoose.Schema(
     },
 
     // ==========================================
-    // DEAL TYPE
+    // DEAL TYPE & TARGET
     // ==========================================
-
     type: {
       type: String,
-      enum: [
-        "percentage",
-        "fixed_amount",
-        "buy_x_get_y",
-        "bundle",
-        "free_shipping",
-      ],
-      required: true,
+      enum: ["percentage", "fixed_amount", "buy_x_get_y", "bundle", "free_shipping"],
+      required: [true, "Deal type is required"],
     },
-    // ==========================================
-    // APPLY DEAL TO
-    // ==========================================
 
     applyTo: {
       type: String,
-      enum: [
-        "all",
-        "product",
-        "category",
-        "brand",
-        "collection",
-      ],
-      default: "product",
+      enum: ["all", "product", "category", "brand", "collection"],
+      required: [true, "Target scope is required"],
+      default: "all",
     },
 
     // ==========================================
-    // PRODUCTS
+    // REFERENCES (Conditional Requirement)
     // ==========================================
+    productIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+    }],
 
-    productIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-      },
-    ],
+    categoryIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    }],
 
-    // ==========================================
-    // CATEGORIES
-    // ==========================================
-
-    categoryIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Category",
-      },
-    ],
+    brandIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand",
+    }],
 
     // ==========================================
-    // BRANDS
+    // DISCOUNT VALUES
     // ==========================================
-
-    brandIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Brand",
-      },
-    ],
-
-    // ==========================================
-    // DISCOUNT
-    // ==========================================
-
     discountValue: {
       type: Number,
-      default: 0,
+      required: function() { return ["percentage", "fixed_amount"].includes(this.type); },
       min: 0,
+      validate: {
+        validator: function(v) {
+          if (this.type === "percentage") return v <= 100;
+          return true;
+        },
+        message: "Percentage cannot exceed 100%",
+      },
     },
 
     minOrderValue: {
@@ -106,12 +82,12 @@ const dealSchema = new mongoose.Schema(
     maxDiscountAmount: {
       type: Number,
       default: null,
+      min: 0,
     },
 
     // ==========================================
-    // BUY X GET Y
+    // BUY X GET Y LOGIC
     // ==========================================
-
     buyQuantity: {
       type: Number,
       default: 0,
@@ -128,26 +104,23 @@ const dealSchema = new mongoose.Schema(
       type: Number,
       default: 100,
       min: 0,
+      max: 100,
     },
 
     // ==========================================
     // BUNDLE DEAL
     // ==========================================
-
-    bundleProducts: [
-      {
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-        },
-
-        quantity: {
-          type: Number,
-          default: 1,
-          min: 1,
-        },
+    bundleProducts: [{
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
       },
-    ],
+      quantity: {
+        type: Number,
+        default: 1,
+        min: 1,
+      },
+    }],
 
     bundlePrice: {
       type: Number,
@@ -156,39 +129,46 @@ const dealSchema = new mongoose.Schema(
     },
 
     // ==========================================
-    // FREE SHIPPING — which methods are FREE
-    // Default: BOTH standard + express (backward compatible).
-    // Missing/empty array is treated as BOTH methods.
+    // SCHEDULE (REQUIRED)
     // ==========================================
-
-    freeShippingMethods: {
-      type: [String],
-      enum: ["standard", "express"],
-      default: ["standard", "express"],
-    },
-
-    // ==========================================
-    // DEAL SCHEDULE
-    // ==========================================
-
     startDate: {
       type: Date,
-      required: true,
+      required: [true, "Start date is required"],
     },
 
     endDate: {
       type: Date,
-      required: true,
+      required: [true, "End date is required"],
+      validate: {
+        validator: function(v) {
+          return this.startDate ? v > this.startDate : true;
+        },
+        message: "End date must be after start date",
+      },
     },
 
     // ==========================================
-    // USAGE LIMIT
+    // QUANTITY RESTRICTIONS
     // ==========================================
+    minQuantity: {
+      type: Number,
+      default: 1, // Changed default to 1 for better UX
+      min: 1,
+    },
 
-    usageLimit: {
+    maxQuantity: {
       type: Number,
       default: null,
       min: 0,
+    },
+
+    // ==========================================
+    // USAGE LIMITS
+    // ==========================================
+    usageLimit: {
+      type: Number,
+      default: null,
+      min: 1,
     },
 
     usedCount: {
@@ -200,51 +180,26 @@ const dealSchema = new mongoose.Schema(
     perUserLimit: {
       type: Number,
       default: null,
-      min: 0,
+      min: 1,
     },
 
     // ==========================================
     // CUSTOMER RESTRICTIONS
     // ==========================================
-
     customerType: {
       type: String,
-      enum: [
-        "all",
-        "new_customer",
-        "existing_customer",
-        "specific_customer",
-      ],
+      enum: ["all", "new_customer", "existing_customer", "specific_customer"],
       default: "all",
     },
 
-    customerIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
-    // ==========================================
-    // ORDER QUANTITY
-    // ==========================================
-
-    minQuantity: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    maxQuantity: {
-      type: Number,
-      default: null,
-      min: 0,
-    },
+    customerIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }],
 
     // ==========================================
     // COMBINATION RULES
     // ==========================================
-
     allowWithCoupon: {
       type: Boolean,
       default: false,
@@ -258,7 +213,6 @@ const dealSchema = new mongoose.Schema(
     // ==========================================
     // ADMIN CONTROL
     // ==========================================
-
     isActive: {
       type: Boolean,
       default: true,
@@ -273,10 +227,6 @@ const dealSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-
-    // ==========================================
-    // CREATED / UPDATED BY
-    // ==========================================
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -294,27 +244,13 @@ const dealSchema = new mongoose.Schema(
 );
 
 // ==========================================
-// INDEXES
+// INDEXES FOR PERFORMANCE
 // ==========================================
+dealSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
+dealSchema.index({ type: 1 });
+dealSchema.index({ applyTo: 1 });
+dealSchema.index({ productIds: 1 });
+dealSchema.index({ categoryIds: 1 });
+dealSchema.index({ brandIds: 1 });
 
-dealSchema.index({
-  isActive: 1,
-  startDate: 1,
-  endDate: 1,
-});
-
-dealSchema.index({
-  type: 1,
-});
-
-dealSchema.index({
-  applyTo: 1,
-});
-
-// ==========================================
-// MODEL
-// ==========================================
-
-const Deal = mongoose.model("Deal", dealSchema);
-
-module.exports = Deal;
+module.exports = mongoose.model("Deal", dealSchema);

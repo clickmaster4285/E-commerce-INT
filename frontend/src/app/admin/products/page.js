@@ -36,8 +36,33 @@ const ITEMS_PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 
 /* =========================================================
-   HELPERS
+HELPERS & ICONS
 ========================================================= */
+
+// Custom Icons for the Professional Modal (matching Category Form style)
+const Icons = {
+  FileText: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  Text: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 4h7" />
+    </svg>
+  ),
+  Hash: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
+  ),
+  Filter: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1.994 1.994 0 013 6.586V4z" />
+    </svg>
+  ),
+};
+
 function createEmptyVariant(sku = "") {
   return {
     _id: null, sku, title: "", description: "", cost_price: "", selling_price: "",
@@ -63,7 +88,6 @@ async function compressProductImage(file) {
   const MAX_SIZE = 1600;
   const QUALITY = 0.82;
   if (!file.type.startsWith("image/")) throw new Error("Invalid image file");
-
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -112,12 +136,55 @@ function handlePermissionError(error, defaultMessage, resource = "resource") {
 
 function normalizeId(value) {
   if (!value) return "";
-  if (typeof value === "object") return String(value._id || value.id || "");
+  if (typeof value === "object") {
+    if (value.$oid) return String(value.$oid);
+    if (value._id) return String(value._id);
+    if (value.id) return String(value.id);
+    return "";
+  }
   return String(value);
 }
 
+function normalizeOptionToken(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "object") {
+    if (v.$oid) return String(v.$oid);
+    const label = v.label || v.value || v.name || "";
+    return typeof label === "string" ? label.trim() : "";
+  }
+  return String(v).trim();
+}
+
+function getAssignedOptionList(attr) {
+  if (!attr) return [];
+  const seen = new Set();
+  const out = [];
+  const push = (v) => {
+    const token = normalizeOptionToken(v);
+    if (!token) return;
+    const key = token.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(token);
+  };
+  const configVal = attr?.category_config?.value;
+  if (Array.isArray(configVal)) {
+    configVal.forEach(push);
+  } else if (typeof configVal === "string" && configVal.trim()) {
+    configVal.split(",").map((s) => s.trim()).filter(Boolean).forEach(push);
+  }
+  const directValues = attr?.values;
+  if (Array.isArray(directValues)) {
+    directValues.forEach(push);
+  } else if (typeof directValues === "string" && directValues.trim()) {
+    directValues.split(",").map((s) => s.trim()).filter(Boolean).forEach(push);
+  }
+  return out;
+}
+
 /* =========================================================
-   MAIN COMPONENT
+MAIN COMPONENT
 ========================================================= */
 export default function ProductsPage() {
   const router = useRouter();
@@ -132,36 +199,42 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
-
+  
+  // Category Modal States
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({ category_code: "", name: "", description: "" });
   const [loadingCategoryCode, setLoadingCategoryCode] = useState(false);
 
+  // Brand Modal States
   const [showNewBrandModal, setShowNewBrandModal] = useState(false);
   const [brandFormData, setBrandFormData] = useState({ brand_code: "", name: "", description: "", country: "", is_active: true });
   const [brandLogoFile, setBrandLogoFile] = useState(null);
   const [brandLogoPreview, setBrandLogoPreview] = useState("");
   const [loadingBrandCode, setLoadingBrandCode] = useState(false);
 
+  // Attribute Modal States
   const [showNewAttributeModal, setShowNewAttributeModal] = useState(false);
-  const [attributeFormData, setAttributeFormData] = useState({
-    name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true
+  const [attributeFormData, setAttributeFormData] = useState({ 
+    name: "", 
+    code: "", 
+    data_type: "text", 
+    values: [{ label: "", value: "" }], 
+    variant_allowed: true 
   });
 
+  // Product Modal States
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [expandedVariant, setExpandedVariant] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-
   const [categoryAttributes, setCategoryAttributes] = useState([]);
   const [loadingAttributes, setLoadingAttributes] = useState(false);
 
   const [formData, setFormData] = useState({
     category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
   });
-
   const [tagInput, setTagInput] = useState("");
 
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
@@ -173,18 +246,67 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (formData.category_id) {
-      fetchCategoryAttributes(formData.category_id);
+      fetchCategoryAttributes(formData.category_id, editingProduct);
     } else {
       setCategoryAttributes([]);
     }
   }, [formData.category_id]);
 
-  const fetchCategoryAttributes = async (catId) => {
+  const fetchCategoryAttributes = async (catId, productForMerge = null) => {
     try {
       setLoadingAttributes(true);
-      const res = await attributeApi.getByCategory(catId);
-      const list = res || [];
-      setCategoryAttributes(list);
+      const [catRes, allRes] = await Promise.all([
+        attributeApi.getByCategory(catId).catch(() => []),
+        productForMerge ? attributeApi.getAll().catch(() => []) : Promise.resolve([]),
+      ]);
+      const catList = Array.isArray(catRes) ? catRes : [];
+      const allList = Array.isArray(allRes) ? allRes : [];
+
+      if (!productForMerge) {
+        setCategoryAttributes(catList);
+        return;
+      }
+
+      const codesInVariants = new Set();
+      (productForMerge?.variants || []).forEach((v) => {
+        if (v && v.attributes && typeof v.attributes === "object") {
+          Object.keys(v.attributes).forEach((k) => codesInVariants.add(String(k)));
+        }
+      });
+
+      const byCode = new Map();
+      catList.forEach((a) => { if (a?.code) byCode.set(String(a.code), a); });
+      allList.forEach((a) => { if (a?.code && !byCode.has(String(a.code))) byCode.set(String(a.code), a); });
+
+      const ensureCategoryConfig = (attr) => {
+        if (!attr) return attr;
+        if (attr.category_config && attr.category_config.attribute_id) return attr;
+        return {
+          ...attr,
+          category_config: {
+            attribute_id: attr._id,
+            is_required: false,
+            is_visible: true,
+            is_filterable: true,
+            is_searchable: true,
+            is_variant_option: true,
+            sort_order: 0,
+            value: "",
+          },
+        };
+      };
+
+      const merged = [];
+      const seenIds = new Set();
+      catList.forEach((a) => { const id = String(a?._id || ""); if (id && !seenIds.has(id)) { seenIds.add(id); merged.push(ensureCategoryConfig(a)); } });
+      codesInVariants.forEach((code) => {
+        const found = byCode.get(code);
+        if (found) {
+          const id = String(found._id || "");
+          if (id && !seenIds.has(id)) { seenIds.add(id); merged.push(ensureCategoryConfig(found)); }
+        }
+      });
+      setCategoryAttributes(merged);
     } catch (error) {
       console.error("Failed to fetch attributes", error);
     } finally {
@@ -192,26 +314,9 @@ export default function ProductsPage() {
     }
   };
 
-  // ✅ FIXED: Directly reads from attr.values instead of old category_config
-  const getAssignedOptionList = (attr) => {
-    if (!attr || !Array.isArray(attr.values)) return [];
-    return attr.values.map(v => v.label || v.value || String(v)).filter(Boolean);
-  };
-
-  // ✅ FIXED: Filters based on actual values array existence
-  const variantAllowedAttributes = useMemo(() => {
-    return categoryAttributes.filter((attr) => {
-      const hasValues = Array.isArray(attr.values) && attr.values.length > 0;
-      const isVisible = attr.is_visible !== false;
-      return hasValues && isVisible;
-    });
-  }, [categoryAttributes]);
-
-  // ✅ FIXED: Works with direct values array and updates local state correctly
   const handleAddVariantAttributeValue = async (attr, optionLabel, variantIndex) => {
     const trimmed = String(optionLabel || "").trim();
     if (!trimmed || !attr) return;
-
     const existingLabels = getAssignedOptionList(attr);
     if (existingLabels.some((opt) => String(opt).toLowerCase() === trimmed.toLowerCase())) {
       toast.info(`"${trimmed}" already exists in ${attr.name}`);
@@ -220,13 +325,11 @@ export default function ProductsPage() {
       }
       return;
     }
-
     const attributeId = attr?._id;
     if (!attributeId) {
       toast.error("Cannot add value: attribute id not found");
       return;
     }
-
     const previousValues = Array.isArray(attr.values) ? attr.values : [];
     const updatedValues = [
       ...previousValues.map((v) => ({
@@ -235,20 +338,53 @@ export default function ProductsPage() {
       })),
       { label: trimmed, value: trimmed },
     ];
-
     try {
       await attributeApi.update(String(attributeId), { values: updatedValues });
-
-      // Update local state immediately so UI reflects change without refetch
-      setCategoryAttributes((prev) =>
-        prev.map((a) => {
-          if (String(a?._id) === String(attributeId)) {
-            return { ...a, values: updatedValues };
+      if (formData.category_id) {
+        const updatedCategoryAttrs = categoryAttributes.map((a) => {
+          const aid = a?.category_config?.attribute_id || a?._id;
+          if (String(aid) === String(attributeId)) {
+            const currentVal = a?.category_config?.value;
+            const valArray = Array.isArray(currentVal) ? currentVal : (currentVal ? [currentVal] : []);
+            return {
+              attribute_id: aid,
+              is_required: Boolean(a?.category_config?.is_required),
+              is_visible: a?.category_config?.is_visible !== false,
+              is_filterable: Boolean(a?.category_config?.is_filterable),
+              is_searchable: Boolean(a?.category_config?.is_searchable),
+              is_variant_option: a?.category_config?.is_variant_option !== false,
+              sort_order: a?.category_config?.sort_order ?? 0,
+              value: [...valArray, trimmed],
+            };
           }
-          return a;
-        })
-      );
-
+          return {
+            attribute_id: a?.category_config?.attribute_id || a?._id,
+            is_required: Boolean(a?.category_config?.is_required),
+            is_visible: a?.category_config?.is_visible !== false,
+            is_filterable: Boolean(a?.category_config?.is_filterable),
+            is_searchable: Boolean(a?.category_config?.is_searchable),
+            is_variant_option: a?.category_config?.is_variant_option !== false,
+            sort_order: a?.category_config?.sort_order ?? 0,
+            value: a?.category_config?.value ?? "",
+          };
+        });
+        await categoryApi.updateAttributes(formData.category_id, updatedCategoryAttrs);
+        setCategoryAttributes((prev) =>
+          prev.map((a) => {
+            const aid = a?.category_config?.attribute_id || a?._id;
+            if (String(aid) === String(attributeId)) {
+              const currentVal = a?.category_config?.value;
+              const valArray = Array.isArray(currentVal) ? currentVal : (currentVal ? [currentVal] : []);
+              return {
+                ...a,
+                values: updatedValues,
+                category_config: { ...a.category_config, value: [...valArray, trimmed] },
+              };
+            }
+            return a;
+          })
+        );
+      }
       toast.success(`Added "${trimmed}" to ${attr.name}`);
       if (variantIndex !== undefined) {
         updateVariantOption(variantIndex, attr.code, trimmed);
@@ -259,6 +395,22 @@ export default function ProductsPage() {
       throw err;
     }
   };
+
+  const variantAllowedAttributes = useMemo(() => {
+    return categoryAttributes.filter((attr) => {
+      if (!attr) return false;
+      const code = String(attr.code || "").trim();
+      const id = normalizeId(attr._id);
+      if (!code && !id) return false;
+      const config = attr.category_config;
+      if (config) {
+        const visible = config?.is_visible !== false;
+        const variantOk = config?.is_variant_option !== false;
+        return Boolean(config.attribute_id) && visible && variantOk;
+      }
+      return true;
+    });
+  }, [categoryAttributes]);
 
   useEffect(() => {
     if (!productsError || !productsErrorMsg) return;
@@ -273,8 +425,11 @@ export default function ProductsPage() {
   const updateMutation = useMutation({ mutationFn: ({ id, data }) => productApi.update(id, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product updated successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product update failed", "product") });
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
+  
   const createCategoryMutation = useMutation({ mutationFn: (data) => categoryApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["categories"] }); const nc = res?.data || res; if (nc?._id) { setFormData((p) => ({ ...p, category_id: String(nc._id) })); toast.success("Category created and selected!"); } else { toast.success("Category created successfully"); } setShowNewCategoryModal(false); resetCategoryForm(); }, onError: (e) => handlePermissionError(e, "Failed to create category", "category") });
+  
   const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
+  
   const assignAttributeToCategoryMutation = useMutation({
     mutationFn: ({ categoryId, attributes }) => categoryApi.updateAttributes(categoryId, attributes),
   });
@@ -287,11 +442,37 @@ export default function ProductsPage() {
       const categoryId = formData.category_id;
       if (created?._id && categoryId) {
         const alreadyAssigned = categoryAttributes.some(
-          (a) => String(a?._id) === String(created._id)
+          (a) => String(a?.category_config?.attribute_id || a?._id) === String(created._id)
         );
         if (!alreadyAssigned) {
-          const nextAttributes = [...categoryAttributes, created];
-          setCategoryAttributes(nextAttributes);
+          const nextAttributes = categoryAttributes.map((a) => {
+            const aid = a?.category_config?.attribute_id || a?._id;
+            return {
+              attribute_id: aid,
+              is_required: Boolean(a?.category_config?.is_required),
+              is_visible: a?.category_config?.is_visible !== false,
+              is_filterable: Boolean(a?.category_config?.is_filterable),
+              is_searchable: Boolean(a?.category_config?.is_searchable),
+              is_variant_option: a?.category_config?.is_variant_option !== false,
+              sort_order: a?.category_config?.sort_order ?? 0,
+              value: a?.category_config?.value ?? "",
+            };
+          });
+          nextAttributes.push({
+            attribute_id: created._id,
+            is_required: false,
+            is_visible: true,
+            is_filterable: false,
+            is_searchable: false,
+            is_variant_option: true,
+            sort_order: nextAttributes.length,
+            value: "",
+          });
+          try {
+            await assignAttributeToCategoryMutation.mutateAsync({ categoryId, attributes: nextAttributes });
+          } catch (e) {
+            handlePermissionError(e, "Attribute created but failed to assign to category", "category");
+          }
         }
       }
       toast.success("Attribute created successfully!");
@@ -305,7 +486,7 @@ export default function ProductsPage() {
   /* Handlers */
   const openProductDetails = (p) => router.push(`/admin/products/${p._id}`);
   const handleToggleStatus = (p) => { if (p?._id) toggleStatusMutation.mutate(p._id); };
-
+  
   const closeProductModal = () => {
     formData.variants.forEach((v) => v.images.forEach((i) => { if (i.preview?.startsWith("blob:")) URL.revokeObjectURL(i.preview); }));
     setShowModal(false); setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
@@ -405,24 +586,21 @@ export default function ProductsPage() {
   const handleEdit = (product) => {
     const variants = product?.variants?.length
       ? product.variants.map((v) => ({
-        _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
-        cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
-        quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
-        option_values: v.attributes || {},
-        images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
-      }))
+          _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
+          cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
+          quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
+          option_values: v.attributes || {},
+          images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
+        }))
       : [createEmptyVariant()];
-
+    
     const currentTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
-
+    
     setFormData({
       category_id: normalizeId(product?.category_id), brand_id: normalizeId(product?.brand_id),
       name: product?.name || "", description: product?.description || "", tax: String(product?.tax ?? 0),
       status: product?.status || "active", tag_names: currentTagNames, variants,
     });
-
-    if (product?.category_id) fetchCategoryAttributes(normalizeId(product?.category_id));
-
     setTagInput("");
     setEditingProduct(product); setCurrentStep(1); setExpandedVariant(0);
     setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
@@ -484,7 +662,6 @@ export default function ProductsPage() {
         existing_images: existingImgs,
       };
     });
-
     data.append("variants", JSON.stringify(variantsPayload));
     data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
@@ -575,12 +752,10 @@ export default function ProductsPage() {
   const resetAttributeForm = () => {
     setAttributeFormData({ name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true });
   };
-
   const handleOpenAttributeModal = () => {
     resetAttributeForm();
     setShowNewAttributeModal(true);
   };
-
   const handleAddAttributeValue = () => {
     setAttributeFormData(prev => ({ ...prev, values: [...prev.values, { label: "", value: "" }] }));
   };
@@ -594,23 +769,29 @@ export default function ProductsPage() {
       return { ...prev, values: newValues };
     });
   };
-
   const handleAttributeSubmit = (e) => {
     e.preventDefault();
     if (!attributeFormData.name.trim()) { toast.error("Attribute name is required"); return; }
-
     const finalCode = attributeFormData.code.trim() || attributeFormData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
-
+    const dt = attributeFormData.data_type;
+    const normalizedValues = (attributeFormData.values || [])
+      .map((v) => {
+        const raw = (v?.value ?? v?.label ?? "").toString().trim();
+        if (!raw) return null;
+        if (dt === "number") {
+          if (!/^-?\d+(\.\d+)?$/.test(raw)) return null;
+          return { label: raw, value: raw };
+        }
+        return { label: raw, value: raw.toLowerCase() };
+      })
+      .filter(Boolean);
     const payload = {
       name: attributeFormData.name.trim(),
       code: finalCode,
-      data_type: attributeFormData.data_type,
+      data_type: dt,
       variant_allowed: true,
-      values: (attributeFormData.data_type === "select" || attributeFormData.data_type === "multi_select")
-        ? attributeFormData.values.filter(v => v.label.trim() && v.value.trim())
-        : []
+      values: normalizedValues,
     };
-
     createAttributeMutation.mutate(payload);
   };
 
@@ -635,7 +816,6 @@ export default function ProductsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const activeProducts = products.filter((p) => p?.status === "active").length;
@@ -710,7 +890,6 @@ export default function ProductsPage() {
                   const low = qty <= min;
                   const img = fv?.images?.[0]?.img_url;
                   const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
-
                   return (
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
@@ -853,7 +1032,6 @@ export default function ProductsPage() {
                       </div>
                     </Field>
                   </div>
-
                   <Field label="Tags">
                     <div className="flex gap-2">
                       <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag()} placeholder="Type tag name & press Enter" className="h-9 flex-1 rounded-md px-3 text-sm outline-none" style={inputStyle} />
@@ -870,7 +1048,6 @@ export default function ProductsPage() {
                       </div>
                     )}
                   </Field>
-
                   <Field label="Product Name *"><input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
                   <Field label="Description"><textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -883,7 +1060,6 @@ export default function ProductsPage() {
                   </div>
                 </div>
               )}
-
               {currentStep === 2 && (
                 <div className="space-y-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -893,7 +1069,6 @@ export default function ProductsPage() {
                     </div>
                     <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
                   </div>
-
                   <div className="space-y-3">
                     {formData.variants.map((variant, index) => (
                       <div key={variant._id || `new-${index}`} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
@@ -908,7 +1083,6 @@ export default function ProductsPage() {
                             <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
                           </div>
                         </div>
-
                         {expandedVariant === index && (
                           <div className="space-y-5 p-4">
                             <div>
@@ -927,7 +1101,7 @@ export default function ProductsPage() {
                                 </Field>
                               </div>
                             </div>
-
+                            
                             {/* PROFESSIONAL VARIANT ATTRIBUTES SECTION */}
                             <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}>
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b" style={{ borderColor: "var(--border-color)" }}>
@@ -942,35 +1116,45 @@ export default function ProductsPage() {
                                   <Plus className="h-3.5 w-3.5" /> Add Attribute
                                 </button>
                               </div>
-
                               {variantAllowedAttributes.length > 0 ? (
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                   {variantAllowedAttributes.map(attr => {
                                     const assignedOptions = getAssignedOptionList(attr);
                                     const hasAssignedOptions = assignedOptions.length > 0;
-                                    const isMultiSelectType = attr.data_type === 'select' || attr.data_type === 'multi_select' || attr.data_type === 'multi-select';
-                                    const renderAsDropdown = isMultiSelectType || hasAssignedOptions;
+                                    const dt = String(attr.data_type || "").toLowerCase().trim();
+                                    const renderAsSelect = hasAssignedOptions;
+                                    const attrCode = String(attr.code || attr._id || "");
+                                    const storedRaw = variant.option_values?.[attrCode];
+                                    const storedValue = Array.isArray(storedRaw) ? (storedRaw[0] || "") : (storedRaw || "");
                                     return (
-                                      <Field key={attr._id} label={attr.name}>
-                                        {renderAsDropdown ? (
-                                          <DropdownWithAddValue
+                                      <Field key={String(attr._id || attr.code || Math.random())} label={attr.name}>
+                                        {renderAsSelect ? (
+                                          <VariantAttributeSelect
                                             attr={attr}
-                                            assignedOptions={assignedOptions}
-                                            value={variant.option_values[attr.code] || ""}
-                                            onChange={(val) => updateVariantOption(index, attr.code, val)}
-                                            onAddValue={(attr, val) => handleAddVariantAttributeValue(attr, val, index)}
+                                            options={assignedOptions}
+                                            value={storedValue}
+                                            multiple={false}
+                                            onChange={(val) => updateVariantOption(index, attrCode, val)}
+                                            onAddValue={(a, v) => handleAddVariantAttributeValue(a, v, index)}
                                             inputStyle={inputStyle}
                                           />
-                                        ) : attr.data_type === 'color' ? (
+                                        ) : dt === 'color' ? (
                                           <div className="flex items-center gap-2">
-                                            <input type="color" value={variant.option_values[attr.code] || '#000000'} onChange={(e) => updateVariantOption(index, attr.code, e.target.value)} className="h-9 w-12 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
-                                            <span className="text-xs font-mono">{variant.option_values[attr.code] || '#000000'}</span>
-                                            <AddAttributeValueControl attr={attr} onAdd={(attr, val) => handleAddVariantAttributeValue(attr, val, index)} />
+                                            <input type="color" value={variant.option_values?.[attrCode] || '#000000'} onChange={(e) => updateVariantOption(index, attrCode, e.target.value)} className="h-9 w-12 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
+                                            <span className="text-xs font-mono">{variant.option_values?.[attrCode] || '#000000'}</span>
+                                            <AddAttributeValueControl attr={attr} onAdd={(a, v) => handleAddVariantAttributeValue(a, v, index)} />
                                           </div>
                                         ) : (
                                           <div className="flex items-center gap-2">
-                                            <input type={attr.data_type === 'number' || attr.data_type === 'decimal' ? 'number' : 'text'} value={variant.option_values[attr.code] || ""} onChange={(e) => updateVariantOption(index, attr.code, e.target.value)} placeholder={`Enter ${attr.name}`} className="h-9 flex-1 rounded-md px-3 text-sm outline-none" style={inputStyle} />
-                                            <AddAttributeValueControl attr={attr} onAdd={(attr, val) => handleAddVariantAttributeValue(attr, val, index)} />
+                                            <input
+                                              type={dt === 'number' || dt === 'decimal' || dt === 'float' ? 'number' : 'text'}
+                                              value={variant.option_values?.[attrCode] || ""}
+                                              onChange={(e) => updateVariantOption(index, attrCode, e.target.value)}
+                                              placeholder={`Enter ${attr.name}`}
+                                              className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
+                                              style={inputStyle}
+                                            />
+                                            <AddAttributeValueControl attr={attr} onAdd={(a, v) => handleAddVariantAttributeValue(a, v, index)} />
                                           </div>
                                         )}
                                       </Field>
@@ -1002,7 +1186,6 @@ export default function ProductsPage() {
                                 </div>
                               )}
                             </div>
-
                             <div>
                               <SectionTitle>Product Images</SectionTitle>
                               <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
@@ -1030,7 +1213,6 @@ export default function ProductsPage() {
                   </div>
                 </div>
               )}
-
               <div className="flex justify-between border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
                 <button type="button" onClick={() => setCurrentStep(1)} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><ChevronLeft className="h-4 w-4" /> Back</button>
                 <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}<Check className="h-4 w-4" /></button>
@@ -1123,134 +1305,224 @@ export default function ProductsPage() {
         </ModalOverlay>
       )}
 
-      {/* ✅ FIXED ATTRIBUTE MODAL: Clean & Error-Free */}
+      {/* ================= ADD ATTRIBUTE MODAL (PROFESSIONAL DARK STYLE) ================= */}
       {showNewAttributeModal && (
-        <ModalOverlay zIndex="z-[70]">
-          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
-            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">Create New Attribute</h3>
-              <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}>
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-card)] shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border-card)] flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+                  <Icons.FileText className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Create New Attribute</h3>
+                  <p className="text-[11px] text-[var(--text-muted)]">Configure properties for products in this category.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-            
-            <form onSubmit={handleAttributeSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
-              {/* Name and Code fields side by side */}
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Attribute Name *">
-                  <input 
-                    type="text" 
-                    value={attributeFormData.name} 
-                    onChange={e => setAttributeFormData(p => ({ ...p, name: e.target.value }))} 
-                    required 
-                    disabled={createAttributeMutation.isPending} 
-                    className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
-                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder="e.g. Color, RAM, Size" 
-                  />
-                </Field>
 
-                <Field label="Attribute Code">
-                  <input 
-                    type="text" 
-                    value={attributeFormData.code} 
-                    onChange={e => setAttributeFormData(p => ({ ...p, code: e.target.value.toLowerCase() }))} 
-                    disabled={createAttributeMutation.isPending} 
-                    className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
-                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder="e.g. color, ram_size" 
-                  />
-                </Field>
+            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-[var(--danger)]">*</span></label>
+                <input
+                  type="text"
+                  value={attributeFormData.name}
+                  onChange={(e) => setAttributeFormData({ ...attributeFormData, name: e.target.value })}
+                  autoFocus
+                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  placeholder="e.g. Color, Size, RAM"
+                />
               </div>
 
-              <Field label="Data Type *">
-                <select 
-                  value={attributeFormData.data_type} 
-                  onChange={e => setAttributeFormData(p => ({ ...p, data_type: e.target.value }))} 
-                  disabled={createAttributeMutation.isPending} 
-                  className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" 
-                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                >
-                  <option value="text">Text</option>
-                  <option value="number">Number</option>
-                  <option value="multi_select">Multi Select</option>
-                  <option value="decimal">Decimal</option>
-                </select>
-              </Field>
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { id: "text", label: "Text", icon: <Icons.Text className="w-4 h-4" /> },
+                    { id: "number", label: "Number", icon: <Icons.Hash className="w-4 h-4" /> },
+                    { id: "multi_select", label: "Options", icon: <Icons.Filter className="w-4 h-4" /> },
+                  ].map((type) => {
+                    const isActive = attributeFormData.data_type === type.id;
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setAttributeFormData({ ...attributeFormData, data_type: type.id })}
+                        className={`h-12 text-[11px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-colors ${isActive ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)]"}`}
+                      >
+                        {type.icon}
+                        <span>{type.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-              {/* Only show Allowed Values section for "select" type, NOT for "multi_select" */}
-              {attributeFormData.data_type === "select" && (
-                <div className="space-y-2 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Allowed Values</label>
-                    <button type="button" onClick={handleAddAttributeValue} className="flex items-center gap-1 text-[11px] font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}>
-                      <Plus className="h-3 w-3" /> Add Value
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {attributeFormData.values.map((val, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+              {attributeFormData.data_type === "text" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
+                  <input
+                    type="text"
+                    value={(attributeFormData.values[0]?.label || attributeFormData.values[0]?.value || "").toString()}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAttributeFormData({
+                        ...attributeFormData,
+                        values: [{ label: v, value: v.toLowerCase() }],
+                      });
+                    }}
+                    placeholder="Enter text value"
+                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  />
+                </div>
+              )}
+
+              {attributeFormData.data_type === "number" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
+                  <input
+                    type="number"
+                    value={(attributeFormData.values[0]?.label || attributeFormData.values[0]?.value || "").toString()}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAttributeFormData({
+                        ...attributeFormData,
+                        values: [{ label: v, value: v }],
+                      });
+                    }}
+                    placeholder="Enter number value"
+                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  />
+                </div>
+              )}
+
+              {attributeFormData.data_type === "multi_select" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Pre-defined Options</label>
+                  <div className="space-y-1.5">
+                    {(attributeFormData.values || []).map((opt, idx) => (
+                      <div
+                        key={`opt-${idx}`}
+                        className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg"
+                      >
+                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
+                          {idx + 1}
+                        </span>
                         <input 
-                          type="text" 
-                          placeholder="Label (e.g. Red)" 
-                          value={val.label} 
-                          onChange={e => handleAttributeValueChange(idx, "label", e.target.value)} 
-                          className="h-8 flex-1 rounded-md px-2 text-xs outline-none" 
-                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                          type="text"
+                          value={opt.label || opt.value || ""}
+                          onChange={(e) => {
+                            const newValues = [...attributeFormData.values];
+                            newValues[idx] = { ...newValues[idx], label: e.target.value, value: e.target.value.toLowerCase() };
+                            setAttributeFormData({ ...attributeFormData, values: newValues });
+                          }}
+                          placeholder={`Option ${idx + 1}`}
+                          className="flex-1 min-w-0 text-xs text-[var(--text-primary)] bg-transparent outline-none truncate"
                         />
-                        <input 
-                          type="text" 
-                          placeholder="Value (e.g. #FF0000)" 
-                          value={val.value} 
-                          onChange={e => handleAttributeValueChange(idx, "value", e.target.value)} 
-                          className="h-8 flex-1 rounded-md px-2 text-xs outline-none" 
-                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                        />
-                        <button type="button" onClick={() => handleRemoveAttributeValue(idx)} className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition hover:bg-red-500/10">
-                          <X className="h-3.5 w-3.5" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (attributeFormData.values || []).filter((_, i) => i !== idx);
+                            setAttributeFormData({ ...attributeFormData, values: next });
+                          }}
+                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                          aria-label="Remove option"
+                        >
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
                   </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="new-attr-option-input"
+                      placeholder="Add an option (e.g. 8 GB)"
+                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          if (!val) return;
+                          const exists = (attributeFormData.values || []).some((v) => (v.label || v.value || "").toLowerCase() === val.toLowerCase());
+                          if (exists) return;
+                          setAttributeFormData({ ...attributeFormData, values: [...(attributeFormData.values || []), { label: val, value: val.toLowerCase() }] });
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("new-attr-option-input");
+                        if (!input) return;
+                        const val = input.value.trim();
+                        if (!val) return;
+                        const exists = (attributeFormData.values || []).some((v) => (v.label || v.value || "").toLowerCase() === val.toLowerCase());
+                        if (exists) { input.value = ""; return; }
+                        setAttributeFormData({ ...attributeFormData, values: [...(attributeFormData.values || []), { label: val, value: val.toLowerCase() }] });
+                        input.value = "";
+                      }}
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Option
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">Add one or more options. You can also add more after creating the attribute.</p>
                 </div>
               )}
+            </div>
 
-              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}</button>
-              </div>
-            </form>
+            <div className="px-5 py-4 border-t border-[var(--border-card)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+              <button
+                type="button"
+                onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
+                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleAttributeSubmit(e)}
+                disabled={createAttributeMutation.isPending}
+                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+              >
+                {createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}
+              </button>
+            </div>
           </div>
-        </ModalOverlay>
+        </div>
       )}
     </div>
   );
 }
 
 /* =========================================================
-   SUB-COMPONENTS
+SUB-COMPONENTS
 ========================================================= */
 function Field({ label, children }) {
   return <div className="space-y-1"><label className="block text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{label}</label>{children}</div>;
 }
-
 function NumberField({ label, value, placeholder, onChange }) {
   return <Field label={label}><input type="number" min="0" step="0.01" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} /></Field>;
 }
-
 function SectionTitle({ children }) {
   return <p className="mb-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{children}</p>;
 }
-
 function StatusBadge({ status }) {
   const active = status === "active";
   return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>{active ? "Active" : "Inactive"}</span>;
 }
-
 function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
   return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
 }
-
 function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting, isToggling }) {
   const isActive = product?.status === "active";
   return (
@@ -1262,7 +1534,6 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
     </div>
   );
 }
-
 function SelectFilter({ value, onChange, options, placeholder }) {
   return (
     <div className="relative">
@@ -1274,15 +1545,12 @@ function SelectFilter({ value, onChange, options, placeholder }) {
     </div>
   );
 }
-
 function Dropdown({ children, maxHeight = "max-h-48" }) {
   return <div className={`absolute z-[100] mt-1 w-full overflow-y-auto rounded-lg border shadow-lg ${maxHeight}`} style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>{children}</div>;
 }
-
 function ModalOverlay({ children, zIndex }) {
   return <div className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm`}>{children}</div>;
 }
-
 function TagList({ names }) {
   return (
     <div className="flex flex-wrap gap-1">
@@ -1295,16 +1563,12 @@ function TagList({ names }) {
     </div>
   );
 }
-
 function AddAttributeValueControl({ attr, onAdd }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [adding, setAdding] = useState(false);
-
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
-
   if (!attr || !onAdd) return null;
-
   const handleSave = async () => {
     const trimmed = String(value || "").trim();
     if (!trimmed || adding) return;
@@ -1315,7 +1579,6 @@ function AddAttributeValueControl({ attr, onAdd }) {
       setOpen(false);
     } catch { } finally { setAdding(false); }
   };
-
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={`Add a new value to ${attr.name}`}>
@@ -1323,7 +1586,6 @@ function AddAttributeValueControl({ attr, onAdd }) {
       </button>
     );
   }
-
   return (
     <div className="flex items-center gap-1.5">
       <input type="text" autoFocus value={value} onChange={(ev) => setValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setOpen(false); setValue(""); } }} placeholder="New value..." disabled={adding} className="h-9 px-2.5 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} />
@@ -1332,14 +1594,110 @@ function AddAttributeValueControl({ attr, onAdd }) {
     </div>
   );
 }
-
+function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, inputStyle, multiple = false }) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const handleAdd = async () => {
+    const trimmed = String(draft || "").trim();
+    if (!trimmed) return;
+    try {
+      await onAddValue(attr, trimmed);
+      setDraft("");
+      setAdding(false);
+    } catch {}
+  };
+  if (adding) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
+            else if (e.key === "Escape") { e.preventDefault(); setAdding(false); setDraft(""); }
+          }}
+          placeholder={`New ${attr.name} value...`}
+          className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
+          style={inputStyle}
+        />
+        <button type="button" onClick={handleAdd} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition" style={{ backgroundColor: "var(--accent)", border: "none" }}>Add</button>
+        <button type="button" onClick={() => { setAdding(false); setDraft(""); }} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)" }} title="Cancel"><X className="h-4 w-4" /></button>
+      </div>
+    );
+  }
+  const selectedArr = Array.isArray(value) ? value.map(String) : (value != null && value !== "" ? [String(value)] : []);
+  const selectedSet = new Set(selectedArr.map((s) => s.toLowerCase()));
+  const toggle = (opt) => {
+    const optStr = String(opt);
+    if (!multiple) {
+      onChange(optStr);
+      return;
+    }
+    const exists = selectedSet.has(optStr.toLowerCase());
+    const next = exists ? selectedArr.filter((s) => s.toLowerCase() !== optStr.toLowerCase()) : [...selectedArr, optStr];
+    onChange(next);
+  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative flex-1">
+        <select
+          value={multiple ? "" : (selectedArr[0] || "")}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") return;
+            if (!multiple) {
+              onChange(v);
+            } else {
+              if (!selectedSet.has(v.toLowerCase())) toggle(v);
+            }
+          }}
+          className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm outline-none"
+          style={inputStyle}
+        >
+          <option value="">{multiple ? `Select ${attr.name}...` : `Select ${attr.name}`}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+      </div>
+      {multiple && selectedArr.length > 0 && (
+        <div className="flex flex-wrap gap-1 max-w-[140px]">
+          {selectedArr.slice(0, 2).map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}>
+              {s}
+              <button type="button" onClick={() => toggle(s)} className="opacity-70 hover:opacity-100" aria-label={`Remove ${s}`}><X className="h-3 w-3" /></button>
+            </span>
+          ))}
+          {selectedArr.length > 2 && (
+            <span className="text-[10px] self-center" style={{ color: "var(--text-muted)" }}>+{selectedArr.length - 2}</span>
+          )}
+        </div>
+      )}
+      {!multiple && selectedArr.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium whitespace-nowrap" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}>
+          {selectedArr[0]}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="h-9 px-2 rounded-md text-xs font-semibold inline-flex items-center gap-1 whitespace-nowrap"
+        style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--accent)" }}
+        title={`Add new ${attr.name} value`}
+      >
+        <Plus className="h-3.5 w-3.5" /> Add
+      </button>
+    </div>
+  );
+}
 function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddValue, inputStyle }) {
   const [adding, setAdding] = useState(false);
   const [newValue, setNewValue] = useState("");
   const [saving, setSaving] = useState(false);
-
   if (!attr) return null;
-
   const handleSave = async () => {
     const trimmed = String(newValue || "").trim();
     if (!trimmed || saving) return;
@@ -1350,7 +1708,6 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
       setAdding(false);
     } catch { } finally { setSaving(false); }
   };
-
   if (adding) {
     return (
       <div className="flex items-center gap-1.5">
@@ -1360,7 +1717,6 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
       </div>
     );
   }
-
   return (
     <select value={value || ""} onChange={(e) => { const v = e.target.value; if (v === "__add_new__") { setAdding(true); return; } onChange(v); }} className="h-9 w-full rounded-md px-3 text-sm outline-none" style={inputStyle}>
       <option value="">Select {attr.name}</option>
