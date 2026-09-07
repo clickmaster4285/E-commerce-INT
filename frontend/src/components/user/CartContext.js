@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
@@ -8,6 +8,7 @@ import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, ma
 const CartContext = createContext(null);
 
 const CART_KEY = "cm_cart";
+const SELECTED_KEY = "cart_selected_keys";
 
 const readLocalCart = () => {
   if (typeof window === "undefined") return [];
@@ -24,6 +25,24 @@ const writeLocalCart = (items) => {
   try {
     if (items.length) localStorage.setItem(CART_KEY, JSON.stringify(items));
     else localStorage.removeItem(CART_KEY);
+  } catch {}
+};
+
+const readLocalSelection = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SELECTED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((k) => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalSelection = (keys) => {
+  try {
+    if (keys.length) localStorage.setItem(SELECTED_KEY, JSON.stringify(keys));
+    else localStorage.removeItem(SELECTED_KEY);
   } catch {}
 };
 
@@ -56,8 +75,10 @@ const getStock = (product, variant) => {
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
+  const [selectedKeys, setSelectedKeys] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const cartRef = useRef([]);
+  const selectedRef = useRef([]);
   const prevUserIdRef = useRef(null);
 
   const { data: user = null } = useQuery({
@@ -76,6 +97,9 @@ export function CartProvider({ children }) {
     const stored = readLocalCart();
     cartRef.current = stored;
     setCart(stored);
+    const storedSel = readLocalSelection();
+    selectedRef.current = storedSel;
+    setSelectedKeys(storedSel);
   }, []);
 
   useEffect(() => {
@@ -87,6 +111,10 @@ export function CartProvider({ children }) {
       cartRef.current = [];
       setCart([]);
       writeLocalCart([]);
+      // Clear selection when logged out
+      selectedRef.current = [];
+      setSelectedKeys([]);
+      writeLocalSelection([]);
       return;
     }
 
@@ -102,6 +130,15 @@ export function CartProvider({ children }) {
         }
         cartRef.current = items;
         setCart(items);
+        // After server merge, prune selection to existing keys; auto-select any new merged keys
+        const validKeys = new Set(items.map((i) => i.key));
+        const persistedSel = readLocalSelection();
+        const persistedSet = new Set(persistedSel.filter((k) => validKeys.has(k)));
+        for (const k of validKeys) persistedSet.add(k);
+        const nextSel = [...persistedSet];
+        selectedRef.current = nextSel;
+        setSelectedKeys(nextSel);
+        writeLocalSelection(nextSel);
       } catch {}
     })();
   }, [userId]);
@@ -109,6 +146,16 @@ export function CartProvider({ children }) {
   const save = (next) => {
     cartRef.current = next;
     setCart(next);
+    // Prune selection to existing keys, auto-select any new keys
+    const validKeys = new Set(next.map((i) => i.key));
+    const selSet = new Set(selectedRef.current.filter((k) => validKeys.has(k)));
+    for (const k of validKeys) selSet.add(k);
+    const nextSel = [...selSet];
+    if (nextSel.length !== selectedRef.current.length || nextSel.some((k, i) => k !== selectedRef.current[i])) {
+      selectedRef.current = nextSel;
+      setSelectedKeys(nextSel);
+      writeLocalSelection(nextSel);
+    }
     if (userId) {
       axiosInstance.put("/cart", { items: next }).catch(() => {});
     } else {
@@ -119,9 +166,25 @@ export function CartProvider({ children }) {
   // ✅ ADD TO CART — with STOCK CHECK
   const addToCart = (product, variant = null, qty = 1, dealInfo = null) => {
     const id = product._id || product.id;
-    const key = `${id}__${variant?._id || variant?.title || "default"}`;
-    const price = Number(variant?.selling_price || product.price || 0);
+    const variantKey = variant?._id
+      ? `id:${variant._id}`
+      : variant?.title
+        ? `title:${variant.title}`
+        : "no-variant";
+    const dealKeyPart = dealInfo?.dealId ? `__deal_${dealInfo.dealId}` : "";
+    const key = `${id}__${variantKey}${dealKeyPart}`;
+    const regularPrice = Number(variant?.selling_price || product.price || 0);
     const stock = getStock(product, variant);
+
+    // ✅ For percentage/fixed_amount deals, store the discounted price on the cart line
+    // so the CartContext `total` reflects the deal consistently across drawer/cart/checkout.
+    // For buy_x_get_y the price stays the regular unit price; free items are handled by qty math.
+    let linePrice = regularPrice;
+    if (dealInfo?.dealType === "percentage" && Number(dealInfo.dealDiscountValue) > 0) {
+      linePrice = Math.round(regularPrice * (1 - Number(dealInfo.dealDiscountValue) / 100));
+    } else if (dealInfo?.dealType === "fixed_amount" && Number(dealInfo.dealDiscountValue) > 0) {
+      linePrice = Math.max(0, regularPrice - Number(dealInfo.dealDiscountValue));
+    }
 
     const existing = cartRef.current.find((i) => i.key === key);
     const currentQty = existing?.qty || 0;
@@ -165,6 +228,8 @@ export function CartProvider({ children }) {
             dealBadge: dealInfo.dealBadge || null,
             dealSavings: Number(dealInfo.savings) || 0,
             dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
+            dealDiscountValue: Number(dealInfo.dealDiscountValue) || 0,
+            dealRegularPrice: regularPrice,
             ...(dealInfo.dealType === "buy_x_get_y"
               ? {
                   dealBuyQuantity: dealInfo.buyQuantity || 0,
@@ -182,7 +247,8 @@ export function CartProvider({ children }) {
           variant_id: variant?._id || null,
           name: product.name,
           brand: product.brand_id?.name || product.brand || "",
-          price,
+          price: linePrice,
+          regularPrice,
           image: variant?.images?.[0]?.img_url || "",
           variantTitle: variant?.title || "",
           qty: addQty,
@@ -233,15 +299,49 @@ export function CartProvider({ children }) {
 
   const clearCart = () => save([]);
 
-  const count = cart.reduce((s, i) => s + i.qty, 0);
+  // ✅ SELECTION HELPERS
+  const isLineSelected = useCallback(
+    (key) => selectedRef.current.includes(key),
+    []
+  );
 
-  const total = cart.reduce((s, i) => {
-    if (i.dealType === "buy_x_get_y" && i.dealBuyQuantity && i.dealGetQuantity) {
-      const payableQty = calculatePayableItems(i.qty, i.dealBuyQuantity, i.dealGetQuantity);
-      return s + (payableQty * i.price);
-    }
-    return s + (i.qty * i.price);
-  }, 0);
+  const toggleLineSelected = useCallback((key) => {
+    const cur = selectedRef.current;
+    const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+    selectedRef.current = next;
+    setSelectedKeys(next);
+    writeLocalSelection(next);
+  }, []);
+
+  const setAllSelected = useCallback((flag) => {
+    const next = flag ? cartRef.current.map((i) => i.key) : [];
+    selectedRef.current = next;
+    setSelectedKeys(next);
+    writeLocalSelection(next);
+  }, []);
+
+  const setSelection = useCallback((keys) => {
+    const validKeys = new Set(cartRef.current.map((i) => i.key));
+    const next = [...new Set(keys.filter((k) => validKeys.has(k)))];
+    selectedRef.current = next;
+    setSelectedKeys(next);
+    writeLocalSelection(next);
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    selectedRef.current = [];
+    setSelectedKeys([]);
+    writeLocalSelection([]);
+  }, []);
+
+  // ✅ Derived: only items whose keys are selected
+  const selectedItems = useMemo(() => {
+    const selSet = new Set(selectedKeys);
+    return cart.filter((i) => selSet.has(i.key));
+  }, [cart, selectedKeys]);
+
+  const count = cart.reduce((s, i) => s + i.qty, 0);
+  const selectedCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
 
   const getDealInfoForItem = (item) => {
     if (!item.dealId || item.dealType !== "buy_x_get_y") return null;
@@ -263,14 +363,20 @@ export function CartProvider({ children }) {
         removeFromCart,
         removeItems,
         restoreItems,
-        removeItems,
-        restoreItems,
         clearCart,
         count,
-        total,
         isCartOpen,
         setIsCartOpen,
         getDealInfoForItem,
+        // Selection
+        selectedKeys,
+        selectedItems,
+        selectedCount,
+        isLineSelected,
+        toggleLineSelected,
+        setAllSelected,
+        setSelection,
+        clearSelection,
       }}
     >
       {children}

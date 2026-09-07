@@ -104,7 +104,7 @@ export default function DealsSection() {
   if (!deals || deals.length === 0) return null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-6 lg:py-10">
+    <section className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-10">
       <style>{`
         @keyframes dealShine { 0% { transform: translateX(-150%) skewX(-20deg); } 60%, 100% { transform: translateX(400%) skewX(-20deg); } }
         @keyframes dealFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -232,38 +232,38 @@ function DealEngine({ deals }) {
             />
           )}
 
-          <div className="relative px-5 sm:px-8 lg:px-10 py-6 sm:py-7 lg:py-8">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
+          <div className="relative px-4 sm:px-8 lg:px-10 py-5 sm:py-7 lg:py-8">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
               {/* LEFT — identity */}
-              <div className="flex items-start gap-4 sm:gap-5 flex-1 min-w-0">
+              <div className="flex items-start gap-3 sm:gap-5 flex-1 min-w-0">
                 <div
-                  className="w-14 h-14 sm:w-16 sm:h-16 lg:w-[4.5rem] lg:h-[4.5rem] rounded-2xl bg-white/15 backdrop-blur border-2 border-white/25 flex items-center justify-center shrink-0 shadow-2xl"
+                  className="w-12 h-12 sm:w-16 sm:h-16 lg:w-[4.5rem] lg:h-[4.5rem] rounded-2xl bg-white/15 backdrop-blur border-2 border-white/25 flex items-center justify-center shrink-0 shadow-2xl"
                   style={{ animation: "floatY 3.5s ease-in-out infinite" }}
                 >
-                  <Zap size={28} className="text-white" />
+                  <Zap size={24} className="text-white sm:w-7 sm:h-7" />
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-1.5 sm:mb-2">
-                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-none drop-shadow-lg truncate">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+                    <h3 className="text-lg sm:text-3xl lg:text-4xl font-black text-white leading-none drop-shadow-lg truncate">
                       {activeDeal.name}
                     </h3>
                     {badgeText && (
-                                         <span
+                     <span
                         style={{ color: "#0a0a0a" }}
-                        className="bg-white px-3 sm:px-4 py-1.5 rounded-full text-[11px] sm:text-sm font-black uppercase tracking-wide shadow-xl whitespace-nowrap"
+                        className="bg-white px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm font-black uppercase tracking-wide shadow-xl whitespace-nowrap"
                       >
                         {badgeText}
                       </span>
                     )}
                   </div>
 
-                  <p className="text-white/90 text-xs sm:text-base max-w-xl line-clamp-2 leading-relaxed">
+                  <p className="hidden sm:block text-white/90 text-xs sm:text-base max-w-xl line-clamp-2 leading-relaxed">
                     {activeDeal.description || "Limited-time offer — grab it before it's gone"}
                   </p>
 
                   {/* ✅ Perks row */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 sm:mt-4">
+                  <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1.5 mt-2 sm:mt-4">
                     <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black text-white/95 uppercase tracking-wider">
                       <Package size={12} /> {products.length} Products
                     </span>
@@ -356,7 +356,7 @@ function DealEngine({ deals }) {
         </div>
 
         {/* ═══════ PRODUCTS AREA ═══════ */}
-        <div className="p-3.5 sm:p-5 lg:p-6" key={activeDeal._id} style={{ animation: "dealFadeIn .45s ease-out" }}>
+        <div className="p-3 sm:p-5 lg:p-6" key={activeDeal._id} style={{ animation: "dealFadeIn .45s ease-out" }}>
           <ProductsRow products={products} deal={activeDeal} hex={cfg.hex} />
         </div>
       </div>
@@ -458,8 +458,8 @@ function ProductsRow({ products, deal, hex }) {
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {products.map((product) => (
-          <div key={product._id || product.id} className="flex-shrink-0 w-[45%] sm:w-[30%] lg:w-[19.2%] snap-start">
-            <ProductCard product={product} deal={deal} />
+          <div key={product._id || product.id} className="flex-shrink-0 w-[47%] sm:w-[30%] lg:w-[19.2%] snap-start">
+            <ProductCard product={product} deal={deal} dealId={deal._id} showDealPricing />
           </div>
         ))}
       </div>
@@ -472,7 +472,7 @@ function ProductsRow({ products, deal, hex }) {
 ===================================================== */
 function DealsSkeleton() {
   return (
-    <section className="max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-6 lg:py-10">
+    <section className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-10">
       <div className="animate-pulse space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-[var(--user-bg-card)]" />

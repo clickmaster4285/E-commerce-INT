@@ -116,13 +116,13 @@ export default function DealDetailPage({ params }) {
   const Icon = visual.icon;
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-8 lg:py-12">
-      <Link href="/deals" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] mb-8 transition">
-        <ArrowLeft size={16} /> Back to All Deals
+    <main className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-12">
+      <Link href="/deals" className="inline-flex items-center gap-2 text-xs lg:text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] mb-5 lg:mb-8 transition">
+        <ArrowLeft size={14} className="lg:w-4 lg:h-4" /> Back to All Deals
       </Link>
 
       {/* Deal Header Card */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-orange-500/10 via-red-500/5 to-pink-500/10 border-2 border-orange-500/30 shadow-2xl mb-10">
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-orange-500/10 via-red-500/5 to-pink-500/10 border-2 border-orange-500/30 shadow-2xl mb-6 lg:mb-10">
         <div className="grid md:grid-cols-2 gap-0">
           <div className="relative aspect-[4/3] md:aspect-auto block overflow-hidden">
             {imgUrl ? (
@@ -192,12 +192,14 @@ export default function DealDetailPage({ params }) {
 
         {products.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4 mb-8">
              {products.map((product) => (
   <ProductCard 
     key={product._id} 
     product={product} 
     deal={deal} 
+    dealId={deal._id}
+    showDealPricing
   />
 ))}
             </div>

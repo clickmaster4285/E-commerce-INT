@@ -156,6 +156,18 @@ const dealSchema = new mongoose.Schema(
     },
 
     // ==========================================
+    // FREE SHIPPING — which methods are FREE
+    // Default: BOTH standard + express (backward compatible).
+    // Missing/empty array is treated as BOTH methods.
+    // ==========================================
+
+    freeShippingMethods: {
+      type: [String],
+      enum: ["standard", "express"],
+      default: ["standard", "express"],
+    },
+
+    // ==========================================
     // DEAL SCHEDULE
     // ==========================================
 

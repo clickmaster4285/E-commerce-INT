@@ -112,6 +112,8 @@ export default function UserLayout({ children }) {
   // ✅ LIVE SOCKET SYNC — admin changes automatically reflect
   useUserSocketSync();
 
+  const pathname = usePathname();
+
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
@@ -128,6 +130,9 @@ export default function UserLayout({ children }) {
     if (store?.store_name) document.title = store.store_name;
   }, [store]);
 
+  // ✅ Hide Footer on /cart, /checkout, and /orders (all breakpoints).
+  const hideFooter = pathname === "/cart" || pathname?.startsWith("/cart/") || pathname === "/checkout" || pathname?.startsWith("/checkout/") || pathname === "/orders" || pathname?.startsWith("/orders/");
+
   return (
     <WishlistProvider>
       <CartProvider>
@@ -137,7 +142,7 @@ export default function UserLayout({ children }) {
         >
           <Header />
 <main className="w-full min-w-0">{children}</main>
-          <Footer />
+          {!hideFooter && <Footer />}
           <CartDrawer />
           <MobileNav />
         </div>

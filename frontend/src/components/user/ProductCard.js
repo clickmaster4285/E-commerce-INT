@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, Plus, Check, Package, Tag, Truck, Zap, PackageOpen } from "lucide-react";
+import { Heart, Plus, Check, Package, Tag, Truck, Zap, PackageOpen, Sparkles } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { useDiscounts } from "./DiscountContext";
@@ -36,13 +36,15 @@ export default function ProductCard({
   product,
   hideDiscountBadge = false,
   dealBadge = null,
-  deal = null, 
+  deal = null,
+  dealId = null,
+  showDealPricing = false,
   children,
 }) {
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  const { calculateProductDiscount } = useDiscounts();
+  const { calculateProductDiscount, getActiveDealForProduct } = useDiscounts();
 
   if (!product) return null;
 
@@ -60,9 +62,11 @@ export default function ProductCard({
   let oldPrice = variantOldPrice;
   let hasDiscount = false;
   let matchedDeal = null;
+  let discInfo = null;   // ✅ poora discount object rakh lo
   
   try {
-    const disc = calculateProductDiscount(product, variantPrice);
+    const disc = calculateProductDiscount(product, variantPrice, showDealPricing);
+    discInfo = disc;
     price = disc.discountedPrice;
     oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
     hasDiscount = disc.hasDiscount;
@@ -71,6 +75,10 @@ export default function ProductCard({
     console.warn("Discount calc error:", e);
   }
 
+  // ✅ When showDealPricing is false (regular listing), still detect deal membership
+  // so we can show a subtle "Also available in deal" mention — without applying deal pricing.
+  const mentionDeal = !showDealPricing ? (deal || matchedDeal || getActiveDealForProduct(product)) : null;
+
   const totalStock = variants.length
     ? variants.reduce((s, v) => s + Number(v.quantity || 0), 0)
     : (product.quantity || 99);
@@ -78,9 +86,26 @@ export default function ProductCard({
   const brandName = product.brand_id?.name || product.brand || "";
   const out = totalStock < 1;
 
-  const activeDeal = deal || matchedDeal;
+  const activeDeal = showDealPricing ? (deal || matchedDeal) : deal;
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
   const displayBadgeText = badgeConfig?.text || dealBadge;
+
+  // ✅ SIMPLE DISCOUNT BADGE — percentage / fixed amount / effective %
+  let discountBadgeText = "";
+  if (hasDiscount && !activeDeal) {
+    const d = discInfo || {};
+    const md = d.matchedDiscount || d.discount || null;
+    const t = d.discountType || d.type || (md && md.type) || "";
+    const v = Number(d.discountValue ?? d.value ?? (md && md.value) ?? 0);
+    if (t === "percentage" && v > 0) {
+      discountBadgeText = `${v}% OFF`;
+    } else if ((t === "fixed_amount" || t === "fixed") && v > 0) {
+      discountBadgeText = `Rs. ${v.toLocaleString()} OFF`;
+    } else {
+      const pct = oldPrice > 0 ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
+      if (pct > 0) discountBadgeText = `${pct}% OFF`;
+    }
+  }
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -95,6 +120,7 @@ export default function ProductCard({
         dealBadge: badgeConfig?.text || null,
         savings: price > 0 ? (oldPrice - price) : 0,
         originalPrice: oldPrice,
+        dealDiscountValue: Number(activeDeal.discountValue) || 0,
       };
       if (activeDeal.type === "buy_x_get_y") {
         dealInfo.buyQuantity = activeDeal.buyQuantity;
@@ -110,7 +136,11 @@ export default function ProductCard({
 
   return (
     <Link
-      href={`/product/${productId}`}
+      href={
+        showDealPricing
+          ? (dealId ? `/product/${productId}?source=deal&deal=${encodeURIComponent(dealId)}` : `/product/${productId}?source=deal`)
+          : `/product/${productId}`
+      }
       className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
     >
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
@@ -131,9 +161,10 @@ export default function ProductCard({
             </span>
           )}
 
+          {/* ✅ SIMPLE DISCOUNT — ab value dikhegi, sirf "Sale" nahi */}
           {!displayBadgeText && hasDiscount && !hideDiscountBadge && (
             <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <Tag size={9} /> Sale
+              <Tag size={9} /> {discountBadgeText || "Sale"}
             </span>
           )}
 
@@ -166,7 +197,6 @@ export default function ProductCard({
         <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">{brandName || ""}</p>
         <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">{product.name}</h3>
 
-        {/* ✅ FIX: cut price AB price ke UPAR — full show hota hai */}
         <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
           {oldPrice > price && (
             <span className="text-[11px] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
@@ -176,6 +206,11 @@ export default function ProductCard({
           <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)] whitespace-nowrap">
             Rs. {price.toLocaleString()}
           </h4>
+          {mentionDeal && (
+            <span className="mt-1 text-[10px] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
+              <Sparkles size={10} className="text-orange-500" /> Also available in deal
+            </span>
+          )}
         </div>
         {children}
       </div>

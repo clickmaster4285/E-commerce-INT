@@ -29,8 +29,12 @@ export default function useDealSocketSync() {
     // -------------------------------------------------------
     const invalidateDeals = () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
+      // ✅ Mirror to the deals key the user GUI's DiscountContext reads,
+      // so admin deal changes refresh the homepage deals strip + product page
+      // deal-mode pricing immediately.
+      queryClient.invalidateQueries({ queryKey: ["activeDeals"] });
       // Agar stats alag query hain to unhein bhi refresh karein
-      // queryClient.invalidateQueries({ queryKey: ["deal-stats"] }); 
+      // queryClient.invalidateQueries({ queryKey: ["deal-stats"] });
     };
 
     // -------------------------------------------------------

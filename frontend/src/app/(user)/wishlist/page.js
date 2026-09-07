@@ -26,7 +26,7 @@ export default function WishlistPage() {
   const isLoading = loading || (count > 0 && productsLoading);
 
   return (
-    <main className="max-w-[1200px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-10">
+    <main className="max-w-[1200px] mx-auto px-3 lg:px-6 py-4 lg:py-10 pb-24 md:pb-10">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 sm:mb-8">
         <div>
@@ -72,7 +72,7 @@ export default function WishlistPage() {
         </div>
       ) : (
         /* ✅ Wishlist Grid — full product cards */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
           {items.map((item) => (
             <ProductCard key={item._id || item.id} product={item} />
           ))}

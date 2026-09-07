@@ -575,14 +575,36 @@ const calculateDiscountedPrice = async (product, discounts) => {
           ));
 
       if (dealApplies) {
+        // ✅ Apply the deal's OWN discount to the price.
+        // Percentage / fixed_amount → reduce price. buy_x_get_y / bundle /
+        // free_shipping → no price change (free items / shipping only).
+        // Regular (non-deal) discounts are skipped entirely for this product.
+        const dealType = activeDeal.type;
+        const dealValue = Number(activeDeal.discountValue || 0);
+
+        let dealDiscountedPrice = originalPriceSnapshot;
+        let dealHasDiscount = false;
+        let dealSavings = 0;
+
+        if (dealType === "percentage") {
+          dealDiscountedPrice = Math.round(originalPriceSnapshot * (1 - dealValue / 100) * 100) / 100;
+          dealHasDiscount = true;
+          dealSavings = Math.round((originalPriceSnapshot - dealDiscountedPrice) * 100) / 100;
+        } else if (dealType === "fixed_amount") {
+          dealDiscountedPrice = Math.max(0, originalPriceSnapshot - dealValue);
+          dealHasDiscount = dealDiscountedPrice < originalPriceSnapshot;
+          dealSavings = Math.round((originalPriceSnapshot - dealDiscountedPrice) * 100) / 100;
+        }
+
         return {
-          hasDiscount: false,
+          hasDiscount: dealHasDiscount,
           originalPrice: originalPriceSnapshot,
-          discountedPrice: originalPriceSnapshot,
-          discountValue: 0,
-          discountType: null,
-          discountName: "",
-          savings: 0,
+          discountedPrice: dealDiscountedPrice,
+          discountValue: dealValue,
+          discountType: dealType,
+          discountName: activeDeal.name || "",
+          savings: dealSavings,
+          matchedDeal: activeDeal,
         };
       }
     }

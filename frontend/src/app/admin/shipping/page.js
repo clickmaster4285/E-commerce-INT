@@ -10,17 +10,17 @@ import { productApi } from "@/apis/user/productApi";
 import { useShippingSocketSync } from "@/hooks/useShippingSocketSync.js";
 
 /* ================= Icons ================= */
-const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1h4a1 1 0 001-1v-3m-9 4a2 2 0 104 0m-4 0a2 2 0 114 0m6-2V9m-2 2h4l2 3v3h-2m-2-5a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
+const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a2 2 0 11-1-1h-1m4 0a2 2 0 104 0m-4 0a2 2 0 114 0m6-2V9m-2 2h4l2 3v3h-2m-2-5a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 const ZapIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>);
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>);
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
-const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
 const CheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>);
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
 const ArrowRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
+const GlobeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
 
 const inputCls = "h-9 px-3 rounded-md text-sm w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40";
@@ -31,7 +31,7 @@ const labelStyle = { color: "var(--text-secondary)" };
 
 /* ================================================================
    ✅ SEARCHABLE TARGET PICKER
-================================================================ */
+============================================================ */
 const SearchSelect = ({ value, onChange, options, placeholder }) => {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -50,7 +50,7 @@ const SearchSelect = ({ value, onChange, options, placeholder }) => {
     return options.filter((o) => o.name?.toLowerCase().includes(term.toLowerCase()));
   }, [options, term]);
 
-  const selected = options.find((o) => String(o._id) === String(value));
+  const sel = options.find((o) => String(o._id) === String(value));
 
   return (
     <div ref={ref} className="relative">
@@ -60,10 +60,10 @@ const SearchSelect = ({ value, onChange, options, placeholder }) => {
         className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition"
         style={inputStyle}
       >
-        <span className="truncate" style={{ color: selected ? "var(--text-primary)" : "var(--text-muted)" }}>
-          {selected ? selected.name : placeholder}
+        <span className="truncate" style={{ color: sel ? "var(--text-primary)" : "var(--text-muted)" }}>
+          {sel ? sel.name : placeholder}
         </span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {open && (
@@ -114,20 +114,105 @@ const SearchSelect = ({ value, onChange, options, placeholder }) => {
 };
 
 /* ================================================================
+   ✅ INLINE SETTINGS PANEL
+============================================================ */
+function SettingsPanel({ open, config, onCancel, onSave, saving }) {
+  const [form, setForm] = useState(null);
+
+  // ✅ Re-initialize form from fetched config every time the panel opens.
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      standard: {
+        fee: Number(config?.standard?.fee ?? 200),
+        min_days: Number(config?.standard?.min_days ?? 2),
+        max_days: Number(config?.standard?.max_days ?? 4),
+      },
+      express: {
+        fee: Number(config?.express?.fee ?? 500),
+        min_days: Number(config?.express?.min_days ?? 1),
+        max_days: Number(config?.express?.max_days ?? 2),
+      },
+      free_shipping_over: Number(config?.free_shipping_over ?? 0),
+    });
+  }, [open, config]);
+
+  if (!open || !form) return null;
+
+  const updateStd = (k, v) => setForm({ ...form, standard: { ...form.standard, [k]: v } });
+  const updateExp = (k, v) => setForm({ ...form, express: { ...form.express, [k]: v } });
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ ...cardStyle, animation: "settingsSlide .25s ease-out" }}
+    >
+      <style>{`
+        @keyframes settingsSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+      <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
+        <div>
+          <h3 className="text-base font-semibold">Shipping Settings</h3>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Standard & Express rates, delivery window, free-shipping promo</p>
+        </div>
+        <button type="button" onClick={onCancel} disabled={saving} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
+      </div>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); onSave(form); }}
+        className="p-5 space-y-4"
+      >
+        {/* (a) Standard Delivery */}
+        <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+          <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}><TruckIcon /> Standard Delivery</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label className={labelCls} style={labelStyle}>Fee (Rs)</label><input type="number" min="0" value={form.standard.fee} onChange={(e) => updateStd("fee", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+            <div><label className={labelCls} style={labelStyle}>Min Days</label><input type="number" min="0" value={form.standard.min_days} onChange={(e) => updateStd("min_days", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+            <div><label className={labelCls} style={labelStyle}>Max Days</label><input type="number" min="0" value={form.standard.max_days} onChange={(e) => updateStd("max_days", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+          </div>
+        </div>
+
+        {/* (b) Express Delivery */}
+        <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+          <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}><ZapIcon /> Express Delivery</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label className={labelCls} style={labelStyle}>Fee (Rs)</label><input type="number" min="0" value={form.express.fee} onChange={(e) => updateExp("fee", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+            <div><label className={labelCls} style={labelStyle}>Min Days</label><input type="number" min="0" value={form.express.min_days} onChange={(e) => updateExp("min_days", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+            <div><label className={labelCls} style={labelStyle}>Max Days</label><input type="number" min="0" value={form.express.max_days} onChange={(e) => updateExp("max_days", Number(e.target.value))} className={inputCls} style={inputStyle} /></div>
+          </div>
+        </div>
+
+        {/* (c) Free Shipping Over */}
+        <div>
+          <label className={labelCls} style={labelStyle}>Free Shipping Over (Rs) — 0 = disabled</label>
+          <input type="number" min="0" value={form.free_shipping_over} onChange={(e) => setForm({ ...form, free_shipping_over: Number(e.target.value) })} className={inputCls} style={inputStyle} />
+        </div>
+
+        <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+          <button type="button" onClick={onCancel} disabled={saving} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+          <button type="submit" disabled={saving} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+            {saving ? <><Spinner className="w-3.5 h-3.5" /> Saving...</> : "Save Settings"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ================================================================
    MAIN PAGE
-================================================================ */
+============================================================ */
 export default function ShippingPage() {
   useShippingSocketSync();
   const queryClient = useQueryClient();
 
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [configForm, setConfigForm] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleForm, setRuleForm] = useState({ rule_type: "brand", ref_id: "", shipping_type: "free", fee: 0, is_active: true });
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const { data: config, isLoading } = useQuery({ queryKey: ["adminShippingConfig"], queryFn: shippingApi.getConfig });
+  const { data: config } = useQuery({ queryKey: ["adminShippingConfig"], queryFn: shippingApi.getConfig });
   const { data: rules = [] } = useQuery({ queryKey: ["adminShippingRules"], queryFn: shippingApi.getRules });
   const { data: brands = [] } = useQuery({ queryKey: ["adminBrands"], queryFn: adminBrandApi.getAll });
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
@@ -139,9 +224,9 @@ export default function ShippingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingConfig"] });
       toast.success("Shipping settings updated");
-      setShowConfigModal(false);
+      setSettingsOpen(false);
     },
-    onError: (e) => toast.error(e.response?.data?.message || "Update failed"),
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Update failed"),
   });
 
   const ruleMutation = useMutation({
@@ -152,7 +237,7 @@ export default function ShippingPage() {
       setShowRuleModal(false);
       setEditingRule(null);
     },
-    onError: (e) => toast.error(e.response?.data?.message || "Rule save failed"),
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Rule save failed"),
   });
 
   const deleteMutation = useMutation({
@@ -162,7 +247,7 @@ export default function ShippingPage() {
       toast.success("Rule deleted");
       setDeleteTarget(null);
     },
-    onError: (e) => toast.error(e.response?.data?.message || "Delete failed"),
+    onError: (e) => toast.error(e?.response?.data?.message || e?.message || "Delete failed"),
   });
 
   const toggleMutation = useMutation({
@@ -172,27 +257,26 @@ export default function ShippingPage() {
 
   /* ---------- Helpers ---------- */
   const refName = (rule) => {
+    if (rule.rule_type === "all" || ruleForm.rule_type === "all" && !rule.ref_id) return "All Products";
     const id = String(rule.ref_id ?? rule);
     if ((rule.rule_type || ruleForm.rule_type) === "brand") return brands.find((b) => String(b._id) === id)?.name || "Unknown brand";
     if ((rule.rule_type || ruleForm.rule_type) === "category") return categories.find((c) => String(c._id) === id)?.name || "Unknown category";
+    if ((rule.rule_type || ruleForm.rule_type) === "all") return "All Products";
     return products.find((p) => String(p._id) === id)?.name || "Unknown product";
   };
 
-  const refList = ruleForm.rule_type === "brand" ? brands : ruleForm.rule_type === "category" ? categories : products;
-
-  const openConfigModal = () => {
-    setConfigForm({
-      standard: { fee: config?.standard?.fee ?? 200, min_days: config?.standard?.min_days ?? 2, max_days: config?.standard?.max_days ?? 4 },
-      express: { fee: config?.express?.fee ?? 500, min_days: config?.express?.min_days ?? 1, max_days: config?.express?.max_days ?? 2 },
-      free_shipping_over: config?.free_shipping_over ?? 0,
-    });
-    setShowConfigModal(true);
-  };
+  const refList = (t) => t === "brand" ? brands : t === "category" ? categories : t === "product" ? products : [];
 
   const openRuleModal = (rule = null) => {
     if (rule) {
       setEditingRule(rule);
-      setRuleForm({ rule_type: rule.rule_type, ref_id: String(rule.ref_id), shipping_type: rule.shipping_type, fee: rule.fee || 0, is_active: rule.is_active });
+      setRuleForm({
+        rule_type: rule.rule_type || "brand",
+        ref_id: rule.rule_type === "all" ? "" : String(rule.ref_id || ""),
+        shipping_type: rule.shipping_type || "free",
+        fee: Number(rule.fee) || 0,
+        is_active: !!rule.is_active,
+      });
     } else {
       setEditingRule(null);
       setRuleForm({ rule_type: "brand", ref_id: "", shipping_type: "free", fee: 0, is_active: true });
@@ -200,11 +284,32 @@ export default function ShippingPage() {
     setShowRuleModal(true);
   };
 
+  /* ---------- ✅ FIX: normalize payload + surface backend errors ---------- */
   const submitRule = (e) => {
     e.preventDefault();
-    if (!ruleForm.ref_id) return toast.error("Please select a target");
-    if (ruleForm.shipping_type === "fixed" && ruleForm.fee < 0) return toast.error("Fee cannot be negative");
-    ruleMutation.mutate({ id: editingRule?._id, data: ruleForm });
+    const { rule_type, ref_id, shipping_type, fee, is_active } = ruleForm;
+
+    if (!["brand", "category", "product", "all"].includes(rule_type)) {
+      return toast.error("Please select a valid rule type");
+    }
+    // ✅ Skip target validation for 'all' rules.
+    if (rule_type !== "all" && !ref_id) {
+      return toast.error("Please select a target");
+    }
+    if (shipping_type === "fixed" && Number(fee) < 0) {
+      return toast.error("Fee cannot be negative");
+    }
+
+    // ✅ Build exact backend contract payload.
+    const payload = {
+      rule_type,
+      ref_id: rule_type === "all" ? null : ref_id,
+      shipping_type,
+      fee: shipping_type === "fixed" ? Number(fee) : 0,
+      is_active: !!is_active,
+    };
+
+    ruleMutation.mutate({ id: editingRule?._id, data: payload });
   };
 
   const activeRules = rules.filter((r) => r.is_active).length;
@@ -213,7 +318,7 @@ export default function ShippingPage() {
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
-        {/* Header */}
+        {/* (1) HEADER */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight">Shipping Management</h1>
@@ -222,8 +327,14 @@ export default function ShippingPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={openConfigModal} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <EditIcon /> Edit Settings
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((o) => !o)}
+              aria-expanded={settingsOpen}
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              <EditIcon /> {settingsOpen ? "Close Settings" : "Edit Settings"}
             </button>
             <button onClick={() => openRuleModal()} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={cardStyle}>
               <PlusIcon /> Add Rule
@@ -231,7 +342,16 @@ export default function ShippingPage() {
           </div>
         </div>
 
-        {/* Stat Cards */}
+        {/* (2) INLINE SETTINGS PANEL */}
+        <SettingsPanel
+          open={settingsOpen}
+          config={config}
+          saving={configMutation.isPending}
+          onCancel={() => setSettingsOpen(false)}
+          onSave={(data) => configMutation.mutate(data)}
+        />
+
+        {/* (3) STAT CARDS */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px] font-medium flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}><TruckIcon /> Standard</p>
@@ -255,10 +375,18 @@ export default function ShippingPage() {
           </div>
         </div>
 
-        {/* Rules Table */}
+        {/* (4) RULES SECTION */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-            <h2 className="text-[12px] font-semibold uppercase tracking-wider">Shipping Rules (Brand / Category / Product)</h2>
+            <h2 className="text-[12px] font-semibold uppercase tracking-wider">Shipping Rules</h2>
+            <button
+              type="button"
+              onClick={() => openRuleModal()}
+              className="h-8 px-3 rounded-md text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              <PlusIcon className="w-3.5 h-3.5" /> Add Rule
+            </button>
           </div>
           {rules.length === 0 ? (
             <div className="py-14 text-center">
@@ -278,38 +406,46 @@ export default function ShippingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rules.map((rule, i) => (
-                    <tr key={rule._id} style={{ borderBottom: i < rules.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase" style={{ backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)" }}>
-                          {rule.rule_type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{refName(rule)}</td>
-                      <td className="px-4 py-3">
-                        {rule.shipping_type === "free" ? (
-                          <span className="font-bold text-emerald-500">FREE</span>
-                        ) : (
-                          <span className="font-bold">Rs. {rule.fee.toLocaleString()}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => toggleMutation.mutate(rule._id)} className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition" style={rule.is_active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
-                          {rule.is_active ? "Active" : "Inactive"}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openRuleModal(rule)} className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
-                            <EditIcon />
+                  {rules.map((rule, i) => {
+                    const isAll = rule.rule_type === "all";
+                    return (
+                      <tr key={rule._id} style={{ borderBottom: i < rules.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                            style={isAll
+                              ? { backgroundColor: "rgba(168,85,247,0.12)", color: "#c084fc", border: "1px solid rgba(168,85,247,0.35)" }
+                              : { backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)" }}
+                          >
+                            {isAll ? "ALL" : rule.rule_type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium">{isAll ? "All Products" : refName(rule)}</td>
+                        <td className="px-4 py-3">
+                          {rule.shipping_type === "free" ? (
+                            <span className="font-bold text-emerald-500">FREE</span>
+                          ) : (
+                            <span className="font-bold">Rs. {Number(rule.fee || 0).toLocaleString()}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => toggleMutation.mutate(rule._id)} className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide transition" style={rule.is_active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
+                            {rule.is_active ? "Active" : "Inactive"}
                           </button>
-                          <button onClick={() => setDeleteTarget(rule)} className="min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
-                            <TrashIcon />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => openRuleModal(rule)} className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
+                              <EditIcon />
+                            </button>
+                            <button onClick={() => setDeleteTarget(rule)} className="min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -317,95 +453,57 @@ export default function ShippingPage() {
         </div>
       </div>
 
-      {/* ===== Config Modal ===== */}
-      {showConfigModal && configForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-lg rounded-xl" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <h3 className="text-base font-semibold">Shipping Settings</h3>
-              <button onClick={() => setShowConfigModal(false)} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
-            </div>
-            <form
-              onSubmit={(e) => { e.preventDefault(); configMutation.mutate(configForm); }}
-              className="p-5 space-y-4 max-h-[70vh] overflow-y-auto"
-            >
-              <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}><TruckIcon /> Standard Delivery</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div><label className={labelCls} style={labelStyle}>Fee (Rs)</label><input type="number" min="0" value={configForm.standard.fee} onChange={(e) => setConfigForm({ ...configForm, standard: { ...configForm.standard, fee: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                  <div><label className={labelCls} style={labelStyle}>Min Days</label><input type="number" min="0" value={configForm.standard.min_days} onChange={(e) => setConfigForm({ ...configForm, standard: { ...configForm.standard, min_days: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                  <div><label className={labelCls} style={labelStyle}>Max Days</label><input type="number" min="0" value={configForm.standard.max_days} onChange={(e) => setConfigForm({ ...configForm, standard: { ...configForm.standard, max_days: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                </div>
-              </div>
-
-              <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}><ZapIcon /> Express Delivery</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div><label className={labelCls} style={labelStyle}>Fee (Rs)</label><input type="number" min="0" value={configForm.express.fee} onChange={(e) => setConfigForm({ ...configForm, express: { ...configForm.express, fee: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                  <div><label className={labelCls} style={labelStyle}>Min Days</label><input type="number" min="0" value={configForm.express.min_days} onChange={(e) => setConfigForm({ ...configForm, express: { ...configForm.express, min_days: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                  <div><label className={labelCls} style={labelStyle}>Max Days</label><input type="number" min="0" value={configForm.express.max_days} onChange={(e) => setConfigForm({ ...configForm, express: { ...configForm.express, max_days: Number(e.target.value) } })} className={inputCls} style={inputStyle} /></div>
-                </div>
-              </div>
-
-              <div>
-                <label className={labelCls} style={labelStyle}>Free Shipping Over (Rs) — 0 = disabled</label>
-                <input type="number" min="0" value={configForm.free_shipping_over} onChange={(e) => setConfigForm({ ...configForm, free_shipping_over: Number(e.target.value) })} className={inputCls} style={inputStyle} />
-              </div>
-
-              <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={() => setShowConfigModal(false)} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={configMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {configMutation.isPending ? "Saving..." : "Save Settings"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== ✅ IMPROVED RULE MODAL ===== */}
+      {/* ===== RULE MODAL ===== */}
       {showRuleModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-md rounded-xl" style={cardStyle}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div>
                 <h3 className="text-base font-semibold">{editingRule ? "Edit Rule" : "Add Shipping Rule"}</h3>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Free ya fixed shipping — brand / category / product ke liye</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Free ya fixed shipping — for any brand, category, product or all</p>
               </div>
               <button onClick={() => setShowRuleModal(false)} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
             </div>
 
             <form onSubmit={submitRule} className="p-5 space-y-4">
-              {/* 1. Rule Type — segmented */}
+              {/* 1. Rule Type — 2x2 responsive grid */}
               <div>
                 <label className={labelCls} style={labelStyle}>Apply To</label>
-                <div className="grid grid-cols-3 gap-1 p-1 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                  {["brand", "category", "product"].map((t) => (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                  {[
+                    { key: "brand", label: "Brand" },
+                    { key: "category", label: "Category" },
+                    { key: "product", label: "Product" },
+                    { key: "all", label: "All Products", icon: GlobeIcon },
+                  ].map(({ key, label, icon: Icon }) => (
                     <button
-                      key={t}
+                      key={key}
                       type="button"
-                      onClick={() => setRuleForm({ ...ruleForm, rule_type: t, ref_id: "" })}
-                      className="h-8 rounded-md text-[12px] font-semibold capitalize transition"
-                      style={ruleForm.rule_type === t ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { color: "var(--text-muted)" }}
+                      onClick={() => setRuleForm({ ...ruleForm, rule_type: key, ref_id: "" })}
+                      className="h-8 px-2 rounded-md text-[12px] font-semibold capitalize transition flex items-center justify-center gap-1"
+                      style={ruleForm.rule_type === key ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { color: "var(--text-muted)" }}
                     >
-                      {t}
+                      {Icon ? <Icon className="w-3 h-3" /> : null}
+                      <span>{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* 2. Target — searchable */}
-              <div>
-                <label className={labelCls} style={labelStyle}>Select {ruleForm.rule_type === "brand" ? "Brand" : ruleForm.rule_type === "category" ? "Category" : "Product"}</label>
-                <SearchSelect
-                  value={ruleForm.ref_id}
-                  onChange={(id) => setRuleForm({ ...ruleForm, ref_id: id })}
-                  options={refList}
-                  placeholder={`Search ${ruleForm.rule_type}...`}
-                />
-              </div>
+              {/* 2. Target — only for brand/category/product */}
+              {ruleForm.rule_type !== "all" && (
+                <div>
+                  <label className={labelCls} style={labelStyle}>Select {ruleForm.rule_type === "brand" ? "Brand" : ruleForm.rule_type === "category" ? "Category" : "Product"}</label>
+                  <SearchSelect
+                    value={ruleForm.ref_id}
+                    onChange={(id) => setRuleForm({ ...ruleForm, ref_id: id })}
+                    options={refList(ruleForm.rule_type)}
+                    placeholder={`Search ${ruleForm.rule_type}...`}
+                  />
+                </div>
+              )}
 
-              {/* 3. Shipping Type — cards */}
+              {/* 3. Shipping Type */}
               <div>
                 <label className={labelCls} style={labelStyle}>Shipping</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -454,17 +552,17 @@ export default function ShippingPage() {
                 </div>
               )}
 
-              {/* 5. Live Preview */}
-              {ruleForm.ref_id && (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                  <span className="text-[11px] uppercase font-bold" style={{ color: "var(--text-muted)" }}>{ruleForm.rule_type}</span>
-                  <span className="text-[12px] font-semibold truncate flex-1">{refName(ruleForm)}</span>
-                  <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
-                  <span className="text-[12px] font-black shrink-0" style={{ color: ruleForm.shipping_type === "free" ? "#34d399" : "var(--text-primary)" }}>
-                    {ruleForm.shipping_type === "free" ? "FREE" : `Rs. ${Number(ruleForm.fee || 0).toLocaleString()}`}
-                  </span>
-                </div>
-              )}
+              {/* 5. Live Preview — always show, including for 'all' */}
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <span className="text-[11px] uppercase font-bold" style={{ color: "var(--text-muted)" }}>{ruleForm.rule_type}</span>
+                <span className="text-[12px] font-semibold truncate flex-1">
+                  {ruleForm.rule_type === "all" ? "All Products" : (ruleForm.ref_id ? refName(ruleForm) : "—")}
+                </span>
+                <ArrowRightIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
+                <span className="text-[12px] font-black shrink-0" style={{ color: ruleForm.shipping_type === "free" ? "#34d399" : "var(--text-primary)" }}>
+                  {ruleForm.shipping_type === "free" ? "FREE" : `Rs. ${Number(ruleForm.fee || 0).toLocaleString()}`}
+                </span>
+              </div>
 
               {/* 6. Active */}
               <label className="flex items-center gap-2 cursor-pointer">
@@ -480,8 +578,8 @@ export default function ShippingPage() {
 
               <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
                 <button type="button" onClick={() => setShowRuleModal(false)} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={ruleMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {ruleMutation.isPending ? "Saving..." : editingRule ? "Update Rule" : "Save Rule"}
+                <button type="submit" disabled={ruleMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {ruleMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Saving...</> : editingRule ? "Update Rule" : "Save Rule"}
                 </button>
               </div>
             </form>
@@ -500,14 +598,14 @@ export default function ShippingPage() {
               <div>
                 <h3 className="text-sm font-semibold">Delete this rule?</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  {refName(deleteTarget)} — {deleteTarget.shipping_type === "free" ? "FREE shipping" : `Rs. ${deleteTarget.fee}`}
+                  {deleteTarget.rule_type === "all" ? "All Products" : refName(deleteTarget)} — {deleteTarget.shipping_type === "free" ? "FREE shipping" : `Rs. ${deleteTarget.fee}`}
                 </p>
               </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button onClick={() => deleteMutation.mutate(deleteTarget._id)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              <button onClick={() => deleteMutation.mutate(deleteTarget._id)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
               </button>
             </div>
           </div>

@@ -14,11 +14,11 @@ export default function ProductsPage() {
       fallback={
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8 lg:py-12">
           <div className="h-8 w-64 bg-[var(--user-bg-card)] rounded-full animate-pulse mb-8 lg:mb-10" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse" />
-            ))}
-          </div>
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse" />
+          ))}
+        </div>
         </div>
       }
     >
@@ -71,7 +71,7 @@ function ProductsContent() {
   }, [filtered, sortBy]);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 lg:px-6 py-8 lg:py-12">
+    <main className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
       {/* HEADER */}
       <div className="mb-6 lg:mb-10">
         <h1 className="text-2xl lg:text-3xl xl:text-4xl font-extrabold text-[var(--user-text)] tracking-tight uppercase">
@@ -105,7 +105,7 @@ function ProductsContent() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-lg px-2.5 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
+              className="h-10 lg:h-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full lg:rounded-lg px-3 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs font-bold text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
             >
               <option value="featured">Featured</option>
               <option value="newest">Newest Arrivals</option>
@@ -118,20 +118,20 @@ function ProductsContent() {
 
       {/* LOADING */}
       {isLoading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="space-y-2 lg:space-y-3">
-              <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
-              <div className="h-3 w-3/4 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-              <div className="h-4 w-1/3 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-            </div>
-          ))}
-        </div>
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="space-y-2 lg:space-y-3">
+                <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
+                <div className="h-3 w-3/4 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
+                <div className="h-4 w-1/3 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
+              </div>
+            ))}
+          </div>
       )}
 
       {/* GRID */}
       {!isLoading && sorted.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
           {sorted.map((p) => (
             <ProductCard key={p._id} product={p} />
           ))}

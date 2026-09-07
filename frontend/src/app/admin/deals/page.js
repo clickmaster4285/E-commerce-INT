@@ -187,10 +187,12 @@ export default function DealsPage() {
     target_type: "all",
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
-    buy_quantity: "",       
-    get_quantity: "",       
-    get_discount_value: "", 
+    buy_quantity: "",
+    get_quantity: "",
+    get_discount_value: "",
     bundle_price: "",
+    // ✅ FREE SHIPPING — which methods are covered (default BOTH)
+    free_shipping_methods: ["standard", "express"],
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
     status: "active", is_featured: false,
   });
@@ -218,6 +220,7 @@ export default function DealsPage() {
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
       buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      free_shipping_methods: ["standard", "express"],
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
       status: "active", is_featured: false,
     });
@@ -272,13 +275,18 @@ export default function DealsPage() {
   }), [deals]);
 
   const openEdit = (deal) => {
+    // ✅ Backward compatible: missing/empty freeShippingMethods → BOTH methods
+    const fsm = Array.isArray(deal?.freeShippingMethods) && deal.freeShippingMethods.length > 0
+      ? deal.freeShippingMethods
+      : ["standard", "express"];
+
     setFormData({
       name: deal?.name || "", code: deal?.code || "", description: deal?.description || "",
       target_type: deal?.applyTo || "all",
       selected_product_ids: Array.isArray(deal?.productIds) ? deal.productIds.map(getId) : [],
       selected_category_ids: Array.isArray(deal?.categoryIds) ? deal.categoryIds.map(getId) : [],
       selected_brand_ids: Array.isArray(deal?.brandIds) ? deal.brandIds.map(getId) : [],
-      
+
       value_type: deal?.type || "percentage",
       value: deal?.discountValue ?? "",
       min_order_value: deal?.minOrderValue ?? "",
@@ -286,6 +294,7 @@ export default function DealsPage() {
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
       bundle_price: deal?.bundlePrice ?? "",
+      free_shipping_methods: fsm,
       start_at: toDateInput(deal?.startDate),
       end_at: toDateInput(deal?.endDate),
       usage_limit: deal?.usageLimit ?? "",
@@ -340,6 +349,13 @@ export default function DealsPage() {
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100, // Fallback for backend compatibility
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
+      // ✅ FREE SHIPPING — which methods are covered. Always send for free_shipping;
+      // never empty (UI requires at least one). For non free_shipping types, omit.
+      ...(formData.value_type === "free_shipping"
+        ? { freeShippingMethods: Array.isArray(formData.free_shipping_methods) && formData.free_shipping_methods.length > 0
+            ? formData.free_shipping_methods
+            : ["standard", "express"] }
+        : {}),
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
       perUserLimit: formData.per_user_limit !== "" ? Number(formData.per_user_limit) : null,
@@ -657,6 +673,60 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                  <div className="col-span-1 md:col-span-2 mt-2">
                     <Field label="Bundle Fixed Price (Rs.) *" type="number" value={formData.bundle_price} onChange={(v) => setFormData({ ...formData, bundle_price: v })} placeholder="e.g., 1500" inputStyle={inputStyle} />
                  </div>
+              )}
+
+              {/* ✅ FREE SHIPPING — choose which shipping methods are covered */}
+              {formData.value_type === "free_shipping" && (
+                <div className="col-span-1 md:col-span-2 mt-2">
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+                  >
+                    <p className="text-[13px] font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+                      Free Shipping Applies To
+                    </p>
+                    <p className="text-[11px] mb-3" style={{ color: "var(--text-muted)" }}>
+                      Pick the shipping methods that should be FREE for this deal. Unchecked methods will charge normally.
+                    </p>
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { value: "standard", label: "Standard" },
+                        { value: "express", label: "Express" },
+                      ].map((opt) => {
+                        const checked = Array.isArray(formData.free_shipping_methods)
+                          && formData.free_shipping_methods.includes(opt.value);
+                        return (
+                          <label
+                            key={opt.value}
+                            className="flex items-center gap-2 cursor-pointer text-[13px] font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const cur = Array.isArray(formData.free_shipping_methods)
+                                  ? formData.free_shipping_methods
+                                  : [];
+                                const next = e.target.checked
+                                  ? Array.from(new Set([...cur, opt.value]))
+                                  : cur.filter((m) => m !== opt.value);
+                                // ✅ Never allow zero — fallback to both (keeps UI usable)
+                                setFormData({
+                                  ...formData,
+                                  free_shipping_methods: next.length > 0 ? next : ["standard", "express"],
+                                });
+                              }}
+                              className="w-4 h-4"
+                              style={{ accentColor: "var(--accent)" }}
+                            />
+                            {opt.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
