@@ -52,6 +52,11 @@ export const adminCategoryApi = {
       .get(`/categories/${categoryId}/attributes`)
       .then(getList),
 
+  getAttributesHierarchy: (categoryId) =>
+    axiosInstance
+      .get(`/categories/${categoryId}/attributes-hierarchy`)
+      .then(getList),
+
   create: (data) =>
     axiosInstance
       .post("/categories", data)

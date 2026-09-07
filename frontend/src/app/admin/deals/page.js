@@ -27,6 +27,13 @@ const BoxIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill=
 const FolderIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>);
 const AwardIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>);
 const GlobeIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
+const PackageIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
+const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>);
+const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
+const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
+const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
@@ -83,6 +90,11 @@ const formatDealValue = (deal) => {
     case "bundle": return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
     default: return value > 0 ? `${value}` : "-";
   }
+};
+
+// ✅ CURRENCY FORMATTER
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
 };
 
 const toDateInput = (value) => {
@@ -181,7 +193,6 @@ export default function DealsPage() {
   const typeMenuRef = useRef(null);
   const { markSelfAction } = useDealSocketSync();
 
-  // ✅ UPDATED: Empty defaults for Buy X Get Y
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
     target_type: "all",
@@ -191,6 +202,7 @@ export default function DealsPage() {
     get_quantity: "",       
     get_discount_value: "", 
     bundle_price: "",
+    min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
     status: "active", is_featured: false,
   });
@@ -218,6 +230,7 @@ export default function DealsPage() {
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
       buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
       status: "active", is_featured: false,
     });
@@ -286,6 +299,7 @@ export default function DealsPage() {
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
       bundle_price: deal?.bundlePrice ?? "",
+      min_quantity: deal?.minQuantity ?? "",
       start_at: toDateInput(deal?.startDate),
       end_at: toDateInput(deal?.endDate),
       usage_limit: deal?.usageLimit ?? "",
@@ -308,7 +322,6 @@ export default function DealsPage() {
       if (formData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
     }
 
-    // ✅ UPDATED: Validation for Buy X Get Y quantities
     if (formData.value_type === "buy_x_get_y") {
       if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
@@ -338,8 +351,9 @@ export default function DealsPage() {
       minOrderValue: formData.min_order_value ? Number(formData.min_order_value) : 0,
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
-      getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100, // Fallback for backend compatibility
+      getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
+      minQuantity: formData.min_quantity ? Number(formData.min_quantity) : 1,
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
       perUserLimit: formData.per_user_limit !== "" ? Number(formData.per_user_limit) : null,
@@ -569,203 +583,551 @@ function Field({ label, value, onChange, type = "text", placeholder, inputStyle 
   </div>);
 }
 
-/* ==================== DEAL FORM MODAL ==================== */
+/* ==================== SECTION HEADER (REUSABLE) ==================== */
+const SectionHeader = ({ icon: Icon, title, subtitle, right }) => (
+  <div className="flex items-center justify-between gap-3 mb-3">
+    <div className="flex items-center gap-2.5 min-w-0">
+      {Icon && (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+          <Icon className="h-4 w-4" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <h4 className="text-[13px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--text-primary)" }}>{title}</h4>
+        {subtitle && <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+      </div>
+    </div>
+    {right}
+  </div>
+);
+
+const FormField = ({ label, required, children, hint, fullWidth }) => (
+  <div className={fullWidth ? "md:col-span-2" : ""}>
+    {label && (
+      <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+        {label} {required && <span className="text-red-500 normal-case">*</span>}
+      </label>
+    )}
+    {children}
+    {hint && <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{hint}</p>}
+  </div>
+);
+
+const TextInput = ({ value, onChange, placeholder, type = "text", style }) => (
+  <input
+    type={type}
+    value={value || ""}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+    style={style}
+  />
+);
+
+const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
+  <textarea
+    rows={rows}
+    value={value || ""}
+    onChange={(e) => onChange(e.target.value)}
+    placeholder={placeholder}
+    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+    style={style}
+  />
+);
+
+/* ==================== DEAL FORM MODAL (WITH OUTSIDE CLICK CLOSE & UPDATED SETTINGS) ==================== */
 const DEAL_TYPE_LABELS = { all: "All Products Deal", product: "Product Deal", category: "Category Deal", brand: "Brand Deal" };
-const DEAL_TYPE_SUBTITLES = { all: "This deal will apply to all products in your store", product: "Apply deal on specific products", category: "Apply deal on entire categories", brand: "Apply deal on specific brands" };
-const getInitials = (name) => { if (!name) return "??"; return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase(); };
+const DEAL_TYPE_SUBTITLES = { 
+  all: "This deal will apply to all products in your store automatically.", 
+  product: "Select specific products to apply this deal to.", 
+  category: "Select entire categories to apply this deal to.", 
+  brand: "Select specific brands to apply this deal to." 
+};
+const DEAL_TYPE_ICONS = { all: GlobeIcon, product: BoxIcon, category: FolderIcon, brand: AwardIcon };
+
+const TargetIconFor = (formType) => {
+  if (formType === "product") return PackageIcon;
+  if (formType === "category") return FolderIcon;
+  if (formType === "brand") return AwardIcon;
+  return TagIcon;
+};
+
+const getInitials = (name) => { 
+  if (!name) return "??"; 
+  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase(); 
+};
+
+// ✅ Resolve an image URL from a product (uses variant images as per existing API)
+const getProductImage = (product) => {
+  if (!product) return null;
+  const firstVariantImage = product?.variants?.[0]?.images?.[0]?.img_url;
+  if (firstVariantImage) return firstVariantImage;
+  return null;
+};
+
+// ✅ Resolve the most accurate product price (direct price > first variant price)
+const getProductPrice = (product) => {
+  if (!product) return 0;
+  const directPrice = Number(product.price || 0);
+  const variantPrice = product.variants?.[0]?.selling_price ? Number(product.variants[0].selling_price) : 0;
+  return directPrice > 0 ? directPrice : variantPrice;
+};
+
+// ✅ Build a clean attribute list from product.specifications + variant.attributes
+const getProductAttributes = (product) => {
+  if (!product) return [];
+  const list = [];
+
+  // Product-level specifications
+  if (product.specifications && typeof product.specifications === "object") {
+    Object.entries(product.specifications).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") return;
+      if (typeof value === "object") return; // skip nested objects
+      list.push({ name: humanizeKey(key), value: String(value) });
+    });
+  }
+
+  // Variant attributes (merge across all variants without duplicates)
+  const seen = new Set();
+  (product.variants || []).forEach((variant) => {
+    if (variant.attributes && typeof variant.attributes === "object") {
+      Object.entries(variant.attributes).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === "") return;
+        const k = `${key}::${value}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        if (typeof value === "object") return;
+        list.push({ name: humanizeKey(key), value: String(value) });
+      });
+    }
+  });
+
+  return list;
+};
+
+const humanizeKey = (key) => {
+  if (!key) return "";
+  const s = String(key);
+  return s
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
 
 function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
-  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
-  const [itemSearch, setItemSearch] = useState("");
-  const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
+  const [viewingProduct, setViewingProduct] = useState(null);
 
-  // ✅ REMOVED: The useEffect that was forcing default values of 1, 1, and 100
+  const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
+  const TypeIcon = DEAL_TYPE_ICONS[formType] || DealIcon;
 
   const selConfig = {
-    product: { key: "selected_product_ids", items: products, label: "Products" },
-    category: { key: "selected_category_ids", items: categories, label: "Categories" },
-    brand: { key: "selected_brand_ids", items: brands, label: "Brands" },
+    product: { key: "selected_product_ids", items: products, label: "Products", sub: "Select specific products to include in this deal" },
+    category: { key: "selected_category_ids", items: categories, label: "Categories", sub: "Apply this deal to entire categories" },
+    brand: { key: "selected_brand_ids", items: brands, label: "Brands", sub: "Apply this deal to specific brands" },
   };
+
   const sel = formType !== "all" ? selConfig[formType] : null;
   const ids = sel ? (formData[sel.key] || []) : [];
-  const selectedItems = sel ? sel.items.filter((item) => ids.includes(getId(item))) : [];
 
-  const filteredItems = (() => {
+  const selectedItemsDetails = useMemo(() => {
     if (!sel) return [];
-    const term = itemSearch.toLowerCase().trim();
-    if (!term) return sel.items;
-    return sel.items.filter((item) => getName(item, formType).toLowerCase().includes(term));
-  })();
+    return sel.items.filter((item) => ids.includes(getId(item)));
+  }, [sel, ids, sel?.items]);
 
-  const toggleItem = (id) => {
+  const totalSelectedValue = useMemo(() => {
+    if (formType !== 'product') return 0;
+    return selectedItemsDetails.reduce((sum, item) => sum + getProductPrice(item), 0);
+  }, [selectedItemsDetails, formType]);
+
+  const openSelection = () => setSelector({ open: true, type: formType });
+
+  const removeSelectedItem = (id) => {
     if (!sel) return;
     setFormData((prev) => ({
       ...prev,
-      [sel.key]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+      [sel.key]: prev[sel.key].filter((x) => x !== id),
     }));
   };
 
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-          <div>
-            <h3 className="text-base font-semibold">{editingDeal ? `Edit ${typeLabel}` : `Create ${typeLabel}`}</h3>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{DEAL_TYPE_SUBTITLES[formType] || "Set the offer, products and deal schedule."}</p>
+    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
+      <div
+        className="w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+      >
+        {/* ===================== HEADER ===================== */}
+        <div
+          className="px-5 sm:px-6 py-4 flex items-center justify-between gap-3 shrink-0"
+          style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              <TypeIcon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[16px] sm:text-lg font-bold tracking-tight truncate">
+                {editingDeal ? `Edit ${typeLabel}` : `Create ${typeLabel}`}
+              </h3>
+              <p className="text-[11px] sm:text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
+                {DEAL_TYPE_SUBTITLES[formType]}
+              </p>
+            </div>
           </div>
-          <button onClick={() => { setShowModal(false); resetForm(); }} disabled={saveMutation.isPending} className="p-1 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
+          <button
+            type="button"
+            onClick={() => { setShowModal(false); resetForm(); }}
+            disabled={saveMutation.isPending}
+            className="shrink-0 p-2 rounded-md transition hover:bg-red-500/10 hover:text-red-500"
+            style={{ color: "var(--text-muted)" }}
+            title="Close"
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
-          <div>
-            <p className="text-sm font-semibold mb-3">Basic Information</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Deal Name *" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} placeholder="Weekend Mega Deal" inputStyle={inputStyle} />
-            </div>
-            <div className="mt-3">
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
-              <textarea rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none" style={inputStyle} placeholder="Describe this deal..." />
-            </div>
-          </div>
+        {/* ===================== FORM BODY ===================== */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="p-5 sm:p-6 space-y-6">
 
-          <div>
-            <p className="text-sm font-semibold mb-3">Deal Offer</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Discount Type</label>
-                <CustomModalSelect value={formData.value_type} onChange={(val) => setFormData({ ...formData, value_type: val })}
-                  options={[
-                    { value: "percentage", label: "Percentage Discount (%)" },
-                    { value: "fixed_amount", label: "Fixed Amount Discount (Rs.)" },
-                    { value: "buy_x_get_y", label: "Buy X Get Y" },
-                    { value: "bundle", label: "Bundle Deal" },
-                    { value: "free_shipping", label: "Free Shipping" },
-                  ]} placeholder="Select Discount Type" />
-              </div>
-              {formData.value_type === "percentage" && <Field label="Discount Percentage *" type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" inputStyle={inputStyle} />}
-              {formData.value_type === "fixed_amount" && <Field label="Discount Amount (Rs.) *" type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" inputStyle={inputStyle} />}
-              {formData.value_type === "free_shipping" && <Field label="Min Order Value (Rs.)" type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 2000" inputStyle={inputStyle} />}
-              
-              {/* ✅ UPDATED: Buy X Get Y fields with empty defaults, 2-column grid, and Get Discount removed */}
-              {formData.value_type === "buy_x_get_y" && (
-                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                  <Field label="Buy Quantity (X) *" type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="Enter quantity" inputStyle={inputStyle} />
-                  <Field label="Get Quantity (Y) *" type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="Enter quantity" inputStyle={inputStyle} />
+            {/* ===== SECTION: BASIC INFORMATION ===== */}
+            <section>
+              <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your deal a clear identity" />
+              <div className="rounded-lg p-4" style={cardStyle}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField label="Deal Name" required fullWidth>
+                    <TextInput
+                      value={formData.name}
+                      onChange={(v) => setFormData({ ...formData, name: v })}
+                      placeholder="e.g., Summer Sale 2024"
+                      style={inputStyle}
+                    />
+                  </FormField>
+                  <FormField label="Description" fullWidth>
+                    <TextArea
+                      value={formData.description}
+                      onChange={(v) => setFormData({ ...formData, description: v })}
+                      placeholder="Add optional details customers will see for this deal..."
+                      rows={3}
+                      style={inputStyle}
+                    />
+                  </FormField>
                 </div>
-              )}
-              {formData.value_type === "bundle" && (
-                 <div className="col-span-1 md:col-span-2 mt-2">
-                    <Field label="Bundle Fixed Price (Rs.) *" type="number" value={formData.bundle_price} onChange={(v) => setFormData({ ...formData, bundle_price: v })} placeholder="e.g., 1500" inputStyle={inputStyle} />
-                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </section>
 
-          {sel && (
-            <div className="overflow-hidden rounded-xl" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <button type="button" onClick={() => setIsSelectionOpen((open) => !open)} aria-expanded={isSelectionOpen} className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[var(--bg-tertiary)]" style={{ borderBottom: isSelectionOpen ? "1px solid var(--border-color)" : "none" }}>
-                <span>
-                  <span className="block text-[13px] font-semibold">Select {sel.label} *</span>
-                  <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>{ids.length} selected</span>
-                </span>
-                <span className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{isSelectionOpen ? "Close" : "Choose"}<ChevronDownIcon className={`h-4 w-4 transition-transform ${isSelectionOpen ? "rotate-180" : ""}`} /></span>
-              </button>
-              {isSelectionOpen && (
-                <>
-                  <div className="p-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-4 h-4" /></span>
-                      <input type="text" value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder={`Search ${sel.label.toLowerCase()}...`} className="h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] w-full outline-none focus:ring-1 focus:ring-[var(--accent)]/40" style={inputStyle} />
+            {/* ===== SECTION: TARGET SELECTION ===== */}
+            {sel && (
+              <section>
+                <SectionHeader
+                  icon={TargetIconFor(formType)}
+                  title={`Target Selection — ${sel.label}`}
+                  subtitle={sel.sub}
+                  right={
+                    formType === 'product' && ids.length > 0 ? (
+                      <span
+                        className="px-2.5 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap"
+                        style={{ backgroundColor: "rgba(16,185,129,0.10)", borderColor: "rgba(16,185,129,0.25)", color: "#34d399" }}
+                      >
+                        Total: {formatCurrency(totalSelectedValue)}
+                      </span>
+                    ) : null
+                  }
+                />
+
+                <div className="rounded-lg overflow-hidden" style={cardStyle}>
+                  {/* Selection trigger row */}
+                  <div className="flex items-center justify-between gap-3 p-3.5" style={{ borderBottom: ids.length > 0 ? "1px solid var(--border-color)" : "none" }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sm font-bold"
+                        style={{
+                          backgroundColor: ids.length > 0 ? "var(--accent)" : "var(--bg-tertiary)",
+                          color: ids.length > 0 ? "var(--accent-text)" : "var(--text-muted)",
+                          border: "1px solid var(--border-color)",
+                        }}
+                      >
+                        {ids.length}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold truncate">
+                          {ids.length > 0
+                            ? `${ids.length} ${sel.label.toLowerCase()} selected`
+                            : `No ${sel.label.toLowerCase()} selected yet`}
+                        </p>
+                        <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+                          {ids.length > 0 ? "Click below to manage the selection" : `Choose which ${sel.label.toLowerCase()} this deal applies to`}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={openSelection}
+                      className="shrink-0 h-9 px-3.5 rounded-md text-[12px] font-semibold flex items-center gap-1.5 transition hover:brightness-110"
+                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                      Select {sel.label}
+                    </button>
                   </div>
-                  {selectedItems.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3 py-2.5" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                      {selectedItems.map((item) => {
-                        const id = getId(item);
-                        return (
-                          <span key={id} className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
-                            <span className="max-w-[120px] truncate">{getName(item, formType)}</span>
-                            <button type="button" onClick={() => toggleItem(id)} className="w-4 h-4 rounded flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition"><CloseIcon className="w-3 h-3" /></button>
-                          </span>
-                        );
-                      })}
+
+                  {/* Selected items list */}
+                  {selectedItemsDetails.length > 0 && (
+                    <div className="p-3 space-y-2">
+                      {formType === "product" ? (
+                        selectedItemsDetails.map((product) => {
+                          const id = getId(product);
+                          const price = getProductPrice(product);
+                          const image = getProductImage(product);
+                          return (
+                            <SelectedProductRow
+                              key={id}
+                              product={product}
+                              price={price}
+                              image={image}
+                              onView={() => setViewingProduct(product)}
+                              onRemove={() => removeSelectedItem(id)}
+                            />
+                          );
+                        })
+                      ) : (
+                        selectedItemsDetails.map((item) => {
+                          const id = getId(item);
+                          return (
+                            <div
+                              key={id}
+                              className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md"
+                              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
+                                  style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+                                >
+                                  {getInitials(getName(item, formType))}
+                                </span>
+                                <p className="text-[13px] font-medium truncate">{getName(item, formType)}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeSelectedItem(id)}
+                                className="shrink-0 p-1.5 rounded-md hover:bg-red-500/10 hover:text-red-500 transition"
+                                style={{ color: "var(--text-muted)" }}
+                                title="Remove"
+                              >
+                                <CloseIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+
+                      {/* Summary footer for products */}
+                      {formType === "product" && selectedItemsDetails.length > 0 && (
+                        <div
+                          className="flex items-center justify-between gap-3 pt-2 mt-1 px-1 text-[11px]"
+                          style={{ borderTop: "1px dashed var(--border-color)", color: "var(--text-muted)" }}
+                        >
+                          <span>Selected Products: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{selectedItemsDetails.length}</span></span>
+                          <span>Total Value: <span className="font-bold" style={{ color: "#34d399" }}>{formatCurrency(totalSelectedValue)}</span></span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  <div className="max-h-[220px] overflow-y-auto">
-                    {filteredItems.length === 0 ? (
-                      <p className="py-8 text-center text-xs" style={{ color: "var(--text-muted)" }}>No {sel.label.toLowerCase()} found</p>
-                    ) : (
-                      <div className="p-1.5 space-y-0.5">
-                        {filteredItems.map((item) => {
-                          const id = getId(item);
-                          const isSelected = ids.includes(id);
-                          return (
-                            <button key={id} type="button" onClick={() => toggleItem(id)} className="w-full px-3 py-2 rounded-md flex items-center gap-3 text-left transition" style={{ backgroundColor: isSelected ? "var(--accent-soft)" : "transparent" }}
-                              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }}
-                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${isSelected ? "" : "border-slate-600"}`}
-                                style={isSelected ? { backgroundColor: "var(--accent)", borderColor: "var(--accent)", color: "#0a0a0a" } : {}}>
-                                {isSelected && <CheckIcon className="w-3 h-3" />}
-                              </span>
-                              <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--border-color)" }}>
-                                {getInitials(getName(item, formType))}
-                              </div>
-                              <span className="text-[13px] truncate flex-1" style={{ color: isSelected ? "var(--accent)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>
-                                {getName(item, formType)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                </div>
+              </section>
+            )}
 
-          <div>
-            <p className="text-sm font-semibold mb-3">Deal Schedule & Limits</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Start Date & Time" type="datetime-local" value={formData.start_at} onChange={(v) => setFormData({ ...formData, start_at: v })} inputStyle={inputStyle} />
-              <Field label="End Date & Time" type="datetime-local" value={formData.end_at} onChange={(v) => setFormData({ ...formData, end_at: v })} inputStyle={inputStyle} />
-              <Field label="Total Usage Limit" type="number" value={formData.usage_limit} onChange={(v) => setFormData({ ...formData, usage_limit: v })} placeholder="100" inputStyle={inputStyle} />
-              <Field label="Per Customer Limit" type="number" value={formData.per_user_limit} onChange={(v) => setFormData({ ...formData, per_user_limit: v })} placeholder="2" inputStyle={inputStyle} />
-            </div>
-          </div>
+            {/* ===== SECTION: DEAL OFFER ===== */}
+            <section>
+              <SectionHeader icon={PercentIcon} title="Deal Offer" subtitle="Configure how the discount is calculated" />
+              <div className="rounded-lg p-4 space-y-4" style={cardStyle}>
+                <FormField label="Discount Type" fullWidth>
+                  <CustomModalSelect
+                    value={formData.value_type}
+                    onChange={(val) => setFormData({ ...formData, value_type: val })}
+                    options={[
+                      { value: "percentage", label: "Percentage Discount (%)" },
+                      { value: "fixed_amount", label: "Fixed Amount (Rs.)" },
+                      { value: "buy_x_get_y", label: "Buy X Get Y" },
+                      { value: "bundle", label: "Bundle Price" },
+                      { value: "free_shipping", label: "Free Shipping" },
+                    ]}
+                    placeholder="Select discount type"
+                  />
+                </FormField>
 
-          <div>
-            <p className="text-sm font-semibold mb-3">Settings</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Status</label>
-                <CustomModalSelect value={formData.status} onChange={(val) => setFormData({ ...formData, status: val })}
-                  options={[{ value: "active", label: "Active" }, { value: "disabled", label: "Disabled" }]} placeholder="Select Status" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  {formData.value_type === "percentage" && (
+                    <>
+                      <FormField label="Discount Percentage (%)">
+                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                      </FormField>
+                      <FormField label="Min Order Value (Rs.)" hint="Optional">
+                        <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 1000" style={inputStyle} />
+                      </FormField>
+                    </>
+                  )}
+
+                  {formData.value_type === "fixed_amount" && (
+                    <>
+                      <FormField label="Discount Amount (Rs.)">
+                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                      </FormField>
+                      <FormField label="Min Order Value (Rs.)" hint="Optional">
+                        <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 1000" style={inputStyle} />
+                      </FormField>
+                    </>
+                  )}
+
+                  {formData.value_type === "buy_x_get_y" && (
+                    <>
+                      <FormField label="Buy Quantity (X)">
+                        <TextInput type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="e.g., 2" style={inputStyle} />
+                      </FormField>
+                      <FormField label="Get Quantity (Y)">
+                        <TextInput type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
+                      </FormField>
+                      <FormField label="Discount on Get Item (%)" hint="100 means free" fullWidth>
+                        <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" style={inputStyle} />
+                      </FormField>
+                    </>
+                  )}
+
+                  {formData.value_type === "bundle" && (
+                    <>
+                      <FormField label="Bundle Fixed Price (Rs.)" fullWidth>
+                        <TextInput type="number" value={formData.bundle_price} onChange={(v) => setFormData({ ...formData, bundle_price: v })} placeholder="e.g., 1500" style={inputStyle} />
+                      </FormField>
+                      {formType === 'product' && totalSelectedValue > 0 && (
+                        <p className="md:col-span-2 text-[10px] text-right" style={{ color: "var(--text-muted)" }}>
+                          Original Total: <span className="line-through">{formatCurrency(totalSelectedValue)}</span>
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {formData.value_type === "free_shipping" && (
+                    <FormField label="Min Order Value for Free Shipping (Rs.)" fullWidth>
+                      <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 2000" style={inputStyle} />
+                    </FormField>
+                  )}
+
+                  {/* Min Quantity Required — applies to all discount types */}
+                  <FormField label="Min Quantity Required" hint="Minimum cart quantity for the deal to apply" fullWidth>
+                    <TextInput type="number" value={formData.min_quantity} onChange={(v) => setFormData({ ...formData, min_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
+                  </FormField>
+                </div>
               </div>
-              <label className="h-9 mt-6 px-3 rounded-md flex items-center gap-2 cursor-pointer text-xs" style={inputStyle}>
-                <input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })} className="w-4 h-4" style={{ accentColor: "var(--accent)" }} />
-                Featured Deal
-              </label>
-            </div>
-          </div>
+            </section>
 
-          <div className="flex gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-            <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={saveMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
-            <button type="submit" disabled={saveMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold flex items-center justify-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              {saveMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Saving...</> : editingDeal ? "Update Deal" : "Create Deal"}
-            </button>
+            {/* ===== SECTION: SCHEDULE & LIMITS ===== */}
+            <section>
+              <SectionHeader icon={CalendarIcon} title="Schedule & Limits" subtitle="Control when and how often the deal can be used" />
+              <div className="rounded-lg p-4" style={cardStyle}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField label="Start Date">
+                    <TextInput type="datetime-local" value={formData.start_at} onChange={(v) => setFormData({ ...formData, start_at: v })} style={inputStyle} />
+                  </FormField>
+                  <FormField label="End Date">
+                    <TextInput type="datetime-local" value={formData.end_at} onChange={(v) => setFormData({ ...formData, end_at: v })} style={inputStyle} />
+                  </FormField>
+                  <FormField label="Total Usage Limit" hint="Leave empty for unlimited">
+                    <TextInput type="number" value={formData.usage_limit} onChange={(v) => setFormData({ ...formData, usage_limit: v })} placeholder="Unlimited" style={inputStyle} />
+                  </FormField>
+                  <FormField label="Per Customer Limit" hint="Leave empty for unlimited">
+                    <TextInput type="number" value={formData.per_user_limit} onChange={(v) => setFormData({ ...formData, per_user_limit: v })} placeholder="Unlimited" style={inputStyle} />
+                  </FormField>
+                </div>
+              </div>
+            </section>
+
+            {/* ===== SECTION: SETTINGS ===== */}
+            <section>
+              <SectionHeader icon={SettingsIcon} title="Settings" subtitle="Status and visibility options" />
+              <div className="rounded-lg p-4" style={cardStyle}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                  <FormField label="Status">
+                    <CustomModalSelect
+                      value={formData.status}
+                      onChange={(val) => setFormData({ ...formData, status: val })}
+                      options={[{ value: "active", label: "Active" }, { value: "disabled", label: "Disabled" }]}
+                      placeholder="Select Status"
+                    />
+                  </FormField>
+                  <div className="flex items-center">
+                    <label
+                      className="flex w-full items-center gap-3 px-3 h-9 rounded-md cursor-pointer transition hover:opacity-90"
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.is_featured}
+                        onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                        className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                      />
+                      <span className="text-[13px] font-semibold">Featured Deal</span>
+                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Highlight in store</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </form>
+
+        {/* ===================== FOOTER (FIXED) ===================== */}
+        <div
+          className="px-5 sm:px-6 py-3.5 flex items-center justify-end gap-2.5 shrink-0"
+          style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <button
+            type="button"
+            onClick={() => { setShowModal(false); resetForm(); }}
+            disabled={saveMutation.isPending}
+            className="h-9 px-4 rounded-md text-[13px] font-semibold transition hover:opacity-80 disabled:opacity-50"
+            style={{ backgroundColor: "transparent", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={saveMutation.isPending}
+            className="h-9 px-5 rounded-md text-[13px] font-bold flex items-center gap-2 transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+          >
+            {saveMutation.isPending ? (
+              <><Spinner className="w-4 h-4" /> Saving...</>
+            ) : (
+              editingDeal ? "Update Deal" : "Create Deal"
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* ===================== PRODUCT DETAILS POPUP ===================== */}
+      {viewingProduct && (
+        <ProductDetailsModal
+          product={viewingProduct}
+          onClose={() => setViewingProduct(null)}
+        />
+      )}
     </div>
   );
 }
 
-/* ==================== SELECTION MODAL ==================== */
+/* ==================== SELECTION MODAL (REDESIGNED) ==================== */
 function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
-  
+
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
     if (!term) return items;
@@ -773,48 +1135,450 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
   }, [items, search, type]);
 
   const title = type === "product" ? "Products" : type === "category" ? "Categories" : "Brands";
+  const TypeIcon = type === "product" ? BoxIcon : type === "category" ? FolderIcon : AwardIcon;
   const toggle = (id) => {
     const cleanId = String(id?._id || id);
     setDraftIds((prev) => prev.includes(cleanId) ? prev.filter((x) => x !== cleanId) : [...prev, cleanId]);
   };
+  const clearAll = () => setDraftIds([]);
+
+  const totalDraftValue = useMemo(() => {
+    if (type !== "product") return 0;
+    return items.reduce((sum, item) => {
+      const id = String(item?._id || item?.id);
+      if (!draftIds.includes(id)) return sum;
+      return sum + getProductPrice(item);
+    }, 0);
+  }, [items, draftIds, type]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={cardStyle}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-          <h3 className="text-base font-semibold">Select {title}</h3>
-          <button onClick={onClose} style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div
+        className="w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
+        style={cardStyle}
+      >
+        {/* HEADER */}
+        <div
+          className="px-5 py-3.5 flex items-center justify-between gap-3 shrink-0"
+          style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              <TypeIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-bold truncate">Select {title}</h3>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+                Multi-select {title.toLowerCase()} to include in this deal
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 p-2 rounded-md transition hover:bg-red-500/10 hover:text-red-500"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
         </div>
-        <div className="p-4">
+
+        {/* SEARCH */}
+        <div className="px-4 py-3 shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-            <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${title.toLowerCase()}...`} className="w-full h-10 md:h-9 pl-9 pr-3 rounded-md text-[16px] md:text-[13px] outline-none" style={inputStyle} />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+              <SearchIcon />
+            </span>
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${title.toLowerCase()}...`}
+              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+              style={inputStyle}
+            />
           </div>
         </div>
-        <div className="max-h-[320px] overflow-y-auto px-4 pb-4">
-          {filtered.length === 0 ? (<p className="text-center text-xs py-6" style={{ color: "var(--text-muted)" }}>No items found</p>) : (
+
+        {/* LIST */}
+        <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0">
+          {filtered.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>No {title.toLowerCase()} found</p>
+            </div>
+          ) : (
             <div className="space-y-1">
               {filtered.map((item) => {
                 const id = getId(item);
                 const selected = draftIds.includes(id);
+                const price = type === "product" ? getProductPrice(item) : 0;
+                const image = type === "product" ? getProductImage(item) : null;
+
                 return (
-                  <button key={id} type="button" onClick={() => toggle(id)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left" style={{ backgroundColor: selected ? "rgba(16,185,129,0.08)" : "transparent" }}>
-                    <span className="w-4 h-4 rounded border flex items-center justify-center shrink-0" style={{ backgroundColor: selected ? "#10b981" : "transparent", borderColor: selected ? "#10b981" : "var(--border-color)", color: "#fff" }}>
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggle(id)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition"
+                    style={{
+                      backgroundColor: selected ? "rgba(16,185,129,0.10)" : "transparent",
+                      border: `1px solid ${selected ? "rgba(16,185,129,0.30)" : "transparent"}`,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!selected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!selected) e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <span
+                      className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: selected ? "var(--accent)" : "transparent",
+                        borderColor: selected ? "var(--accent)" : "var(--border-color)",
+                        color: "var(--accent-text)",
+                      }}
+                    >
                       {selected && <CheckIcon className="w-3 h-3" />}
                     </span>
-                    <span className="text-[13px] truncate">{getName(item, type)}</span>
+
+                    {type === "product" ? (
+                      <>
+                        {/* Product image / fallback */}
+                        {image ? (
+                          <img
+                            src={image}
+                            alt={getName(item, type)}
+                            className="w-9 h-9 rounded-md object-cover shrink-0"
+                            style={{ border: "1px solid var(--border-color)" }}
+                            onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+                          />
+                        ) : null}
+                        <span
+                          className="w-9 h-9 rounded-md shrink-0 items-center justify-center text-[10px] font-bold"
+                          style={{
+                            display: image ? "none" : "flex",
+                            backgroundColor: "var(--bg-tertiary)",
+                            color: "var(--text-muted)",
+                            border: "1px solid var(--border-color)",
+                          }}
+                        >
+                          {getInitials(getName(item, type))}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
+                            style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
+                          >
+                            {getName(item, type)}
+                          </p>
+                          <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>
+                            {formatCurrency(price)}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
+                          style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
+                        >
+                          {getInitials(getName(item, type))}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
+                            style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
+                          >
+                            {getName(item, type)}
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </button>
                 );
               })}
             </div>
           )}
         </div>
-        <div className="px-4 py-3 flex items-center justify-between" style={{ borderTop: "1px solid var(--border-color)" }}>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{draftIds.length} selected</span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="h-8 px-3 rounded-md text-xs" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
-            <button onClick={() => onApply(draftIds)} className="h-8 px-4 rounded-md text-xs font-semibold" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Apply</button>
+
+        {/* FOOTER */}
+        <div
+          className="px-4 py-3 flex items-center justify-between gap-2 shrink-0"
+          style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{draftIds.length}</span> selected
+              {type === "product" && draftIds.length > 0 && (
+                <> · <span className="font-bold" style={{ color: "#34d399" }}>{formatCurrency(totalDraftValue)}</span></>
+              )}
+            </span>
+            {draftIds.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-[11px] font-semibold underline hover:opacity-80"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Clear
+              </button>
+            )}
           </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-3.5 rounded-md text-[12px] font-semibold transition hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => onApply(draftIds)}
+              className="h-9 px-4 rounded-md text-[12px] font-bold transition hover:brightness-110"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              Apply Selection
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== SELECTED PRODUCT ROW (INSIDE TARGET SELECTION) ==================== */
+function SelectedProductRow({ product, price, image, onView, onRemove }) {
+  const name = getName(product, "product");
+  const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
+
+  return (
+    <div
+      className="flex items-center gap-3 p-2.5 rounded-md transition hover:opacity-95"
+      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+    >
+      {/* Image / fallback */}
+      {image ? (
+        <img
+          src={image}
+          alt={name}
+          className="w-11 h-11 rounded-md object-cover shrink-0"
+          style={{ border: "1px solid var(--border-color)" }}
+          onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+        />
+      ) : null}
+      <span
+        className="w-11 h-11 rounded-md shrink-0 items-center justify-center text-[11px] font-bold"
+        style={{
+          display: image ? "none" : "flex",
+          backgroundColor: "var(--accent-soft)",
+          color: "var(--accent)",
+          border: "1px solid var(--border-color)",
+        }}
+      >
+        {getInitials(name)}
+      </span>
+
+      {/* Name + Price */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+          {name}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[12px] font-bold font-mono" style={{ color: "#34d399" }}>
+            {formatCurrency(price)}
+          </span>
+          {variantCount > 1 && (
+            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              · {variantCount} variants
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={onView}
+          className="h-8 px-2.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition hover:opacity-80"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+            color: "var(--accent)",
+          }}
+          title="View attributes"
+        >
+          <InfoIcon className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">View Attributes</span>
+          <span className="sm:hidden">Details</span>
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="h-8 w-8 rounded-md flex items-center justify-center transition hover:bg-red-500/10 hover:text-red-500"
+          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}
+          title="Remove"
+        >
+          <CloseIcon className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== PRODUCT DETAILS / ATTRIBUTES MODAL ==================== */
+function ProductDetailsModal({ product, onClose }) {
+  const name = getName(product, "product");
+  const price = getProductPrice(product);
+  const image = getProductImage(product);
+  const attributes = getProductAttributes(product);
+  const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
+        style={cardStyle}
+      >
+        {/* HEADER */}
+        <div
+          className="px-5 py-3.5 flex items-center justify-between gap-3 shrink-0"
+          style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              <BoxIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-bold truncate">Product Details</h3>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+                Attributes and pricing information
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 p-2 rounded-md transition hover:bg-red-500/10 hover:text-red-500"
+            style={{ color: "var(--text-muted)" }}
+            title="Close"
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {/* Product Hero */}
+          <div className="flex items-center gap-4 mb-5">
+            {image ? (
+              <img
+                src={image}
+                alt={name}
+                className="w-16 h-16 rounded-lg object-cover shrink-0"
+                style={{ border: "1px solid var(--border-color)" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+              />
+            ) : null}
+            <span
+              className="w-16 h-16 rounded-lg shrink-0 items-center justify-center text-base font-bold"
+              style={{
+                display: image ? "none" : "flex",
+                backgroundColor: "var(--accent-soft)",
+                color: "var(--accent)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {getInitials(name)}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                {name}
+              </p>
+              <p className="text-[18px] font-bold font-mono mt-0.5" style={{ color: "#34d399" }}>
+                {formatCurrency(price)}
+              </p>
+              {variantCount > 0 && (
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {variantCount} {variantCount === 1 ? "variant" : "variants"} available
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Attributes */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+              >
+                <TagIcon className="h-3.5 w-3.5" />
+              </span>
+              <h4 className="text-[12px] font-bold uppercase tracking-wide">Attributes</h4>
+              <span className="ml-auto text-[10px]" style={{ color: "var(--text-muted)" }}>
+                {attributes.length} {attributes.length === 1 ? "attribute" : "attributes"}
+              </span>
+            </div>
+
+            {attributes.length === 0 ? (
+              <div className="rounded-md py-6 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                  No attributes available for this product
+                </p>
+              </div>
+            ) : (
+              <div
+                className="rounded-md overflow-hidden"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+              >
+                {attributes.map((attr, idx) => (
+                  <div
+                    key={`${attr.name}-${idx}`}
+                    className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                    style={{
+                      borderTop: idx === 0 ? "none" : "1px solid var(--border-color)",
+                    }}
+                  >
+                    <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-muted)" }}>
+                      {attr.name}
+                    </span>
+                    <span className="text-[12px] font-bold text-right truncate max-w-[60%]" style={{ color: "var(--text-primary)" }}>
+                      {attr.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div
+          className="px-5 py-3 flex items-center justify-end shrink-0"
+          style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 rounded-md text-[12px] font-bold transition hover:brightness-110"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>

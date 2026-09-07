@@ -186,6 +186,7 @@ const assertValidParent = async ({ categoryId, parentId }) => {
 };
 
 // ✅ UPDATED: getCategoryAttributesList no longer checks tenant_id
+// ✅ UPDATED: Returns hierarchical structure (Main Attribute → Sub-Attribute → Values)
 const getCategoryAttributesList = async (categoryId) => {
   // ✅ FIX: Removed tenant_id filter
   const category = await Category.findOne({
@@ -207,27 +208,52 @@ const getCategoryAttributesList = async (categoryId) => {
 
   const attributeMap = new Map(attributes.map((item) => [String(item._id), item]));
 
+  const decorate = (config, attribute) => ({
+    ...attribute,
+    category_config: {
+      attribute_id: config.attribute_id,
+      is_required: Boolean(config.is_required),
+      is_visible: config.is_visible !== false,
+      is_filterable: Boolean(config.is_filterable),
+      is_searchable: Boolean(config.is_searchable),
+      is_variant_option: Boolean(config.is_variant_option),
+      sort_order: config.sort_order || 0,
+      // ✅ FIX: Surface the category-level attribute value so product
+      // forms can pre-fill the same value/details automatically.
+      value: config.value !== undefined && config.value !== null ? config.value : "",
+    },
+  });
+
+  // ✅ Return all assigned attributes (including sub-attributes) so the frontend
+  // can use parent_attribute_id to render the proper Main → Sub → Values hierarchy.
   return configs
     .map((config) => {
       const attribute = attributeMap.get(String(config.attribute_id));
       if (!attribute) return null;
-      return {
-        ...attribute,
-        category_config: {
-          attribute_id: config.attribute_id,
-          is_required: Boolean(config.is_required),
-          is_visible: config.is_visible !== false,
-          is_filterable: Boolean(config.is_filterable),
-          is_searchable: Boolean(config.is_searchable),
-          is_variant_option: Boolean(config.is_variant_option),
-          sort_order: config.sort_order || 0,
-          // ✅ FIX: Surface the category-level attribute value so product
-          // forms can pre-fill the same value/details automatically.
-          value: config.value !== undefined && config.value !== null ? config.value : "",
-        },
-      };
+      return decorate(config, attribute);
     })
     .filter(Boolean);
+};
+
+// ✅ NEW: Returns hierarchical structure (Main → Sub-Attributes → Values) for a category
+const getCategoryAttributesHierarchy = async (categoryId) => {
+  const flat = await getCategoryAttributesList(categoryId);
+
+  const byId = new Map();
+  flat.forEach((attr) => byId.set(String(attr._id), { ...attr, sub_attributes: [] }));
+
+  const mains = [];
+  flat.forEach((attr) => {
+    const node = byId.get(String(attr._id));
+    const parentId = attr.parent_attribute_id ? String(attr.parent_attribute_id) : null;
+    if (parentId && byId.has(parentId)) {
+      byId.get(parentId).sub_attributes.push(node);
+    } else {
+      mains.push(node);
+    }
+  });
+
+  return mains;
 };
 
 const getNextCode = async (req, res) => {
@@ -452,6 +478,17 @@ const getCategoryAttributes = async (req, res) => {
     
     // ✅ FIX: Get attributes globally
     const attributes = await getCategoryAttributesList(req.params.id);
+    return res.status(200).json({ success: true, data: attributes });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ NEW: Returns hierarchical structure (Main Attribute → Sub-Attributes → Values)
+// Used by the Product Variant form to render the proper hierarchical dropdowns.
+const getCategoryAttributesHierarchical = async (req, res) => {
+  try {
+    const attributes = await getCategoryAttributesHierarchy(req.params.id);
     return res.status(200).json({ success: true, data: attributes });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ success: false, message: error.message });

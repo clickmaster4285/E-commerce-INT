@@ -1,7 +1,8 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useProductSocketSync } from "@/hooks/useProductSocketSync";
 import { useSocket } from "@/hooks/useSocket";
 import {
@@ -166,9 +167,13 @@ function TItem({ icon, title, sub, user, date, color = "var(--accent)", last }) 
 function StatusPill({ active }) {
   const c = active ? "var(--success)" : "var(--danger)";
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium shrink-0"
-      style={{ backgroundColor: active ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: c }}>
-      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: c }} />
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+      style={{
+        backgroundColor: active ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
+        color: c,
+        border: active ? "1px solid rgba(34,197,94,0.20)" : "1px solid rgba(239,68,68,0.20)",
+      }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -242,6 +247,16 @@ export default function ProductDetailPage() {
   const [newGlobalTag, setNewGlobalTag] = useState("");
   const [editingGlobalTagId, setEditingGlobalTagId] = useState(null);
   const [editingGlobalTagName, setEditingGlobalTagName] = useState("");
+
+  const [showAttributeModal, setShowAttributeModal] = useState(false);
+  const [attributeTargetVariant, setAttributeTargetVariant] = useState(null);
+  const [newAttributeData, setNewAttributeData] = useState({
+    name: "",
+    code: "",
+    data_type: "text",
+    values: [{ label: "", value: "" }],
+    variant_allowed: true,
+  });
 
   const { data: product, isLoading, isError, refetch: refetchProduct } = useQuery({
     queryKey: ["product", id], queryFn: () => productApi.getById(id), enabled: !!id,
@@ -339,13 +354,13 @@ export default function ProductDetailPage() {
           cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
           quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
           attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
-            const strValue = String(value);
+            const strValue = String(value ?? "");
             const preset = rawAttributes.find((a) => a.name === name);
             const isMulti = preset?.data_type === "multi_select";
             return {
               name,
               value: isMulti
-                ? strValue.split(",").map((s) => s.trim()).filter(Boolean)
+                ? strValue.split(",").map((s) => s.trim()).filter(Boolean)[0] || ""
                 : strValue,
               isCustom: false,
             };
@@ -420,8 +435,120 @@ export default function ProductDetailPage() {
     setFormData((prev) => { const v = [...prev.variants]; v[index] = {...v[index], [field]: value}; return {...prev, variants: v}; });
   };
 
+  const resetAttributeForm = () => {
+    setNewAttributeData({ name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true });
+  };
+
+  const handleOpenAttributeModal = (vi) => {
+    setAttributeTargetVariant(vi);
+    resetAttributeForm();
+    setShowAttributeModal(true);
+  };
+
+  const handleAddAttributeValue = () => {
+    setNewAttributeData((prev) => ({ ...prev, values: [...prev.values, { label: "", value: "" }] }));
+  };
+  const handleRemoveAttributeValue = (index) => {
+    setNewAttributeData((prev) => ({ ...prev, values: prev.values.filter((_, i) => i !== index) }));
+  };
+  const handleAttributeValueChange = (index, field, val) => {
+    setNewAttributeData((prev) => {
+      const newValues = [...prev.values];
+      newValues[index] = { ...newValues[index], [field]: val };
+      return { ...prev, values: newValues };
+    });
+  };
+
   const addAttribute = (vi) => {
-    setFormData((prev) => { const v = [...prev.variants]; v[vi] = {...v[vi], attributes: [...v[vi].attributes, {name:"",value:"",isCustom:false}]}; return {...prev, variants: v}; });
+    handleOpenAttributeModal(vi);
+  };
+
+  const createAttributeMutation = useMutation({
+    mutationFn: ({ payload }) => attributeApi.create(payload),
+    onSuccess: async (res, variables) => {
+      const { tempKey, targetIndex, attributeName } = variables || {};
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      queryClient.invalidateQueries({ queryKey: ["category-attributes", productCategoryId] });
+      const created = res?.data || res;
+      const createdId = created?._id || created?.id;
+      setFormData((prev) => {
+        const v = [...prev.variants];
+        if (v[targetIndex]) {
+          v[targetIndex] = {
+            ...v[targetIndex],
+            attributes: (v[targetIndex]?.attributes || []).map((a) =>
+              tempKey && a._localKey === tempKey
+                ? { ...a, name: attributeName, _creating: false, _creatingId: createdId ? String(createdId) : undefined }
+                : a
+            ),
+          };
+        }
+        return { ...prev, variants: v };
+      });
+      await refetchProduct();
+      toast.success("Attribute created successfully!");
+      setShowAttributeModal(false);
+      setAttributeTargetVariant(null);
+      resetAttributeForm();
+    },
+    onError: (err, variables) => {
+      const { tempKey, targetIndex } = variables || {};
+      setFormData((prev) => {
+        const v = [...prev.variants];
+        if (v[targetIndex]) {
+          v[targetIndex] = {
+            ...v[targetIndex],
+            attributes: (v[targetIndex]?.attributes || []).map((a) =>
+              tempKey && a._localKey === tempKey ? { ...a, _creating: false, _createError: true } : a
+            ),
+          };
+        }
+        return { ...prev, variants: v };
+      });
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      queryClient.invalidateQueries({ queryKey: ["category-attributes", productCategoryId] });
+      refetchProduct();
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create attribute");
+    },
+  });
+
+  const handleAttributeSubmit = () => {
+    if (!newAttributeData.name.trim()) { toast.error("Attribute name is required"); return; }
+
+    const finalCode = newAttributeData.code.trim() || newAttributeData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+    const payload = {
+      name: newAttributeData.name.trim(),
+      code: finalCode,
+      data_type: newAttributeData.data_type,
+      variant_allowed: true,
+      values: (newAttributeData.data_type === "select" || newAttributeData.data_type === "multi_select")
+        ? newAttributeData.values.filter((v) => v.label.trim() && v.value.trim())
+        : [],
+    };
+
+    const tempKey = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const newAttrConfig = {
+      _localKey: tempKey,
+      name: newAttributeData.name,
+      value: "",
+      isCustom: false,
+      _creating: true,
+    };
+    const targetIndex = attributeTargetVariant ?? 0;
+    setFormData((prev) => {
+      const v = [...prev.variants];
+      if (v[targetIndex]) {
+        v[targetIndex] = {
+          ...v[targetIndex],
+          attributes: [...(v[targetIndex]?.attributes || []), newAttrConfig],
+        };
+      }
+      return { ...prev, variants: v };
+    });
+    setShowAttributeModal(false);
+
+    createAttributeMutation.mutate({ payload, tempKey, targetIndex, attributeName: newAttributeData.name });
   };
 
   const updateAttribute = (vi, ai, field, value) => {
@@ -570,10 +697,17 @@ export default function ProductDetailPage() {
       v.attributes.forEach((a) => {
         const key = a.name.trim();
         if (!key) return;
-        if (Array.isArray(a.value)) {
+        const preset = rawAttributes.find((p) => p.name === key);
+        const isMulti = preset?.data_type === "multi_select";
+        if (isMulti) {
+          const singleVal = String(a.value || "").trim();
+          if (!singleVal) return;
+          attributes[key] = singleVal;
+        } else if (Array.isArray(a.value)) {
           if (a.value.length === 0) return;
           attributes[key] = a.value.join(",");
         } else {
+          if (a.value === "" || a.value == null) return;
           attributes[key] = a.value;
         }
       });
@@ -718,13 +852,15 @@ export default function ProductDetailPage() {
                 <Package className="h-7 w-7" style={{ color: "var(--accent)" }} />
               </div>
               <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
                   <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{product.name}</h1>
                   <StatusPill active={product.status === "active"} />
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
                   <span className="font-mono flex items-center gap-1"><Hash className="w-3 h-3" />{product.product_code || product.sku || "N/A"}</span>
-                  <span>·</span><span>{totalVariants} Variants</span><span>·</span><span>{totalStock} Units</span><span>·</span><span>Created {fd(product.created_at)}</span>
+                  <span className="opacity-50">·</span><span>{totalVariants} Variants</span>
+                  <span className="opacity-50">·</span><span>{totalStock} Units</span>
+                  <span className="opacity-50">·</span><span>Created {fd(product.created_at)}</span>
                 </div>
               </div>
             </div>
@@ -742,7 +878,7 @@ export default function ProductDetailPage() {
               const active = activeTab === tb.id;
               return (
                 <button key={tb.id} type="button" onClick={() => setActiveTab(tb.id)}
-                  className="relative flex items-center gap-1.5 whitespace-nowrap py-3 text-[12px] font-medium transition-colors duration-150"
+                  className={`relative flex items-center gap-1.5 whitespace-nowrap py-3 text-[12px] font-medium transition-colors duration-150 ${active ? "" : "hover:text-[var(--text-primary)]"}`}
                   style={{ background: "none", border: "none", cursor: "pointer",
                     color: active ? "var(--accent)" : "var(--text-muted)" }}>
                   {tb.label}
@@ -751,7 +887,7 @@ export default function ProductDetailPage() {
                         style={{ backgroundColor: active ? "var(--accent-soft)" : "var(--bg-tertiary)", color: active ? "var(--accent)" : "var(--text-muted)" }}>
                       {tb.badge}</span>
                   )}
-                      {active && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px]" style={{ backgroundColor: "var(--accent)" }} />}
+                      {active && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-t-full" style={{ backgroundColor: "var(--accent)" }} />}
                 </button>
               );
             })}
@@ -762,8 +898,11 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
             {/* Left column */}
             <div className="space-y-4 min-w-0">
-              <InnerCard>
-                <SecTitle>Product Details</SecTitle>
+              <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                  style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                  <span>Product Details</span>
+                </div>
                 <div className="flex-1">
                   <InfoRow label="Name" value={product.name} />
                   <InfoRow label="Category" value={product.category_id?.name || "—"} />
@@ -777,7 +916,7 @@ export default function ProductDetailPage() {
                     <div className="mt-1.5 flex flex-wrap gap-1.5 justify-end">
                       {displayTagNames.length > 0 ? (
                         displayTagNames.map(tag => (
-                          <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
+                          <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium"
                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                             {tag}
                           </span>
@@ -812,50 +951,63 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
                 </div>
-              </InnerCard>
-              <InnerCard>
-                <SecTitle>Description</SecTitle>
+              </div>
+              <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                  style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                  Description
+                </div>
                 <div className="flex-1">
-                  <p className="text-[12px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
                     {product.description || "No description provided."}</p>
                 </div>
-              </InnerCard>
+              </div>
             </div>
 
             {/* Right column — Inventory Summary */}
-            <InnerCard>
-              <SecTitle>Inventory Summary</SecTitle>
+            <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                <span>Inventory Summary</span>
+              </div>
               <div className="space-y-3 flex-1">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Total Stock</p>
                     <p className="text-[18px] font-semibold" style={{ color: totalStock === 0 ? "#f87171" : "#34d399" }}>{totalStock}</p>
                   </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Variants</p>
                     <p className="text-[18px] font-semibold">{totalVariants}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Lowest Price</p>
                     <p className="text-[14px] font-semibold">Rs. {lowestPrice.toLocaleString()}</p>
                   </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Highest Price</p>
                     <p className="text-[14px] font-semibold">Rs. {highestPrice.toLocaleString()}</p>
                   </div>
                 </div>
+                <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                  <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Total Inventory Value</p>
+                  <p className="text-[18px] font-semibold" style={{ color: "#34d399" }}>Rs. {totalValue.toLocaleString()}</p>
+                </div>
               </div>
-            </InnerCard>
+            </div>
           </div>
         )}
 
             {/* TAGS TAB */}
             {activeTab === "tags" && (
               <div className="space-y-4">
-                <InnerCard>
-                  <SecTitle>Global Tags</SecTitle>
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                    style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                    <span>Global Tags</span>
+                  </div>
                   <div className="flex justify-end">
                     <button 
                       type="button" 
@@ -865,14 +1017,17 @@ export default function ProductDetailPage() {
                       <Plus className="w-3.5 h-3.5" /> Create Tag
                     </button>
                   </div>
-                </InnerCard>
+                </div>
 
-                <InnerCard>
-                  <SecTitle>Assigned Tags ({globalTags.length})</SecTitle>
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                    style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                    <span>Assigned Tags ({globalTags.length})</span>
+                  </div>
                   {globalTags.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {globalTags.map((tag) => (
-                        <div key={tag._id} className="flex items-center gap-2 px-3 py-2 rounded-lg group" 
+                        <div key={tag._id} className="flex items-center gap-2 px-3 py-2 rounded-lg group transition-colors" 
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                           
                           {editingGlobalTagId === tag._id ? (
@@ -920,7 +1075,7 @@ export default function ProductDetailPage() {
                       <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>No tags assigned yet</p>
                     </div>
                   )}
-                </InnerCard>
+                </div>
               </div>
             )}
 
@@ -928,40 +1083,40 @@ export default function ProductDetailPage() {
             {activeTab === "variants" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <InnerCard>
+                  <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex items-center gap-2 mb-1">
                       <Layers3 className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total Variants</span>
                     </div>
                     <p className="text-[20px] font-semibold">{totalVariants}</p>
-                  </InnerCard>
-                  <InnerCard>
+                  </div>
+                  <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex items-center gap-2 mb-1">
                       <Box className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total Stock</span>
                     </div>
                     <p className="text-[20px] font-semibold" style={{ color: totalStock === 0 ? "#f87171" : "#34d399" }}>{totalStock}</p>
-                  </InnerCard>
-                  <InnerCard>
+                  </div>
+                  <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex items-center gap-2 mb-1">
                       <DollarSign className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Price Range</span>
                     </div>
                     <p className="text-[16px] font-semibold">{priceRange}</p>
-                  </InnerCard>
-                  <InnerCard>
+                  </div>
+                  <div className="rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total Value</span>
                     </div>
-                    <p className="text-[16px] font-semibold">Rs. {totalValue.toLocaleString()}</p>
-                  </InnerCard>
+                    <p className="text-[16px] font-semibold" style={{ color: "#34d399" }}>Rs. {totalValue.toLocaleString()}</p>
+                  </div>
                 </div>
                 <div className="flex justify-end">
                   <SBtn primary onClick={handleAddVariantFromTab}><Plus className="w-3.5 h-3.5" />Add Variant</SBtn>
                 </div>
                 {variants.length === 0 ? (
-                  <InnerCard>
+                  <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex flex-col items-center justify-center py-8 gap-2">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ border: "1px dashed var(--border-color)" }}>
                         <Package className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
@@ -969,15 +1124,31 @@ export default function ProductDetailPage() {
                       <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>No variants available</p>
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Click "Add Variant" above to create one.</p>
                     </div>
-                  </InnerCard>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {variants.map((variant, index) => (
-                      <div key={variant._id || index} className="rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg"
+                    {variants.map((variant, index) => {
+                      const firstImage = variant.images && variant.images.length > 0 ? variant.images[0] : null;
+                      const imageUrl = firstImage ? (firstImage.img_url ? getImageUrl(firstImage.img_url) : firstImage.preview) : null;
+                      return (
+                      <div key={variant._id || index} className="rounded-xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
                         style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "12px" }}>
                         
+                        {/* Variant Image Preview */}
+                        {imageUrl && (
+                          <div className="relative h-32 overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                            <img src={imageUrl} alt={variant.title || `Variant ${index + 1}`} className="w-full h-full object-cover" />
+                            {variant.images.length > 1 && (
+                              <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#fff" }}>
+                                +{variant.images.length - 1}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        
                         {/* Variant Header */}
-                        <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                        <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: imageUrl ? "none" : "1px solid var(--border-color)" }}>
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(52,211,153,0.1)" }}>
                               <Package className="w-4 h-4" style={{ color: "#34d399" }} />
@@ -1050,12 +1221,13 @@ export default function ProductDetailPage() {
                                 className="flex-1 h-7 px-2 rounded text-[11px] font-medium inline-flex items-center justify-center gap-1 transition-colors"
                                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                               >
-                                <TagIcon className="w-3 h-3" /> Tags
-                              </button>
-                           </div>
-                        </div>
-                      </div>
-                    ))}
+                                 <TagIcon className="w-3 h-3" /> Tags
+                               </button>
+                            </div>
+                         </div>
+                       </div>
+                     );
+                    })}
                   </div>
                 )}
               </div>
@@ -1066,39 +1238,48 @@ export default function ProductDetailPage() {
               <div>
                 {product.category_id ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Category Details</SecTitle>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        <span>Category Details</span>
+                      </div>
                       <div className="divide-y flex-1" style={{ borderColor: "var(--border-color)" }}>
                         <InfoRow label="Name" value={product.category_id.name} />
                         <InfoRow label="Code" value={product.category_id.category_code || "—"} mono />
                         <InfoRow label="Status" value="Active" green />
                         <InfoRow label="Assigned Product" value={product.name} />
                       </div>
-                    </InnerCard>
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Description</SecTitle>
+                    </div>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        Description
+                      </div>
                       <div className="flex-1">
-                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
                           {product.category_id.description || "No description available."}</p>
                       </div>
-                    </InnerCard>
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Metadata</SecTitle>
+                    </div>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        Metadata
+                      </div>
                       <div className="space-y-3 flex-1">
                         <Person user={product.category_id.createdby} label="Created By" date={product.category_id.created_at} color="#34d399" fallback="Unknown user" />
                         {product.category_id.updatedby && <Person user={product.category_id.updatedby} label="Updated By" date={product.category_id.updated_at} color="#60a5fa" />}
                       </div>
-                    </InnerCard>
+                    </div>
                   </div>
                 ) : (
-                  <InnerCard>
+                  <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex flex-col items-center justify-center py-8 gap-2">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ border: "1px dashed var(--border-color)" }}>
                         <FolderOpen className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
                       </div>
                       <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>No category assigned</p>
                     </div>
-                  </InnerCard>
+                  </div>
                 )}
               </div>
             )}
@@ -1107,54 +1288,64 @@ export default function ProductDetailPage() {
               <div>
                 {product.brand_id ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Brand Details</SecTitle>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        <span>Brand Details</span>
+                      </div>
                       <div className="divide-y flex-1" style={{ borderColor: "var(--border-color)" }}>
                         <InfoRow label="Name" value={product.brand_id.name} />
                         <InfoRow label="Code" value={product.brand_id.brand_code || "—"} mono />
                         <InfoRow label="Country" value={product.brand_id.country || "—"} />
                         <InfoRow label="Status" value={product.brand_id.is_active ? "Active" : "Inactive"} green={product.brand_id.is_active} />
                       </div>
-                    </InnerCard>
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Description</SecTitle>
+                    </div>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        Description
+                      </div>
                       <div className="flex-1">
-                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
                           {product.brand_id.description || "No description available."}</p>
                       </div>
-                    </InnerCard>
-                    <InnerCard className="flex flex-col">
-                      <SecTitle>Metadata</SecTitle>
+                    </div>
+                    <div className="rounded-xl p-5 flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                        style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                        Metadata
+                      </div>
                       <div className="space-y-3 flex-1">
                         <Person user={product.brand_id.createdby} label="Created By" date={product.brand_id.created_at} color="#34d399" fallback="Unknown user" />
                         {product.brand_id.updatedby && <Person user={product.brand_id.updatedby} label="Updated By" date={product.brand_id.updated_at} color="#60a5fa" />}
                       </div>
-                    </InnerCard>
+                    </div>
                   </div>
                 ) : (
-                  <InnerCard>
+                  <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <div className="flex flex-col items-center justify-center py-8 gap-2">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ border: "1px dashed var(--border-color)" }}>
                         <Store className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
                       </div>
                       <p className="text-[12px] font-medium" style={{ color: "var(--text-secondary)" }}>No brand assigned</p>
                     </div>
-                  </InnerCard>
+                  </div>
                 )}
               </div>
             )}
 
             {activeTab === "activity" && (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-                <InnerCard>
-                  <SecTitle>
-                    Activity Timeline
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5 flex items-center justify-between"
+                    style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                    <span>Activity Timeline</span>
                     <span className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide"
                       style={{ color: isConnected ? "#34d399" : "var(--text-muted)" }}>
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isConnected ? "#34d399" : "var(--text-muted)" }} />
                       {isConnected ? "Live" : "Offline"}
                     </span>
-                  </SecTitle>
+                  </div>
 
                   {/* Created Event */}
                   <TItem icon={<Plus className="w-3.5 h-3.5" />} title="Product Created" sub="Added to the system"
@@ -1182,17 +1373,20 @@ export default function ProductDetailPage() {
                       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>No updates yet.</span>
                     </div>
                   )}
-                </InnerCard>
+                </div>
 
-                <InnerCard>
-                  <SecTitle>User Details</SecTitle>
+                <div className="rounded-xl p-5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mb-3 pb-2.5"
+                    style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                    User Details
+                  </div>
                   <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
                     <Person user={product.createdby} label="Creator" date={product.created_at} color="#34d399" fallback="Unknown user" />
                     {wasUp && product.updatedby
                       ? <Person user={product.updatedby} label="Last Editor" date={product.updated_at} color="#60a5fa" />
                       : <Person user={null} label="Last Editor" color="#60a5fa" fallback="No updates yet" />}
                   </div>
-                </InnerCard>
+                </div>
               </div>
             )}
       </div>
@@ -1437,81 +1631,78 @@ export default function ProductDetailPage() {
                                   const preset = ATTRIBUTE_PRESETS.find(p => p.name === attr.name);
                                   const isCustom = !!attr.isCustom;
                                   const isMulti = preset?.data_type === "multi_select";
-                                  const selectedArr = Array.isArray(attr.value)
-                                    ? attr.value
-                                    : (typeof attr.value === "string" && attr.value.length
-                                        ? attr.value.split(",").map((s) => s.trim()).filter(Boolean)
-                                        : []);
+                                  const isNumber = preset?.data_type === "number";
+                                  const selectedSingle = typeof attr.value === "string" ? attr.value : "";
 
-                                  const toggleMulti = (val) => {
+                                  const setSingleValue = (val) => {
                                     const v = [...formData.variants];
                                     const a = [...v[index].attributes];
-                                    const current = Array.isArray(a[ai].value)
-                                      ? a[ai].value
-                                      : (typeof a[ai].value === "string" && a[ai].value
-                                          ? a[ai].value.split(",").map((s) => s.trim()).filter(Boolean)
-                                          : []);
-                                    a[ai] = {
-                                      ...a[ai],
-                                      isCustom: false,
-                                      value: current.includes(val) ? current.filter((x) => x !== val) : [...current, val],
-                                    };
+                                    a[ai] = { ...a[ai], value: val, isCustom: false };
                                     v[index] = { ...v[index], attributes: a };
                                     setFormData({ ...formData, variants: v });
                                   };
 
                                   return (
                                     <div key={ai} className="flex flex-wrap items-center gap-2">
-                                      <select value={attr.name}
-                                        onChange={(e) => { const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],name:e.target.value,value:isMulti?[]:"",isCustom:false}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
-                                        className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
-                                        {ATTRIBUTE_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                                      </select>
+                                      <div className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 flex items-center gap-1.5 font-medium truncate" style={is_}>
+                                        <span className="truncate">{attr.name || "—"}</span>
+                                        {attr._creating && (
+                                          <span className="text-[10px] font-normal italic shrink-0" style={{ color: "var(--text-muted)" }}>creating…</span>
+                                        )}
+                                        {attr._createError && (
+                                          <span className="text-[10px] font-normal italic shrink-0 text-red-500">save failed</span>
+                                        )}
+                                      </div>
                                       {preset ? (
                                         isMulti ? (
                                           <div className="flex-1 min-w-[180px] flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md min-h-[34px]" style={is_}>
-                                            {selectedArr.length === 0 && (
-                                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Select values...</span>
+                                            {!selectedSingle && (
+                                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Select an option...</span>
                                             )}
-                                            {preset.values.map((val) => {
-                                              const active = selectedArr.includes(val);
-                                              return (
+                                            {selectedSingle && (
+                                              <span
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border"
+                                                style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", borderColor: "rgba(16,185,129,0.4)" }}
+                                              >
+                                                {selectedSingle}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setSingleValue("")}
+                                                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-black/10"
+                                                  aria-label={`Clear ${selectedSingle}`}
+                                                >
+                                                  <X className="w-2.5 h-2.5" />
+                                                </button>
+                                              </span>
+                                            )}
+                                            <div className="flex flex-wrap items-center gap-1 ml-auto">
+                                              {preset.values.filter((val) => val !== selectedSingle).map((val) => (
                                                 <button
                                                   type="button"
                                                   key={val}
-                                                  onClick={() => toggleMulti(val)}
+                                                  onClick={() => setSingleValue(val)}
                                                   className="px-2 py-0.5 rounded text-[10px] font-medium border"
-                                                  style={active
-                                                    ? { backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399", borderColor: "rgba(16,185,129,0.4)" }
-                                                    : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", borderColor: "var(--border-color)" }}
+                                                  style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", borderColor: "var(--border-color)" }}
                                                 >
                                                   {val}
                                                 </button>
-                                              );
-                                            })}
+                                              ))}
+                                            </div>
                                           </div>
                                         ) : (
                                           <>
-                                            <select value={isCustom ? "__custom__" : attr.value}
-                                              onChange={(e) => { const val=e.target.value; const v=[...formData.variants]; const a=[...v[index].attributes]; a[ai]={...a[ai],isCustom:val==="__custom__",value:val==="__custom__"?(preset.name==="Color"?"#000000":""):val}; v[index]={...v[index],attributes:a}; setFormData({...formData,variants:v}); }}
-                                              className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 outline-none" style={is_}>
-                                              {preset.values.map(v => <option key={v} value={v}>{v}</option>)}
-                                              <option value="__custom__">+ Custom</option>
-                                            </select>
-                                            {isCustom && preset.name === "Color" ? (
-                                              <div className="flex items-center gap-2 flex-1">
-                                                <input type="color" value={attr.value||"#000000"} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
-                                                  className="w-8 h-8 cursor-pointer rounded border" style={{ borderColor: "var(--border-color)" }} />
-                                                <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.value||"#000000"}</span>
-                                              </div>
-                                            ) : isCustom ? (
-                                              <input type="text" placeholder="Custom value..." value={attr.value} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
-                                                className="h-8 px-2.5 rounded-md text-[12px] flex-1 outline-none" style={is_} />
-                                            ) : null}
+                                            <input
+                                              type={isNumber ? "number" : "text"}
+                                              value={attr.value || ""}
+                                              onChange={(e) => setSingleValue(e.target.value)}
+                                              placeholder={`Enter ${preset.name.toLowerCase()} value...`}
+                                              className="h-8 px-2.5 rounded-md text-[12px] min-w-[140px] flex-1 outline-none"
+                                              style={is_}
+                                            />
                                           </>
                                         )
                                       ) : (
-                                        <input type="text" placeholder="Value e.g. Black" value={attr.value} onChange={(e) => updateAttribute(index,ai,"value",e.target.value)}
+                                        <input type="text" placeholder="Value e.g. Black" value={attr.value || ""} onChange={(e) => setSingleValue(e.target.value)}
                                           className="h-8 px-2.5 rounded-md text-[12px] flex-1 outline-none" style={is_} />
                                       )}
                                       <button type="button" onClick={() => removeAttribute(index,ai)}
@@ -1704,6 +1895,91 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ADD ATTRIBUTE MODAL */}
+      {showAttributeModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={{ ...cs, maxHeight: "90vh" }}>
+            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              <h3 className="text-base font-semibold">Create New Attribute</h3>
+              <button type="button" onClick={() => { setShowAttributeModal(false); setAttributeTargetVariant(null); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
+            </div>
+            <div className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Attribute Name *</label>
+                  <input type="text" value={newAttributeData.name} onChange={e => setNewAttributeData(p => ({ ...p, name: e.target.value }))} required disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-[12px] outline-none disabled:opacity-50" style={is_} placeholder="e.g. Color, RAM, Size" />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Attribute Code</label>
+                  <input
+                    type="text"
+                    value={newAttributeData.code}
+                    onChange={e => setNewAttributeData(p => ({ ...p, code: e.target.value.toLowerCase() }))}
+                    disabled={createAttributeMutation.isPending}
+                    className="h-9 w-full rounded-md px-3 text-[12px] outline-none disabled:opacity-50"
+                    style={is_}
+                    placeholder="e.g. color, ram_size"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Data Type *</label>
+                <select value={newAttributeData.data_type} onChange={e => setNewAttributeData(p => ({ ...p, data_type: e.target.value }))} disabled={createAttributeMutation.isPending} className="h-9 w-full rounded-md px-3 text-[12px] outline-none disabled:opacity-50" style={is_}>
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="multi_select">Multi Select</option>
+                  <option value="decimal">Decimal</option>
+                </select>
+              </div>
+
+              {/* Only show Allowed Values section for "select" type, NOT for "multi_select" */}
+              {newAttributeData.data_type === "select" && (
+                <div className="space-y-2 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Allowed Values</label>
+                    <button type="button" onClick={handleAddAttributeValue} className="flex items-center gap-1 text-[11px] font-semibold transition hover:opacity-80" style={{ color: "var(--accent)" }}>
+                      <Plus className="h-3 w-3" /> Add Value
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {newAttributeData.values.map((val, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Label (e.g. Red)"
+                          value={val.label}
+                          onChange={e => handleAttributeValueChange(idx, "label", e.target.value)}
+                          className="h-8 flex-1 rounded-md px-2 text-[12px] outline-none"
+                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Value (e.g. #FF0000)"
+                          value={val.value}
+                          onChange={e => handleAttributeValueChange(idx, "value", e.target.value)}
+                          className="h-8 flex-1 rounded-md px-2 text-[12px] outline-none"
+                          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                        />
+                        <button type="button" onClick={() => handleRemoveAttributeValue(idx)} className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 transition hover:bg-red-500/10">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowAttributeModal(false); setAttributeTargetVariant(null); resetAttributeForm(); }} disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-[12px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="button" onClick={handleAttributeSubmit} disabled={createAttributeMutation.isPending} className="h-9 flex-1 rounded-md text-[12px] font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
