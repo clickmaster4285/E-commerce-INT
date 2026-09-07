@@ -10,14 +10,20 @@ const unwrap = (res) => {
 const unwrapObject = (res) => res?.data?.data || res?.data;
 
 export const attributeApi = {
-  // ✅ FIXED: Accepts query params object to prevent Regex crash
-  getAll: (queryParams = {}) => {
-    const params = typeof queryParams === 'string' ? { search: queryParams } : queryParams;
-    return axiosInstance.get("/attributes", { params }).then(unwrap);
+  getAll: (params = "") => {
+    const query = {};
+    if (typeof params === "string") {
+      if (params) query.search = params;
+    } else if (params && typeof params === "object") {
+      Object.assign(query, params);
+    }
+    return axiosInstance.get("/attributes", { params: query }).then(unwrap);
   },
 
   getByCategory: (categoryId) =>
-    axiosInstance.get(`/categories/${categoryId}/attributes`).then(unwrap),
+    axiosInstance
+      .get(`/categories/${categoryId}/attributes`)
+      .then(unwrap),
 
   create: (data) =>
     axiosInstance.post("/attributes", data).then(unwrapObject),

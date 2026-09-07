@@ -173,7 +173,7 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 };
 
 // ======================================================
-// GET ALL PRODUCTS
+// GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
 // ======================================================
 const getProducts = async (req, res) => {
   try {
@@ -210,10 +210,22 @@ const getProducts = async (req, res) => {
       variantsMap[productId].push(variant);
     });
 
-    const result = products.map((product) => ({
-      ...product,
-      variants: variantsMap[String(product._id)] || [],
-    }));
+    // ✅ UPDATED: Price calculation logic added here
+    const result = products.map((product) => {
+      const productVariants = variantsMap[String(product._id)] || [];
+      
+      // Pehli active variant ki selling_price ko 'price' ke tor par assign karna
+      let calculatedPrice = 0;
+      if (productVariants.length > 0) {
+        calculatedPrice = Number(productVariants[0].selling_price) || 0;
+      }
+
+      return {
+        ...product,
+        variants: productVariants,
+        price: calculatedPrice, // Frontend ke liye direct price field
+      };
+    });
 
     return res.status(200).json(result);
   } catch (error) {
