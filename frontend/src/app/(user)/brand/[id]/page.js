@@ -42,7 +42,7 @@ export default function BrandPage() {
 
   return (
     <main className="min-h-screen text-[var(--user-text)]">
-      <section className="max-w-7xl mx-auto px-4 lg:px-6 py-8 lg:py-12">
+      <section className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
         {/* BREADCRUMB */}
         <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
           <Link href="/" className="hover:text-[var(--user-accent)] transition">
@@ -95,16 +95,16 @@ export default function BrandPage() {
 
         {/* LOADING */}
         {isLoading && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="space-y-2 lg:space-y-3">
-                <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
-                <div className="h-3 w-3/4 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-                <div className="h-3 w-1/2 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-                <div className="h-4 w-1/3 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="space-y-2 lg:space-y-3">
+              <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
+              <div className="h-3 w-3/4 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
+              <div className="h-3 w-1/2 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
+              <div className="h-4 w-1/3 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
+            </div>
+          ))}
+        </div>
         )}
 
         {/* ERROR */}
@@ -130,7 +130,7 @@ export default function BrandPage() {
 
         {/* PRODUCTS */}
         {!isLoading && !isError && products.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
             {products.map((product) => (
               <ProductCard key={product._id} product={product} />
             ))}

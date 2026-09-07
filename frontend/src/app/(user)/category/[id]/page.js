@@ -59,7 +59,7 @@ export default function CategoryPage({ params }) {
   }, [filtered, sortBy]);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 lg:px-6 py-8 lg:py-12">
+    <main className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
       {/* BREADCRUMB */}
       <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
         <Link href="/" className="hover:text-[var(--user-accent)] transition">
@@ -103,7 +103,7 @@ export default function CategoryPage({ params }) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-lg px-2.5 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
+              className="h-10 lg:h-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full lg:rounded-lg px-3 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs font-bold text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
             >
               <option value="featured">Featured</option>
               <option value="newest">Newest Arrivals</option>
@@ -116,7 +116,7 @@ export default function CategoryPage({ params }) {
 
       {/* LOADING */}
       {isLoading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="space-y-2 lg:space-y-3">
               <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
@@ -130,7 +130,7 @@ export default function CategoryPage({ params }) {
 
       {/* PRODUCTS GRID */}
       {!isLoading && sorted.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
           {sorted.map((p) => (
             <ProductCard key={p._id} product={p} />
           ))}

@@ -21,16 +21,17 @@ const calculateShipping = async ({ items = [], method = "standard", subtotal = 0
     reason = `Free shipping over Rs. ${config.free_shipping_over.toLocaleString()}`;
   }
 
-  // ✅ Brand / Category / Product rules
+  // ✅ Brand / Category / Product / All rules
   if (!free && items.length) {
     const rules = await ShippingRule.find({ is_active: true }).lean();
     outer: for (const item of items) {
       for (const r of rules) {
-        const refId = String(r.ref_id);
+        const refId = String(r.ref_id || "");
         const match =
-          (r.rule_type === "product" && refId === String(item.productId || item.product_id || item._id)) ||
-          (r.rule_type === "brand" && refId === String(item.brandId || item.brand_id)) ||
-          (r.rule_type === "category" && refId === String(item.categoryId || item.category_id));
+          r.rule_type === "all" ||
+          (r.rule_type === "product" && refId && refId === String(item.productId || item.product_id || item._id)) ||
+          (r.rule_type === "brand" && refId && refId === String(item.brandId || item.brand_id)) ||
+          (r.rule_type === "category" && refId && refId === String(item.categoryId || item.category_id));
         if (match) {
           if (r.shipping_type === "free") {
             free = true;
@@ -54,6 +55,21 @@ const getShippingConfig = async (req, res) => {
   try {
     const config = await ShippingConfig.getConfig();
     res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==========================================
+// ✅ PUBLIC: GET /api/shipping/rules (active rules only)
+//    User GUI uses these to compute per-cart shipping.
+// ==========================================
+const getActiveShippingRules = async (req, res) => {
+  try {
+    const rules = await ShippingRule.find({ is_active: true })
+      .select("rule_type ref_id shipping_type fee is_active")
+      .lean();
+    res.json({ success: true, data: rules });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -118,13 +134,21 @@ const getShippingRules = async (req, res) => {
 const createShippingRule = async (req, res) => {
   try {
     const { rule_type, ref_id, shipping_type = "free", fee = 0, is_active = true, note = "" } = req.body || {};
-    if (!["product", "category", "brand"].includes(rule_type) || !ref_id) {
-      return res.status(400).json({ success: false, message: "Invalid rule type or target" });
+    if (!["product", "category", "brand", "all"].includes(rule_type)) {
+      return res.status(400).json({ success: false, message: "Invalid rule type" });
+    }
+    // ✅ 'all' rules apply to every product and don't need a target.
+    //    All other rule types MUST have a ref_id.
+    if (rule_type !== "all" && !ref_id) {
+      return res.status(400).json({ success: false, message: "Please select a target" });
     }
     const rule = await ShippingRule.create({
-      rule_type, ref_id, shipping_type,
+      rule_type,
+      ref_id: rule_type === "all" ? null : ref_id,
+      shipping_type,
       fee: shipping_type === "fixed" ? Math.max(0, Number(fee) || 0) : 0,
-      is_active, note,
+      is_active,
+      note,
     });
     emit("shippingRules:updated", rule);
     emit("shippingRuleCreated", rule);
@@ -140,8 +164,18 @@ const updateShippingRule = async (req, res) => {
     if (!rule) return res.status(404).json({ success: false, message: "Rule not found" });
 
     const b = req.body || {};
-    if (b.rule_type) rule.rule_type = b.rule_type;
-    if (b.ref_id) rule.ref_id = b.ref_id;
+    if (b.rule_type) {
+      if (!["product", "category", "brand", "all"].includes(b.rule_type)) {
+        return res.status(400).json({ success: false, message: "Invalid rule type" });
+      }
+      rule.rule_type = b.rule_type;
+      // ✅ When switching to 'all', drop the ref_id; otherwise accept the new one.
+      if (b.rule_type === "all") rule.ref_id = null;
+      else if (b.ref_id) rule.ref_id = b.ref_id;
+    } else if (b.ref_id !== undefined) {
+      if (rule.rule_type === "all") rule.ref_id = null;
+      else rule.ref_id = b.ref_id || rule.ref_id;
+    }
     if (b.shipping_type) rule.shipping_type = b.shipping_type;
     if (b.fee !== undefined) rule.fee = Math.max(0, Number(b.fee) || 0);
     if (b.is_active !== undefined) rule.is_active = !!b.is_active;
@@ -184,6 +218,7 @@ const toggleShippingRule = async (req, res) => {
 module.exports = {
   calculateShipping,
   getShippingConfig,
+  getActiveShippingRules,
   quoteShipping,
   updateShippingConfig,
   getShippingRules,

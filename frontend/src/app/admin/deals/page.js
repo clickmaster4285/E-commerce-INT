@@ -198,9 +198,9 @@ export default function DealsPage() {
     target_type: "all",
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
-    buy_quantity: "",       
-    get_quantity: "",       
-    get_discount_value: "", 
+    buy_quantity: "",
+    get_quantity: "",
+    get_discount_value: "",
     bundle_price: "",
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -285,13 +285,18 @@ export default function DealsPage() {
   }), [deals]);
 
   const openEdit = (deal) => {
+    // ✅ Backward compatible: missing/empty freeShippingMethods → BOTH methods
+    const fsm = Array.isArray(deal?.freeShippingMethods) && deal.freeShippingMethods.length > 0
+      ? deal.freeShippingMethods
+      : ["standard", "express"];
+
     setFormData({
       name: deal?.name || "", code: deal?.code || "", description: deal?.description || "",
       target_type: deal?.applyTo || "all",
       selected_product_ids: Array.isArray(deal?.productIds) ? deal.productIds.map(getId) : [],
       selected_category_ids: Array.isArray(deal?.categoryIds) ? deal.categoryIds.map(getId) : [],
       selected_brand_ids: Array.isArray(deal?.brandIds) ? deal.brandIds.map(getId) : [],
-      
+
       value_type: deal?.type || "percentage",
       value: deal?.discountValue ?? "",
       min_order_value: deal?.minOrderValue ?? "",

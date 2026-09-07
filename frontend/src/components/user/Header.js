@@ -45,6 +45,13 @@ import {
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
+// ✅ PRODUCT IMAGE URL HELPER
+const getImageUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("blob:")) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}`;
+};
+
 const getIcon = (name) => {
   if (!name) return <FolderOpen size={17} />;
   const n = name.toLowerCase();
@@ -61,10 +68,10 @@ const getIcon = (name) => {
   return <FolderOpen size={17} />;
 };
 
-function SearchBox({ value, onChange, onSubmit }) {
+function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
   return (
     <div className="relative flex w-full items-center">
-      <Search size={16} className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none" />
+      <Search size={16} className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none z-10" />
       <input
         value={value}
         onChange={onChange}
@@ -80,6 +87,38 @@ function SearchBox({ value, onChange, onSubmit }) {
         <Search size={14} />
         <span className="hidden lg:inline">Search</span>
       </button>
+
+      {/* ✅ LIVE RESULTS DROPDOWN */}
+      {results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl overflow-hidden">
+          <div className="max-h-80 overflow-y-auto">
+            {results.map((p) => {
+              const img = p.variants?.[0]?.images?.[0]?.img_url || p.image || p.images?.[0]?.img_url || "";
+              const price = Number(p.variants?.[0]?.selling_price || p.price || p.selling_price || 0);
+              return (
+                <button
+                  key={p._id || p.id}
+                  onClick={() => onPick(p)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
+                >
+                  {img ? (
+                    <img src={getImageUrl(img)} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[var(--user-border)] shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
+                      <Package size={16} className="text-[var(--user-text-subtle)]" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--user-text)] truncate">{p.name}</p>
+                    <p className="text-[11px] text-[var(--user-text-muted)] capitalize truncate">{p.brand_id?.name || p.brand || ""}</p>
+                  </div>
+                  <span className="text-sm font-bold text-[var(--user-accent)] whitespace-nowrap">Rs. {price.toLocaleString()}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,6 +294,19 @@ useEffect(() => {
       .slice(0, 5);
   }, [brands, brandCounts]);
 
+  // ✅ LIVE SEARCH RESULTS — name se match
+  const searchResults = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (q.length < 1) return [];
+    return products.filter((p) => (p.name || "").toLowerCase().includes(q)).slice(0, 8);
+  }, [searchTerm, products]);
+
+  const handlePick = (p) => {
+    setSearchTerm("");
+    setMobileSearchOpen(false);
+    router.push(`/product/${p._id || p.id}`);
+  };
+
   const handleLogout = async () => {
     try {
       await axiosInstance.post("/users/logout");
@@ -266,11 +318,7 @@ useEffect(() => {
   };
 
   const handleSearch = () => {
-    if (searchTerm.trim()) {
-      router.push(`/products?q=${encodeURIComponent(searchTerm.trim())}`);
-      setSearchTerm("");
-      setMobileSearchOpen(false);
-    }
+   
   };
 
   const getLogoUrl = (logo) => {
@@ -325,10 +373,12 @@ useEffect(() => {
 
             {/* CENTER — Search (desktop only, unchanged) */}
             <div className="hidden md:block flex-1 max-w-2xl mx-auto">
-              <SearchBox
+                           <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onSubmit={handleSearch}
+                results={searchResults}
+                onPick={handlePick}
               />
             </div>
 
@@ -454,10 +504,12 @@ useEffect(() => {
           {/* MOBILE SEARCH — expandable */}
           {mobileSearchOpen && (
             <div className="md:hidden pb-3">
-              <SearchBox
+                             <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onSubmit={handleSearch}
+                results={searchResults}
+                onPick={handlePick}
               />
             </div>
           )}

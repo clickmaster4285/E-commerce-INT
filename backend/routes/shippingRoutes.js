@@ -2,7 +2,7 @@ const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 const {
-  getShippingConfig, quoteShipping, updateShippingConfig,
+  getShippingConfig, getActiveShippingRules, quoteShipping, updateShippingConfig,
   getShippingRules, createShippingRule, updateShippingRule,
   deleteShippingRule, toggleShippingRule,
 } = require("../controllers/shippingController");
@@ -11,6 +11,8 @@ const router = express.Router();
 
 // Public / user
 router.get("/config", getShippingConfig);
+// ✅ Public: user GUI reads active rules via this endpoint (no auth needed).
+router.get("/rules", getActiveShippingRules);
 router.post("/quote", authMiddleware, quoteShipping);
 
 // Admin

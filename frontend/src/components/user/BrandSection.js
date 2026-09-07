@@ -25,7 +25,7 @@ export default function BrandSection() {
   };
 
   return (
-    <section className="px-4 lg:px-6 py-8 lg:py-12">
+    <section className="px-3 lg:px-6 py-5 lg:py-12">
       <div className="max-w-[1400px] mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">

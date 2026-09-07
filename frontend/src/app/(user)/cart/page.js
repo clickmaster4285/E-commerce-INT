@@ -13,7 +13,7 @@ import {
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { shippingApi } from "@/apis/user/shippingApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings } from "@/utils/dealCalculator";
+import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -45,18 +45,28 @@ function getDealBadgeConfig(deal) {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, updateQty, removeFromCart, restoreItems } = useCart();
-  const { calculateProductDiscount } = useDiscounts();
+  const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection } = useCart();
+  const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
   const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
 
-  // ✅ SHIPPING METHOD — fixed standard (selector removed)
-  const shippingMethod = "standard";
+  // ✅ SHIPPING METHOD — derived from active free-shipping deal (no selector on cart page)
+  const activeFreeShippingDeal = hasFreeShippingDeal(cart)
+    ? dealsList.find((d) => d.type === "free_shipping")
+    : null;
+  const shippingMethod = getDefaultShippingMethod(activeFreeShippingDeal);
 
   // ✅ SHIPPING CONFIG — database se (admin panel)
   const { data: shipConfig } = useQuery({
     queryKey: ["shippingConfig"],
     queryFn: shippingApi.getConfig,
     staleTime: 5 * 60 * 1000,
+  });
+  // ✅ Active shipping rules (brand/category/product/all — free or fixed).
+  const { data: shippingRules = [] } = useQuery({
+    queryKey: ["shippingRules"],
+    queryFn: shippingApi.getRules,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const cfg = shipConfig || {
@@ -74,32 +84,52 @@ export default function CartPage() {
     });
   };
 
-  // ✅ Same grouping logic as drawer
+  // ✅ Same grouping logic as drawer (with Buy X Get Y activation threshold + regular discount)
   const groupedItems = useMemo(() => {
     const dealGroups = new Map();
     const regularItems = [];
 
     cart.forEach((raw) => {
-      const disc = calculateProductDiscount(
-        {
+      const qty = Number(raw.qty) || 0;
+      const dealActive = isDealActive({ ...raw, qty });
+      let displayPrice = Number(raw.price) || 0;
+      const originalPrice = Number(raw.regularPrice ?? raw.price ?? 0);
+      let regularDiscountSavings = 0;
+
+      // ✅ Apply admin-applied regular discount on non-deal lines
+      if (!dealActive) {
+        const fakeProduct = {
           _id: raw.productId || raw.id,
           category_id: raw.categoryId || null,
           brand_id: raw.brandId || null,
           discount: raw.productDiscountPct || 0,
-        },
-        raw.price,
-      );
-      
-      const qty = raw.qty;
+        };
+        // ✅ Regular cart line: includeDeals=false so any active deal
+        // is IGNORED and ONLY the regular admin discount is applied.
+        const disc = calculateProductDiscount(fakeProduct, originalPrice, false);
+        if (disc && disc.hasDiscount && disc.discountedPrice < originalPrice) {
+          displayPrice = Number(disc.discountedPrice) || displayPrice;
+          regularDiscountSavings = Math.max(0, originalPrice - displayPrice);
+        }
+      }
+
       let freeItems = 0;
       let payableItems = qty;
       let dealSavings = 0;
-      
-      if (raw.dealType === "buy_x_get_y" && raw.dealBuyQuantity && raw.dealGetQuantity) {
+      let effectiveDealSavings = 0;
+
+      if (dealActive && raw.dealType === "buy_x_get_y" && raw.dealBuyQuantity && raw.dealGetQuantity) {
         freeItems = calculateFreeItems(qty, raw.dealBuyQuantity, raw.dealGetQuantity);
         payableItems = calculatePayableItems(qty, raw.dealBuyQuantity, raw.dealGetQuantity);
-        dealSavings = calculateBuyXGetYSavings(qty, disc.discountedPrice, raw.dealBuyQuantity, raw.dealGetQuantity);
+        dealSavings = calculateBuyXGetYSavings(qty, displayPrice, raw.dealBuyQuantity, raw.dealGetQuantity);
+        effectiveDealSavings = dealSavings;
+      } else if (dealActive && (raw.dealType === "percentage" || raw.dealType === "fixed_amount")) {
+        effectiveDealSavings = Math.max(0, (originalPrice - displayPrice) * qty);
       }
+
+      const lineTotal = (raw.dealType === "buy_x_get_y" && raw.dealBuyQuantity && raw.dealGetQuantity)
+        ? payableItems * displayPrice
+        : qty * displayPrice;
 
       const itemData = {
         raw,
@@ -109,17 +139,19 @@ export default function CartPage() {
         brand: raw.brand,
         variantTitle: raw.variantTitle,
         image: raw.image,
-        displayPrice: disc.discountedPrice,
-        originalPrice: disc.originalPrice,
-        hasDiscount: disc.hasDiscount || raw.dealType === "buy_x_get_y",
-        savings: raw.dealType === "buy_x_get_y" ? (dealSavings / qty) : disc.savings,
-        dealSavings,
-        freeItems,
-        payableItems,
-        lineTotal: payableItems * disc.discountedPrice,
+        displayPrice,
+        originalPrice,
+        stock: raw.stock,
+        hasDiscount: (originalPrice > displayPrice),
+        savings: regularDiscountSavings,
+        dealSavings: effectiveDealSavings,
+        freeItems: dealActive ? freeItems : 0,
+        payableItems: dealActive ? payableItems : qty,
+        lineTotal,
+        dealActive,
       };
 
-      if (raw.dealId) {
+      if (dealActive && raw.dealId) {
         if (!dealGroups.has(raw.dealId)) {
           dealGroups.set(raw.dealId, {
             dealId: raw.dealId,
@@ -132,7 +164,7 @@ export default function CartPage() {
         }
         const group = dealGroups.get(raw.dealId);
         group.items.push(itemData);
-        group.totalSavings += dealSavings;
+        group.totalSavings += effectiveDealSavings;
       } else {
         regularItems.push(itemData);
       }
@@ -142,19 +174,28 @@ export default function CartPage() {
   }, [cart, calculateProductDiscount]);
 
   const totals = useMemo(() => {
-    const allItems = [...groupedItems.deals.flatMap(d => d.items), ...groupedItems.regular];
+    // ✅ Compute from SELECTED items only
+    const allItems = [...groupedItems.deals.flatMap(d => d.items), ...groupedItems.regular]
+      .filter((i) => isLineSelected(i.key));
+    const itemsForRules = selectedItems;
     const subtotal = allItems.reduce((s, i) => s + i.lineTotal, 0);
-    const totalSavings = allItems.reduce((s, i) => {
-      if (i.raw.dealType === "buy_x_get_y") return s + i.dealSavings;
-      if (i.originalPrice > i.displayPrice) return s + (i.originalPrice - i.displayPrice) * i.qty;
-      return s;
-    }, 0);
+    // ✅ No double counting:
+    // - Deal lines contribute `dealSavings` (deal section price drop + free items)
+    // - Regular lines contribute `savings * qty` (regular-discount drop only)
+    const totalSavings = allItems.reduce(
+      (s, i) => s + (i.dealActive ? i.dealSavings : i.savings * i.qty),
+      0
+    );
     const tax = Math.round(allItems.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.raw.tax || 0) / 100), 0));
-    const hasFreeShippingDeal = allItems.some((i) => i.raw.dealType === "free_shipping");
-    return { subtotal, totalSavings, tax, hasFreeShippingDeal, allItems };
-  }, [groupedItems]);
+    // ✅ Shared helper — single source of truth. Evaluate against SELECTED items.
+    const hasFreeShippingDealFlag = hasFreeShippingDeal(itemsForRules);
+    // ✅ Cart page has no method selector — derive default from the active deal
+    //    so an express-only deal shows EXPRESS + FREE here too.
+    const freeShippingActiveForDefault = isFreeShippingApplicable(activeFreeShippingDeal, shippingMethod);
+    return { subtotal, totalSavings, tax, hasFreeShippingDeal: hasFreeShippingDealFlag, freeShippingActiveForDefault, allItems };
+  }, [groupedItems, selectedItems, isLineSelected, dealsList, activeFreeShippingDeal, shippingMethod]);
 
-  // ✅ SHIPPING QUOTE — database se accurate calculation
+  // ✅ SHIPPING QUOTE — database se accurate calculation (selected items only)
   const { data: shipQuote } = useQuery({
     queryKey: [
       "shippingQuote",
@@ -175,9 +216,33 @@ export default function CartPage() {
     enabled: totals.allItems.length > 0,
   });
 
-  const baseFee = cfg.standard.fee;
-  const shipping = shipQuote?.fee ?? baseFee;
-  const shippingReason = shipQuote?.reason || "";
+  const baseFee = shippingMethod === "express" ? cfg.express.fee : cfg.standard.fee;
+
+  // ✅ Match admin shipping rules against SELECTED items (single source of truth).
+  const cartItemsForRule = selectedItems.map((i) => ({
+    productId: i.productId || i.product_id || i.id,
+    categoryId: i.categoryId || i.category_id,
+    brandId: i.brandId || i.brand_id,
+  }));
+  const matchedRule = matchShippingRule(cartItemsForRule, shippingRules);
+  const ruleFree = matchedRule?.shipping_type === "free";
+  const ruleFixedFee = matchedRule?.shipping_type === "fixed" ? Number(matchedRule.fee) || 0 : null;
+
+  // ✅ Combine all free-shipping sources: deal (method-gated) | rule | threshold.
+  //    Fixed rule overrides the method fee.
+  let shipping;
+  if (totals.freeShippingActiveForDefault || ruleFree) {
+    shipping = 0;
+  } else if (ruleFixedFee != null) {
+    shipping = ruleFixedFee;
+  } else {
+    shipping = shipQuote?.fee ?? baseFee;
+  }
+  const shippingReason = totals.freeShippingActiveForDefault
+    ? "Free shipping via active deal"
+    : ruleFree
+    ? `Free shipping (${matchedRule.rule_type} rule)`
+    : (shipQuote?.reason || "");
 
   const grandTotal = Math.round(totals.subtotal + shipping + totals.tax);
   const freeOver = Number(cfg.free_shipping_over || 0);
@@ -186,18 +251,38 @@ export default function CartPage() {
 
   const count = cart.reduce((s, i) => s + (Number(i.qty) || 0), 0);
   const hasItems = cart.length > 0;
+  const selectedLineCount = selectedItems.length;
+  const selectedQtyCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+  const allSelected = hasItems && selectedLineCount === cart.length;
+  const canCheckout = selectedLineCount > 0;
 
   const handleRemove = (row) => {
     removeFromCart(row.key);
     toast.success("Item removed", { action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
   };
 
-  const ItemRow = ({ row, isDeal = false, dealBadge = null }) => (
-    <div className={`group flex flex-col sm:flex-row gap-4 p-4 rounded-xl border-2 transition-all duration-200 ${
+  const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => (
+    <div className={`group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
+      !isSelected ? "opacity-60" : ""
+    } ${
       isDeal
         ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)] hover:border-[var(--user-accent)]/40 hover:shadow-md hover:shadow-[var(--user-accent)]/5"
         : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-accent)]/30 hover:shadow-md hover:-translate-y-0.5"
     }`}>
+      {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
+      <button
+        type="button"
+        onClick={() => onToggleSelect?.()}
+        aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
+        aria-pressed={isSelected}
+        className="shrink-0 p-1 mt-0.5 sm:mt-1 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+      >
+        <span
+          className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${isSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
+        >
+          {isSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
+        </span>
+      </button>
       {/* Image + Name */}
       <div className="flex gap-4 flex-1 min-w-0">
         <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0 group/img">
@@ -246,8 +331,8 @@ export default function CartPage() {
 
           <div className="flex items-center gap-2 mt-auto pt-2">
             <p className="text-base font-black text-[var(--user-text)]">{fmt(row.displayPrice)}</p>
-            {row.hasDiscount && row.originalPrice > row.displayPrice && (
-              <p className="text-xs text-[var(--user-text-subtle)] line-through">{fmt(row.originalPrice)}</p>
+            {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
+              <p className="text-xs text-[var(--user-text-subtle)] line-through">{fmt(row.originalPrice * row.qty)}</p>
             )}
           </div>
         </div>
@@ -300,7 +385,11 @@ export default function CartPage() {
     </div>
   );
 
+  // ✅ Daraz-style mobile rendering — kept identical state/handlers/queries.
   return (
+    <>
+    {/* ============= DESKTOP — UNCHANGED ============= */}
+    <div className="hidden lg:block">
     <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-32 md:pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
@@ -322,6 +411,28 @@ export default function CartPage() {
           <ArrowLeft size={16} /> Continue Shopping
         </Link>
       </div>
+
+      {/* ✅ Select All row (visible whenever items exist) */}
+      {hasItems && (
+        <div className="flex items-center justify-between mb-5 px-3 sm:px-4 py-2.5 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)]">
+          <button
+            type="button"
+            onClick={() => setAllSelected(!allSelected)}
+            aria-pressed={allSelected}
+            className="flex items-center gap-2 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-[0.98] transition"
+          >
+            <span
+              className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${allSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
+            >
+              {allSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
+            </span>
+            <span className="text-sm font-bold text-[var(--user-text)]">Select All</span>
+          </button>
+          <span className="text-[11px] sm:text-xs font-bold text-[var(--user-text-muted)] tabular-nums">
+            {selectedLineCount} of {cart.length} selected
+          </span>
+        </div>
+      )}
 
       {!hasItems ? (
         <div className="rounded-3xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 sm:p-16 text-center relative overflow-hidden">
@@ -420,7 +531,7 @@ export default function CartPage() {
                   {!isCollapsed && (
                     <div className="p-4 space-y-3">
                       {dealGroup.items.map((row) => (
-                        <ItemRow key={row.key} row={row} isDeal dealBadge={dealGroup.dealBadge} />
+                        <ItemRow key={row.key} row={row} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
                       ))}
                     </div>
                   )}
@@ -437,7 +548,7 @@ export default function CartPage() {
                 </h3>
                 <div className="space-y-3">
                   {groupedItems.regular.map((row) => (
-                    <ItemRow key={row.key} row={row} />
+                    <ItemRow key={row.key} row={row} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
                   ))}
                 </div>
               </div>
@@ -470,6 +581,11 @@ export default function CartPage() {
                 <div className="flex justify-between text-[var(--user-text-muted)]">
                   <span className="flex items-center gap-1.5">
                     <Truck size={13} /> Shipping
+                    {totals.freeShippingActiveForDefault && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[9px] font-black text-orange-600">
+                        <Truck size={9} /> Deal
+                      </span>
+                    )}
                     {shipping === 0 && (
                       <span className="text-[9px] font-black text-[var(--user-success)] bg-[var(--user-success)]/15 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>
                     )}
@@ -499,10 +615,11 @@ export default function CartPage() {
 
               <button
                 type="button"
-                onClick={() => router.push("/checkout")}
-                className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] py-4 text-sm font-black uppercase tracking-widest text-[var(--user-accent-text)] hover:opacity-90 hover:shadow-xl hover:shadow-[var(--user-accent)]/20 active:scale-[0.98] transition-all"
+                onClick={() => canCheckout && router.push("/checkout")}
+                disabled={!canCheckout}
+                className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] py-4 text-sm font-black uppercase tracking-widest text-[var(--user-accent-text)] hover:opacity-90 hover:shadow-xl hover:shadow-[var(--user-accent)]/20 active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50"
               >
-                Proceed to Checkout <ArrowRight size={16} />
+                {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : ("Select items to checkout")}
               </button>
 
               <div className="mt-5 pt-5 border-t-2 border-[var(--user-border)] space-y-2">
@@ -526,7 +643,7 @@ export default function CartPage() {
         <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t-2 border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-[var(--user-text-muted)] font-bold">{count} items · {totals.hasFreeShippingDeal || shipping === 0 ? "FREE shipping" : `Shipping ${fmt(shipping)}`}</p>
+              <p className="text-[10px] text-[var(--user-text-muted)] font-bold">{count} items · {totals.freeShippingActiveForDefault || shipping === 0 ? "FREE shipping" : `Shipping ${fmt(shipping)}`}</p>
               <p className="text-lg font-black text-[var(--user-accent)]">{fmt(grandTotal)}</p>
             </div>
             <button
@@ -539,5 +656,227 @@ export default function CartPage() {
         </div>
       )}
     </main>
+    </div>
+
+    {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
+    <div className="lg:hidden">
+      {/* Sticky top app bar */}
+      <div
+        className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="flex items-center gap-2 px-3 h-12">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            aria-label="Back"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition active:scale-90"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">Cart</p>
+            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{count} {count === 1 ? "item" : "items"}</p>
+          </div>
+          <span className="text-[11px] font-bold text-[var(--user-text-muted)] tabular-nums">{fmt(grandTotal)}</span>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="bg-[var(--user-bg)] px-3 pt-3 pb-28 min-h-[60vh]">
+        {!hasItems ? (
+          <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center">
+            <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
+              <ShoppingBag size={36} className="text-[var(--user-accent)]" />
+            </div>
+            <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Your cart is empty</h2>
+            <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[280px]">Looks like you haven&apos;t added anything yet. Let&apos;s find something great.</p>
+            <Link
+              href="/product"
+              className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition"
+            >
+              Start Shopping <ArrowRight size={16} />
+            </Link>
+          </div>
+        ) : (
+          <>
+              {/* Optional FREE shipping progress (matches desktop) */}
+              {freeOver > 0 && !totals.hasFreeShippingDeal && (
+                <div className="rounded-xl border border-[var(--user-success)]/30 bg-[var(--user-success)]/10 p-3 mb-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Truck size={15} className="text-[var(--user-success)] shrink-0" />
+                    {freeRemaining > 0 ? (
+                      <p className="text-[12px] font-bold text-[var(--user-text)]">
+                        Add <span className="text-[var(--user-success)]">{fmt(freeRemaining)}</span> more for FREE shipping!
+                      </p>
+                    ) : (
+                      <p className="text-[12px] font-black text-[var(--user-success)] flex items-center gap-1">
+                        <Check size={13} /> You&apos;ve unlocked FREE shipping!
+                      </p>
+                    )}
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--user-bg-hover)] overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[var(--user-success)] to-emerald-500 transition-all duration-700 ease-out" style={{ width: `${freeProgress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Deal sections (mobile cards) */}
+              {groupedItems.deals.map((dealGroup) => (
+                <div key={dealGroup.dealId} className="mb-3">
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <Sparkles size={13} className="text-purple-500" />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-purple-500">{dealGroup.dealBadge || dealGroup.dealName}</span>
+                  </div>
+                  {dealGroup.items.map((row) => (
+                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
+                  ))}
+                </div>
+              ))}
+
+              {/* Regular items */}
+              {groupedItems.regular.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <Box size={13} className="text-[var(--user-text-muted)]" />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Items ({groupedItems.regular.length})</span>
+                  </div>
+                  {groupedItems.regular.map((row) => (
+                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
+                  ))}
+                </div>
+              )}
+            </>
+        )}
+      </div>
+
+      {/* Sticky bottom bar (mobile) — direct child of lg:hidden page root, fixed bottom-0 z-50 */}
+      {hasItems && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)]"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="flex items-center gap-3 px-3 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-[var(--user-text-muted)] font-bold uppercase tracking-wider">
+                Total
+                <span className={`ml-1 ${totals.freeShippingActiveForDefault || shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"}`}>
+                  {totals.freeShippingActiveForDefault || shipping === 0 ? "FREE shipping" : "incl. shipping"}
+                </span>
+              </p>
+              <p className="text-base font-black text-[var(--user-accent)] leading-none mt-0.5">{fmt(grandTotal)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => canCheckout && router.push("/checkout")}
+              disabled={!canCheckout}
+              className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition shadow-lg shadow-[var(--user-accent)]/20 disabled:pointer-events-none disabled:opacity-50"
+            >
+              Checkout <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+    </>
+  );
+}
+
+// ✅ MOBILE cart card (Daraz-style) — reusable in mobile tree, uses passed-in handlers.
+function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) {
+  const img = getImgUrl(row.image);
+  return (
+    <div className={`bg-[var(--user-bg-card)] rounded-xl border border-[var(--user-border)] p-3 mb-2 flex items-start gap-2 ${!isSelected ? "opacity-60" : ""}`}>
+      {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
+      <button
+        type="button"
+        onClick={() => onToggleSelect?.()}
+        aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
+        aria-pressed={isSelected}
+        className="shrink-0 p-1 mt-0.5 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+      >
+        <span
+          className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${isSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
+        >
+          {isSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
+        </span>
+      </button>
+      <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0">
+        {img ? (
+          <img src={img} alt={row.name} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
+        ) : (
+          <div className="w-20 h-20 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
+            <Package size={26} className="text-[var(--user-text-muted)]" />
+          </div>
+        )}
+      </Link>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Link href={`/product/${row.raw.productId || row.raw.id}`} className="text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
+          {row.name}
+        </Link>
+        {row.variantTitle && (
+          <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>
+        )}
+        {(isDeal && dealBadge) || row.freeItems > 0 || row.hasDiscount ? (
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {isDeal && dealBadge && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white px-1.5 py-0.5 text-[9px] font-black">
+                <Sparkles size={8} /> {dealBadge}
+              </span>
+            )}
+            {row.freeItems > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-success)]/15 text-[var(--user-success)] border border-[var(--user-success)]/25 px-1.5 py-0.5 text-[9px] font-black">
+                <Check size={8} /> {row.freeItems} FREE
+              </span>
+            )}
+            {row.hasDiscount && row.originalPrice > row.displayPrice && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/25 px-1.5 py-0.5 text-[9px] font-black">
+                <TrendingUp size={8} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
+              </span>
+            )}
+          </div>
+        ) : null}
+
+        {/* Price row */}
+        <div className="flex items-baseline gap-1.5 mt-1">
+          <p className="text-[13px] font-black text-[var(--user-accent)]">{fmt(row.displayPrice)}</p>
+          {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
+            <p className="text-[10px] text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
+          )}
+        </div>
+
+        {/* Qty stepper + delete */}
+        <div className="flex items-center justify-between mt-auto pt-1.5">
+          <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-elevated)] overflow-hidden">
+            <button
+              type="button"
+              onClick={onDec}
+              disabled={row.qty <= 1}
+              aria-label="Decrease"
+              className="h-7 w-7 flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition"
+            >
+              <Minus size={13} />
+            </button>
+            <span className="w-7 text-center text-[12px] font-black tabular-nums text-[var(--user-text)]">{row.qty}</span>
+            <button
+              type="button"
+              onClick={onInc}
+              aria-label="Increase"
+              className="h-7 w-7 flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(row)}
+            aria-label={`Remove ${row.name}`}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] active:scale-90 transition"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

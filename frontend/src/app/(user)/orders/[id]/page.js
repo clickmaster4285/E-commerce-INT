@@ -12,7 +12,7 @@ import { Country, State, City } from "country-state-city";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
   Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck,
-  Tag, Headphones, Download, Pencil, Save, X, ChevronDown, Sparkles, TrendingUp,
+  Tag, Headphones, Download, Pencil, Save, X, ChevronDown, ChevronRight, Sparkles, TrendingUp,
   Box, MessageCircle, Lock
 } from "lucide-react";
 
@@ -297,7 +297,8 @@ export default function OrderDetailPage({ params }) {
 
   if (isLoading) {
     return (
-      <div className="max-w-[1100px] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
+    <>
+      <div className="hidden lg:block max-w-[1100px] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
         <div className="h-4 w-32 bg-[var(--user-bg-hover)] rounded" />
         <div className="h-72 bg-[var(--user-bg-card)] rounded-3xl border border-[var(--user-border)]" />
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
@@ -305,12 +306,17 @@ export default function OrderDetailPage({ params }) {
           <div className="space-y-5"><div className="h-52 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /><div className="h-64 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /></div>
         </div>
       </div>
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
+        <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+      </div>
+    </>
     );
   }
 
   if (!order) {
     return (
-      <div className="max-w-[500px] mx-auto px-4 py-24 text-center">
+    <>
+      <div className="hidden lg:block max-w-[500px] mx-auto px-4 py-24 text-center">
         <div className="w-24 h-24 mx-auto rounded-3xl bg-[var(--user-accent)] flex items-center justify-center mb-6 shadow-2xl">
           <Package size={40} className="text-[var(--user-accent-text)]" />
         </div>
@@ -318,6 +324,17 @@ export default function OrderDetailPage({ params }) {
         <p className="text-sm text-[var(--user-text-muted)] mb-7">This order does not exist or has been removed.</p>
         <Link href="/orders" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition"><ArrowLeft size={16} /> Back to Orders</Link>
       </div>
+      <div className="lg:hidden min-h-[60vh] flex flex-col items-center justify-center bg-[var(--user-bg)] px-4 text-center">
+        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
+          <Package size={36} className="text-[var(--user-accent)]" />
+        </div>
+        <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Order Not Found</h2>
+        <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[280px]">This order does not exist or has been removed.</p>
+        <Link href="/orders" className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+          <ArrowLeft size={16} /> Back to Orders
+        </Link>
+      </div>
+    </>
     );
   }
 
@@ -329,8 +346,12 @@ export default function OrderDetailPage({ params }) {
   const canCancel = order.status === "pending";
 
   const totalSavings = order.items.reduce((sum, i) => {
-    const priceSaved = (Number(i.original_price || 0) - Number(i.price || 0)) * (Number(i.qty) || 1);
-    return sum + (priceSaved > 0 ? priceSaved : 0) + Number(i.deal_savings || 0);
+    const original = Number(i.original_price || 0);
+    const paid = Number(i.price || 0);
+    const qty = Number(i.qty) || 1;
+    const priceDiff = Math.max(0, (original - paid) * qty);
+    const dealSavings = (i.deal_type === 'buy_x_get_y') ? Number(i.deal_savings || 0) : 0;
+    return sum + priceDiff + dealSavings;
   }, 0);
 
   const handleCancel = async () => {
@@ -346,6 +367,9 @@ export default function OrderDetailPage({ params }) {
   const estimatedDelivery = order.shipping_method === "express" ? "1–2" : "2–4";
 
   return (
+    <>
+    {/* ============= DESKTOP — UNCHANGED ============= */}
+    <div className="hidden lg:block">
     <main className="max-w-[1100px] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-8 lg:py-10 pb-40 md:pb-10">
       <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition mb-4 sm:mb-5 group">
         <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Back to Orders
@@ -447,8 +471,8 @@ export default function OrderDetailPage({ params }) {
       <div className="grid lg:grid-cols-[1fr_380px] gap-5 lg:gap-6">
         {/* LEFT: ITEMS — right column ke barabar height, phir scroll */}
         <div className="relative">
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm flex flex-col lg:absolute lg:inset-0">
-            <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm lg:absolute lg:inset-x-0 lg:top-0 lg:max-h-full lg:overflow-y-auto">
+                        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
                   <Box size={18} className="text-[var(--user-accent-text)]" />
@@ -458,14 +482,12 @@ export default function OrderDetailPage({ params }) {
                   <p className="text-[10px] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
                 </div>
               </div>
-              <button className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 px-3 py-1.5 rounded-lg transition">
-                <Download size={14} /> Invoice
-              </button>
+             
             </div>
 
             {/* ✅ ITEMS LIST — right column tak phailti hai, phir scroll */}
-            <div className="divide-y divide-[var(--user-border)] overflow-y-auto max-h-[420px] sm:max-h-[520px] lg:max-h-none lg:flex-1 lg:min-h-0">
-              {order.items.map((i, idx) => {
+            <div className="divide-y divide-[var(--user-border)]">
+                            {order.items.map((i, idx) => {
                 const originalPrice = Number(i.original_price || 0);
                 const paidPrice = Number(i.price || 0);
                 const qty = Number(i.qty) || 1;
@@ -585,5 +607,251 @@ export default function OrderDetailPage({ params }) {
       {showAddressModal && <AddressModal order={order} addresses={addresses} onClose={() => setShowAddressModal(false)} onSuccess={() => setShowAddressModal(false)} />}
       {showCancelModal && <CancelConfirmModal orderNumber={order.order_number} canceling={canceling} onClose={() => setShowCancelModal(false)} onConfirm={handleCancel} />}
     </main>
+    </div>
+
+    {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
+    <div className="lg:hidden bg-[var(--user-bg)]">
+      {/* Sticky top app bar */}
+      <div
+        className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="flex items-center gap-2 px-3 h-12">
+          <button type="button" onClick={() => router.push("/orders")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">Order Details</p>
+            <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">#{order.order_number}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 pt-3 pb-24 space-y-2.5">
+        {/* HERO STATUS BAND */}
+        <div className={`rounded-2xl border shadow-sm p-4 ${
+          order.status === "cancelled"
+            ? "bg-[var(--user-danger)]/12 border-[var(--user-danger)]/30"
+            : order.status === "delivered"
+            ? "bg-[var(--user-success)]/12 border-[var(--user-success)]/30"
+            : "bg-[var(--user-accent)]/12 border-[var(--user-accent)]/30"
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+              order.status === "cancelled"
+                ? "bg-[var(--user-danger)] text-white"
+                : order.status === "delivered"
+                ? "bg-[var(--user-success)] text-white"
+                : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+            }`}>
+              <StatusIcon size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-[16px] font-black leading-tight ${
+                order.status === "cancelled"
+                  ? "text-[var(--user-danger)]"
+                  : order.status === "delivered"
+                  ? "text-[var(--user-success)]"
+                  : "text-[var(--user-accent)]"
+              }`}>{cfg.label}</p>
+              <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">#{order.order_number} · {date}</p>
+            </div>
+          </div>
+          {order.status === "cancelled" && order.cancel_reason && (
+            <p className="text-[11px] text-[var(--user-text)] mt-3 pt-3 border-t border-[var(--user-danger)]/20 leading-relaxed">
+              <span className="font-black uppercase tracking-wider text-[var(--user-danger)]">Reason: </span>{order.cancel_reason}
+            </p>
+          )}
+        </div>
+
+        {/* TIMELINE card */}
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
+          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-4 flex items-center gap-1.5">
+            <Clock size={11} /> Order Progress
+          </p>
+          {order.status === "cancelled" ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[var(--user-danger)] flex items-center justify-center shrink-0">
+                <XCircle size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="text-[13px] font-black text-[var(--user-danger)]">Cancelled</p>
+                <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">This order has been cancelled</p>
+              </div>
+            </div>
+          ) : (
+            <div className="relative pl-7">
+              <div className="absolute left-[10px] top-3 bottom-3 w-[2px] bg-[var(--user-border)] rounded-full" />
+              <div
+                className="absolute left-[10px] top-3 w-[2px] bg-[var(--user-success)] rounded-full transition-all duration-700"
+                style={{ height: `calc((100% - 24px) * ${Math.max(0, STATUS_FLOW.indexOf(order.status)) / (STATUS_FLOW.length - 1)})` }}
+              />
+              <div className="space-y-4">
+                {STATUS_FLOW.map((step, i) => {
+                  const idx = STATUS_FLOW.indexOf(order.status);
+                  const isCompleted = i < idx;
+                  const isCurrent = i === idx;
+                  const sCfg = STATUS_CONFIG[step];
+                  const Icon = sCfg.icon;
+                  return (
+                    <div key={step} className="relative">
+                      <div className={`absolute -left-7 top-0 w-5 h-5 rounded-full flex items-center justify-center border-2 ${
+                        isCompleted ? "bg-[var(--user-success)] border-[var(--user-success)] text-white"
+                        : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-accent)] ring-4 ring-[var(--user-accent)]/20"
+                        : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-muted)]"
+                      }`}>
+                        {isCompleted ? <CheckCircle2 size={11} strokeWidth={3} /> : <Icon size={10} />}
+                      </div>
+                      <p className={`text-[12px] font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>
+                        {sCfg.label}{isCurrent && <span className="ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                      </p>
+                      <p className={`text-[10px] mt-0.5 ${isCurrent || isCompleted ? "text-[var(--user-text-muted)]" : "text-[var(--user-text-muted)]/70"}`}>{sCfg.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ADDRESS card */}
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+              <MapPin size={14} className="text-[var(--user-accent)]" />
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Delivery Address</p>
+          </div>
+          <p className="text-[13px] font-black text-[var(--user-text)]">{order.address_snapshot?.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {order.address_snapshot?.phone}</span></p>
+          <p className="text-[12px] text-[var(--user-text-muted)] leading-relaxed mt-1 line-clamp-2">
+            {order.address_snapshot?.street_address1}{order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}, {order.address_snapshot?.city}, {order.address_snapshot?.state} {order.address_snapshot?.zip_code}
+          </p>
+        </div>
+
+        {/* ITEMS card */}
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+              <Package size={12} /> Items ({order.items.length})
+            </p>
+            <p className="text-[11px] font-bold text-[var(--user-text-muted)]">{fmt(order.subtotal)}</p>
+          </div>
+          <div className="divide-y divide-[var(--user-border)]">
+            {order.items.map((i, idx) => {
+              const originalPrice = Number(i.original_price || 0);
+              const paidPrice = Number(i.price || 0);
+              const qty = Number(i.qty) || 1;
+              const freeItems = Number(i.free_items || 0);
+              const payableItems = Number(i.payable_items || qty);
+              const hasDiscount = originalPrice > 0 && originalPrice > paidPrice;
+              const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + Number(i.deal_savings || 0);
+              return (
+                <div key={idx} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="shrink-0 relative">
+                    {getImgUrl(i.image) ? (
+                      <img src={getImgUrl(i.image)} alt={i.name} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
+                        <Package size={20} className="text-[var(--user-text-muted)]" />
+                      </div>
+                    )}
+                    <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{i.name}</p>
+                    {i.variantTitle && <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
+                    <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
+                    {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[13px] font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
+                    {hasDiscount && <p className="text-[9px] text-[var(--user-text-muted)] line-through">{fmt(originalPrice * qty)}</p>}
+                    {itemSavings > 0 && <p className="text-[9px] font-bold text-[var(--user-success)] mt-0.5">Save {fmt(itemSavings)}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* PAYMENT & DELIVERY card */}
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+            <CreditCard size={12} /> Payment & Delivery
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
+              <PayIcon size={16} className="text-[var(--user-accent)]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Payment</p>
+              <p className="text-[13px] font-bold text-[var(--user-text)] truncate">{pay.label}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
+              {order.shipping_method === "express" ? <Zap size={16} className="text-[var(--user-accent)]" /> : <Truck size={16} className="text-[var(--user-accent)]" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Method</p>
+              <p className="text-[13px] font-bold text-[var(--user-text)]">{order.shipping_method === "express" ? "Express" : "Standard"} <span className="text-[var(--user-text-muted)] font-semibold">· {estimatedDelivery} days</span></p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[var(--user-bg-hover)] flex items-center justify-center shrink-0">
+              <Tag size={16} className="text-[var(--user-text-secondary)]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Fee</p>
+              <p className={`text-[13px] font-black ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                {order.shipping === 0 ? "FREE" : fmt(order.shipping)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* SUMMARY card */}
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-2 text-[13px]">
+          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5 mb-2">
+            <TrendingUp size={12} /> Order Summary
+          </p>
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text-muted)]">Items Total</span>
+            <span className="font-bold text-[var(--user-text)]">{fmt(order.subtotal)}</span>
+          </div>
+          {totalSavings > 0 && (
+            <div className="flex justify-between">
+              <span className="font-bold text-[var(--user-success)]">You Save</span>
+              <span className="font-black text-[var(--user-success)]">-{fmt(totalSavings)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text-muted)]">Shipping Fee</span>
+            <span className={`font-bold ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+              {order.shipping === 0 ? "FREE" : fmt(order.shipping)}
+            </span>
+          </div>
+          <div className="flex justify-between items-baseline pt-3 mt-1 border-t border-[var(--user-border)]">
+            <span className="text-[14px] font-black text-[var(--user-text)]">Total</span>
+            <span className="text-xl font-black text-[var(--user-accent)]">{fmt(order.total)}</span>
+          </div>
+        </div>
+
+        {/* ACTIONS — only existing actions */}
+        {canCancel && (
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="w-full h-12 rounded-2xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-sm font-black hover:bg-[var(--user-danger)]/10 active:scale-[0.98] transition flex items-center justify-center gap-2"
+          >
+            <XCircle size={16} /> Cancel Order
+          </button>
+        )}
+      </div>
+    </div>
+
+    {/* Shared modals — work for both desktop and mobile */}
+    {showAddressModal && <AddressModal order={order} addresses={addresses} onClose={() => setShowAddressModal(false)} onSuccess={() => setShowAddressModal(false)} />}
+    {showCancelModal && <CancelConfirmModal orderNumber={order.order_number} canceling={canceling} onClose={() => setShowCancelModal(false)} onConfirm={handleCancel} />}
+    </>
   );
 }

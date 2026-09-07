@@ -58,7 +58,7 @@ export function useDiscounts() {
   }, [socket, queryClient]);
 
   const calculateProductDiscount = useCallback(
-    (product, variantPrice) => {
+    (product, variantPrice, includeDeals = false, overrideDeal = null) => {
       const originalPrice = Number(variantPrice ?? product?.price ?? product?.selling_price ?? 0);
       
       // STEP 0: DEAL PRIORITY GUARD — if product belongs to any active deal,
@@ -69,7 +69,48 @@ export function useDiscounts() {
       const brandId = String(product?.brand_id?._id || product?.brand_id || "");
       const now = new Date();
 
-      if (deals && Array.isArray(deals)) {
+      if (includeDeals && deals && Array.isArray(deals)) {
+        // ✅ If the caller provides an override deal (e.g. the user picked a
+        //    specific deal in a multi-deal product page), use it directly.
+        if (overrideDeal && overrideDeal.type) {
+          const deal = overrideDeal;
+          const dealType = deal.type;
+          const dealValue = Number(deal.discountValue || 0);
+
+          let dealDiscountedPrice = originalPrice;
+          let dealHasDiscount = false;
+          let dealSavings = 0;
+          let dealDisplayType = dealType;
+          let dealDisplayValue = dealValue;
+
+          if (dealType === "percentage") {
+            dealDiscountedPrice = Math.round(originalPrice * (1 - dealValue / 100));
+            dealHasDiscount = true;
+            dealSavings = originalPrice - dealDiscountedPrice;
+          } else if (dealType === "fixed_amount") {
+            dealDiscountedPrice = Math.max(0, originalPrice - dealValue);
+            dealHasDiscount = dealDiscountedPrice < originalPrice;
+            dealSavings = originalPrice - dealDiscountedPrice;
+          } else {
+            dealDiscountedPrice = originalPrice;
+            dealHasDiscount = false;
+            dealSavings = 0;
+            dealDisplayType = dealType;
+            dealDisplayValue = dealValue;
+          }
+
+          return {
+            hasDiscount: dealHasDiscount,
+            originalPrice,
+            discountedPrice: dealDiscountedPrice,
+            savings: dealSavings,
+            discountName: deal.name || "",
+            discountType: dealDisplayType,
+            discountValue: dealDisplayValue,
+            matchedDeal: deal,
+          };
+        }
+
         for (const deal of deals) {
           if (!deal.isActive) continue;
           const startDate = new Date(deal.startDate);
@@ -91,14 +132,43 @@ export function useDiscounts() {
           }
 
           if (dealApplies) {
+            const dealType = deal.type;
+            const dealValue = Number(deal.discountValue || 0);
+
+            // ✅ Apply the deal's OWN discount to the price.
+            // Percentage / fixed_amount → reduce price. buy_x_get_y / bundle /
+            // free_shipping → no price change (free items / shipping only).
+            // Regular (non-deal) discounts are skipped entirely for this product.
+            let dealDiscountedPrice = originalPrice;
+            let dealHasDiscount = false;
+            let dealSavings = 0;
+            let dealDisplayType = dealType;
+            let dealDisplayValue = dealValue;
+
+            if (dealType === "percentage") {
+              dealDiscountedPrice = Math.round(originalPrice * (1 - dealValue / 100));
+              dealHasDiscount = true;
+              dealSavings = originalPrice - dealDiscountedPrice;
+            } else if (dealType === "fixed_amount") {
+              dealDiscountedPrice = Math.max(0, originalPrice - dealValue);
+              dealHasDiscount = dealDiscountedPrice < originalPrice;
+              dealSavings = originalPrice - dealDiscountedPrice;
+            } else {
+              dealDiscountedPrice = originalPrice;
+              dealHasDiscount = false;
+              dealSavings = 0;
+              dealDisplayType = dealType;
+              dealDisplayValue = dealValue;
+            }
+
             return {
-              hasDiscount: false,
+              hasDiscount: dealHasDiscount,
               originalPrice,
-              discountedPrice: originalPrice,
-              savings: 0,
-              discountName: "",
-              discountType: null,
-              discountValue: 0,
+              discountedPrice: dealDiscountedPrice,
+              savings: dealSavings,
+              discountName: deal.name || "",
+              discountType: dealDisplayType,
+              discountValue: dealDisplayValue,
               matchedDeal: deal,
             };
           }
@@ -131,7 +201,7 @@ export function useDiscounts() {
       };
 
       // ✅ STEP 2: FIRST check for Buy X Get Y deals (special handling)
-      if (deals && Array.isArray(deals)) {
+      if (includeDeals && deals && Array.isArray(deals)) {
         for (const deal of deals) {
           if (!deal.isActive) continue;
           if (deal.type !== "buy_x_get_y") continue; // Sirf buy_x_get_y pehle check karo
@@ -175,7 +245,7 @@ export function useDiscounts() {
       }
 
       // ✅ STEP 4: Check other deals (percentage/fixed/free_shipping)
-      if (!matchedDeal && deals && Array.isArray(deals)) {
+      if (includeDeals && !matchedDeal && deals && Array.isArray(deals)) {
         for (const deal of deals) {
           if (!deal.isActive) continue;
           if (deal.type === "buy_x_get_y") continue; // Already check kar liya
@@ -220,5 +290,80 @@ export function useDiscounts() {
     [discounts, deals],
   );
 
-  return { discounts, deals, isLoading, calculateProductDiscount };
+  const getActiveDealForProduct = useCallback(
+    (product) => {
+      if (!product || !deals || !Array.isArray(deals)) return null;
+      const productId = String(product._id || product.id || "");
+      const categoryId = String(product.category_id?._id || product.category_id || "");
+      const brandId = String(product.brand_id?._id || product.brand_id || "");
+      const now = new Date();
+
+      const checkApplies = (deal) => {
+        if (deal.applyTo === "all") return true;
+        if (deal.applyTo === "product" || deal.applyTo === "specific_products") {
+          const ids = deal.productIds || deal.selectedProducts || [];
+          return ids.some((p) => String(p?._id || p) === productId);
+        }
+        if (deal.applyTo === "category" || deal.applyTo === "specific_categories") {
+          const ids = deal.categoryIds || deal.selectedCategories || [];
+          return categoryId && ids.some((c) => String(c?._id || c) === categoryId);
+        }
+        if (deal.applyTo === "brand" || deal.applyTo === "specific_brands") {
+          const ids = deal.brandIds || deal.selectedBrands || [];
+          return brandId && ids.some((b) => String(b?._id || b) === brandId);
+        }
+        return false;
+      };
+
+      for (const deal of deals) {
+        if (!deal.isActive) continue;
+        const startDate = new Date(deal.startDate);
+        const endDate = new Date(deal.endDate);
+        if (startDate > now || endDate < now) continue;
+        if (checkApplies(deal)) return deal;
+      }
+      return null;
+    },
+    [deals],
+  );
+
+  // ✅ Returns ALL active deals matching this product (same matching rules
+  //    as getActiveDealForProduct but without the early-return).
+  const getActiveDealsForProduct = useCallback(
+    (product) => {
+      if (!product || !deals || !Array.isArray(deals)) return [];
+      const productId = String(product._id || product.id || "");
+      const categoryId = String(product.category_id?._id || product.category_id || "");
+      const brandId = String(product.brand_id?._id || product.brand_id || "");
+      const now = new Date();
+
+      const checkApplies = (deal) => {
+        if (deal.applyTo === "all") return true;
+        if (deal.applyTo === "product" || deal.applyTo === "specific_products") {
+          const ids = deal.productIds || deal.selectedProducts || [];
+          return ids.some((p) => String(p?._id || p) === productId);
+        }
+        if (deal.applyTo === "category" || deal.applyTo === "specific_categories") {
+          const ids = deal.categoryIds || deal.selectedCategories || [];
+          return categoryId && ids.some((c) => String(c?._id || c) === categoryId);
+        }
+        if (deal.applyTo === "brand" || deal.applyTo === "specific_brands") {
+          const ids = deal.brandIds || deal.selectedBrands || [];
+          return brandId && ids.some((b) => String(b?._id || b) === brandId);
+        }
+        return false;
+      };
+
+      return deals.filter((deal) => {
+        if (!deal.isActive) return false;
+        const startDate = new Date(deal.startDate);
+        const endDate = new Date(deal.endDate);
+        if (startDate > now || endDate < now) return false;
+        return checkApplies(deal);
+      });
+    },
+    [deals],
+  );
+
+  return { discounts, deals, isLoading, calculateProductDiscount, getActiveDealForProduct, getActiveDealsForProduct };
 }

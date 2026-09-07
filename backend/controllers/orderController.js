@@ -145,7 +145,24 @@ const placeOrder = async (req, res) => {
     }
 
     const shipping_method = reqShippingMethod === "express" ? "express" : "standard";
-    const hasFreeShippingDeal = orderItems.some(i => i.deal_type === "free_shipping");
+
+    // ✅ Fetch the free_shipping deal docs so we can honour freeShippingMethods
+    //    (missing/empty array => BOTH methods, backward compatible).
+    const freeShipDeals = await Deal.find({
+      _id: { $in: Array.from(uniqueDealIds) },
+      type: "free_shipping",
+      isActive: true,
+    }).select("_id freeShippingMethods").lean();
+
+    const isFreeForMethod = (method) =>
+      Array.isArray(freeShipDeals) &&
+      freeShipDeals.some((d) => {
+        const arr = d.freeShippingMethods;
+        if (!Array.isArray(arr) || arr.length === 0) return true;
+        return arr.includes(method);
+      });
+
+    const hasFreeShippingDeal = isFreeForMethod(shipping_method);
     let shipping;
     if (hasFreeShippingDeal) {
       shipping = 0;

@@ -11,7 +11,7 @@ import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
   Package, Loader2, ShoppingBag, Calendar, MapPin, CreditCard,
-  CheckCircle2, Clock, Truck, XCircle, ArrowRight, Banknote,
+  CheckCircle2, Clock, Truck, XCircle, ArrowRight, ArrowLeft, Banknote,
   Landmark, Zap, Trash2, Play, Tag, Navigation, ChevronLeft, ChevronRight,
   AlertTriangle, Search, ChevronDown, Check, ArrowUpDown, X
 } from "lucide-react";
@@ -303,7 +303,12 @@ export default function OrdersPage() {
   useEffect(() => { if (!userLoading && !user) router.replace("/login?redirect=/orders"); }, [user, userLoading, router]);
 
   if (userLoading || ordersLoading) {
-    return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>;
+    return (
+    <>
+      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
+    </>
+    );
   }
 
   const counts = orders.reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc; }, {});
@@ -357,7 +362,7 @@ export default function OrdersPage() {
     const count = items.length || draft.selectedKeys?.length || 0;
     const firstItem = items[0];
     const discountedItems = items.map((i) => {
-      const disc = calculateProductDiscount({ _id: i.productId || i.id, category_id: i.categoryId || null, brand_id: i.brandId || null, discount: i.productDiscountPct || 0 }, i.price);
+      const disc = calculateProductDiscount({ _id: i.productId || i.id, category_id: i.categoryId || null, brand_id: i.brandId || null, discount: i.productDiscountPct || 0 }, i.price, false);
       return { ...i, displayPrice: disc.discountedPrice, originalPrice: disc.originalPrice, hasDiscount: disc.hasDiscount, savings: disc.savings };
     });
     const total = discountedItems.reduce((s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1), 0);
@@ -404,6 +409,9 @@ export default function OrdersPage() {
   };
 
   return (
+    <>
+    {/* ============= DESKTOP — UNCHANGED ============= */}
+    <div className="hidden lg:block">
     <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -492,7 +500,9 @@ export default function OrdersPage() {
               const original = Number(i.original_price || 0);
               const paid = Number(i.price || 0);
               const qty = Number(i.qty) || 1;
-              return sum + ((original - paid) * qty) + Number(i.deal_savings || 0);
+              const priceDiff = Math.max(0, (original - paid) * qty);
+              const dealSavings = (i.deal_type === 'buy_x_get_y') ? Number(i.deal_savings || 0) : 0;
+              return sum + priceDiff + dealSavings;
             }, 0);
 
             return (
@@ -570,5 +580,213 @@ export default function OrdersPage() {
         <DeleteConfirmModal orderNumber={deleteTarget.order_number} deleting={deleting} onClose={() => setDeleteTarget(null)} onConfirm={handleDeleteOrder} />
       )}
     </main>
+    </div>
+
+    {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
+    <div className="lg:hidden bg-[var(--user-bg)]">
+      {/* Sticky top app bar */}
+      <div
+        className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="flex items-center gap-2 px-3 h-12">
+          <button type="button" onClick={() => router.push("/")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">My Orders</p>
+            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{orders.length} {orders.length === 1 ? "order" : "orders"}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 pt-3 pb-24 space-y-2.5">
+        {/* Status filter chips (horizontal scrollable) */}
+        {(orders.length > 0 || hasDrafts) && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3" style={{ scrollbarWidth: "none" }}>
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+                filter === "all"
+                  ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                  : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
+              }`}
+            >
+              All ({orders.length})
+            </button>
+            {hasDrafts && (
+              <button
+                type="button"
+                onClick={() => setFilter("draft")}
+                className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+                  filter === "draft"
+                    ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                    : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
+                }`}
+              >
+                Drafts ({drafts.length})
+              </button>
+            )}
+            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
+              const count = counts[key] || 0;
+              if (count === 0) return null;
+              const active = filter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+                    active
+                      ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                      : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
+                  }`}
+                >
+                  {cfg.label} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Drafts */}
+        {hasDrafts && (filter === "all" || filter === "draft") && (
+          <div className="space-y-2">
+            {drafts.map((draft) => (
+              <div key={draft._id} className="rounded-xl bg-[var(--user-bg-card)] border-2 border-[var(--user-accent)] p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
+                  <ShoppingBag size={18} className="text-[var(--user-accent)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-black text-[var(--user-text)]">DRAFT</p>
+                  <p className="text-[10px] text-[var(--user-text-muted)]">Step {draft.step}/3 · {draft.items?.length || 0} items</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => resumeDraft(draft._id)}
+                  className="h-8 px-3 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] font-black"
+                >
+                  Resume
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty */}
+        {filter !== "draft" && filtered.length === 0 && !(filter === "all" && hasDrafts) && (
+          <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-8 text-center">
+            <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center mb-4">
+              <Package size={36} className="text-[var(--user-accent)]" />
+            </div>
+            <h2 className="text-base font-black text-[var(--user-text)] mb-1.5">
+              {orders.length === 0 ? "No orders yet" : "No orders match your filters"}
+            </h2>
+            <p className="text-xs text-[var(--user-text-muted)] mb-5">
+              {orders.length === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
+            </p>
+            {hasActiveFilters ? (
+              <button onClick={clearFilters} className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+                Clear Filters
+              </button>
+            ) : (
+              <Link href="/product" className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+                <ShoppingBag size={16} /> Start Shopping
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Orders list */}
+        {filter !== "draft" && filtered.length > 0 && (
+          <div className="space-y-2">
+            {filtered.map((order) => {
+              const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+              const StatusIcon = cfg.icon;
+              const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+              return (
+                <Link
+                  key={order._id}
+                  href={`/orders/${order._id}`}
+                  className="block rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm overflow-hidden active:scale-[0.99] transition"
+                >
+                  {/* Header strip */}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-[var(--user-border)] bg-[var(--user-bg-hover)]/40">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
+                        <Package size={13} className="text-[var(--user-accent)]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-black text-[var(--user-text)] truncate">#{order.order_number}</p>
+                        <p className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1">
+                          <Calendar size={9} /> {date}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border} shrink-0`}>
+                      <StatusIcon size={10} className={cfg.color} />
+                      <span className={`text-[9px] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
+                    </span>
+                  </div>
+
+                  {/* Cancelled reason strip */}
+                  {order.status === "cancelled" && order.cancel_reason && (
+                    <div className="px-3 py-1.5 bg-[var(--user-danger)]/10 border-b border-[var(--user-danger)]/20">
+                      <p className="text-[10px] font-semibold text-[var(--user-danger)] line-clamp-2">
+                        <span className="font-black uppercase tracking-wider mr-1">Reason:</span>{order.cancel_reason}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Body — thumbnail row */}
+                  {order.items?.length > 0 && (
+                    <div className="p-3 flex items-center gap-2">
+                      {order.items.slice(0, 3).map((it, idx) => (
+                        <div key={idx} className="shrink-0">
+                          {getImgUrl(it.image) ? (
+                            <img src={getImgUrl(it.image)} alt="" className="w-[52px] h-[52px] rounded-xl object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
+                          ) : (
+                            <div className="w-[52px] h-[52px] rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
+                              <Package size={20} className="text-[var(--user-text-muted)]" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {order.items.length > 3 && (
+                        <div className="w-[52px] h-[52px] rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
+                          <span className="text-[12px] font-black text-[var(--user-text-secondary)]">+{order.items.length - 3}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 ml-1">
+                        <p className="text-[11px] font-bold text-[var(--user-text)] line-clamp-1">{order.items[0].name}</p>
+                        <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer strip */}
+                  <div className="flex items-center justify-between px-3 py-2.5 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
+                    <div>
+                      <p className="text-[9px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider leading-none">Total</p>
+                      <p className="text-[14px] font-black text-[var(--user-accent)] leading-none mt-1">Rs. {order.total.toLocaleString()}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 h-8 px-3 rounded-full text-[11px] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
+                      View Details <ChevronRight size={12} />
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Shared modal — works for both desktop and mobile */}
+    {deleteTarget && (
+      <DeleteConfirmModal orderNumber={deleteTarget.order_number} deleting={deleting} onClose={() => setDeleteTarget(null)} onConfirm={handleDeleteOrder} />
+    )}
+    </>
   );
 }

@@ -57,8 +57,8 @@ export default function BannerSlider() {
         }
       `}</style>
       <div
-        className="relative w-full h-[220px] sm:h-[320px] lg:h-[440px] overflow-hidden bg-[var(--user-bg-card)]"
-        style={{ minHeight: "220px" }}
+        className="relative w-full h-[170px] sm:h-[320px] lg:h-[440px] overflow-hidden bg-[var(--user-bg-card)]"
+        style={{ minHeight: "170px" }}
       >
         {/* SLIDES */}
         {banners.map((banner, i) => {
@@ -95,26 +95,26 @@ export default function BannerSlider() {
 
               {/* Content */}
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16">
+                <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-16">
                   <div
                     className={`max-w-2xl transition-all duration-700 ${
                       isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                     }`}
                   >
                     {banner.eyebrow && (
-                      <p className="inline-block text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-white/90 mb-2 sm:mb-4 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20">
+                      <p className="hidden sm:inline-block text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-white/90 mb-2 sm:mb-4 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/20">
                         {banner.eyebrow}
                       </p>
                     )}
                     {banner.heading && (
-                      <h2 className="text-2xl sm:text-4xl lg:text-6xl font-black text-white leading-[1.05] mb-3 sm:mb-4 drop-shadow-2xl">
+                      <h2 className="text-lg sm:text-4xl lg:text-6xl font-black text-white leading-[1.05] mb-2 sm:mb-4 drop-shadow-2xl line-clamp-2">
                         {banner.heading}
                       </h2>
                     )}
                     {banner.description && (
-                      <p className="text-sm sm:text-base lg:text-lg text-white/90 mb-5 sm:mb-7 max-w-xl leading-relaxed drop-shadow-lg">
-                        {banner.description}
-                      </p>
+<p className="hidden sm:block text-sm sm:text-base lg:text-lg text-white/90 mb-5 sm:mb-7 max-w-xl leading-relaxed drop-shadow-lg">
+                      {banner.description}
+                    </p>
                     )}
                     <div className="flex flex-wrap gap-3">
                       {banner.primaryButton?.text && (

@@ -170,9 +170,9 @@ function ProductRow({ title, subtitle, href, products }) {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-4 lg:px-6">
-      {/* HEADER — title left */}
-      <div className="flex items-center justify-between mb-4">
+    <section className="max-w-[1400px] mx-auto px-3 lg:px-6">
+      {/* HEADER — title + See all */}
+      <div className="flex items-center justify-between mb-3 lg:mb-4 gap-2">
         <div className="min-w-0">
           <Link href={href} className="group inline-block">
             <h2 className="text-base lg:text-lg font-bold text-[var(--user-text)] capitalize group-hover:text-[var(--user-accent)] transition truncate">
@@ -185,6 +185,9 @@ function ProductRow({ title, subtitle, href, products }) {
             </p>
           )}
         </div>
+        <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[11px] lg:text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">
+          See all <ChevronRight size={12} />
+        </Link>
       </div>
 
       {/* PRODUCTS ROW — horizontal slide + side arrows */}
@@ -200,7 +203,7 @@ function ProductRow({ title, subtitle, href, products }) {
           className="scrollbar-hide flex gap-3 lg:gap-4 overflow-x-auto scroll-smooth pb-1"
         >
           {products.map((p) => (
-            <div key={p._id} className="w-[160px] sm:w-[200px] lg:w-[230px] shrink-0">
+            <div key={p._id} className="w-[150px] sm:w-[200px] lg:w-[230px] shrink-0">
               <ProductCard product={p} />
             </div>
           ))}

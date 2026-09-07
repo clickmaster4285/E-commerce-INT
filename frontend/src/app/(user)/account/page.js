@@ -339,18 +339,18 @@ export default function AccountPage() {
 
   const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
 
-  const inputCls = "w-full h-10 px-3 rounded-lg text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
+  const inputCls = "w-full h-11 lg:h-10 px-3 rounded-lg text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
   const labelCls = "block text-[11px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
   const cardCls = "rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
-  const btnPrimary = "h-10 sm:h-9 px-3.5 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50";
-  const btnSecondary = "h-10 sm:h-9 px-3.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5";
+  const btnPrimary = "h-11 lg:h-9 px-3.5 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50";
+  const btnSecondary = "h-11 lg:h-9 px-3.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5";
 
   const toggleSection = (s) => setOpenSection(openSection === s ? null : s);
 
   const sidebarProps = { user, avatarLetter, tab, orderFilter, wishlistCount, onNavigate: navigate, onExternal: external, onLogout: handleLogout };
 
   return (
-    <main className="max-w-[1200px] mx-auto px-4 lg:px-6 pt-3 sm:pt-6 lg:pt-10 pb-4 md:pb-4">
+    <main className="max-w-[1200px] mx-auto px-3 lg:px-6 pt-3 lg:pt-10 pb-4 md:pb-4">
       <div className="grid lg:grid-cols-[260px_1fr] gap-6 items-start">
         {/* Desktop sidebar (unchanged) */}
         <aside className="hidden lg:block sticky top-24">
