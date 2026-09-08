@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -574,8 +574,9 @@ const ProfessionalCategoryTypeSelect = ({ value, onChange, disabled = false }) =
 export default function CategoryFormPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const categoryId = params?.id;
+  const categoryId = params?.id || searchParams?.get("id");
   const isEditMode = !!categoryId;
 
   const [activeTab, setActiveTab] = useState("details");
