@@ -31,8 +31,7 @@ const slugify = (str) =>
     .replace(/^_+|_+$/g, "");
 
 const SEED_TYPE_TO_DATA_TYPE = {
-  text: "text",
-  number: "number",
+  boolean: "boolean",
   "multi-select": "multi_select",
   multi_select: "multi_select",
 };
@@ -78,7 +77,7 @@ const ensureSeedAttributeByCode = async ({ code, name: label, type, options }) =
 
 const resolveSeedAttribute = async (item) => {
   if (item.attribute_id && mongoose.Types.ObjectId.isValid(String(item.attribute_id))) {
-    return Attribute.findOne({ _id: item.attribute_id, is_deleted: false, is_active: true }).lean();
+    return Attribute.findOne({ _id: item.attribute_id, is_deleted: { $ne: true } }).lean();
   }
   if (item.seed_code) {
     const safeCode = slugify(item.seed_code);
@@ -361,15 +360,14 @@ const getCategories = async (req, res) => {
 
 const getCategoryById = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
-
-    // ✅ FIX: Find by ID globally
+    // ✅ FIX: Find by ID globally — populate attribute_id so frontend gets full attribute data
     const category = await Category.findOne({
       _id: req.params.id,
       is_deleted: false,
     })
       .select("-__v")
       .populate("parent_category_id", "name category_code")
+      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();

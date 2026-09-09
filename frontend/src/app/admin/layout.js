@@ -20,6 +20,7 @@ const ROUTE_PERMISSIONS = {
     '/admin/orders': 'orders',       // ✅ YE LINE ADD KARO
 
   '/admin/categories': 'categories',
+  '/admin/attributes': 'attributes',
   '/admin/products': 'products',
   '/admin/store-info': 'store',
   '/admin/profile': 'profile',

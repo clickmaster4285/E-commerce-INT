@@ -20,6 +20,9 @@ export const attributeApi = {
     return axiosInstance.get("/attributes", { params: query }).then(unwrap);
   },
 
+  getById: (id) =>
+    axiosInstance.get(`/attributes/${id}`).then(unwrapObject),
+
   getByCategory: (categoryId) =>
     axiosInstance
       .get(`/categories/${categoryId}/attributes`)
@@ -30,4 +33,10 @@ export const attributeApi = {
 
   update: (id, data) =>
     axiosInstance.put(`/attributes/${id}`, data).then(unwrapObject),
+
+  getCategories: (id) =>
+    axiosInstance.get(`/attributes/${id}/categories`).then(unwrap),
+
+  updateCategories: (id, categoryIds) =>
+    axiosInstance.put(`/attributes/${id}/categories`, { category_ids: categoryIds }).then(unwrapObject),
 };

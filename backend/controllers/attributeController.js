@@ -1,4 +1,5 @@
 const Attribute = require("../models/Attribute");
+const Category = require("../models/Category");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 
@@ -30,12 +31,11 @@ const normalizeValues = (rawValues) => {
   return out;
 };
 
-const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select", "select", "color"];
+const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select", "boolean"];
 
 const LEGACY_DATA_TYPE_MAP = {
   select: "multi_select",
   color: "multi_select",
-  boolean: "text",
   date: "text",
   datetime: "text",
   url: "text",
@@ -72,6 +72,22 @@ const sanitizePayload = (body) => {
   if (out.visible !== undefined) out.visible = out.visible !== false;
   if (out.is_active !== undefined) out.is_active = out.is_active !== false;
   return out;
+};
+
+const getAttributeById = async (req, res) => {
+  try {
+    const attribute = await Attribute.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    }).lean();
+    if (!attribute) {
+      return res.status(404).json({ success: false, message: "Attribute not found" });
+    }
+    res.status(200).json({ success: true, data: attribute });
+  } catch (error) {
+    console.error("Error in getAttributeById:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 const getAttributes = async (req, res) => {
@@ -147,4 +163,137 @@ const updateAttribute = async (req, res) => {
   }
 };
 
-module.exports = { getAttributes, createAttribute, updateAttribute };
+const getAttributeCategories = async (req, res) => {
+  try {
+    const attribute = await Attribute.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    }).lean();
+
+    if (!attribute) {
+      return res.status(404).json({ success: false, message: "Attribute not found" });
+    }
+
+    const categories = await Category.find({
+      is_deleted: false,
+      "attributes.attribute_id": attribute._id,
+    })
+      .select("name category_code category_type attributes")
+      .lean();
+
+    const result = categories.map((cat) => {
+      const attrConfig = (cat.attributes || []).find(
+        (a) => String(a.attribute_id) === String(attribute._id)
+      );
+      return {
+        _id: cat._id,
+        name: cat.name,
+        category_code: cat.category_code,
+        category_type: cat.category_type,
+        config: attrConfig
+          ? {
+              is_required: Boolean(attrConfig.is_required),
+              is_visible: attrConfig.is_visible !== false,
+              is_filterable: Boolean(attrConfig.is_filterable),
+              is_searchable: Boolean(attrConfig.is_searchable),
+              is_variant_option: Boolean(attrConfig.is_variant_option),
+              sort_order: attrConfig.sort_order || 0,
+              value: attrConfig.value !== undefined ? attrConfig.value : "",
+            }
+          : null,
+      };
+    });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error in getAttributeCategories:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateAttributeCategories = async (req, res) => {
+  try {
+    const attributeId = req.params.id;
+    const { category_ids } = req.body;
+
+    if (!Array.isArray(category_ids)) {
+      return res.status(400).json({ success: false, message: "category_ids must be an array" });
+    }
+
+    const attribute = await Attribute.findOne({
+      _id: attributeId,
+      is_deleted: { $ne: true },
+    }).lean();
+
+    if (!attribute) {
+      return res.status(404).json({ success: false, message: "Attribute not found" });
+    }
+
+    const validCategoryIds = category_ids.filter((id) =>
+      require("mongoose").Types.ObjectId.isValid(id)
+    );
+
+    const allCategories = await Category.find({
+      is_deleted: false,
+    }).lean();
+
+    for (const cat of allCategories) {
+      const hasAttribute = (cat.attributes || []).some(
+        (a) => String(a.attribute_id) === String(attributeId)
+      );
+      const shouldBeAssigned = validCategoryIds.includes(String(cat._id));
+
+      if (!hasAttribute && shouldBeAssigned) {
+        await Category.updateOne(
+          { _id: cat._id },
+          {
+            $push: {
+              attributes: {
+                attribute_id: attributeId,
+                is_required: false,
+                is_visible: true,
+                is_filterable: false,
+                is_searchable: false,
+                is_variant_option: false,
+                sort_order: (cat.attributes || []).length,
+                value: "",
+              },
+            },
+          }
+        );
+      } else if (hasAttribute && !shouldBeAssigned) {
+        await Category.updateOne(
+          { _id: cat._id },
+          {
+            $pull: {
+              attributes: { attribute_id: require("mongoose").Types.ObjectId(attributeId) },
+            },
+          }
+        );
+      }
+    }
+
+    const updatedCategories = await Category.find({
+      is_deleted: false,
+      "attributes.attribute_id": attributeId,
+    })
+      .select("name category_code category_type")
+      .lean();
+
+    const io = req.io || getIO();
+    try {
+      if (io) io.emit("attributeUpdated", { _id: attributeId });
+    } catch (e) {}
+
+    res.status(200).json({
+      success: true,
+      message: "Category assignments updated successfully",
+      data: updatedCategories,
+    });
+  } catch (error) {
+    console.error("Error in updateAttributeCategories:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getAttributeById, getAttributes, createAttribute, updateAttribute, getAttributeCategories, updateAttributeCategories };

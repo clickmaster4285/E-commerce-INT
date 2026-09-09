@@ -28,6 +28,7 @@ import {
   Menu,
   ShoppingCart,
   Truck,
+  SlidersHorizontal, // Added for Attributes
 } from "lucide-react";
 
 // ============================================================
@@ -38,6 +39,12 @@ const allMenuItems = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: null },
   { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
   { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
+  { 
+    name: "Attributes", 
+    icon: SlidersHorizontal, 
+    path: "/admin/attributes", 
+    permissionKey: "attributes" 
+  },
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
   { name: "Discounts", icon: Tag, path: "/admin/discounts", permissionKey: "discounts" },
