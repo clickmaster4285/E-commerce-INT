@@ -16,16 +16,16 @@ const toValues = (arr) =>
 const ATTRIBUTES_TO_SEED = [
   // ============= MOBILE =============
   { name: "RAM", code: "mobile_ram", category: "mobile", data_type: "multi_select", variant_allowed: true, values: toValues(["2 GB", "3 GB", "4 GB", "6 GB", "8 GB", "12 GB", "16 GB", "24 GB"]) },
-  { name: "Storage", code: "mobile_storage", category: "mobile", data_type: "multi_select", variant_allowed: true, values: toValues(["32 GB", "64 GB", "128 GB", "256 GB", "512 GB", "1 TB"]) },
-  { name: "Screen Size", code: "mobile_screen_size", category: "mobile", data_type: "select", unit: "inches", values: toValues(['5.0"', '5.5"', '6.0"', '6.1"', '6.3"', '6.5"', '6.7"', '6.9"']) },
-  { name: "Screen Resolution", code: "mobile_screen_resolution", category: "mobile", data_type: "select", values: toValues(["HD", "HD+", "Full HD+", "2K", "4K"]) },
-  { name: "Color", code: "mobile_color", category: "mobile", data_type: "color", values: toValues(["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Purple"]) },
-  { name: "Battery", code: "mobile_battery", category: "mobile", data_type: "select", unit: "mAh", values: toValues(["3000 mAh", "4000 mAh", "4500 mAh", "5000 mAh", "6000 mAh", "7000 mAh"]) },
-  { name: "Camera", code: "mobile_camera", category: "mobile", data_type: "select", values: toValues(["8 MP", "12 MP", "16 MP", "32 MP", "48 MP", "50 MP", "64 MP", "108 MP", "200 MP"]) },
-  { name: "Model", code: "mobile_model", category: "mobile", data_type: "select", values: toValues(["A15", "S24", "iPhone 15"]) },
-  { name: "Network", code: "mobile_network", category: "mobile", data_type: "select", values: toValues(["2G", "3G", "4G", "5G"]) },
-  { name: "SIM", code: "mobile_sim", category: "mobile", data_type: "select", values: toValues(["Single SIM", "Dual SIM"]) },
-  { name: "OS", code: "mobile_os", category: "mobile", data_type: "select", values: toValues(["Android", "iOS"]) },
+{ name: "Storage", code: "mobile_storage", category: "mobile", data_type: "multi_select", variant_allowed: true, values: toValues(["32 GB", "64 GB", "128 GB", "256 GB", "512 GB", "1 TB"]) },
+{ name: "Screen Size", code: "mobile_screen_size", category: "mobile", data_type: "multi_select", unit: "inches", values: toValues(['5.0"', '5.5"', '6.0"', '6.1"', '6.3"', '6.5"', '6.7"', '6.9"']) },
+{ name: "Screen Resolution", code: "mobile_screen_resolution", category: "mobile", data_type: "multi_select", values: toValues(["HD", "HD+", "Full HD+", "2K", "4K"]) },
+{ name: "Color", code: "mobile_color", category: "mobile", data_type: "multi_select", values: toValues(["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Purple"]) },
+{ name: "Battery", code: "mobile_battery", category: "mobile", data_type: "multi_select", unit: "mAh", values: toValues(["3000 mAh", "4000 mAh", "4500 mAh", "5000 mAh", "6000 mAh", "7000 mAh"]) },
+{ name: "Camera", code: "mobile_camera", category: "mobile", data_type: "multi_select", values: toValues(["8 MP", "12 MP", "16 MP", "32 MP", "48 MP", "50 MP", "64 MP", "108 MP", "200 MP"]) },
+{ name: "Model", code: "mobile_model", category: "mobile", data_type: "multi_select", values: toValues(["A15", "S24", "iPhone 15"]) },
+{ name: "Network", code: "mobile_network", category: "mobile", data_type: "multi_select", values: toValues(["2G", "3G", "4G", "5G"]) },
+{ name: "SIM", code: "mobile_sim", category: "mobile", data_type: "multi_select", values: toValues(["Single SIM", "Dual SIM"]) },
+{ name: "OS", code: "mobile_os", category: "mobile", data_type: "multi_select", values: toValues(["Android", "iOS"]) },
 
   // ============= PC =============
   { name: "RAM", code: "pc_ram", category: "pc", data_type: "multi_select", variant_allowed: true, values: toValues(["4 GB", "8 GB", "16 GB", "32 GB", "64 GB", "128 GB"]) },
@@ -70,7 +70,7 @@ async function seedAttributes() {
       } else {
         await Attribute.updateOne(
           { code: attr.code },
-          { $set: { values: attr.values, variant_allowed: attr.variant_allowed || true, category: attr.category } }
+          { $set: { values: attr.values, variant_allowed: attr.variant_allowed || true, category: attr.category, is_active: true } }
         );
         updatedCount++;
       }

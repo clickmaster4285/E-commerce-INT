@@ -42,16 +42,7 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1.994 1.994 0 013 6.586V4z" />
     </svg>
   ),
-  Text: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 4h7" />
-    </svg>
-  ),
-  Hash: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-    </svg>
-  ),
+
   Search: ({ className }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -90,7 +81,13 @@ const getId = (value) => {
   return "";
 };
 
-const getAttributeId = (attribute) => String(attribute?.attribute_id || attribute?._id || "");
+const getAttributeId = (attribute) => {
+  const aid = attribute?.attribute_id;
+  if (!aid) return String(attribute?._id || "");
+  if (typeof aid === "string") return aid;
+  if (typeof aid === "object" && aid._id) return String(aid._id);
+  return String(aid);
+};
 
 const sanitizeOptionLabels = (raw) => {
   if (!Array.isArray(raw)) return [];
@@ -111,44 +108,34 @@ const sanitizeOptionLabels = (raw) => {
 
 function useClickOutside(ref, handler, triggerRef) {
   const handlerRef = useRef(handler);
-
-  useEffect(() => {
-    handlerRef.current = handler;
-  });
-
+  useEffect(() => { handlerRef.current = handler; });
   useEffect(() => {
     const listener = (event) => {
       if (!ref.current || ref.current.contains(event.target)) return;
       if (triggerRef?.current?.contains(event.target)) return;
-      handlerRef.curlrent(event);
+      handlerRef.current(event);
     };
     document.addEventListener("mousedown", listener);
     return () => document.removeEventListener("mousedown", listener);
   }, [ref, triggerRef]);
 }
 
-// Hook to calculate position and handle flipping (up/down)
 function useDropdownPosition(triggerRef, isOpen) {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, direction: 'down' });
-
   const updatePosition = useCallback(() => {
     if (!triggerRef.current || !isOpen) return;
-    
     const rect = triggerRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
     const DROPDOWN_MAX_H = 320;
     const GAP = 6;
     const shouldFlip = spaceBelow < DROPDOWN_MAX_H && spaceAbove > spaceBelow;
-    
     const vw = window.innerWidth;
     let width = Math.max(rect.width, 280);
     if (width > vw - 32) width = vw - 32;
-    
     let left = rect.left;
     if (left + width > vw - 16) left = vw - width - 16;
     if (left < 16) left = 16;
-
     let top;
     let direction;
     if (shouldFlip) {
@@ -162,7 +149,6 @@ function useDropdownPosition(triggerRef, isOpen) {
       }
       direction = 'down';
     }
-
     setPosition({ top, left, width, direction });
   }, [triggerRef, isOpen]);
 
@@ -171,82 +157,23 @@ function useDropdownPosition(triggerRef, isOpen) {
       updatePosition();
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
-      
       return () => {
         window.removeEventListener('scroll', updatePosition, true);
         window.removeEventListener('resize', updatePosition);
       };
     }
   }, [isOpen, updatePosition]);
-
   return position;
 }
 
 /* ================= REUSABLE COMPONENTS ================= */
 
-const TextValueEditor = ({ config, inputKey, onAssign }) => {
-  const assigned = (config.value != null ? String(config.value) : "");
-  const [draft, setDraft] = useState(assigned);
-  const seedName = config.seed_name || "Value";
-
-  useEffect(() => { setDraft(assigned); }, [assigned, inputKey]);
-
-  const trimmed = draft.trim();
-  const dirty = trimmed !== assigned.trim();
-  const canAssign = trimmed.length > 0 && dirty;
-
-  const handleAssign = () => {
-    if (!canAssign) return;
-    onAssign(trimmed);
-  };
-
-  const inputId = `text-input-${inputKey}`;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label htmlFor={inputId} className="block text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{seedName} Value</label>
-        <span className="text-[10px] font-medium text-[var(--text-muted)]">
-          {assigned.trim() ? "Assigned" : "Not assigned"}
-        </span>
-      </div>
-      <div className="flex gap-2">
-        <input
-          id={inputId}
-          type={config.seed_type === "number" ? "number" : "text"}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAssign(); } }}
-          className="flex-1 min-w-0 h-[38px] px-3 text-sm outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-          placeholder={config.seed_type === "number" ? `e.g. 128` : `e.g. iPhone 15`}
-        />
-        <button
-          type="button"
-          onClick={handleAssign}
-          disabled={!canAssign}
-          className="h-[38px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Icons.Check className="w-3.5 h-3.5" /> Assign
-        </button>
-      </div>
-      {assigned.trim() && (
-        <p className="text-[10px] text-[var(--text-muted)] flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-          Assigned value: <span className="font-semibold text-[var(--text-primary)] truncate">{assigned}</span>
-        </p>
-      )}
-    </div>
-  );
-};
-
 const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [newOption, setNewOption] = useState("");
-
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
-
   const pos = useDropdownPosition(triggerRef, isOpen);
   useClickOutside(dropdownRef, () => setIsOpen(false), triggerRef);
 
@@ -281,48 +208,22 @@ const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption })
     <div
       ref={dropdownRef}
       className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl flex flex-col overflow-hidden"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        width: pos.width,
-        maxHeight: '320px'
-      }}
+      style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}
     >
       <div className="p-2 border-b border-[var(--border-color)] shrink-0">
         <div className="relative">
           <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 pl-8 pr-2.5 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-            autoFocus
-          />
+          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-8 pl-8 pr-2.5 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" autoFocus />
         </div>
       </div>
-
       <div className="flex-1 overflow-y-auto py-0.5 min-h-0 scrollbar-thin">
         {filteredValues.length > 0 ? (
           filteredValues.map((label, idx) => {
             const isSelected = selected.includes(label);
             return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => toggleOption(label)}
-                className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition-colors ${
-                  isSelected
-                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                }`}
-              >
+              <button key={idx} type="button" onClick={() => toggleOption(label)} className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition-colors ${isSelected ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>
                 <span className="truncate">{label}</span>
-                <span className={`w-4 h-4 flex items-center justify-center shrink-0 ml-2 rounded border transition-colors ${
-                  isSelected
-                    ? "bg-[var(--accent)] border-[var(--accent)]"
-                    : "border-[var(--border-color)]"
-                }`}>
+                <span className={`w-4 h-4 flex items-center justify-center shrink-0 ml-2 rounded border transition-colors ${isSelected ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)]"}`}>
                   {isSelected && <Icons.Check className="w-2.5 h-2.5 text-white" />}
                 </span>
               </button>
@@ -332,23 +233,11 @@ const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption })
           <div className="px-3 py-6 text-center text-xs text-[var(--text-muted)]">No matching values</div>
         )}
       </div>
-
       {onAddNewOption && (
         <div className="px-2 py-1.5 border-t border-[var(--border-color)] shrink-0 bg-[var(--bg-tertiary)]/30">
           <div className="flex gap-1">
-            <input
-              type="text"
-              placeholder="Add new..."
-              value={newOption}
-              onChange={(e) => setNewOption(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddNewOption()}
-              className="flex-1 min-w-0 h-7 px-2 text-[11px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
-            />
-            <button
-              onClick={handleAddNewOption}
-              disabled={!newOption.trim()}
-              className="h-7 px-2 text-[10px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-0.5 shrink-0"
-            >
+            <input type="text" placeholder="Add new..." value={newOption} onChange={(e) => setNewOption(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddNewOption()} className="flex-1 min-w-0 h-7 px-2 text-[11px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" />
+            <button onClick={handleAddNewOption} disabled={!newOption.trim()} className="h-7 px-2 text-[10px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-0.5 shrink-0">
               <Icons.Plus className="w-3 h-3" /> Add
             </button>
           </div>
@@ -359,25 +248,14 @@ const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption })
 
   return (
     <div className="relative w-full">
-      <button
-        type="button"
-        ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full min-h-[36px] px-2.5 py-1.5 text-xs flex items-center justify-between outline-none transition-colors rounded border ${
-          isOpen
-            ? "border-[var(--accent)] ring-1 ring-[var(--accent-soft)] bg-[var(--bg-input)]"
-            : "border-[var(--border-color)] hover:border-[var(--text-muted)] bg-[var(--bg-input)]"
-        }`}
-      >
+      <button type="button" ref={triggerRef} onClick={() => setIsOpen(!isOpen)} className={`w-full min-h-[36px] px-2.5 py-1.5 text-xs flex items-center justify-between outline-none transition-colors rounded border ${isOpen ? "border-[var(--accent)] ring-1 ring-[var(--accent-soft)] bg-[var(--bg-input)]" : "border-[var(--border-color)] hover:border-[var(--text-muted)] bg-[var(--bg-input)]"}`}>
         <div className="flex flex-wrap items-center gap-1 text-left w-full min-w-0">
           {selected.length === 0 ? (
             <span className="text-[var(--text-muted)]">Select values...</span>
           ) : (
             <>
               {selected.slice(0, 3).map((item) => (
-                <span key={item} className="inline-flex items-center gap-0.5 px-1.5 py-px text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/20">
-                  {item}
-                </span>
+                <span key={item} className="inline-flex items-center gap-0.5 px-1.5 py-px text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/20">{item}</span>
               ))}
               {selected.length > 3 && <span className="text-[10px] font-medium text-[var(--text-muted)]">+{selected.length - 3}</span>}
             </>
@@ -385,11 +263,7 @@ const ProfessionalMultiSelect = ({ attribute, value, onChange, onAddNewOption })
         </div>
         <Icons.ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ml-1.5 text-[var(--text-muted)] ${isOpen ? "rotate-180" : ""}`} />
       </button>
-
-      {isOpen && typeof document !== 'undefined' && createPortal(
-        renderDropdown(),
-        document.body
-      )}
+      {isOpen && typeof document !== 'undefined' && createPortal(renderDropdown(), document.body)}
     </div>
   );
 };
@@ -413,11 +287,7 @@ const ProfessionalSingleSelect = ({ value, onChange, placeholder = "Select...", 
   const filteredOptions = options.filter((l) => l.toLowerCase().includes(search.toLowerCase()));
 
   const renderDropdown = () => (
-    <div
-      ref={dropdownRef}
-      className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden flex flex-col"
-      style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}
-    >
+    <div ref={dropdownRef} className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden flex flex-col" style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}>
       <div className="p-2 border-b border-[var(--border-color)] shrink-0">
         <div className="relative">
           <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
@@ -509,25 +379,13 @@ const ProfessionalCategoryTypeSelect = ({ value, onChange, disabled = false }) =
   };
 
   const renderDropdown = () => (
-    <div
-      ref={containerRef}
-      className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden flex flex-col"
-      style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}
-    >
+    <div ref={containerRef} className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden flex flex-col" style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}>
       <div className="p-2 border-b border-[var(--border-color)] shrink-0">
         <div className="relative">
           <Icons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 pl-8 pr-2.5 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-            autoFocus
-          />
+          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-8 pl-8 pr-2.5 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" autoFocus />
         </div>
       </div>
-
       <div className="overflow-y-auto py-0.5 flex-1 min-h-0 scrollbar-thin">
         {filteredOptions.map((label) => {
           const isSelected = value === label;
@@ -540,7 +398,6 @@ const ProfessionalCategoryTypeSelect = ({ value, onChange, disabled = false }) =
         })}
         {filteredOptions.length === 0 && <div className="px-3 py-4 text-xs text-center text-[var(--text-muted)]">No types found</div>}
       </div>
-
       <div className="p-2 border-t border-[var(--border-color)] shrink-0 bg-[var(--bg-tertiary)]/30">
         {isAdding ? (
           <div className="flex gap-1.5">
@@ -579,11 +436,14 @@ export default function CategoryFormPage() {
   const categoryId = params?.id || searchParams?.get("id");
   const isEditMode = !!categoryId;
 
+  // Reuse exact card style from List Page to ensure consistency
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
   const [activeTab, setActiveTab] = useState("details");
   const [openAttributeKey, setOpenAttributeKey] = useState(null);
   const [showAttributeModal, setShowAttributeModal] = useState(false);
 
-  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "text", values: [], value: "" });
+  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
 
   const [formData, setFormData] = useState({
     category_code: "",
@@ -629,38 +489,106 @@ export default function CategoryFormPage() {
   });
 
   useEffect(() => {
-    if (!isEditMode && !autoCode) fetchNextCode();
-  }, [isEditMode]);
+    if (!isEditMode && !autoCode) fetchNextCode(); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [isEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isEditMode && existingCategory) {
       const cat = existingCategory;
+      const catType = cat.category_type || "";
       const loadedAttrs = (cat.attributes || []).map((a, i) => ({
         ...a,
         ui_key: a.ui_key || `edit-${getAttributeId(a) || a.seed_code || `idx-${i}`}-${i}`,
       }));
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         category_code: cat.category_code || "",
-        category_type: cat.category_type || "",
+        category_type: catType,
         name: cat.name || "",
         description: cat.description || "",
         parent_category_id: getId(cat.parent_category_id),
         status: cat.status || "active",
         attributes: loadedAttrs,
       });
-      loadedSeedTypeRef.current = cat.category_type || "";
+
+      loadedSeedTypeRef.current = catType;
       setAutoCode(cat.category_code || "");
     }
   }, [isEditMode, existingCategory]);
 
   useEffect(() => {
     if (isEditMode) return;
+    const categoryType = formData.category_type?.toLowerCase();
+    const isSeededCategory = ["mobile", "pc", "clothing"].includes(categoryType);
+    if (isSeededCategory) {
+      loadedSeedTypeRef.current = "";
+    }
+  }, [formData.category_type, isEditMode]);
 
+  useEffect(() => {
     const categoryType = formData.category_type?.toLowerCase();
     const isSeededCategory = ["mobile", "pc", "clothing"].includes(categoryType);
 
-    if (isSeededCategory) {
-      if (seededAttributes.length > 0 && loadedSeedTypeRef.current !== categoryType) {
+    if (!isSeededCategory) {
+      if (loadedSeedTypeRef.current) {
+        setFormData((p) => ({ ...p, attributes: [] }));
+        loadedSeedTypeRef.current = "";
+      }
+      return;
+    }
+
+    if (seededAttributes.length === 0) return;
+
+    const firstSeededCategory = seededAttributes[0]?.category?.toLowerCase();
+    if (firstSeededCategory && firstSeededCategory !== categoryType) return;
+
+    if (isEditMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData((p) => {
+        const needsEnrichment = p.attributes.some((a) => a.attribute_id && !a.seed_name) ||
+          p.attributes.some((a) => {
+            const attrId = getAttributeId(a);
+            const seedAttr = seededAttributes.find((sa) => String(sa._id) === String(attrId));
+            return seedAttr && a.seed_name !== seedAttr.name;
+          });
+        if (!needsEnrichment) return p;
+
+        const enrichedAttrs = p.attributes.map((existingAttr) => {
+          const attrId = getAttributeId(existingAttr);
+          const seedAttr = seededAttributes.find((sa) => String(sa._id) === String(attrId));
+
+          if (seedAttr) {
+            const mappedSeedType = seedAttr.data_type === "select" || seedAttr.data_type === "color" ? "multi_select" : seedAttr.data_type;
+            const seedOptions = (seedAttr.values || []).map(v => v.label || v.value || v);
+            return {
+              ...existingAttr,
+              seed_code: seedAttr.code,
+              seed_name: seedAttr.name,
+              seed_type: mappedSeedType,
+              seed_options: seedOptions,
+            };
+          }
+
+          const populatedAttr = existingAttr.attribute_id;
+          if (populatedAttr && typeof populatedAttr === "object" && populatedAttr.name) {
+            const mappedSeedType = populatedAttr.data_type === "select" || populatedAttr.data_type === "color" ? "multi_select" : populatedAttr.data_type;
+            const seedOptions = (populatedAttr.values || []).map(v => v.label || v.value || v);
+            return {
+              ...existingAttr,
+              seed_code: populatedAttr.code,
+              seed_name: populatedAttr.name,
+              seed_type: mappedSeedType,
+              seed_options: seedOptions,
+            };
+          }
+
+          return existingAttr;
+        });
+        return { ...p, attributes: enrichedAttrs };
+      });
+    } else {
+      if (loadedSeedTypeRef.current !== categoryType) {
         const newAttrs = seededAttributes.map((attr, index) => {
           const mappedSeedType = attr.data_type === "select" || attr.data_type === "color" ? "multi_select" : attr.data_type;
           const options = (attr.values || []).map(v => v.label || v.value || v);
@@ -672,9 +600,7 @@ export default function CategoryFormPage() {
             seed_name: attr.name,
             seed_type: mappedSeedType,
             seed_options: options,
-            is_required: false,
             is_visible: true,
-            is_filterable: true,
             is_searchable: true,
             sort_order: index,
             value: mappedSeedType === "multi_select" ? options : "",
@@ -683,13 +609,8 @@ export default function CategoryFormPage() {
         setFormData((p) => ({ ...p, attributes: newAttrs }));
         loadedSeedTypeRef.current = categoryType;
       }
-    } else {
-      if (loadedSeedTypeRef.current) {
-        setFormData((p) => ({ ...p, attributes: [] }));
-        loadedSeedTypeRef.current = "";
-      }
     }
-  }, [formData.category_type, seededAttributes, isEditMode]);
+  }, [formData.category_type, seededAttributes, isEditMode, formData.attributes]);
 
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => (id ? categoryApi.update(id, data) : categoryApi.create(data)),
@@ -701,12 +622,15 @@ export default function CategoryFormPage() {
         const properAttrs = attrs
           .filter((a) => a && (a.attribute_id || a.seed_code))
           .map((a) => {
-            const aid = a.attribute_id || a._id;
+            const raw = a.attribute_id || a._id;
+            let aid;
+            if (!raw) aid = undefined;
+            else if (typeof raw === "string") aid = raw;
+            else if (typeof raw === "object" && raw._id) aid = String(raw._id);
+            else aid = String(raw);
             return {
-              attribute_id: aid ? String(aid) : undefined,
-              is_required: Boolean(a.is_required),
+              attribute_id: aid || undefined,
               is_visible: a.is_visible !== false,
-              is_filterable: Boolean(a.is_filterable),
               is_searchable: Boolean(a.is_searchable),
               is_variant_option: a.is_variant_option !== false,
               sort_order: typeof a.sort_order === "number" ? a.sort_order : 0,
@@ -753,9 +677,7 @@ export default function CategoryFormPage() {
       seed_name: newAttributeData.name,
       seed_type: newAttributeData.data_type,
       seed_options: newAttributeData.values || [],
-      is_required: false,
       is_visible: true,
-      is_filterable: true,
       is_searchable: true,
       sort_order: formData.attributes.length,
       value: newAttributeData.data_type === "multi_select" ? newAttributeData.values || [] : (newAttributeData.value || ""),
@@ -763,7 +685,7 @@ export default function CategoryFormPage() {
     };
     setFormData((p) => ({ ...p, attributes: [...p.attributes, newAttrConfig] }));
     setShowAttributeModal(false);
-    setNewAttributeData({ name: "", code: "", data_type: "text", values: [], value: "" });
+    setNewAttributeData({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
     toast.success("Attribute added");
     try {
       const valuesPayload = (newAttrConfig.seed_options || []).map((opt) => {
@@ -843,7 +765,7 @@ export default function CategoryFormPage() {
       let updatedAttribute = null;
       let nextSelected = currentSelected;
       let nextSeedOptions = currentSeedOptions;
-      let nextAttributeId = config.attribute_id ? String(config.attribute_id) : null;
+      let nextAttributeId = getAttributeId(config) || null;
 
       if (nextAttributeId) {
         const fullAttr = seededAttributes.find((a) => String(a._id) === String(nextAttributeId));
@@ -867,7 +789,7 @@ export default function CategoryFormPage() {
         nextSeedOptions = responseValues.map((v) => v.label || v.value || "").filter(Boolean);
       } else {
         const created = await attributeApi.create({
-          code: `${config.seed_code || inputKey}-value-${Date.now()}`,
+          code: `${config.seed_code || inputKey}-value-${Date.now()}`, // eslint-disable-line react-hooks/purity
           name: raw,
           data_type: config.seed_type || "text",
           values: [{ label: raw, value: raw.toLowerCase(), sort_order: 0, is_active: true }],
@@ -881,7 +803,7 @@ export default function CategoryFormPage() {
 
       updateAttributeConfig(inputKey, "value", nextSelected);
       updateAttributeConfig(inputKey, "seed_options", nextSeedOptions);
-      if (nextAttributeId && nextAttributeId !== String(config.attribute_id || "")) {
+      if (nextAttributeId && nextAttributeId !== getAttributeId(config)) {
         updateAttributeConfig(inputKey, "attribute_id", nextAttributeId);
       }
 
@@ -906,7 +828,7 @@ export default function CategoryFormPage() {
 
   if (isLoadingCategory) {
     return (
-      <div className="w-full min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+      <div className="w-full min-h-[50vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Icons.Spinner className="w-7 h-7 text-[var(--accent)]" />
           <p className="text-xs text-[var(--text-muted)]">Loading category details...</p>
@@ -916,58 +838,56 @@ export default function CategoryFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    // REMOVED min-h-screen bg-[var(--bg-primary)] to prevent double background
+    <div className="w-full h-full overflow-y-auto space-y-5">
 
       {/* ================= HEADER ================= */}
-      {/* CLEAN NON-STICKY HEADER WITH PROFESSIONAL TYPOGRAPHY */}
-      <header className="bg-[var(--bg-navbar)] border-b border-[var(--border-card)]">
-        <div className="max-w-[1600px] mx-auto px-6 h-[80px] flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all"
-            >
-              <Icons.ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="leading-tight">
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-                {isEditMode ? "Edit Category" : "Create Category"}
-              </h1>
-              <p className="text-sm text-[var(--text-muted)] mt-1 font-medium">
-                Configure product classification and attributes
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="h-10 px-5 text-xs font-semibold text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="category-form"
-              disabled={saveMutation.isPending}
-              className="h-10 px-6 text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-[var(--accent)]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saveMutation.isPending ? <Icons.Spinner className="w-4 h-4" /> : <Icons.Check className="w-4 h-4" />}
-              {isEditMode ? "Update Category" : "Create Category"}
-            </button>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all"
+          >
+            <Icons.ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="leading-tight">
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight text-[var(--text-primary)]">
+              {isEditMode ? "Edit Category" : "Create Category"}
+            </h1>
+            <p className="text-[13px] mt-1 text-[var(--text-muted)]">
+              Configure product classification and attributes
+            </p>
           </div>
         </div>
-      </header>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="h-9 px-4 text-[13px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="category-form"
+            disabled={saveMutation.isPending}
+            className="h-9 px-4 text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saveMutation.isPending ? <Icons.Spinner className="w-4 h-4" /> : <Icons.Check className="w-4 h-4" />}
+            {isEditMode ? "Update Category" : "Create Category"}
+          </button>
+        </div>
+      </div>
 
       {/* ================= MAIN FORM ================= */}
-      <form id="category-form" onSubmit={handleSubmit} className="max-w-[1600px] mx-auto px-6 py-8">
-        {/* GRID RATIO KEPT AS REQUESTED: Left slightly smaller, Right larger */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.1fr] gap-6 items-start">
+      <form id="category-form" onSubmit={handleSubmit} className="w-full">
+        {/* GRID LAYOUT MATCHING LIST PAGE WIDTH */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
 
           {/* ================= LEFT: CATEGORY INFORMATION ================= */}
-          <section className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-card)] overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-[var(--border-card)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
+          <section className="rounded-lg overflow-hidden flex flex-col" style={cardStyle}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
               <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
                 <Icons.Folder className="w-4 h-4" />
               </div>
@@ -1066,8 +986,8 @@ export default function CategoryFormPage() {
           </section>
 
           {/* ================= RIGHT: ATTRIBUTES & FEATURES ================= */}
-          <section className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-card)] overflow-hidden flex flex-col shadow-sm">
-            <div className="px-5 py-4 border-b border-[var(--border-card)] flex items-center justify-between bg-[var(--bg-tertiary)]/30">
+          <section className="rounded-lg overflow-hidden flex flex-col max-h-[calc(100vh-140px)]" style={cardStyle}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-tertiary)]/30">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
                   <Icons.Layers className="w-4 h-4" />
@@ -1088,9 +1008,9 @@ export default function CategoryFormPage() {
               )}
             </div>
 
-            <div className="p-5 flex-1 overflow-auto max-h-[calc(100vh-220px)] scrollbar-thin">
+            <div className="p-5 flex-1 overflow-auto scrollbar-thin">
               {!formData.category_type ? (
-                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[var(--border-card)] rounded-xl bg-[var(--bg-primary)]/30 text-center">
+                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[var(--border-color)] rounded-xl bg-[var(--bg-primary)]/30 text-center">
                   <div className="w-16 h-16 flex items-center justify-center mb-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-color)]">
                     <Icons.Filter className="w-7 h-7 text-[var(--text-muted)]" />
                   </div>
@@ -1104,18 +1024,26 @@ export default function CategoryFormPage() {
                     const inputKey = config.ui_key || `attr-${getId(config.attribute_id) || getId(config._id) || config.seed_code || index}`;
                     const isOpen = openAttributeKey === inputKey;
                     const selectedValues = Array.isArray(config.value) ? config.value : [];
-                    const TypeIcon = config.seed_type === "number" ? Icons.Hash : config.seed_type === "text" ? Icons.Text : Icons.Filter;
+                    
+                    // Determine Icon based on type
+                    let TypeIcon = Icons.Filter;
+                    if (config.seed_type === "boolean") TypeIcon = Icons.Check;
+
                     const assignedCount = config.seed_type === "multi_select"
                       ? selectedValues.length
-                      : (config.value && String(config.value).trim() ? 1 : 0);
+                      : (config.value !== undefined && config.value !== null && String(config.value).trim() !== "" ? 1 : 0);
                     const isAssigned = assignedCount > 0;
-                    const typeBadgeLabel = config.seed_type === "multi_select" ? "Multi Select" : (config.seed_type === "text" ? "Text" : "Number");
+                    
+                    // Badge Label Logic
+                    let typeBadgeLabel = "Multi Select";
+                    if (config.seed_type === "boolean") typeBadgeLabel = "Boolean";
 
                     return (
                       <div
                         key={inputKey}
-                        className={`rounded-xl border overflow-visible transition-all duration-200 ${isOpen ? "border-[var(--accent)]/50 bg-[var(--bg-primary)] shadow-md ring-1 ring-[var(--accent)]/10" : "border-[var(--border-card)] bg-[var(--bg-card)] hover:border-[var(--text-muted)]"}`}
+                        className={`rounded-xl border overflow-visible transition-all duration-200 ${isOpen ? "border-[var(--accent)]/50 bg-[var(--bg-primary)] shadow-md ring-1 ring-[var(--accent)]/10" : "border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--text-muted)]"}`}
                       >
+                        {/* FIXED: Outer Button */}
                         <button
                           type="button"
                           onClick={() => setOpenAttributeKey((prev) => (prev === inputKey ? null : inputKey))}
@@ -1138,8 +1066,30 @@ export default function CategoryFormPage() {
                                   </span>
                                 )}
                               </div>
-                              <div className="flex flex-wrap gap-1.5 min-h-[20px]">
-                                {config.seed_type === "multi_select" ? (
+                              
+                              {/* CONTENT DISPLAY AREA */}
+                              <div className="flex flex-wrap gap-1.5 min-h-[20px] items-center">
+                                {config.seed_type === "boolean" ? (
+                                  // FIXED: BOOLEAN TOGGLE IN CARD HEADER (Using Div instead of Button)
+                                  <div 
+                                    onClick={(e) => e.stopPropagation()} 
+                                    className="flex rounded-md border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 cursor-pointer"
+                                  >
+                                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
+                                      const isActive = config.value === opt.id;
+                                      return (
+                                        <div
+                                          key={String(opt.id)}
+                                          onClick={() => updateAttributeConfig(inputKey, "value", opt.id)}
+                                          className={`px-3 py-1 text-[10px] font-medium flex items-center justify-center gap-1.5 rounded transition-all select-none ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                                        >
+                                          <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                                          {opt.label}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
                                   selectedValues.length > 0 ? (
                                     <>
                                       {selectedValues.slice(0, 3).map((val, i) => (
@@ -1154,14 +1104,6 @@ export default function CategoryFormPage() {
                                   ) : (
                                     <span className="text-[11px] italic text-[var(--text-muted)]">No options assigned</span>
                                   )
-                                ) : (
-                                  config.value && String(config.value).trim() ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/15 truncate max-w-full">
-                                      {String(config.value)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] italic text-[var(--text-muted)]">No value entered</span>
-                                  )
                                 )}
                               </div>
                             </div>
@@ -1170,7 +1112,7 @@ export default function CategoryFormPage() {
                         </button>
 
                         {isOpen && (
-                          <div className="px-4 pb-4 pt-3 border-t border-[var(--border-card)]/50 bg-[var(--bg-primary)]/50 rounded-b-xl">
+                          <div className="px-4 pb-4 pt-3 border-t border-[var(--border-color)]/50 bg-[var(--bg-primary)]/50 rounded-b-xl">
                             {config.seed_type === "multi_select" ? (
                               <div className="space-y-2.5">
                                 <div className="flex items-center justify-between">
@@ -1193,25 +1135,26 @@ export default function CategoryFormPage() {
                                           onClick={() => {
                                             const next = selectedValues.filter((_, idx) => idx !== i);
                                             updateAttributeConfig(inputKey, "value", next);
-                                            if (config.attribute_id) {
-                                              const fullAttr = seededAttributes.find(a => String(a._id) === String(config.attribute_id));
+                                            const attrIdForUpdate = getAttributeId(config);
+                                            if (attrIdForUpdate) {
+                                              const fullAttr = seededAttributes.find(a => String(a._id) === attrIdForUpdate);
                                               if (fullAttr) {
                                                 const remaining = (fullAttr.values || []).filter((v) => {
                                                   const lbl = v.label || v.value || "";
-                                                                          return lbl !== val;
-                                                                        });
-                                                                        attributeApi.update(config.attribute_id, {
-                                                                          values: remaining.map((v) => ({
-                                                                            label: v.label || v.value || "",
-                                                                            value: v.value || v.label || "",
-                                                                            sort_order: v.sort_order ?? 0,
-                                                                            is_active: v.is_active !== false,
-                                                                          })),
-                                                                        }).then(() => {
-                                                                          queryClient.invalidateQueries({ queryKey: ["seeded-attributes", formData.category_type?.toLowerCase()] });
-                                                                        }).catch(() => {});
-                                                                      }
-                                                                    }
+                                                  return lbl !== val;
+                                                });
+                                                attributeApi.update(attrIdForUpdate, {
+                                                  values: remaining.map((v) => ({
+                                                    label: v.label || v.value || "",
+                                                    value: v.value || v.label || "",
+                                                    sort_order: v.sort_order ?? 0,
+                                                    is_active: v.is_active !== false,
+                                                  })),
+                                                }).then(() => {
+                                                  queryClient.invalidateQueries({ queryKey: ["seeded-attributes", formData.category_type?.toLowerCase()] });
+                                                }).catch(() => {});
+                                              }
+                                            }
                                                                   }}
                                           className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                           aria-label={`Remove ${val}`}
@@ -1235,10 +1178,11 @@ export default function CategoryFormPage() {
                                     onKeyDown={async (e) => {
                                       if (e.key !== "Enter") return;
                                       e.preventDefault();
-                                      const raw = e.currentTarget.value.trim();
+                                      const input = e.currentTarget;
+                                      const raw = input.value.trim();
                                       if (!raw) return;
+                                      input.value = "";
                                       await handleAddAttributeValue(inputKey, { ...config, _draftValue: raw });
-                                      e.currentTarget.value = "";
                                     }}
                                   />
                                   <button
@@ -1257,12 +1201,28 @@ export default function CategoryFormPage() {
                                   </button>
                                 </div>
                               </div>
-                            ) : (
-                              <TextValueEditor
-                                config={config}
-                                inputKey={inputKey}
-                                onAssign={(val) => updateAttributeConfig(inputKey, "value", val)}
-                              />
+                             ) : (
+                               // BOOLEAN EXPANDED VIEW
+                               <div className="space-y-2">
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Current State</label>
+                                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
+                                      const isActive = config.value === opt.id;
+                                      return (
+                                        <button
+                                          key={String(opt.id)}
+                                          type="button"
+                                          onClick={() => updateAttributeConfig(inputKey, "value", opt.id)}
+                                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                                        >
+                                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                                          {opt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                   <p className="text-[10px] text-[var(--text-muted)]">Toggle to switch between Yes and No.</p>
+                                </div>
                             )}
                           </div>
                         )}
@@ -1271,7 +1231,7 @@ export default function CategoryFormPage() {
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[var(--border-card)] rounded-xl bg-[var(--bg-primary)]/30 text-center">
+                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-[var(--border-color)] rounded-xl bg-[var(--bg-primary)]/30 text-center">
                   <div className="w-16 h-16 flex items-center justify-center mb-4 bg-[var(--bg-tertiary)] rounded-2xl border border-[var(--border-color)]">
                     <Icons.Layers className="w-7 h-7 text-[var(--text-muted)]" />
                   </div>
@@ -1327,13 +1287,13 @@ export default function CategoryFormPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
+              {/* UPDATED DATA TYPE SECTION WITH PROFESSIONAL SPACING */}
+              <div className="space-y-2">
                 <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   {[
-                    { id: "text", label: "Text", icon: <Icons.Text className="w-4 h-4" /> },
-                    { id: "number", label: "Number", icon: <Icons.Hash className="w-4 h-4" /> },
                     { id: "multi_select", label: "Options", icon: <Icons.Filter className="w-4 h-4" /> },
+                    { id: "boolean", label: "Boolean", icon: <Icons.Check className="w-4 h-4" /> },
                   ].map((type) => {
                     const isActive = newAttributeData.data_type === type.id;
                     return (
@@ -1341,7 +1301,10 @@ export default function CategoryFormPage() {
                         key={type.id}
                         type="button"
                         onClick={() => setNewAttributeData({ ...newAttributeData, data_type: type.id })}
-                        className={`h-12 text-[11px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-colors ${isActive ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)]"}`}
+                        className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive 
+                          ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" 
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
+                        }`}
                       >
                         {type.icon}
                         <span>{type.label}</span>
@@ -1350,32 +1313,6 @@ export default function CategoryFormPage() {
                   })}
                 </div>
               </div>
-
-              {newAttributeData.data_type === "text" && (
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
-                  <input
-                    type="text"
-                    value={newAttributeData.value || ""}
-                    onChange={(e) => setNewAttributeData({ ...newAttributeData, value: e.target.value })}
-                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                    placeholder="Enter text value..."
-                  />
-                </div>
-              )}
-
-              {newAttributeData.data_type === "number" && (
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
-                  <input
-                    type="number"
-                    value={newAttributeData.value || ""}
-                    onChange={(e) => setNewAttributeData({ ...newAttributeData, value: e.target.value })}
-                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                    placeholder="Enter numeric value..."
-                  />
-                </div>
-              )}
 
               {newAttributeData.data_type === "multi_select" && (
                 <div className="space-y-2">
@@ -1440,6 +1377,30 @@ export default function CategoryFormPage() {
                     </button>
                   </div>
                   <p className="text-[10px] text-[var(--text-muted)]">Add one or more options. You can also add more after creating the attribute.</p>
+                </div>
+              )}
+
+              {/* BOOLEAN TOGGLE UI - YES / NO */}
+              {newAttributeData.data_type === "boolean" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default State</label>
+                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
+                      const isActive = newAttributeData.value === opt.id;
+                      return (
+                        <button
+                          key={String(opt.id)}
+                          type="button"
+                          onClick={() => setNewAttributeData({ ...newAttributeData, value: opt.id })}
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                        >
+                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default Yes/No state for this attribute.</p>
                 </div>
               )}
             </div>
