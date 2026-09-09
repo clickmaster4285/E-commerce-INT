@@ -12,16 +12,10 @@ const attributeValueSchema = new mongoose.Schema(
 
 const attributeSchema = new mongoose.Schema(
   {
-    tenant_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Store",
-      required: false,
-      index: true,
-    },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, lowercase: true },
     
-    // ✅ ADDED: Category field to properly filter attributes by type
+    // Category field for filtering attributes by type
     category: { type: String, trim: true, lowercase: true, index: true },
     
     data_type: {
@@ -32,7 +26,7 @@ const attributeSchema = new mongoose.Schema(
     unit: { type: String, trim: true, default: "" },
     description: { type: String, trim: true, default: "" },
     values: { type: [attributeValueSchema], default: [] },
-    variant_allowed: { type: Boolean, default: false },
+    variant_allowed: { type: Boolean, default: true },
     is_active: { type: Boolean, default: true },
     is_deleted: { type: Boolean, default: false },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -41,6 +35,7 @@ const attributeSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-attributeSchema.index({ tenant_id: 1, code: 1, is_deleted: 1 }, { unique: true });
+// ✅ Updated unique index without tenant_id
+attributeSchema.index({ code: 1, is_deleted: 1 }, { unique: true });
 
 module.exports = mongoose.model("Attribute", attributeSchema);
