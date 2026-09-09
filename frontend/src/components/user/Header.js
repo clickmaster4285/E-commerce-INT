@@ -39,13 +39,11 @@ import {
   Moon,
   Heart,
   Package,
-    Settings,
-
+  Settings,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
-// ✅ PRODUCT IMAGE URL HELPER
 const getImageUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("http") || url.startsWith("blob:")) return url;
@@ -69,18 +67,54 @@ const getIcon = (name) => {
 };
 
 function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  const show = open && value.trim().length > 0 && results.length > 0;
+
+  const submit = () => {
+    setOpen(false);
+    onSubmit();
+  };
+
+  const pick = (p) => {
+    setOpen(false);
+    onPick(p);
+  };
+
   return (
-    <div className="relative flex w-full items-center">
+    <div ref={ref} className="relative flex w-full items-center">
       <Search size={16} className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none z-10" />
       <input
         value={value}
-        onChange={onChange}
-        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+        onChange={(e) => {
+          onChange(e);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
         placeholder="Search products..."
         className="w-full h-10 lg:h-11 rounded-full bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-14 lg:pr-24 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15 transition"
       />
       <button
-        onClick={onSubmit}
+        onClick={submit}
         aria-label="Search"
         className="absolute right-1 h-8 lg:h-9 px-3 lg:px-4 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 active:scale-95 transition flex items-center gap-1.5"
       >
@@ -88,8 +122,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
         <span className="hidden lg:inline">Search</span>
       </button>
 
-      {/* ✅ LIVE RESULTS DROPDOWN */}
-      {results.length > 0 && (
+      {show && (
         <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl overflow-hidden">
           <div className="max-h-80 overflow-y-auto">
             {results.map((p) => {
@@ -98,7 +131,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
               return (
                 <button
                   key={p._id || p.id}
-                  onClick={() => onPick(p)}
+                  onClick={() => pick(p)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
                 >
                   {img ? (
@@ -211,14 +244,15 @@ export default function Header() {
     const el = document.getElementById("user-theme");
     if (el) el.classList.toggle("light", saved === "light");
   }, []);
-// ✅ Mobile detect — cart ko page vs drawer decide karne ke liye
-useEffect(() => {
-  const mq = window.matchMedia("(max-width: 767px)");
-  setIsMobile(mq.matches);
-  const onChange = (e) => setIsMobile(e.matches);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -278,7 +312,6 @@ useEffect(() => {
       .slice(0, 5);
   }, [categories, products]);
 
-    // ✅ Brand products count — products list se calculate
   const brandCounts = useMemo(() => {
     const counts = {};
     products.forEach((p) => {
@@ -294,7 +327,6 @@ useEffect(() => {
       .slice(0, 5);
   }, [brands, brandCounts]);
 
-  // ✅ LIVE SEARCH RESULTS — name se match
   const searchResults = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (q.length < 1) return [];
@@ -317,9 +349,7 @@ useEffect(() => {
     window.location.href = "/";
   };
 
-  const handleSearch = () => {
-   
-  };
+  const handleSearch = () => {};
 
   const getLogoUrl = (logo) => {
     const raw = typeof logo === "string" ? logo : logo?.img_url;
@@ -331,7 +361,6 @@ useEffect(() => {
 
   const storeName = store?.store_name || "";
 
-  // ✅ TIGHTER DESKTOP SPACING — smaller buttons + less gap
   const iconBtn =
     "relative w-9 h-9 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition";
 
@@ -351,9 +380,7 @@ useEffect(() => {
         <div className="absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md pointer-events-none" />
 
         <div className="relative max-w-[1400px] mx-auto px-4 lg:px-6">
-          {/* ✅ TIGHTER: lg:gap-3 (was lg:gap-4) */}
           <div className="h-14 lg:h-16 flex items-center gap-1.5 lg:gap-3">
-            {/* LEFT — Menu + Logo — ✅ TIGHTER: lg:gap-1.5 */}
             <div className="flex items-center gap-0.5 lg:gap-1.5 shrink-0">
               <button
                 onClick={() => setOpen(true)}
@@ -371,9 +398,8 @@ useEffect(() => {
               </Link>
             </div>
 
-            {/* CENTER — Search (desktop only, unchanged) */}
             <div className="hidden md:block flex-1 max-w-2xl mx-auto">
-                           <SearchBox
+              <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onSubmit={handleSearch}
@@ -382,9 +408,7 @@ useEffect(() => {
               />
             </div>
 
-            {/* ✅ RIGHT — TIGHTER GAP: lg:gap-0.5 (was lg:gap-1.5) */}
             <div className="flex items-center gap-0 lg:gap-0.5 ml-auto shrink-0">
-              {/* MOBILE SEARCH TOGGLE */}
               <button
                 onClick={() => setMobileSearchOpen((v) => !v)}
                 aria-label={mobileSearchOpen ? "Close search" : "Open search"}
@@ -393,17 +417,15 @@ useEffect(() => {
                 {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
               </button>
 
-              {/* THEME — desktop only */}
-              <button
+                          <button
                 onClick={toggleTheme}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                 aria-label="Toggle theme"
-                className={`${iconBtn} hidden md:flex`}
+                className={iconBtn}
               >
                 {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
               </button>
 
-              {/* WISHLIST */}
               <Link href="/wishlist" title="My Wishlist" aria-label="My Wishlist" className={iconBtn}>
                 <Heart size={18} />
                 {wishlistCount > 0 && (
@@ -417,13 +439,12 @@ useEffect(() => {
                 )}
               </Link>
 
-              {/* CART */}
-             <button
-  onClick={() => (isMobile ? router.push("/cart") : setIsCartOpen(true))}
-  title="Cart"
-  aria-label={`Open cart, ${count} items`}
-  className={iconBtn}
->
+              <button
+                onClick={() => (isMobile ? router.push("/cart") : setIsCartOpen(true))}
+                title="Cart"
+                aria-label={`Open cart, ${count} items`}
+                className={iconBtn}
+              >
                 <ShoppingCart size={18} />
                 {count > 0 && (
                   <span
@@ -436,7 +457,6 @@ useEffect(() => {
                 )}
               </button>
 
-              {/* ACCOUNT / LOGIN */}
               {user ? (
                 <div className="relative">
                   <button
@@ -501,10 +521,9 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* MOBILE SEARCH — expandable */}
           {mobileSearchOpen && (
             <div className="md:hidden pb-3">
-                             <SearchBox
+              <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onSubmit={handleSearch}
@@ -516,7 +535,6 @@ useEffect(() => {
         </div>
       </header>
 
-         {/* ✅ PREMIUM SIDEBAR — 10x Improved + All Fixes Applied */}
       <div
         className={`fixed top-0 left-0 h-full w-[85%] max-w-[340px] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
           open ? "translate-x-0" : "-translate-x-full"
@@ -538,19 +556,18 @@ useEffect(() => {
           .sidebar-item:nth-child(5) { animation-delay: 0.25s; }
         `}</style>
 
-        {/* HEADER — Logo + Close */}
-        <div className="p-5 border-b border-[var(--user-border)] shrink-0 bg-gradient-to-br from-[var(--user-bg-card)] to-[var(--user-bg-hover)]">
-          <div className="flex items-center justify-between mb-4">
-            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5 group">
-              <div className="relative">
-                <StoreLogo store={store} sizeClass="w-10 h-10" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[var(--user-success)] rounded-full border-2 border-[var(--user-bg-elevated)]" />
+        <div className="px-4 py-2.5 border-b border-[var(--user-border)] shrink-0 bg-gradient-to-br from-[var(--user-bg-card)] to-[var(--user-bg-hover)]">
+          <div className="flex items-center justify-between">
+            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2 group min-w-0">
+              <div className="relative shrink-0">
+                <StoreLogo store={store} sizeClass="w-8 h-8" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--user-success)] rounded-full border-2 border-[var(--user-bg-elevated)]" />
               </div>
-              <div>
-                <span className="font-black text-base tracking-wide text-[var(--user-text)] block leading-tight">
+              <div className="min-w-0">
+                <span className="font-black text-sm tracking-wide text-[var(--user-text)] block leading-tight truncate">
                   {storeName}
                 </span>
-                <span className="text-[10px] font-semibold text-[var(--user-text-muted)] uppercase tracking-wider">
+                <span className="text-[9px] font-semibold text-[var(--user-text-muted)] uppercase tracking-wider">
                   Shop Premium
                 </span>
               </div>
@@ -558,40 +575,24 @@ useEffect(() => {
             <button
               onClick={() => setOpen(false)}
               aria-label="Close menu"
-              className="w-9 h-9 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90"
+              className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90 shrink-0"
             >
-              <X size={16} className="text-[var(--user-text)] hover:text-white" />
+              <X size={14} className="text-[var(--user-text)] hover:text-white" />
             </button>
           </div>
 
-          {/* USER GREETING */}
-          {user ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20">
-              <Avatar user={user} sizeClass="w-11 h-11" textClass="text-base" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Welcome back,</p>
-                <p className="text-sm font-bold text-[var(--user-text)] truncate">
-                  {user.name || user.username}
-                </p>
-              </div>
-              <div className="shrink-0">
-                <div className="w-2 h-2 rounded-full bg-[var(--user-success)] animate-pulse" />
-              </div>
-            </div>
-          ) : (
+          {!user && (
             <button
               onClick={() => { setOpen(false); setLoginOpen(true); }}
-              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold hover:opacity-90 transition active:scale-95"
+              className="w-full flex items-center justify-center gap-2 h-9 mt-2 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 transition active:scale-95"
             >
-              <User size={16} />
+              <User size={14} />
               Login / Sign Up
             </button>
           )}
         </div>
 
-        {/* SCROLLABLE CONTENT */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
-          {/* QUICK ACTIONS GRID */}
           {user && (
             <div className="p-5 border-b border-[var(--user-border)]">
               <div className="grid grid-cols-2 gap-2.5">
@@ -633,26 +634,28 @@ useEffect(() => {
                   <span className="text-xs font-bold text-[var(--user-text)]">Wishlist</span>
                 </Link>
 
-                <button
-                  onClick={handleLogout}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                <Link
+                  href="/account?tab=settings"
+                  onClick={() => {
+                    setOpen(false);
+                    window.dispatchEvent(new CustomEvent("account:tab", { detail: "settings" }));
+                  }}
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-danger)]/10 flex items-center justify-center">
-                    <LogOut size={18} className="text-[var(--user-danger)]" />
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                    <Settings size={18} className="text-[var(--user-accent)]" />
                   </div>
-                  <span className="text-xs font-bold text-[var(--user-danger)]">Logout</span>
-                </button>
+                  <span className="text-xs font-bold text-[var(--user-text)]">Settings</span>
+                </Link>
               </div>
             </div>
           )}
 
-          {/* CATEGORIES */}
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
                 Top Categories
               </h3>
-             
             </div>
             <div className="space-y-1">
               {topCategories.map((category, idx) => (
@@ -680,13 +683,11 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* BRANDS — ✅ FIXED: Products count from brandCounts */}
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
                 Top Brands
               </h3>
-            
             </div>
             <div className="space-y-1">
               {topBrands.map((brand, idx) => {
@@ -723,61 +724,8 @@ useEffect(() => {
               })}
             </div>
           </div>
-
-          {/* THEME TOGGLE — ✅ FIXED: Better visibility in dark mode */}
-          <div className="p-5 border-b border-[var(--user-border)]">
-            <button
-              onClick={toggleTheme}
-              className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] transition-all duration-300 group active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                  {theme === "dark" ? (
-                    <Sun size={18} className="text-[var(--user-accent)]" />
-                  ) : (
-                    <Moon size={18} className="text-[var(--user-accent)]" />
-                  )}
-                </div>
-                <div className="text-left">
-                  <span className="text-sm font-bold text-[var(--user-text)] block">
-                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                  </span>
-                  <span className="text-[10px] text-[var(--user-text-muted)]">
-                    Switch theme appearance
-                  </span>
-                </div>
-              </div>
-              <div className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${theme === "dark" ? "bg-emerald-500" : "bg-slate-300"}`}>
-                <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${theme === "dark" ? "left-6" : "left-1"}`}>
-                  {theme === "dark" ? <Moon size={11} className="text-emerald-500" /> : <Sun size={11} className="text-amber-500" />}
-                </div>
-              </div>
-            </button>
-          </div>
-
-          {/* ✅ SETTINGS ONLY — Removed Help/About */}
-          <div className="p-5">
-            <Link
-              href="/account?tab=settings"
-              onClick={() => {
-                setOpen(false);
-                window.dispatchEvent(new CustomEvent("account:tab", { detail: "settings" }));
-              }}
-              className="flex items-center gap-3 px-4 py-3.5 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg transition-all duration-300 group active:scale-[0.98]"
-            >
-              <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                <Settings size={18} className="text-[var(--user-accent)]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-bold text-[var(--user-text)] block">Settings</span>
-                <span className="text-[10px] text-[var(--user-text-muted)]">Manage your account preferences</span>
-              </div>
-              <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
-            </Link>
-          </div>
         </div>
 
-        {/* FOOTER */}
         <div className="p-4 border-t border-[var(--user-border)] shrink-0 bg-[var(--user-bg-card)]">
           <p className="text-[10px] text-[var(--user-text-subtle)] text-center">
             © 2026 {storeName}. All rights reserved.

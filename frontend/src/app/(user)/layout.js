@@ -12,6 +12,7 @@ import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
 import { useUserSocketSync } from "@/hooks/useUserSocketSync";
+
 function getThemeFromCookie() {
   const cookies = document.cookie.split("; ");
   const themeCookie = cookies.find((cookie) => cookie.startsWith("user-theme="));
@@ -25,31 +26,27 @@ export function setUserTheme(theme) {
   if (element) element.classList.toggle("light", theme === "light");
 }
 
+/* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
   const pathname = usePathname();
   const { count } = useCart();
   const { count: wishlistCount } = useWishlist();
 
   const isActive = (href) => {
-    if (href === "/") {
-      return pathname === "/";
-    }
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)] border-t border-[var(--user-border)] backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="grid grid-cols-4 h-16">
-
-        {/* HOME */}
         <Link href="/" className="h-full">
           <NavItem icon={<Home size={20} />} label="Home" active={isActive("/")} />
         </Link>
 
-        {/* WISHLIST */}
         <Link href="/wishlist" className="h-full">
           <NavItem
             icon={
@@ -67,7 +64,6 @@ function MobileNav() {
           />
         </Link>
 
-        {/* ✅ CART — mobile pe /cart PAGE khulta hai */}
         <Link href="/cart" className="h-full">
           <NavItem
             icon={
@@ -85,23 +81,25 @@ function MobileNav() {
           />
         </Link>
 
-        {/* ACCOUNT */}
         <Link href="/account" className="h-full">
           <NavItem icon={<User size={20} />} label="Account" active={isActive("/account")} />
         </Link>
-
       </div>
     </nav>
   );
 }
 
+/* ✅ Active tab: top indicator bar + icon scale + accent color */
 function NavItem({ icon, label, active }) {
   return (
-    <span className="flex flex-col items-center justify-center gap-1 w-full h-full">
-      <span className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}>
+    <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full">
+      {active && (
+        <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--user-accent)]" />
+      )}
+      <span className={`transition-transform duration-200 ${active ? "text-[var(--user-accent)] scale-110" : "text-[var(--user-text-muted)]"}`}>
         {icon}
       </span>
-      <span className={`text-[9px] font-semibold ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>
+      <span className={`text-[9px] font-bold ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>
         {label}
       </span>
     </span>
@@ -109,9 +107,7 @@ function NavItem({ icon, label, active }) {
 }
 
 export default function UserLayout({ children }) {
-  // ✅ LIVE SOCKET SYNC — admin changes automatically reflect
   useUserSocketSync();
-
   const pathname = usePathname();
 
   const { data: store } = useQuery({
@@ -130,8 +126,10 @@ export default function UserLayout({ children }) {
     if (store?.store_name) document.title = store.store_name;
   }, [store]);
 
-  // ✅ Hide Footer on /cart, /checkout, and /orders (all breakpoints).
-  const hideFooter = pathname === "/cart" || pathname?.startsWith("/cart/") || pathname === "/checkout" || pathname?.startsWith("/checkout/") || pathname === "/orders" || pathname?.startsWith("/orders/");
+  const hideFooter =
+    pathname === "/cart" || pathname?.startsWith("/cart/") ||
+    pathname === "/checkout" || pathname?.startsWith("/checkout/") ||
+    pathname === "/orders" || pathname?.startsWith("/orders/");
 
   return (
     <WishlistProvider>
@@ -141,7 +139,7 @@ export default function UserLayout({ children }) {
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
         >
           <Header />
-<main className="w-full min-w-0">{children}</main>
+          <main className="w-full min-w-0">{children}</main>
           {!hideFooter && <Footer />}
           <CartDrawer />
           <MobileNav />

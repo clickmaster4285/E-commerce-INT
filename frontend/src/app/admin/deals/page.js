@@ -1057,7 +1057,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
             <section>
               <SectionHeader icon={SettingsIcon} title="Settings" subtitle="Status and visibility options" />
               <div className="rounded-lg p-4" style={cardStyle}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Status">
                     <CustomModalSelect
                       value={formData.status}
@@ -1066,9 +1066,9 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                       placeholder="Select Status"
                     />
                   </FormField>
-                  <div className="flex items-center">
+                  <FormField label="Visibility">
                     <label
-                      className="flex w-full items-center gap-3 px-3 h-9 rounded-md cursor-pointer transition hover:opacity-90"
+                      className="flex w-full items-center gap-3 px-3 h-10 md:h-9 rounded-md cursor-pointer transition hover:opacity-90"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
                     >
                       <input
@@ -1080,7 +1080,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
                       <span className="text-[13px] font-semibold">Featured Deal</span>
                       <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Highlight in store</span>
                     </label>
-                  </div>
+                  </FormField>
                 </div>
               </div>
             </section>

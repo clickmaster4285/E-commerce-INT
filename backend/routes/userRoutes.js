@@ -11,6 +11,7 @@ const {
   changePassword,
   toggle2FA,
   googleLogin,
+  googleCustomerLogin,
   updatePhone,
   createCheckoutDraft,
   getCheckoutDrafts,
@@ -36,6 +37,7 @@ router.post("/admin/login", loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
 router.post("/logout", logoutUser);
 router.post("/google-login", googleLogin);
+router.post("/google-customer-login", googleCustomerLogin);
 
 // ==========================================
 // 🔒 PROTECTED ROUTES

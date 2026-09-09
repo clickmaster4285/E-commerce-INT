@@ -998,8 +998,8 @@ export default function BrandsPage() {
       <select
         value={value}
         onChange={onChange}
-        className="appearance-none h-10 md:h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
-        style={inputStyle}
+        className="appearance-none h-10 md:h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40"
+                style={inputStyle}
       >
         {children}
       </select>
@@ -1012,39 +1012,15 @@ export default function BrandsPage() {
     </div>
   );
 
-  const ActionButtons = ({ brand }) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleViewBrand(brand._id);
-        }}
-        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center"
-        style={{ color: "#34d399" }}
-        title="View Details"
-      >
+   const ActionButtons = ({ brand }) => (
+    <div className="flex items-center justify-end gap-0.5 sm:gap-2">
+      <button onClick={(e) => { e.stopPropagation(); handleViewBrand(brand._id); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
         <EyeIcon className="w-4 h-4" />
       </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleEdit(brand);
-        }}
-        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-        style={{ color: "var(--text-secondary)" }}
-        title="Edit"
-      >
+      <button onClick={(e) => { e.stopPropagation(); handleEdit(brand); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
         <EditIcon className="w-4 h-4" />
       </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          handleDelete(brand);
-        }}
-        disabled={isDeleting}
-        className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
-        title="Delete"
-      >
+      <button onClick={(e) => { e.stopPropagation(); handleDelete(brand); }} disabled={isDeleting} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete">
         <TrashIcon className="w-4 h-4" />
       </button>
     </div>
@@ -1124,60 +1100,19 @@ export default function BrandsPage() {
         </div>
 
         {/* ===== Stat Cards ===== */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="rounded-lg p-4" style={cardStyle}>
-            <p
-              className="text-[12px] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Total Brands
-            </p>
-            <p className="text-[20px] font-bold mt-1">{allBrands}</p>
-          </div>
-          <div className="rounded-lg p-4" style={cardStyle}>
-            <p
-              className="text-[12px] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Active
-            </p>
-            <p className="text-[20px] font-bold mt-1 text-emerald-500">
-              {activeBrands}
-            </p>
-          </div>
-          <div className="rounded-lg p-4" style={cardStyle}>
-            <p
-              className="text-[12px] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Inactive
-            </p>
-            <p className="text-[20px] font-bold mt-1 text-amber-500">
-              {inactiveBrands}
-            </p>
-          </div>
-          <div className="rounded-lg p-4" style={cardStyle}>
-            <p
-              className="text-[12px] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              Countries
-            </p>
-            <p className="text-[20px] font-bold mt-1 text-blue-500">
-              {countries.length}
-            </p>
-          </div>
-          <div className="rounded-lg p-4" style={cardStyle}>
-            <p
-              className="text-[12px] font-medium"
-              style={{ color: "var(--text-muted)" }}
-            >
-              With Logo
-            </p>
-            <p className="text-[20px] font-bold mt-1 text-purple-500">
-              {withLogo}
-            </p>
-          </div>
+             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+          {[
+            { label: "Total Brands", value: allBrands, color: "" },
+            { label: "Active", value: activeBrands, color: "text-emerald-500" },
+            { label: "Inactive", value: inactiveBrands, color: "text-amber-500" },
+            { label: "Countries", value: countries.length, color: "text-blue-500" },
+            { label: "With Logo", value: withLogo, color: "text-purple-500" },
+          ].map((s, i) => (
+            <div key={i} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
+              <p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{s.label}</p>
+              <p className={`text-[18px] sm:text-[20px] font-bold mt-1 ${s.color}`}>{s.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* ===== Search ===== */}
@@ -1199,60 +1134,26 @@ export default function BrandsPage() {
         </div>
 
         {/* ===== Filters ===== */}
-        <div className="flex flex-wrap items-center gap-3">
-          <SelectFilter
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
+               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </SelectFilter>
-          <SelectFilter
-            value={filterCountry}
-            onChange={(e) => setFilterCountry(e.target.value)}
-          >
+          <SelectFilter value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
             <option value="all">All Countries</option>
-            {countries.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {countries.map((c) => (<option key={c} value={c}>{c}</option>))}
           </SelectFilter>
         </div>
 
         {/* ===== Bulk selection bar ===== */}
-        {selectedIds.length > 0 && (
-          <div
-            className="flex items-center justify-between rounded-lg px-4 h-11"
-            style={{
-              backgroundColor: "rgba(16,185,129,0.08)",
-              border: "1px solid rgba(16,185,129,0.35)",
-            }}
-          >
-            <p className="text-sm font-semibold" style={{ color: "#34d399" }}>
-              {selectedIds.length} selected
-            </p>
+              {selectedIds.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelectedIds([])}
-                className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  border: "1px solid var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                Clear
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={isDeleting}
-                className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "var(--danger)" }}
-              >
-                <TrashIcon className="w-3.5 h-3.5" />
-                Delete Selected
+              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
+              <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
+                <TrashIcon className="w-3.5 h-3.5" /> Delete Selected
               </button>
             </div>
           </div>
@@ -1357,54 +1258,38 @@ export default function BrandsPage() {
                             : "var(--bg-card)")
                         }
                       >
-                        <td
-                          className="px-4 py-2.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(brand._id)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                            style={{ accentColor: "var(--accent)" }}
-                          />
+
+
+
+
+                                                <td className="px-2 sm:px-4 py-2 sm:py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(brand._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                         </td>
-                        <td className="px-4 py-2.5">
-                          <span
-                            className="text-[13px] font-mono truncate max-w-[100px] block"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            {brand.brand_code || "—"}
-                          </span>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
+                          <span className="text-[11px] sm:text-[13px] font-mono truncate max-w-[70px] sm:max-w-[100px] block" style={{ color: "var(--text-secondary)" }}>{brand.brand_code || "—"}</span>
                         </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar brand={brand} />
-                            <span className="font-medium text-[13px] truncate max-w-[140px]">
-                              {brand.name}
-                            </span>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
+                          <div className="flex items-center gap-2 sm:gap-2.5">
+                            <Avatar brand={brand} size="w-7 h-7 sm:w-8 sm:h-8" />
+                            <span className="font-medium text-[12px] sm:text-[13px] truncate max-w-[110px] sm:max-w-[140px]">{brand.name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]">
-                          <p
-                            className="truncate text-[13px]"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            {brand.description || "—"}
-                          </p>
+
+
+
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]">
+                          <p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{brand.description || "—"}</p>
                         </td>
-                        <td
-                          className="px-4 py-2.5 text-[13px]"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          {brand.country || "—"}
-                        </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <StatusBadge active={brand.is_active} />
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap w-1">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap w-1">
                           <ActionButtons brand={brand} />
                         </td>
+
+
+
                       </tr>
                     );
                   })}
@@ -1413,40 +1298,19 @@ export default function BrandsPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedBrands.map((brand) => (
-              <div
-                key={brand._id}
-                onClick={() => handleViewBrand(brand._id)}
-                className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer"
-                style={cardStyle}
-              >
-                <div className="flex items-start justify-between">
-                  <Avatar brand={brand} size="w-10 h-10" />
+              <div key={brand._id} onClick={() => handleViewBrand(brand._id)} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
+                <div className="flex items-start justify-between gap-2">
+                  <Avatar brand={brand} size="w-9 h-9 sm:w-10 sm:h-10" />
                   <StatusBadge active={brand.is_active} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">
-                    {brand.name}
-                  </p>
-                  <p
-                    className="text-[11px] font-mono mt-0.5"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {brand.brand_code || "—"}
-                  </p>
+                  <p className="font-semibold text-[12px] sm:text-[13px] truncate">{brand.name}</p>
+                  <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{brand.brand_code || "—"}</p>
                 </div>
-                <div
-                  className="flex items-center justify-between pt-3"
-                  style={{ borderTop: "1px solid var(--border-color)" }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span
-                    className="text-[12px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    {brand.country || "—"}
-                  </span>
+                <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
+                  <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{brand.country || "—"}</span>
                   <ActionButtons brand={brand} />
                 </div>
               </div>
@@ -1567,46 +1431,31 @@ export default function BrandsPage() {
               className="p-5 space-y-4 overflow-y-auto flex-1"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label
-                    className="block text-xs font-medium mb-1.5"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Brand Code *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.brand_code}
-                      onChange={(e) =>
-                        setFormData({ ...formData, brand_code: e.target.value })
-                      }
-                      required
-                      readOnly={!!editingBrand}
-                      disabled={isSubmitting || loadingCode || !!editingBrand}
-                      className={`h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] w-full outline-none disabled:opacity-50 ${editingBrand ? "cursor-not-allowed opacity-70" : ""}`}
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        border: "1px solid var(--border-color)",
-                        color: "var(--text-primary)",
-                      }}
-                      placeholder={loadingCode ? "Generating..." : "BRD-001"}
-                    />
-                    {loadingCode && (
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                        <Spinner className="w-3.5 h-3.5" />
-                      </span>
+                             <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="w-16 h-16 sm:w-14 sm:h-14 rounded-full flex items-center justify-center overflow-hidden shrink-0 self-center sm:self-auto" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
                     )}
                   </div>
-                  {!editingBrand && autoBrandCode && !loadingCode && (
-                    <p
-                      className="text-[10px] mt-1"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Auto-generated • You can change it
-                    </p>
-                  )}
+                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                    <label htmlFor="logo-upload" className="cursor-pointer h-9 sm:h-8 px-3 rounded-md text-xs font-medium flex items-center justify-center sm:justify-start gap-2 transition hover:opacity-80 w-full sm:w-fit" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                      <UploadIcon className="w-3.5 h-3.5" />
+                      {logoPreview ? "Change Image" : "Upload Image"}
+                    </label>
+                    <div className="flex items-center justify-center sm:justify-start gap-3 flex-wrap">
+                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                      {logoPreview && (
+                        <button type="button" onClick={handleRemoveLogo} className="text-[11px] text-red-500 hover:underline">Remove</button>
+                      )}
+                    </div>
+                  </div>
+                  <input id="logo-upload" type="file" accept="image/png, image/jpeg, image/webp" className="hidden" onChange={handleLogoChange} disabled={isSubmitting} />
                 </div>
+              </div>
                 <div>
                   <label
                     className="block text-xs font-medium mb-1.5"
@@ -1764,40 +1613,10 @@ export default function BrandsPage() {
                 </label>
               </div>
 
-              <div
-                className="flex gap-2 pt-4"
-                style={{ borderTop: "1px solid var(--border-color)" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    resetForm();
-                  }}
-                  disabled={isSubmitting}
-                  className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    border: "1px solid var(--border-color)",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || loadingCode}
-                  className="flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
-                  style={{
-                    backgroundColor: "var(--accent)",
-                    color: "var(--accent-text)",
-                  }}
-                >
-                  {isSubmitting
-                    ? "Saving..."
-                    : editingBrand
-                      ? "Update"
-                      : "Save"}
+                            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={isSubmitting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={isSubmitting || loadingCode} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {isSubmitting ? <><Spinner className="w-3.5 h-3.5 inline mr-1.5" /> Saving...</> : editingBrand ? "Update Brand" : "Save Brand"}
                 </button>
               </div>
             </form>
@@ -1872,33 +1691,10 @@ export default function BrandsPage() {
               </div>
             </div>
 
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                disabled={isDeleting}
-                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  border: "1px solid var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
-                style={{ backgroundColor: "var(--danger)" }}
-              >
-                {isDeleting ? (
-                  <>
-                    <Spinner className="w-3.5 h-3.5" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
+                     <div className="flex flex-col-reverse sm:flex-row gap-2 mt-5">
+              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
+                {isDeleting ? (<><Spinner className="w-3.5 h-3.5" /> Deleting...</>) : "Delete"}
               </button>
             </div>
           </div>
