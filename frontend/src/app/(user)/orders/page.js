@@ -164,7 +164,7 @@ const ProductScrollList = ({ items }) => {
           <ChevronLeft size={16} />
         </button>
       )}
-      <div ref={scrollRef} className="flex gap-3 overflow-x-auto scroll-smooth py-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            <div ref={scrollRef} className="flex gap-2 sm:gap-3 overflow-x-auto scroll-smooth py-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
         {items.map((item, index) => {
           const unitPrice = Number(item.price || item.displayPrice || 0);
           const originalPrice = Number(item.original_price || item.originalPrice || 0);
@@ -174,31 +174,31 @@ const ProductScrollList = ({ items }) => {
           const totalPrice = unitPrice * payableQty;
           const hasDiscount = originalPrice > unitPrice;
           return (
-            <div key={index} className="flex-shrink-0 w-72">
-              <div className="flex flex-col h-full p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-accent)]/40 transition-all">
-                <div className="flex gap-3 mb-2">
+                       <div key={index} className="flex-shrink-0 w-44 sm:w-72">
+              <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-accent)]/40 transition-all">
+                <div className="flex gap-2 sm:gap-3 mb-1.5 sm:mb-2">
                   <div className="shrink-0">
                     {getImgUrl(item.image) ? (
-                      <img src={getImgUrl(item.image)} alt={item.name} className="w-16 h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
+                      <img src={getImgUrl(item.image)} alt={item.name} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
                     ) : (
-                      <div className="w-16 h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
                     )}
                   </div>
-                  <div className="flex-1 flex flex-col justify-between items-end">
-                    <div className="text-right">
-                      {hasDiscount && <p className="text-[9px] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
-                      <p className="text-base font-black text-[var(--user-accent)]">Rs. {totalPrice.toLocaleString()}</p>
+                  <div className="flex-1 min-w-0 flex flex-col justify-between items-end">
+                    <div className="text-right min-w-0">
+                      {hasDiscount && <p className="text-[8px] sm:text-[9px] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
+                      <p className="text-sm sm:text-base font-black text-[var(--user-accent)] truncate">Rs. {totalPrice.toLocaleString()}</p>
                     </div>
-                    {freeItems > 0 && <span className="text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-1.5 py-0.5 rounded border border-[var(--user-success)]/20">+{freeItems} FREE</span>}
+                    {freeItems > 0 && <span className="text-[8px] sm:text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-1.5 py-0.5 rounded border border-[var(--user-success)]/20">+{freeItems} FREE</span>}
                   </div>
                 </div>
-                <div className="flex-1 min-w-0 mb-2">
-                  <p className="text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
-                  {item.variantTitle && <p className="text-[9px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
+                <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
+                  <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
+                  {item.variantTitle && <p className="text-[8px] sm:text-[9px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t border-[var(--user-border)]">
-                  <span className="text-[9px] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)]">Qty: {qty}</span>
-                  <p className="text-[9px] text-[var(--user-text-muted)]">Rs. {unitPrice.toLocaleString()} each</p>
+                <div className="flex items-center justify-between gap-1 pt-1.5 sm:pt-2 border-t border-[var(--user-border)]">
+                  <span className="text-[8px] sm:text-[9px] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {qty}</span>
+                  <p className="text-[8px] sm:text-[9px] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
                 </div>
               </div>
             </div>
@@ -701,79 +701,47 @@ export default function OrdersPage() {
         {/* Orders list */}
         {filter !== "draft" && filtered.length > 0 && (
           <div className="space-y-2">
-            {filtered.map((order) => {
+                                  {filtered.map((order) => {
               const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
-              const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
+              const visibleItems = (order.items || []).slice(0, 2);
+              const extraCount = (order.items || []).length - visibleItems.length;
               return (
                 <Link
                   key={order._id}
                   href={`/orders/${order._id}`}
-                  className="block rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm overflow-hidden active:scale-[0.99] transition"
+                  className="block rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm overflow-hidden active:scale-[0.99] transition"
                 >
-                  {/* Header strip */}
-                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-[var(--user-border)] bg-[var(--user-bg-hover)]/40">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-                        <Package size={13} className="text-[var(--user-accent)]" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-black text-[var(--user-text)] truncate">#{order.order_number}</p>
-                        <p className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1">
-                          <Calendar size={9} /> {date}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border} shrink-0`}>
-                      <StatusIcon size={10} className={cfg.color} />
-                      <span className={`text-[9px] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
-                    </span>
-                  </div>
-
                   {/* Cancelled reason strip */}
                   {order.status === "cancelled" && order.cancel_reason && (
-                    <div className="px-3 py-1.5 bg-[var(--user-danger)]/10 border-b border-[var(--user-danger)]/20">
-                      <p className="text-[10px] font-semibold text-[var(--user-danger)] line-clamp-2">
+                    <div className="px-2.5 py-1.5 bg-[var(--user-danger)]/10 border-b border-[var(--user-danger)]/20">
+                      <p className="text-[10px] font-semibold text-[var(--user-danger)] line-clamp-1">
                         <span className="font-black uppercase tracking-wider mr-1">Reason:</span>{order.cancel_reason}
                       </p>
                     </div>
                   )}
 
-                  {/* Body — thumbnail row */}
+                                 {/* ✅ Desktop wala hi product card — mobile pe chota (scroll + arrows) */}
                   {order.items?.length > 0 && (
-                    <div className="p-3 flex items-center gap-2">
-                      {order.items.slice(0, 3).map((it, idx) => (
-                        <div key={idx} className="shrink-0">
-                          {getImgUrl(it.image) ? (
-                            <img src={getImgUrl(it.image)} alt="" className="w-[52px] h-[52px] rounded-xl object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
-                          ) : (
-                            <div className="w-[52px] h-[52px] rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-                              <Package size={20} className="text-[var(--user-text-muted)]" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      {order.items.length > 3 && (
-                        <div className="w-[52px] h-[52px] rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
-                          <span className="text-[12px] font-black text-[var(--user-text-secondary)]">+{order.items.length - 3}</span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0 ml-1">
-                        <p className="text-[11px] font-bold text-[var(--user-text)] line-clamp-1">{order.items[0].name}</p>
-                        <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
-                      </div>
+                    <div className="p-2.5 pb-1.5">
+                      <ProductScrollList items={order.items} />
                     </div>
                   )}
 
-                  {/* Footer strip */}
-                  <div className="flex items-center justify-between px-3 py-2.5 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
-                    <div>
-                      <p className="text-[9px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider leading-none">Total</p>
-                      <p className="text-[14px] font-black text-[var(--user-accent)] leading-none mt-1">Rs. {order.total.toLocaleString()}</p>
+                  {/* ✅ Single-line footer — total + status + view */}
+                  <div className="flex items-center justify-between gap-2 px-2.5 py-2 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
+                    <p className="text-[13px] font-black text-[var(--user-accent)] leading-none">
+                      Rs. {order.total.toLocaleString()}
+                    </p>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border}`}>
+                        <StatusIcon size={9} className={cfg.color} />
+                        <span className={`text-[8px] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[10px] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
+                        View Details <ChevronRight size={11} />
+                      </span>
                     </div>
-                    <span className="inline-flex items-center gap-1 h-8 px-3 rounded-full text-[11px] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
-                      View Details <ChevronRight size={12} />
-                    </span>
                   </div>
                 </Link>
               );

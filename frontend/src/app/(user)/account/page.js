@@ -8,12 +8,12 @@ import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import { useWishlist } from "@/components/user/WishlistContext";
-import { Country, State, City } from "country-state-city";
+import AddressForm from "@/components/user/AddressForm";
 import {
   LayoutDashboard, Package, MapPin, Settings, LogOut, User, Phone, Lock,
-  Plus, Pencil, Trash2, Heart, ShoppingBag, Calendar, ArrowRight, Loader2,
+  Plus, Pencil, Trash2, Heart, ShoppingBag, Calendar, ArrowRight, ArrowLeft, Loader2,
   X, CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck,
-  Star, Save, ChevronDown, ChevronRight
+  Star, Save, ChevronDown, ChevronRight, SlidersHorizontal,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -34,7 +34,17 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled", icon: XCircle,      color: "text-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30" },
 };
 
-/* ============ SIDEBAR NAV (AliExpress style) — DESKTOP ============ */
+const FILTER_OPTIONS = [
+  { value: "all", label: "All Orders" },
+  { value: "pending", label: "Pending" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "processing", label: "Processing" },
+  { value: "shipped", label: "Shipped" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+/* ============ SIDEBAR NAV (DESKTOP ONLY) ============ */
 function SidebarNav({ user, avatarLetter, tab, orderFilter, wishlistCount, onNavigate, onExternal, onLogout }) {
   const [openGroups, setOpenGroups] = useState({ orders: true });
 
@@ -71,31 +81,9 @@ function SidebarNav({ user, avatarLetter, tab, orderFilter, wishlistCount, onNav
           <LayoutDashboard size={15} /> Overview
         </button>
 
-        <button
-          onClick={() => setOpenGroups(g => ({ ...g, orders: !g.orders }))}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition"
-        >
-          <span className="flex items-center gap-2.5"><Package size={15} /> My Orders</span>
-          <ChevronDown size={14} className={`transition-transform ${openGroups.orders ? "rotate-180" : ""}`} />
+               <button onClick={() => onExternal("/orders")} className={itemCls(false)}>
+          <Package size={15} /> My Orders
         </button>
-        {openGroups.orders && (
-          <div className="ml-4 pl-3 border-l border-[var(--user-border)] space-y-0.5 py-1">
-            {orderItems.map(o => (
-              <button
-                key={o.filter}
-                onClick={() => onNavigate("orders", o.filter)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-[11px] font-semibold transition ${
-                  tab === "orders" && orderFilter === o.filter
-                    ? "bg-[var(--user-accent)]/10 text-[var(--user-accent)]"
-                    : "text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)]"
-                }`}
-              >
-                {o.label}
-                {tab === "orders" && orderFilter === o.filter && <ChevronRight size={12} />}
-              </button>
-            ))}
-          </div>
-        )}
 
         <button onClick={() => onExternal("/wishlist")} className={itemCls(false)}>
           <Heart size={15} /> Wish List
@@ -121,117 +109,99 @@ function SidebarNav({ user, avatarLetter, tab, orderFilter, wishlistCount, onNav
   );
 }
 
-/* ============ ADDRESS FORM MODAL ============ */
-const AddressFormModal = ({ address, onClose, onSaved }) => {
-  const [form, setForm] = useState(address ? {
-    full_name: address.full_name || "", phone: address.phone || "", country: address.country || "",
-    state: address.state || "", city: address.city || "", street_address1: address.street_address1 || "",
-    street_address2: address.street_address2 || "", zip_code: address.zip_code || "",
-    delivery_instructions: address.delivery_instructions || "", is_default: !!address.is_default,
-  } : {
-    full_name: "", phone: "", country: "", state: "", city: "", street_address1: "",
-    street_address2: "", zip_code: "", delivery_instructions: "", is_default: false,
-  });
-  const [saving, setSaving] = useState(false);
+/* ============ ✅ MOBILE TOP BAR WITH BACK ARROW ============ */
+function MobileTopBar({ tab, onBack }) {
+  // Overview pe back nahi chahiye (home hai)
+  if (tab === "overview") return null;
 
-  const allCountries = Country.getAllCountries();
-  const allStates = (() => { const c = allCountries.find(x => x.name === form.country); return c ? State.getStatesOfCountry(c.isoCode) : []; })();
-  const allCities = (() => { const c = allCountries.find(x => x.name === form.country); const s = allStates.find(x => x.name === form.state); return c && s ? City.getCitiesOfState(c.isoCode, s.isoCode) : []; })();
-
-  const inputCls = "w-full h-10 px-3 rounded-lg text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
-  const labelCls = "block text-[11px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
-
-  const handleSave = async () => {
-    if (!form.full_name.trim() || !form.phone.trim() || !form.country || !form.state || !form.city || !form.street_address1.trim()) {
-      toast.error("Please fill all required fields"); return;
-    }
-    setSaving(true);
-    try {
-      if (address) await addressApi.update(address._id, form);
-      else await addressApi.create(form);
-      toast.success(address ? "Address updated!" : "Address added!");
-      onSaved();
-    } catch (e) { toast.error(e.response?.data?.message || "Failed to save address"); }
-    finally { setSaving(false); }
+  const titles = {
+    orders: "My Orders",
+    addresses: "Addresses",
+    settings: "Settings",
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-[var(--user-bg-card)] border-t-2 sm:border-2 border-[var(--user-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-5 py-3.5 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95">
-          <h2 className="text-sm font-black text-[var(--user-text)]">{address ? "Edit Address" : "Add New Address"}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg border border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition flex items-center justify-center"><X size={15} /></button>
+    <div className="lg:hidden sticky top-[57px] z-30 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-b border-[var(--user-border)] mb-4">
+      <div className="flex items-center gap-3 h-12 px-3">
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <h1 className="text-base font-black text-[var(--user-text)] flex-1">{titles[tab] || "Account"}</h1>
+      </div>
+    </div>
+  );
+}
+
+/* ============ ✅ MOBILE FILTER BOTTOM SHEET ============ */
+function FilterSheet({ open, current, onClose, onSelect }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] lg:hidden">
+      <div onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute bottom-0 inset-x-0 bg-[var(--user-bg-card)] border-t border-[var(--user-border)] rounded-t-2xl max-h-[70vh] overflow-hidden flex flex-col" style={{ animation: "slideUp .25s ease" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--user-border)] shrink-0">
+          <h3 className="text-sm font-black text-[var(--user-text)]">Filter Orders</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[var(--user-bg-hover)] flex items-center justify-center transition">
+            <X size={16} />
+          </button>
         </div>
-        <div className="p-4 sm:p-5 space-y-3.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className={labelCls}>Full Name *</label><input value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} placeholder="Ahsan Khan" className={inputCls} /></div>
-            <div><label className={labelCls}>Phone *</label><input type="tel" value={form.phone} maxLength={14} onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g,"").slice(0,14)})} placeholder="03001234567" className={inputCls} /></div>
-          </div>
-          <div><label className={labelCls}>Country *</label>
-            <select value={form.country} onChange={e => setForm({...form, country: e.target.value, state:"", city:""})} className={inputCls+" appearance-none cursor-pointer"}>
-              <option value="">Select country</option>
-              {allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div><label className={labelCls}>State *</label><select value={form.state} onChange={e => setForm({...form, state: e.target.value, city:""})} disabled={!form.country} className={inputCls+" disabled:opacity-50"}><option value="">Select</option>{allStates.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
-            <div><label className={labelCls}>City *</label><select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!form.state} className={inputCls+" disabled:opacity-50"}><option value="">Select</option>{allCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></div>
-            <div><label className={labelCls}>ZIP</label><input value={form.zip_code} onChange={e => setForm({...form, zip_code: e.target.value})} placeholder="54000" className={inputCls} /></div>
-          </div>
-          <div><label className={labelCls}>Street Address *</label><textarea value={form.street_address1} onChange={e => setForm({...form, street_address1: e.target.value})} rows="2" placeholder="Street address" className={inputCls+" resize-none py-2.5"} /></div>
-          <div><label className={labelCls}>Delivery Instructions</label><textarea value={form.delivery_instructions} onChange={e => setForm({...form, delivery_instructions: e.target.value})} rows="2" placeholder="Notes, access codes" className={inputCls+" resize-none py-2.5"} /></div>
-          <label className="flex items-center gap-2 text-sm text-[var(--user-text)] cursor-pointer pt-1">
-            <input type="checkbox" checked={form.is_default} onChange={e => setForm({...form, is_default: e.target.checked})} className="w-4 h-4 rounded" style={{ accentColor: "var(--user-accent)" }} />
-            Make this my default address
-          </label>
+        <div className="overflow-y-auto p-2">
+          {FILTER_OPTIONS.map((opt) => {
+            const active = current === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => { onSelect(opt.value); onClose(); }}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition mb-0.5 ${
+                  active ? "bg-[var(--user-accent)]/10 text-[var(--user-accent)]" : "text-[var(--user-text)] hover:bg-[var(--user-bg-hover)]"
+                }`}
+              >
+                <span>{opt.label}</span>
+                {active && <CheckCircle2 size={16} />}
+              </button>
+            );
+          })}
         </div>
-        <div className="sticky bottom-0 px-4 sm:px-5 py-3 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95 flex gap-2" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-          <button onClick={onClose} className="flex-1 h-10 sm:h-9 rounded-lg border border-[var(--user-border)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 h-10 sm:h-9 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Address
+        <div className="p-3 border-t border-[var(--user-border)] shrink-0" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+          <button onClick={onClose} className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider hover:opacity-90 transition active:scale-[0.98]">
+            Done
           </button>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default function AccountPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { count: wishlistCount } = useWishlist();
-  
+
   const [tab, setTab] = useState(() => {
     if (typeof window === "undefined") return "overview";
     return new URLSearchParams(window.location.search).get("tab") || "overview";
   });
 
-  // ✅ URL change + event dono suno — FIX APPLIED
   useEffect(() => {
     const checkUrlTab = () => {
       const urlTab = new URLSearchParams(window.location.search).get("tab");
       if (urlTab && urlTab !== tab) setTab(urlTab);
     };
-
-    const onTab = (e) => { 
+    const onTab = (e) => {
       if (e.detail && e.detail !== tab) {
         setTab(e.detail);
-        // URL bhi update karo
         const url = new URL(window.location);
         url.searchParams.set("tab", e.detail);
         window.history.pushState({}, "", url);
       }
     };
-
-    // Initial check
     checkUrlTab();
-
-    // URL change hone pe check karo
     window.addEventListener("popstate", checkUrlTab);
-    
-    // Custom event suno
     window.addEventListener("account:tab", onTab);
-    
     return () => {
       window.removeEventListener("popstate", checkUrlTab);
       window.removeEventListener("account:tab", onTab);
@@ -240,6 +210,7 @@ export default function AccountPage() {
 
   const [orderFilter, setOrderFilter] = useState("all");
   const [openSection, setOpenSection] = useState(null);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   const [profileForm, setProfileForm] = useState(null);
   const [phoneForm, setPhoneForm] = useState("");
@@ -281,16 +252,18 @@ export default function AccountPage() {
   const refreshUser = () => queryClient.invalidateQueries({ queryKey: ["userProfile"] });
   const refreshAddresses = () => queryClient.invalidateQueries({ queryKey: ["addresses"] });
 
-  const navigate = (tabId, filter) => { 
-    setTab(tabId); 
-    if (filter) setOrderFilter(filter); 
-    // URL update karo
+  const navigate = (tabId, filter) => {
+    setTab(tabId);
+    if (filter) setOrderFilter(filter);
     const url = new URL(window.location);
     url.searchParams.set("tab", tabId);
     if (filter) url.searchParams.set("filter", filter);
     window.history.pushState({}, "", url);
   };
   const external = (href) => router.push(href);
+
+  // ✅ MOBILE BACK → overview pe wapas
+  const handleBack = () => navigate("overview");
 
   const saveProfile = async () => {
     setSavingProfile(true);
@@ -338,6 +311,7 @@ export default function AccountPage() {
   };
 
   const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
+  const currentFilterLabel = FILTER_OPTIONS.find(f => f.value === orderFilter)?.label || "All";
 
   const inputCls = "w-full h-11 lg:h-10 px-3 rounded-lg text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
   const labelCls = "block text-[11px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
@@ -351,13 +325,16 @@ export default function AccountPage() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-3 lg:px-6 pt-3 lg:pt-10 pb-4 md:pb-4">
+      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+
+      {/* ✅ MOBILE TOP BAR — Back arrow on non-overview tabs */}
+      <MobileTopBar tab={tab} onBack={handleBack} />
+
       <div className="grid lg:grid-cols-[260px_1fr] gap-6 items-start">
-        {/* Desktop sidebar (unchanged) */}
         <aside className="hidden lg:block sticky top-24">
           <SidebarNav {...sidebarProps} />
         </aside>
 
-        {/* Content */}
         <div className="space-y-4 sm:space-y-5">
           {/* OVERVIEW */}
           {tab === "overview" && (
@@ -366,14 +343,13 @@ export default function AccountPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/10 via-transparent to-transparent pointer-events-none" />
                 <div className="absolute -right-8 -bottom-12 opacity-[0.05] pointer-events-none"><ShoppingBag size={180} className="text-[var(--user-accent)]" /></div>
 
-                {/* ✅ MOBILE ONLY — Settings icon top-right */}
-                <button
-                  onClick={() => setTab("settings")}
-                  aria-label="Settings"
-                  className="lg:hidden absolute top-3 right-3 z-10 w-9 h-9 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-muted)] flex items-center justify-center active:scale-95 transition"
-                >
-                  <Settings size={16} />
-                </button>
+             <button
+  onClick={() => navigate("settings")}
+  aria-label="Settings"
+  className="lg:hidden absolute top-3 right-3 z-10 w-9 h-9 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-muted)] flex items-center justify-center active:scale-95 transition"
+>
+  <Settings size={16} />
+</button>
 
                 <div className="relative p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
                   {user.avatar ? (
@@ -417,90 +393,89 @@ export default function AccountPage() {
                 ))}
               </div>
 
+              {/* ✅ RECENT ORDERS — Better mobile design */}
               <div className={cardCls}>
                 <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)]">
-                  <h2 className="text-sm font-black text-[var(--user-text)]">Recent Orders</h2>
-                  <button onClick={() => navigate("orders","all")} className="text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1">View All <ArrowRight size={12} /></button>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center lg:hidden">
+                      <Package size={15} className="text-[var(--user-accent)]" />
+                    </div>
+                    <h2 className="text-sm font-black text-[var(--user-text)]">Recent Orders</h2>
+                  </div>
+                  <button onClick={() => router.push("/orders")} className="hidden lg:flex text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline items-center gap-1">View All <ArrowRight size={12} /></button>
+                                  </div>
                 <div className="p-3 sm:p-4">
                   {orders.length === 0 ? (
-                    <p className="text-sm text-[var(--user-text-muted)] py-6 text-center">No orders yet. <Link href="/" className="text-[var(--user-accent)] font-bold hover:underline">Start shopping</Link></p>
+                    <div className="text-center py-8 sm:py-6">
+                      <div className="w-14 h-14 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
+                        <Package size={24} className="text-[var(--user-text-subtle)]" />
+                      </div>
+                      <p className="text-sm text-[var(--user-text-muted)] mb-1">No orders yet</p>
+                      <Link href="/" className="text-[12px] text-[var(--user-accent)] font-bold hover:underline">Start shopping →</Link>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {orders.slice(0, 3).map(o => {
                         const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
+                        const StatusIcon = cfg.icon;
+                        const date = new Date(o.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
                         return (
-                          <Link key={o._id} href={`/orders/${o._id}`} className="flex items-center gap-3 p-2.5 sm:p-3 rounded-lg border border-[var(--user-border)] hover:border-[var(--user-accent)]/50 hover:bg-[var(--user-bg-hover)]/40 transition active:scale-[0.99]">
-                            {getImgUrl(o.items?.[0]?.image) ? (
-                              <img src={getImgUrl(o.items[0].image)} alt="" className="w-10 h-10 rounded-lg object-cover border border-[var(--user-border)]" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center"><Package size={15} className="text-[var(--user-text-subtle)]" /></div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] sm:text-xs font-black text-[var(--user-accent)] font-mono">{o.order_number}</p>
-                              <p className="text-[10px] text-[var(--user-text-muted)]">{o.items.length} items · {fmt(o.total)}</p>
+                          <Link key={o._id} href={`/orders/${o._id}`} className="block p-3 rounded-xl border border-[var(--user-border)] hover:border-[var(--user-accent)]/50 hover:shadow-md transition-all active:scale-[0.99]">
+                            {/* Top: Status badge (mobile-prominent) */}
+                            <div className="flex items-center justify-between mb-2.5">
+                              <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border flex items-center gap-1 ${cfg.bg} ${cfg.border} ${cfg.color}`}>
+                                <StatusIcon size={10} /> {cfg.label}
+                              </span>
+                              <span className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1">
+                                <Calendar size={10} /> {date}
+                              </span>
                             </div>
-                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${cfg.bg} ${cfg.border} ${cfg.color}`}>{cfg.label}</span>
+
+                            {/* Middle: Image + Info */}
+                            <div className="flex items-center gap-3">
+                              {getImgUrl(o.items?.[0]?.image) ? (
+                                <img src={getImgUrl(o.items[0].image)} alt="" className="w-14 h-14 rounded-lg object-cover border border-[var(--user-border)] shrink-0" />
+                              ) : (
+                                <div className="w-14 h-14 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-black text-[var(--user-accent)] font-mono mb-0.5">#{o.order_number}</p>
+                                <p className="text-[12px] font-semibold text-[var(--user-text)] truncate">{o.items?.[0]?.name || "Order"}</p>
+                                <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">
+                                  {o.items.length} {o.items.length === 1 ? "item" : "items"}
+                                  {o.items.length > 1 && <span className="ml-1">+{o.items.length - 1} more</span>}
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-[14px] font-black text-[var(--user-text)]">{fmt(o.total)}</p>
+                                <ChevronRight size={14} className="text-[var(--user-text-muted)] ml-auto mt-0.5" />
+                              </div>
+                            </div>
                           </Link>
                         );
                       })}
                     </div>
                   )}
                 </div>
+
+                {/* ✅ MOBILE: Full width "View All" button */}
+                {orders.length > 0 && (
+                               <div className="lg:hidden px-3 pb-3">
+                    <button
+                      onClick={() => router.push("/orders")}
+                      className="w-full h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition"
+                    >
+                      View All Orders <ArrowRight size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
 
-          {/* ORDERS */}
-          {tab === "orders" && (
-            <div className={cardCls}>
-              <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)] flex-wrap gap-2">
-                <h2 className="text-sm font-black text-[var(--user-text)]">My Orders ({orders.length})</h2>
-                <Link href="/orders" className="text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1">Full Page <ArrowRight size={12} /></Link>
-              </div>
-              <div className="p-3 sm:p-4">
-                <div className="flex gap-2 overflow-x-auto pb-3 mb-3 sm:mb-4 -mx-3 sm:-mx-4 px-3 sm:px-4" style={{ scrollbarWidth: "none" }}>
-                  {["all", ...Object.keys(STATUS_CONFIG)].map(f => (
-                    <button key={f} onClick={() => setOrderFilter(f)} className={`shrink-0 px-3 py-2 sm:py-1.5 rounded-lg text-[11px] font-bold border capitalize transition active:scale-95 ${orderFilter === f ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border-[var(--user-accent)]" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] border-[var(--user-border)]"}`}>
-                      {f}
-                    </button>
-                  ))}
-                </div>
-                {filteredOrders.length === 0 ? (
-                  <p className="text-sm text-[var(--user-text-muted)] py-8 text-center">No orders found.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredOrders.map(o => {
-                      const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
-                      const date = new Date(o.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-                      return (
-                        <Link key={o._id} href={`/orders/${o._id}`} className="block p-3 sm:p-3.5 rounded-lg border border-[var(--user-border)] hover:border-[var(--user-accent)]/50 hover:bg-[var(--user-bg-hover)]/40 transition active:scale-[0.99]">
-                          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                            <p className="text-[11px] sm:text-xs font-black text-[var(--user-accent)] font-mono">{o.order_number}</p>
-                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${cfg.bg} ${cfg.border} ${cfg.color}`}>{cfg.label}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mb-2">
-                            {o.items.slice(0,4).map((it, i) => getImgUrl(it.image) ? (
-                              <img key={i} src={getImgUrl(it.image)} alt="" className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-cover border border-[var(--user-border)]" />
-                            ) : (
-                              <div key={i} className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center"><Package size={12} className="text-[var(--user-text-subtle)]" /></div>
-                            ))}
-                            {o.items.length > 4 && <span className="text-[10px] font-bold text-[var(--user-text-muted)]">+{o.items.length-4}</span>}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-[var(--user-text-muted)]">
-                            <span className="flex items-center gap-1"><Calendar size={11} /> {date}</span>
-                            <span className="font-black text-[var(--user-text)]">{fmt(o.total)}</span>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+        
 
-          {/* ADDRESSES */}
+          {/* ADDRESSES — unchanged */}
           {tab === "addresses" && (
             <div className={cardCls}>
               <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)] gap-2">
@@ -544,7 +519,7 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* SETTINGS */}
+          {/* SETTINGS — unchanged */}
           {tab === "settings" && (
             <div className={`${cardCls} overflow-hidden`}>
               <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)]">
@@ -585,7 +560,7 @@ export default function AccountPage() {
                 {openSection === "phone" && (
                   <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 bg-[var(--user-bg-hover)]/20">
                     <div className="flex gap-2">
-                      <input value={phoneForm} onChange={e => setPhoneForm(e.target.value)} placeholder="03001234567" className={inputCls + " flex-1 min-w-0"} />
+                      <input value={phoneForm} onChange={e => setPhoneForm(e.target.value)} placeholder="xxxxxx" className={inputCls + " flex-1 min-w-0"} />
                       <button onClick={savePhone} disabled={savingPhone || !phoneForm} className={btnPrimary + " shrink-0"}>{savingPhone ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Update</button>
                     </div>
                   </div>
@@ -616,7 +591,6 @@ export default function AccountPage() {
                 )}
               </div>
 
-              {/* ✅ MOBILE ONLY — Shipping Address row (below Password) */}
               <div className="lg:hidden">
                 <button onClick={() => setTab("addresses")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--user-bg-hover)]/40 active:bg-[var(--user-bg-hover)] transition text-left">
                   <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0"><MapPin size={17} /></div>
@@ -632,9 +606,13 @@ export default function AccountPage() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Modals — unchanged */}
       {showAddressModal && (
-        <AddressFormModal address={editAddress} onClose={() => setShowAddressModal(false)} onSaved={() => { setShowAddressModal(false); refreshAddresses(); }} />
+        <AddressForm
+          initialAddress={editAddress}
+          onSuccess={() => { setShowAddressModal(false); refreshAddresses(); }}
+          onCancel={() => setShowAddressModal(false)}
+        />
       )}
       {deleteAddressId && (
         <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteAddressId(null)}>
@@ -648,6 +626,14 @@ export default function AccountPage() {
           </div>
         </div>
       )}
+
+      {/* ✅ Filter Bottom Sheet */}
+      <FilterSheet
+        open={showFilterSheet}
+        current={orderFilter}
+        onClose={() => setShowFilterSheet(false)}
+        onSelect={setOrderFilter}
+      />
     </main>
   );
 }

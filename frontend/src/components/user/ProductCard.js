@@ -64,8 +64,8 @@ export default function ProductCard({
   let matchedDeal = null;
   let discInfo = null;   // ✅ poora discount object rakh lo
   
-  try {
-    const disc = calculateProductDiscount(product, variantPrice, showDealPricing);
+   try {
+    const disc = calculateProductDiscount(product, variantPrice, showDealPricing, deal);
     discInfo = disc;
     price = disc.discountedPrice;
     oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;

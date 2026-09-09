@@ -787,7 +787,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
   const img = getImgUrl(row.image);
   return (
     <div className={`bg-[var(--user-bg-card)] rounded-xl border border-[var(--user-border)] p-3 mb-2 flex items-start gap-2 ${!isSelected ? "opacity-60" : ""}`}>
-      {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
+      {/* ✅ Selection checkbox (unchanged) */}
       <button
         type="button"
         onClick={() => onToggleSelect?.()}
@@ -801,6 +801,8 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           {isSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
         </span>
       </button>
+
+      {/* Image (unchanged) */}
       <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0">
         {img ? (
           <img src={img} alt={row.name} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
@@ -810,13 +812,27 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           </div>
         )}
       </Link>
+
       <div className="flex-1 min-w-0 flex flex-col">
-        <Link href={`/product/${row.raw.productId || row.raw.id}`} className="text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
-          {row.name}
-        </Link>
+        {/* ✅ Row 1 — Name (left) + DELETE icon (top-right) */}
+        <div className="flex items-start gap-2">
+          <Link href={`/product/${row.raw.productId || row.raw.id}`} className="flex-1 min-w-0 text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
+            {row.name}
+          </Link>
+          <button
+            type="button"
+            onClick={() => onRemove(row)}
+            aria-label={`Remove ${row.name}`}
+            className="shrink-0 -mt-0.5 -mr-0.5 h-7 w-7 flex items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] active:scale-90 transition"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+
         {row.variantTitle && (
           <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>
         )}
+
         {(isDeal && dealBadge) || row.freeItems > 0 || row.hasDiscount ? (
           <div className="flex flex-wrap items-center gap-1 mt-1">
             {isDeal && dealBadge && (
@@ -837,17 +853,15 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           </div>
         ) : null}
 
-        {/* Price row */}
-        <div className="flex items-baseline gap-1.5 mt-1">
-          <p className="text-[13px] font-black text-[var(--user-accent)]">{fmt(row.displayPrice)}</p>
-          {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
-            <p className="text-[10px] text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
-          )}
-        </div>
-
-        {/* Qty stepper + delete */}
-        <div className="flex items-center justify-between mt-auto pt-1.5">
-          <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-elevated)] overflow-hidden">
+        {/* ✅ Row 2 — Price (left) + QTY stepper (right) — neche wali line khatam */}
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          <div className="flex items-baseline gap-1.5 min-w-0">
+            <p className="text-[13px] font-black text-[var(--user-accent)]">{fmt(row.displayPrice)}</p>
+            {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
+              <p className="text-[10px] text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
+            )}
+          </div>
+          <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-elevated)] overflow-hidden shrink-0">
             <button
               type="button"
               onClick={onDec}
@@ -867,14 +881,6 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
               <Plus size={13} />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onRemove(row)}
-            aria-label={`Remove ${row.name}`}
-            className="h-7 w-7 flex items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] active:scale-90 transition"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
       </div>
     </div>

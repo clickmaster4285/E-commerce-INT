@@ -73,7 +73,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const [removingKeys, setRemovingKeys] = useState(() => new Set());
     // ✅ COLLAPSED DEAL SECTIONS
     const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
-
+    const [confirmClear, setConfirmClear] = useState(false);
+    const clearTimerRef = useRef(null);
     const toggleDealCollapse = (dealId) => {
       setCollapsedDeals((prev) => {
         const next = new Set(prev);
@@ -311,9 +312,29 @@ import { shippingApi } from "@/apis/user/shippingApi";
       timersRef.current.push(t);
     };
 
-    const goCheckout = () => { setIsCartOpen(false); router.push("/checkout"); };
+       const goCheckout = () => { setIsCartOpen(false); router.push("/checkout"); };
     const startShopping = () => { setIsCartOpen(false); router.push("/product"); };
 
+    // ✅ CLEAR CART — two-tap confirm (ghalti se clear na ho)
+    const handleClearCart = () => {
+      if (!confirmClear) {
+        setConfirmClear(true);
+        clearTimeout(clearTimerRef.current);
+        clearTimerRef.current = setTimeout(() => setConfirmClear(false), 3000);
+        return;
+      }
+      clearTimeout(clearTimerRef.current);
+      setConfirmClear(false);
+      const snapshot = cart.map((i) => i.raw ?? i);
+      cart.forEach((i) => removeFromCart(i.key));
+      toast.success("Cart cleared", {
+        action: { label: "Undo", onClick: () => restoreItems(snapshot) },
+      });
+    };
+
+    useEffect(() => {
+      if (!isCartOpen) setConfirmClear(false);
+    }, [isCartOpen]);
     return (
       <>
         <div aria-hidden="true" onClick={() => setIsCartOpen(false)} className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${isCartOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
@@ -508,9 +529,33 @@ import { shippingApi } from "@/apis/user/shippingApi";
                   <span className="text-sm font-semibold text-[var(--user-text)]">Total</span>
                   <span className="text-base font-bold text-[var(--user-accent)]">{fmt(totals.grandTotal)}</span>
                 </div>
-                <button type="button" onClick={goCheckout} disabled={!hasItems || selectedLineCount === 0} className="w-full rounded-xl bg-[var(--user-accent)] h-10 text-xs font-black uppercase tracking-widest text-[var(--user-accent-text)] transition-all duration-200 hover:scale-[1.02] hover:bg-[var(--user-accent-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
-                  {selectedLineCount === 0 && hasItems ? "Select items to checkout" : "Proceed to Checkout"}
-                </button>
+                              <div className="flex items-center gap-2">
+                  {/* ✅ CLEAR — two-tap confirm */}
+                  <button
+                    type="button"
+                    onClick={handleClearCart}
+                    aria-label="Clear cart"
+                                      className={`h-11 px-3.5 shrink-0 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                      confirmClear
+                        ? "bg-[var(--user-danger)] border-[var(--user-danger)] text-white"
+                        : "border-[var(--user-border)] text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10"
+                    }`}
+                  >
+                    <Trash2 size={13} aria-hidden="true" />
+                    {confirmClear ? "Confirm?" : "Clear"}
+                  </button>
+
+                  {/* ✅ CHHOTA CHECKOUT BUTTON */}
+                  <button
+                    type="button"
+                    onClick={goCheckout}
+                    disabled={!hasItems || selectedLineCount === 0}
+                    className="flex-1 h-9 rounded-lg bg-[var(--user-accent)] text-[11px] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                  >
+                    {selectedLineCount === 0 && hasItems ? "Select items" : "Proceed to Checkout"}
+                    <ArrowRight size={13} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
             </footer>
           )}

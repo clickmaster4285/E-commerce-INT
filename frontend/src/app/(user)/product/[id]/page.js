@@ -67,15 +67,35 @@ function useVariant(variants = []) {
   const [index, setIndex] = useState(0);
   const [imgIndex, setImgIndex] = useState(0);
   const current = safeVariants[index] || safeVariants[0];
-  const images = (current.images || []).map(getImageUrl).filter(Boolean);
-  const mainImage = images[imgIndex] || images[0] || null;
+  const currentImages = (current.images || []).map(getImageUrl).filter(Boolean);
+  const mainImage = currentImages[imgIndex] || currentImages[0] || null;
   const selectVariant = useCallback((i) => { setIndex(i); setImgIndex(0); }, []);
+
+  // ✅ ALL variant images as flat URL array — for thumbnails (user can click any)
+  const allVariantImages = useMemo(() => {
+    return safeVariants.flatMap((v) => (v.images || []).map(getImageUrl).filter(Boolean));
+  }, [safeVariants]);
+
+  // ✅ Click any thumbnail → find which variant owns this URL, switch to it
+  const selectImageByUrl = useCallback((url) => {
+    for (let vIdx = 0; vIdx < safeVariants.length; vIdx++) {
+      const imgs = (safeVariants[vIdx].images || []).map(getImageUrl).filter(Boolean);
+      const iIdx = imgs.indexOf(url);
+      if (iIdx >= 0) {
+        setIndex(vIdx);
+        setImgIndex(iIdx);
+        return;
+      }
+    }
+  }, [safeVariants]);
+
   const allImages = useMemo(() => {
     const set = new Set();
     safeVariants.forEach((v) => (v.images || []).forEach((img) => { const u = getImageUrl(img); if (u) set.add(u); }));
     return Array.from(set);
   }, [safeVariants]);
-  return { variantIndex: index, imageIndex: imgIndex, setImageIndex: setImgIndex, currentVariant: current, images, mainImage, selectVariant, allImages };
+
+  return { variantIndex: index, imageIndex: imgIndex, setImageIndex: setImgIndex, currentVariant: current, images: allVariantImages, currentImages, mainImage, selectVariant, selectImageByUrl, allImages };
 }
 
 function useQuantity(maxStock) {
@@ -120,26 +140,24 @@ const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
 ));
 Breadcrumb.displayName = "Breadcrumb";
 
-const Gallery = memo(({ mainImage, images, imageIndex, onImageSelect, stock, onZoom }) => {
+const Gallery = memo(({ mainImage, images, onImageSelect, stock, onZoom }) => {
   const [zoomed, setZoomed] = useState(false);
   const [origin, setOrigin] = useState("50% 50%");
   const [paused, setPaused] = useState(false);
-  useEffect(() => {
-    if (paused || images.length <= 1) return;
-    const t = setInterval(() => onImageSelect((imageIndex + 1) % images.length), 5000);
-    return () => clearInterval(t);
-  }, [paused, imageIndex, images.length, onImageSelect]);
+
+  // ✅ Auto-rotate disabled — user clicks thumbnail to switch variant
   const handleMove = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     setOrigin(`${Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100))}% ${Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100))}%`);
   };
+
   return (
     <div className="flex gap-3 sm:gap-4">
       {images.length > 1 && (
         <div className="hidden lg:flex flex-col gap-2.5 shrink-0">
           {images.map((url, i) => (
-            <button key={i} onClick={() => onImageSelect(i)} aria-label={`View image ${i + 1}`}
-              className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === imageIndex ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/20" : "border-[var(--user-border)] opacity-60 hover:opacity-100"}`}>
+            <button key={i} onClick={() => onImageSelect(url)} aria-label={`View image ${i + 1}`}
+              className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${url === mainImage ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/20" : "border-[var(--user-border)] opacity-60 hover:opacity-100"}`}>
               <img src={url} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
@@ -169,8 +187,8 @@ const Gallery = memo(({ mainImage, images, imageIndex, onImageSelect, stock, onZ
         {images.length > 1 && (
           <div className="flex gap-2 mt-3 overflow-x-auto lg:hidden pb-1 -mx-4 px-4 sm:-mx-5 sm:px-5" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
             {images.map((url, i) => (
-              <button key={i} onClick={() => onImageSelect(i)} aria-label={`View image ${i + 1}`}
-                className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden border-2 transition-all ${i === imageIndex ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-60"}`}>
+              <button key={i} onClick={() => onImageSelect(url)} aria-label={`View image ${i + 1}`}
+                className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden border-2 transition-all ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-60"}`}>
                 <img src={url} alt="" className="w-full h-full object-cover" />
               </button>
             ))}
@@ -396,7 +414,7 @@ function ProductDetailContent({ params }) {
   const storeName = store?.store_name || "";
 
   const variants = product?.variants?.length ? product.variants : [{ _id: "default", images: [] }];
-  const { variantIndex, imageIndex, setImageIndex, currentVariant, images, mainImage, selectVariant, allImages } = useVariant(variants);
+  const { variantIndex, imageIndex, setImageIndex, currentVariant, images, currentImages, mainImage, selectVariant, selectImageByUrl, allImages } = useVariant(variants);
 
   const stock = toNum(currentVariant?.quantity);
   const { quantity, increment, decrement, reset } = useQuantity(stock);
@@ -541,8 +559,8 @@ function ProductDetailContent({ params }) {
 
       <div className="grid lg:grid-cols-2 gap-5 sm:gap-6 lg:gap-12 mt-4 sm:mt-5 lg:mt-6">
         <div className="lg:sticky lg:top-24 self-start">
-          <Gallery mainImage={mainImage} images={images} imageIndex={imageIndex} onImageSelect={setImageIndex} stock={stock} onZoom={openLightbox} />
-        </div>
+          <Gallery mainImage={mainImage} images={images} onImageSelect={selectImageByUrl} stock={stock} onZoom={openLightbox} />
+                  </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-5" ref={sentinelRef}>
           <div className="space-y-2">
@@ -681,25 +699,58 @@ function ProductDetailContent({ params }) {
             </div>
           )}
 
-          <div className="space-y-2.5 sm:space-y-3">
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <div className="flex items-center h-11 sm:h-12 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0 self-stretch sm:self-auto">
-                <button onClick={decrement} className="px-3 sm:px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease"><Minus size={15} /></button>
-                <span className="w-9 sm:w-10 text-center text-sm font-bold text-[var(--user-text)]">{quantity}</span>
-                <button onClick={increment} className="px-3 sm:px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Increase"><Plus size={15} /></button>
+                <div className="space-y-2.5 sm:space-y-3">
+            {/* ✅ MOBILE Row 1 — qty + wishlist icon + live total */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <div className="flex items-center h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0">
+                <button onClick={decrement} className="px-3 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease"><Minus size={15} /></button>
+                <span className="w-8 text-center text-sm font-bold text-[var(--user-text)]">{quantity}</span>
+                <button onClick={increment} className="px-3 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Increase"><Plus size={15} /></button>
+              </div>
+              <button onClick={() => productId && toggleWishlist(productId)} aria-label="Wishlist"
+                className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-90 ${liked ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-secondary)]"}`}>
+                <Heart size={18} fill={liked ? "currentColor" : "none"} />
+              </button>
+              <div className="flex-1 min-w-0 text-right">
+                <p className="text-[9px] uppercase tracking-wider text-[var(--user-text-muted)] font-bold">Total</p>
+                <p className="text-base font-black text-[var(--user-accent)] leading-none truncate">Rs. {(activePrice * quantity).toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* ✅ MOBILE Row 2 — Add + Buy side-by-side */}
+            <div className="grid grid-cols-2 gap-2 sm:hidden">
+              <button onClick={handleAdd} disabled={stock < 1}
+                className={`h-11 rounded-xl flex items-center justify-center gap-1.5 text-[12px] font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
+                {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
+                {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : isDealMode ? "Add Deal" : "Add to Cart"}
+              </button>
+              <button onClick={handleBuy} disabled={stock < 1}
+                className="h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
+                <Zap size={14} /><span>Buy Now</span>
+              </button>
+            </div>
+
+            {/* ✅ DESKTOP (unchanged) — qty + add + buy one row */}
+            <div className="hidden sm:flex flex-row gap-3">
+              <div className="flex items-center h-12 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0">
+                <button onClick={decrement} className="px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease"><Minus size={15} /></button>
+                <span className="w-10 text-center text-sm font-bold text-[var(--user-text)]">{quantity}</span>
+                <button onClick={increment} className="px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Increase"><Plus size={15} /></button>
               </div>
               <button onClick={handleAdd} disabled={stock < 1}
-                className={`flex-1 h-11 sm:h-12 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 text-[13px] sm:text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
+                className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
                 {isAdded ? <Check size={15} /> : <ShoppingCart size={15} />}
                 {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : isDealMode ? "Add Deal" : "Add to Cart"}
               </button>
               <button onClick={handleBuy} disabled={stock < 1}
-                className="flex-1 h-11 sm:h-12 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-[13px] sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
+                className="flex-1 h-12 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-sm font-bold flex items-center justify-center gap-2 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
                 <Zap size={15} /><span>Buy Now</span>
               </button>
             </div>
+
+            {/* ✅ DESKTOP wishlist full-width (unchanged) */}
             <button onClick={() => productId && toggleWishlist(productId)}
-              className={`w-full h-11 rounded-xl border flex items-center justify-center gap-2 text-[11px] sm:text-xs font-bold transition-all ${liked ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-danger)]/40 hover:text-[var(--user-danger)]"}`}>
+              className={`hidden sm:flex w-full h-11 rounded-xl border items-center justify-center gap-2 text-xs font-bold transition-all ${liked ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-danger)]/40 hover:text-[var(--user-danger)]"}`}>
               <Heart size={14} fill={liked ? "currentColor" : "none"} /> {liked ? "Added to Wishlist" : "Add to Wishlist"}
             </button>
           </div>

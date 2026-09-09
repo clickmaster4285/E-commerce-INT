@@ -35,11 +35,11 @@ const createUser = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Email and password are required" });
-    const existing = await User.findOne({ $or: [{ email }, { username }] });
-    if (existing)
-      return res
-        .status(400)
-        .json({ success: false, message: "User already exists" });
+    const errors = {};
+    if (await User.findOne({ email: String(email).toLowerCase().trim() })) errors.email = "This email is already registered";
+    if (username && await User.findOne({ username: String(username).toLowerCase().trim() })) errors.username = "This username is already taken";
+    if (phone && await User.findOne({ phone: String(phone).trim() })) errors.phone = "This phone number is already registered";
+    if (Object.keys(errors).length > 0) return res.status(400).json({ message: "Registration failed", errors });
     const hashedPassword = await bcrypt.hash(password, 10);
     const defaultStore = await Store.findOne();
     const user = await User.create({
@@ -648,6 +648,93 @@ const googleLogin = async (req, res) => {
   }
 };
 
+// ==========================================
+// CUSTOMER GOOGLE LOGIN (One Tap / button)
+// ==========================================
+const googleCustomerLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential)
+      return res.status(400).json({ success: false, message: "Google credential missing" });
+
+    let payload;
+    try {
+      const tokenRes = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+      );
+      if (!tokenRes.ok)
+        return res.status(401).json({ success: false, message: "Invalid Google token" });
+      payload = await tokenRes.json();
+    } catch {
+      return res.status(401).json({ success: false, message: "Invalid Google token" });
+    }
+
+    if (payload.aud !== process.env.GOOGLE_CLIENT_ID)
+      return res.status(401).json({ success: false, message: "Invalid Google token" });
+
+    const { sub: googleId, email, name, picture, email_verified } = payload;
+    if (!email)
+      return res.status(400).json({ success: false, message: "Google account did not return an email" });
+
+    let user = await User.findOne({ $or: [{ email }, { google_id: googleId }] });
+
+    if (user) {
+      const updates = {};
+      if (!user.google_id && googleId) updates.google_id = googleId;
+      if (!user.avatar && picture) updates.avatar = picture;
+      if (Object.keys(updates).length) await User.findByIdAndUpdate(user._id, updates);
+      user = await User.findById(user._id);
+    } else {
+      const randomPassword = await bcrypt.hash(require("crypto").randomBytes(32).toString("hex"), 10);
+      const defaultStore = await Store.findOne();
+      user = await User.create({
+        name: name || email.split("@")[0],
+        username: email.split("@")[0] + Math.floor(Math.random() * 99999),
+        email,
+        password: randomPassword,
+        role: "user",
+        provider: "google",
+        google_id: googleId,
+        avatar: picture || "",
+        storeId: defaultStore?._id,
+      });
+    }
+
+    const io = req.io || getIO();
+    await pushGlobalActivity(
+      io,
+      {
+        action: `${user.name} logged in via Google`,
+        category: "Authentication",
+        performedBy: user._id,
+        performedByName: user.name,
+        details: { ip: req.ip, provider: "google" },
+      },
+      user._id,
+    );
+
+    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
+    res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
+    res.json({
+      success: true,
+      message: "Google login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        phone: user.phone,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || null,
+      },
+    });
+  } catch (error) {
+    console.error("googleCustomerLogin error:", error);
+    res.status(500).json({ success: false, message: "Google login failed" });
+  }
+};
+
 const updatePhone = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -924,6 +1011,7 @@ module.exports = {
   updateProfileREST,
   changePasswordREST,
   googleLogin,
+  googleCustomerLogin,
   updatePhone,
   createCheckoutDraft,
   getCheckoutDrafts,

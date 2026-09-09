@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Country, State, City } from "country-state-city";
 import axiosInstance from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
+import AddressForm from "@/components/user/AddressForm";
 import { orderApi } from "@/apis/user/orderApi";
 import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
@@ -33,11 +33,6 @@ const DEFAULT_SHIP_CONFIG = {
   free_shipping_over: 0,
 };
 
-const emptyAddress = (phone = "") => ({
-  country: "", full_name: "", street_address1: "", street_address2: "",
-  city: "", state: "", zip_code: "", phone, is_default: true, delivery_instructions: "",
-});
-
 const ItemThumb = ({ item, size = "w-14 h-14" }) =>
   getImgUrl(item.image) ? (
     <div className={`${size} rounded-xl overflow-hidden border-2 border-[var(--user-border)] shrink-0 shadow-sm bg-[var(--user-bg-hover)]`}>
@@ -48,6 +43,89 @@ const ItemThumb = ({ item, size = "w-14 h-14" }) =>
       <Package size={18} className="text-[var(--user-accent)]" />
     </div>
   );
+
+// 🏦 BANK DETAILS — filhal hardcoded, baad mein admin/settings se ayengi
+const BANK_DETAILS = {
+  title: "ClickMasters Store",
+  bank: "Meezan Bank",
+  accountNumber: "0000 1234 5678 9012",
+  iban: "PK00 MEZN 0000 1234 5678 9012",
+};
+
+// 🏦 Bank Transfer Panel — mobile + desktop dono ke liye (compact = mobile)
+const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
+  const [copied, setCopied] = useState("");
+  const copy = async (text, key) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      toast.success("Copied to clipboard!");
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+  const inp = compact
+    ? "w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition"
+    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition";
+  const lbl = compact
+    ? "block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider"
+    : "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+
+  return (
+    <div className={`rounded-xl border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] overflow-hidden ${compact ? "" : "mt-4"}`}>
+      {/* ✅ Bank card visual */}
+      <div className="relative p-4 sm:p-5" style={{ background: "linear-gradient(135deg, #06281c 0%, #065f46 60%, #047857 130%)" }}>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-widest font-black text-emerald-200/80">Pay To</p>
+            <p className="text-sm sm:text-base font-black text-white truncate">{BANK_DETAILS.title}</p>
+            <p className="text-[11px] sm:text-xs text-emerald-100/80 font-semibold mt-0.5">{BANK_DETAILS.bank}</p>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+            <Landmark size={18} className="text-white" />
+          </div>
+        </div>
+        <div className="relative mt-4 space-y-2">
+          <button type="button" onClick={() => copy(BANK_DETAILS.accountNumber.replace(/\s/g, ""), "acc")} className="w-full flex items-center justify-between gap-2 rounded-lg bg-black/25 border border-white/10 px-3 py-2 text-left hover:bg-black/40 transition active:scale-[0.99]">
+            <span className="min-w-0">
+              <span className="block text-[9px] uppercase tracking-widest font-bold text-emerald-200/70">Account Number</span>
+              <span className="block font-mono text-[12px] sm:text-[13px] font-bold text-white truncate">{BANK_DETAILS.accountNumber}</span>
+            </span>
+            <span className="text-[9px] font-black uppercase text-emerald-200 shrink-0">{copied === "acc" ? "Copied!" : "Copy"}</span>
+          </button>
+          <button type="button" onClick={() => copy(BANK_DETAILS.iban.replace(/\s/g, ""), "iban")} className="w-full flex items-center justify-between gap-2 rounded-lg bg-black/25 border border-white/10 px-3 py-2 text-left hover:bg-black/40 transition active:scale-[0.99]">
+            <span className="min-w-0">
+              <span className="block text-[9px] uppercase tracking-widest font-bold text-emerald-200/70">IBAN</span>
+              <span className="block font-mono text-[11px] sm:text-[12px] font-bold text-white truncate">{BANK_DETAILS.iban}</span>
+            </span>
+            <span className="text-[9px] font-black uppercase text-emerald-200 shrink-0">{copied === "iban" ? "Copied!" : "Copy"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ✅ Steps + fillable fields */}
+      <div className={`${compact ? "p-3" : "p-4 sm:p-5"} space-y-3`}>
+        <ol className={`space-y-1.5 text-[var(--user-text-muted)] ${compact ? "text-[11px]" : "text-xs"}`}>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">1.</span> Upar diye gaye account mein total amount transfer karein.</li>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">2.</span> Transfer ke baad apna Sender Name aur Transaction ID neeche add karein.</li>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">3.</span> Verification ke baad aapka order confirm ho jayega.</li>
+        </ol>
+        <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
+          <div>
+            <label className={lbl}>Sender Name (as per bank)</label>
+            <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inp} />
+          </div>
+          <div>
+            <label className={lbl}>Transaction ID / Reference (optional)</label>
+            <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inp} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // 💳 Card Preview — intentionally dark (credit-card look), white text OK
 const CardPreview = ({ number, name, expiry }) => (
@@ -90,29 +168,25 @@ function CheckoutContent() {
 
   const { cart, removeItems, updateQty, restoreItems, selectedItems } = useCart();
   const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
-
   const [step, setStep] = useState(1);
   const [draftReady, setDraftReady] = useState(false);
+  const draftRestored = useRef(false);
+  const saveTimer = useRef(null);
+  const mobileAddressForm = false;
   const [draftItems, setDraftItems] = useState([]);
   const [selectedKeys, setSelectedKeys] = useState(null);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [mobileAddressSheet, setMobileAddressSheet] = useState(false);
-  const [mobileAddressForm, setMobileAddressForm] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
-  const [addressForm, setAddressForm] = useState(emptyAddress());
-  const [savingAddress, setSavingAddress] = useState(false);
   const [shippingMethod, setShippingMethod] = useState(() => getDefaultShippingMethod(null));
   const [paymentMethod, setPaymentMethod] = useState("cod");
-  const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "", cvv: "" });
+   const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "", cvv: "" });
+  const [bankForm, setBankForm] = useState({ senderName: "", transactionRef: "" });
   const [placing, setPlacing] = useState(false);
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
-  const [detectedCountry, setDetectedCountry] = useState("");
-
-  const draftRestored = useRef(false);
-  const saveTimer = useRef(null);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -235,28 +309,6 @@ function CheckoutContent() {
   };
 
   useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
-  useEffect(() => {
-    fetch("https://ipapi.co/country_name/").then((r) => r.text()).then((name) => name && setDetectedCountry(name.trim())).catch(() => {});
-  }, []);
-  useEffect(() => {
-    if (showAddressModal && !editingAddressId && detectedCountry && !addressForm.country) {
-      setAddressForm((f) => ({ ...f, country: detectedCountry }));
-    }
-  }, [showAddressModal, editingAddressId, detectedCountry, addressForm.country]);
-
-  const allCountries = useMemo(() => Country.getAllCountries(), []);
-  const allStates = useMemo(() => {
-    const c = allCountries.find((x) => x.name === addressForm.country);
-    return c ? State.getStatesOfCountry(c.isoCode) : [];
-  }, [allCountries, addressForm.country]);
-  const allCities = useMemo(() => {
-    const c = allCountries.find((x) => x.name === addressForm.country);
-    const s = allStates.find((x) => x.name === addressForm.state);
-    return c && s ? City.getCitiesOfState(c.isoCode, s.isoCode) : [];
-  }, [allCountries, allStates, addressForm.country, addressForm.state]);
-
-useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [addressForm.country]);
-  useEffect(() => { setAddressForm((f) => ({ ...f, city: "" })); }, [addressForm.state]);
 
   // ✅ If the user arrives at /checkout with 0 selected items (and cart has items),
   //    send them back to /cart so they can pick what to buy.
@@ -418,18 +470,11 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
   };
 
   const openAddressModal = () => {
-    setAddressForm({ ...emptyAddress(user?.phone || ""), full_name: user?.name || "", phone: user?.phone || "" });
     setEditingAddressId(null);
     setShowAddressModal(true);
   };
 
   const openEditModal = (a) => {
-    setAddressForm({
-      country: a.country || "", full_name: a.full_name || "", street_address1: a.street_address1 || "",
-      street_address2: a.street_address2 || "", city: a.city || "", state: a.state || "",
-      zip_code: a.zip_code || "", phone: a.phone || "", is_default: !!a.is_default,
-      delivery_instructions: a.delivery_instructions || "",
-    });
     setEditingAddressId(a._id);
     setShowAddressModal(true);
   };
@@ -443,34 +488,21 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
     } catch (e) { toast.error(e.response?.data?.message || "Address delete failed"); }
   };
 
-  const saveAddress = async () => {
-    const f = addressForm;
-    if (!f.country || !f.full_name.trim() || !f.street_address1.trim() || !f.state.trim() || !f.city.trim() || !f.phone.trim()) {
-      return toast.error("Please fill in all required fields");
-    }
-    setSavingAddress(true);
-    try {
-      if (editingAddressId) { await addressApi.update(editingAddressId, f); toast.success("Address updated!"); }
-      else { const created = await addressApi.create(f); setSelectedAddressId(created._id); toast.success("Address saved!"); }
-      queryClient.invalidateQueries({ queryKey: ["addresses"] });
-      setShowAddressModal(false);
-      setEditingAddressId(null);
-    } catch (e) { toast.error(e.response?.data?.message || "Address save failed"); }
-    finally { setSavingAddress(false); }
-  };
-
   const placeOrder = async () => {
     if (!activeItems.length) return toast.error("No items selected");
     if (!selectedAddressId) return toast.error("Please select a delivery address");
-    if (paymentMethod === "card") {
+      if (paymentMethod === "card") {
       if (cardForm.number.replace(/\s/g, "").length !== 16) return toast.error("Card number must be 16 digits");
       if (!cardForm.name.trim()) return toast.error("Card holder name is required");
       if (!/^\d{2}\/\d{2}$/.test(cardForm.expiry)) return toast.error("Expiry must be in MM/YY format");
       if (cardForm.cvv.length < 3) return toast.error("Please enter a valid CVV");
     }
+    if (paymentMethod === "bank" && !bankForm.senderName.trim()) {
+      return toast.error("Sender name is required for bank transfer");
+    }
     setPlacing(true);
     try {
-      await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod, shipping });
+           await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod, shipping, bank_sender_name: bankForm.senderName || null, bank_transaction_ref: bankForm.transactionRef || null });
             queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       // ✅ Remove ONLY the selected lines from the cart; the save() helper in
@@ -911,13 +943,24 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                       </button>
                     ))}
                   </div>
-                  {paymentMethod === "bank" && (
-                    <div className="mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4">
-                      <p className="text-xs font-bold text-[var(--user-text)] mb-2">Bank Transfer Details</p>
+                                   {paymentMethod === "bank" && (
+                    <div className="mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4 space-y-3">
+                      <p className="text-xs font-bold text-[var(--user-text)]">Bank Transfer Details</p>
                       <div className="space-y-1 text-xs text-[var(--user-text-muted)]">
                         <p>Account: <span className="font-bold text-[var(--user-text)]">ClickMasters Store</span></p>
                         <p>Bank: <span className="font-bold text-[var(--user-text)]">Meezan Bank</span></p>
                         <p>IBAN: <span className="font-mono font-bold text-[var(--user-text)]">PK00 MEZN 0000 1234 5678 9012</span></p>
+                      </div>
+                      <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
+                        <div>
+                          <label className={labelCls}>Sender Name (as per bank)</label>
+                          <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Transaction ID / Reference (optional)</label>
+                          <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inputCls} />
+                        </div>
+                        <p className="text-[10px] text-[var(--user-text-muted)]">Total amount transfer karne ke baad apna Transaction ID yahan add karein for faster verification.</p>
                       </div>
                     </div>
                   )}
@@ -1052,72 +1095,24 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
         </>
       )}
 
-      {/* Address Modal */}
-      {showAddressModal && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4" onClick={() => setShowAddressModal(false)} style={{ animation: "fadeIn 0.2s ease-out" }}>
-          <div className="w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[var(--user-bg-elevated)] border-t-2 sm:border-2 border-[var(--user-border)] shadow-2xl" style={{ animation: "modalUp .3s ease-out" }} onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-elevated)]/95 backdrop-blur-sm">
-              <h3 className="text-sm font-black text-[var(--user-text)]">{editingAddressId ? "Edit Address" : "Add New Address"}</h3>
-              <button onClick={() => { setShowAddressModal(false); setEditingAddressId(null); }} className="p-2 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 sm:p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><label className={labelCls}>Full Name</label>
-                  <input value={addressForm.full_name} onChange={(e) => setAddressForm({ ...addressForm, full_name: e.target.value })} placeholder="Ahsan Khan" className={inputCls} /></div>
-                <div><label className={labelCls}>Phone Number</label>
-                  <input type="tel" value={addressForm.phone} maxLength={14} onChange={(e) => { const val = e.target.value.replace(/\D/g, "").slice(0, 14); setAddressForm({ ...addressForm, phone: val }); }} placeholder="03001234567" className={inputCls} /></div>
-              </div>
-              <div><label className={labelCls}>Country / Region</label>
-                <div className="relative">
-                  <select value={addressForm.country} onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })} className={inputCls + " appearance-none pr-10 cursor-pointer"}>
-                    <option value="">Select country</option>
-                    {allCountries.map((c) => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                </div></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div><label className={labelCls}>State</label>
-                  <div className="relative">
-                    <select value={addressForm.state} onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })} disabled={!addressForm.country} className={inputCls + " appearance-none pr-10 cursor-pointer disabled:opacity-50"}>
-                      <option value="">Select</option>
-                      {allStates.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                  </div></div>
-                <div><label className={labelCls}>City</label>
-                  <div className="relative">
-                    <select value={addressForm.city} onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })} disabled={!addressForm.state} className={inputCls + " appearance-none pr-10 cursor-pointer disabled:opacity-50"}>
-                      <option value="">Select</option>
-                      {allCities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                  </div></div>
-                <div><label className={labelCls}>ZIP Code</label>
-                  <input value={addressForm.zip_code} onChange={(e) => setAddressForm({ ...addressForm, zip_code: e.target.value })} placeholder="54000" className={inputCls} /></div>
-              </div>
-              <div><label className={labelCls}>Street Address</label>
-                <textarea value={addressForm.street_address1} onChange={(e) => setAddressForm({ ...addressForm, street_address1: e.target.value })} rows="2" placeholder="Street address or P.O. Box" className={textareaCls} /></div>
-              <div><label className={labelCls}>Delivery Instructions (Optional)</label>
-                <textarea value={addressForm.delivery_instructions} onChange={(e) => setAddressForm({ ...addressForm, delivery_instructions: e.target.value })} rows="2" placeholder="Add preferences, notes, access codes" className={textareaCls} /></div>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] cursor-pointer hover:border-[var(--user-accent)]/40 transition">
-                <input type="checkbox" checked={addressForm.is_default} onChange={(e) => setAddressForm({ ...addressForm, is_default: e.target.checked })} className="w-4 h-4 rounded" style={{ accentColor: "var(--user-accent)" }} />
-                <span className="text-sm font-semibold text-[var(--user-text)]">Make this my default address</span>
-              </label>
-              <div className="pt-4 flex items-center justify-between gap-3 border-t-2 border-[var(--user-border)]">
-                <button onClick={() => { setShowAddressModal(false); setEditingAddressId(null); }} className={`h-12 px-6 rounded-xl text-sm font-bold ${ghostBtn}`}>Cancel</button>
-                <button onClick={saveAddress} disabled={savingAddress} className={`h-12 px-8 rounded-xl text-sm font-black flex items-center gap-2 disabled:opacity-50 ${accentBtn}`}>
-                  {savingAddress ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  {editingAddressId ? "Update Address" : "Save Address"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
+      </main>
     </div>
+
+    {/* ✅ AddressForm modal — fragment root pe (mobile + desktop DONO pe render ho) */}
+    {showAddressModal && (
+      <AddressForm
+        initialAddress={editingAddressId ? addresses.find(a => a._id === editingAddressId) : null}
+        onSuccess={(saved) => {
+          setShowAddressModal(false);
+          setEditingAddressId(null);
+          if (saved?._id) setSelectedAddressId(saved._id);
+        }}
+        onCancel={() => {
+          setShowAddressModal(false);
+          setEditingAddressId(null);
+        }}
+      />
+    )}
 
     {/* ============= MOBILE (Daraz-style single-scroll) — lg:hidden ============= */}
     {(() => {
@@ -1223,7 +1218,7 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
               </p>
               <button
                 type="button"
-                onClick={() => { setMobileAddressForm(false); setEditingAddressId(null); setMobileAddressSheet(true); }}
+                onClick={() => { setEditingAddressId(null); setMobileAddressSheet(true); }}
                 aria-label="Change delivery address"
                 className="w-full text-left px-3 pb-3 pt-1 flex items-center gap-3 active:scale-[0.99] transition"
               >
@@ -1348,8 +1343,54 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                       <span className="text-[10px] font-black uppercase tracking-wider mt-1">{m.label}</span>
                     </button>
                   );
-                })}
+                             })}
               </div>
+
+              {/* ✅ Mobile: Bank transfer info + fillable fields */}
+              {paymentMethod === "bank" && (
+                <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
+                  <p className="text-[11px] font-bold text-[var(--user-text)]">Bank Transfer Details</p>
+                  <div className="space-y-1 text-[11px] text-[var(--user-text-muted)]">
+                    <p>Account: <span className="font-bold text-[var(--user-text)]">ClickMasters Store</span></p>
+                    <p>Bank: <span className="font-bold text-[var(--user-text)]">Meezan Bank</span></p>
+                    <p>IBAN: <span className="font-mono font-bold text-[var(--user-text)]">PK00 MEZN 0000 1234 5678 9012</span></p>
+                  </div>
+                  <div className="pt-2 border-t border-[var(--user-border)] space-y-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Sender Name</label>
+                      <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID (optional)</label>
+                      <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ Mobile: Card form */}
+              {paymentMethod === "card" && (
+                <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Number</label>
+                    <input value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 16); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); }} placeholder="1234 5678 9012 3456" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Holder Name</label>
+                    <input value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} placeholder="John Doe" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry</label>
+                      <input value={cardForm.expiry} onChange={(e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); setCardForm({ ...cardForm, expiry: v }); }} placeholder="MM/YY" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">CVV</label>
+                      <input type="password" value={cardForm.cvv} onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" className="w-full h-10 px-3 rounded-lg text-[12px] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Card 4: Order summary */}
@@ -1419,8 +1460,8 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
           {mobileAddressSheet && (
             <div
               className="fixed inset-0 z-[60] flex items-end bg-black/70 backdrop-blur-sm"
-              onClick={() => { setMobileAddressSheet(false); setMobileAddressForm(false); setEditingAddressId(null); }}
-              style={{ animation: "fadeIn 0.2s ease-out" }}
+                onClick={() => { setMobileAddressSheet(false); setEditingAddressId(null); }}
+                style={{ animation: "fadeIn 0.2s ease-out" }}
             >
               <div
                 className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl"
@@ -1430,11 +1471,11 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                 {/* Sheet header */}
                 <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
                   <h3 className="text-[15px] font-black text-[var(--user-text)]">
-                    {mobileAddressForm ? (editingAddressId ? "Edit Address" : "Add New Address") : "Delivery Address"}
+                    Delivery Address
                   </h3>
                   <button
                     type="button"
-                    onClick={() => { setMobileAddressSheet(false); setMobileAddressForm(false); setEditingAddressId(null); }}
+                    onClick={() => { setMobileAddressSheet(false); setEditingAddressId(null); }}
                     aria-label="Close"
                     className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
                   >
@@ -1478,7 +1519,7 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                           <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
                             <button
                               type="button"
-                              onClick={() => { openEditModal(a); setMobileAddressForm(true); }}
+                              onClick={() => { setEditingAddressId(a._id); setMobileAddressSheet(false); setShowAddressModal(true); }}
                               className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-[11px] font-semibold"
                             >
                               <Pencil size={11} /> Edit
@@ -1496,163 +1537,13 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                     })}
                     <button
                       type="button"
-                      onClick={() => { openAddressModal(); setMobileAddressForm(true); }}
+                      onClick={() => { setEditingAddressId(null); setMobileAddressSheet(false); setShowAddressModal(true); }}
                       className="w-full h-11 rounded-xl border-2 border-dashed border-[var(--user-border)] text-[12px] font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-accent)]/5 transition flex items-center justify-center gap-2 mt-2"
                     >
                       <Plus size={14} /> Add New Address
                     </button>
                   </div>
                 )}
-
-                {/* Inline address form (add/edit) — reuses desktop state, mutations, query keys */}
-                {mobileAddressForm && (
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">Full Name</label>
-                        <input value={addressForm.full_name} onChange={(e) => setAddressForm({ ...addressForm, full_name: e.target.value })} placeholder="Ahsan Khan" className={inputCls} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">Phone Number</label>
-                        <input type="tel" value={addressForm.phone} maxLength={14} onChange={(e) => { const val = e.target.value.replace(/\D/g, "").slice(0, 14); setAddressForm({ ...addressForm, phone: val }); }} placeholder="03001234567" className={inputCls} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">Country / Region</label>
-                        <div className="relative">
-                          <select value={addressForm.country} onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })} className={inputCls + " appearance-none pr-10 cursor-pointer"}>
-                            <option value="">Select country</option>
-                            {allCountries.map((c) => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
-                          </select>
-                          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">State</label>
-                          <div className="relative">
-                            <select value={addressForm.state} onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })} disabled={!addressForm.country} className={inputCls + " appearance-none pr-10 cursor-pointer disabled:opacity-50"}>
-                              <option value="">Select</option>
-                              {allStates.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
-                            </select>
-                            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">City</label>
-                          <div className="relative">
-                            <select value={addressForm.city} onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })} disabled={!addressForm.state} className={inputCls + " appearance-none pr-10 cursor-pointer disabled:opacity-50"}>
-                              <option value="">Select</option>
-                              {allCities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                            </select>
-                            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" />
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">ZIP Code</label>
-                        <input value={addressForm.zip_code} onChange={(e) => setAddressForm({ ...addressForm, zip_code: e.target.value })} placeholder="54000" className={inputCls} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">Street Address</label>
-                        <textarea value={addressForm.street_address1} onChange={(e) => setAddressForm({ ...addressForm, street_address1: e.target.value })} rows="2" placeholder="Street address or P.O. Box" className={textareaCls} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider">Delivery Instructions (Optional)</label>
-                        <textarea value={addressForm.delivery_instructions} onChange={(e) => setAddressForm({ ...addressForm, delivery_instructions: e.target.value })} rows="2" placeholder="Add preferences, notes, access codes" className={textareaCls} />
-                      </div>
-                      <label className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] cursor-pointer">
-                        <input type="checkbox" checked={addressForm.is_default} onChange={(e) => setAddressForm({ ...addressForm, is_default: e.target.checked })} className="w-4 h-4 rounded" style={{ accentColor: "var(--user-accent)" }} />
-                        <span className="text-[12px] font-semibold text-[var(--user-text)]">Make this my default address</span>
-                      </label>
-                    </div>
-                    <div className="pt-3 flex items-center justify-between gap-2 border-t border-[var(--user-border)]">
-                      <button onClick={() => { setMobileAddressForm(false); setEditingAddressId(null); setShowAddressModal(false); }} className={`h-11 px-5 rounded-xl text-[12px] font-bold ${ghostBtn}`}>Cancel</button>
-                      <button onClick={async () => { await saveAddress(); setMobileAddressForm(false); }} disabled={savingAddress} className={`h-11 px-6 rounded-xl text-[12px] font-black flex items-center gap-2 disabled:opacity-50 ${accentBtn}`}>
-                        {savingAddress ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                        {editingAddressId ? "Update" : "Save"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {/* Mobile Order Review Sheet (Daraz-style) */}
-          {orderReviewOpen && (
-            <div
-              className="fixed inset-0 z-[70] flex items-end bg-black/50 backdrop-blur-sm"
-              onClick={() => { if (!placing) setOrderReviewOpen(false); }}
-              style={{ animation: "fadeIn 0.2s ease-out" }}
-            >
-              <div
-                className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl"
-                style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Header */}
-                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
-                  <h3 className="text-[15px] font-black text-[var(--user-text)]">Order Review</h3>
-                  <button
-                    type="button"
-                    onClick={() => { if (!placing) setOrderReviewOpen(false); }}
-                    aria-label="Close"
-                    className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                {/* Items */}
-                <div className="px-4 pt-4 pb-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-2">Items ({itemsWithDiscounts.length})</p>
-                  <div className="space-y-2.5">
-                    {itemsWithDiscounts.map((i) => (
-                      <div key={i.key} className="flex items-center gap-3">
-                        <ItemThumb item={i} size="w-14 h-14" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{i.name}</p>
-                          {i.variantTitle && <p className="text-[10px] text-[var(--user-text-muted)] truncate mt-0.5">{i.variantTitle}</p>}
-                          <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">×{i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
-                        </div>
-                        <p className="text-[12px] font-black text-[var(--user-text)] shrink-0">Rs. {Number(i.lineTotal || 0).toLocaleString()}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div className="px-4 py-3 border-t border-[var(--user-border)]">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-1.5 flex items-center gap-1.5">
-                    <MapPin size={11} /> Deliver to
-                  </p>
-                  {selectedAddress ? (
-                    <>
-                      <p className="text-[12px] font-bold text-[var(--user-text)] truncate">
-                        {selectedAddress.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {selectedAddress.phone}</span>
-                      </p>
-                      <p className="text-[11px] text-[var(--user-text-muted)] truncate mt-0.5">
-                        {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}, {selectedAddress.city}, {selectedAddress.state}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[12px] text-[var(--user-danger)] font-semibold">No address selected</p>
-                  )}
-                </div>
-
-                {/* Payment */}
-                <div className="px-4 py-3 border-t border-[var(--user-border)]">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-1.5 flex items-center gap-1.5">
-                    <CreditCard size={11} /> Payment
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] flex items-center justify-center shrink-0">
-                      {paymentMethod === "cod" ? <Truck size={16} className="text-[var(--user-text-muted)]" /> : paymentMethod === "bank" ? <Landmark size={16} className="text-[var(--user-text-muted)]" /> : <CreditCard size={16} className="text-[var(--user-text-muted)]" />}
-                    </div>
-                    <p className="text-[12px] font-bold text-[var(--user-text)]">
-                      {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}
-                    </p>
-                  </div>
-                </div>
 
                 {/* Summary */}
                 <div className="px-4 py-3 border-t border-[var(--user-border)] space-y-2 text-[12px]">
@@ -1692,6 +1583,47 @@ useEffect(() => { setAddressForm((f) => ({ ...f, state: "", city: "" })); }, [ad
                     disabled={placing}
                     className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
                   >
+                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+                    {placing ? "Placing..." : "Confirm & Place Order"}
+                  </button>
+                </div>
+              </div>
+            </div>
+                )}
+
+          {/* ✅ Mobile Order Review Sheet (Daraz-style) */}
+          {orderReviewOpen && (
+            <div className="fixed inset-0 z-[70] flex items-end bg-black/70 backdrop-blur-sm" onClick={() => setOrderReviewOpen(false)} style={{ animation: "fadeIn 0.2s ease-out" }}>
+              <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl" style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
+                  <h3 className="text-[15px] font-black text-[var(--user-text)]">Order Review</h3>
+                  <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
+                </div>
+                <div className="p-3 space-y-2">
+                  {itemsWithDiscounts.map((i) => (
+                    <div key={i.key} className="flex items-center gap-2.5">
+                      <ItemThumb item={i} size="w-12 h-12" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
+                        <p className="text-[10px] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
+                      </div>
+                      <p className="text-[12px] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
+                    </div>
+                  ))}
+                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-2.5 text-[11px] space-y-1">
+                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : "No address selected"}</p>
+                    {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
+                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}</p>
+                  </div>
+                  <div className="space-y-1.5 text-[12px] pt-1">
+                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>Items Total</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
+                    {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">You Save</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
+                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-bold">{shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}</span></div>
+                    <div className="flex justify-between items-baseline pt-2 border-t border-[var(--user-border)]"><span className="text-[13px] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                  </div>
+                </div>
+                <div className="px-4 pt-2 pb-1">
+                  <button type="button" onClick={placeOrder} disabled={placing} className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
                     {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                     {placing ? "Placing..." : "Confirm & Place Order"}
                   </button>
