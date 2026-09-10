@@ -87,7 +87,10 @@ export default function CategoriesPage() {
 
   const sortedCategories = useMemo(() => {
     const arr = [...filteredCategories];
-    if (!sortConfig.key) return arr;
+    if (!sortConfig.key) {
+      arr.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      return arr;
+    }
     arr.sort((a, b) => {
       let va, vb;
       switch (sortConfig.key) {
