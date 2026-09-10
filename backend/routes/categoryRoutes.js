@@ -51,7 +51,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
   try {
     const categories = await Category.find({ is_deleted: false })
       .select("name category_code description parent_category_id category_type attributes sort_order created_at")
-      .sort({ sort_order: 1, name: 1 })
+      .sort({ created_at: -1 })
       .lean();
 
     res.status(200).json({

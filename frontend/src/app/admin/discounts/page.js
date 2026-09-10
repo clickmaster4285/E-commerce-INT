@@ -1061,14 +1061,14 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
                       className="flex w-full items-center gap-3 px-3 h-9 rounded-md cursor-pointer transition hover:opacity-90"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
                     >
-                      <input
+                      {/* <input
                         type="checkbox"
                         checked={formData.is_stackable}
                         onChange={(e) => setFormData({ ...formData, is_stackable: e.target.checked })}
                         className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
                       />
                       <span className="text-[13px] font-semibold">Stackable</span>
-                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Allow with other discounts</span>
+                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Allow with other discounts</span> */}
                     </label>
                   </div>
                 </div>

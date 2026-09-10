@@ -217,9 +217,10 @@ export default function ProductsPage() {
   const [attributeFormData, setAttributeFormData] = useState({ 
     name: "", 
     code: "", 
-    data_type: "text", 
-    values: [{ label: "", value: "" }], 
-    variant_allowed: true 
+    data_type: "multi_select", 
+    values: [], 
+    variant_allowed: true,
+    value: false,
   });
 
   // Product Modal States
@@ -750,7 +751,7 @@ export default function ProductsPage() {
   };
 
   const resetAttributeForm = () => {
-    setAttributeFormData({ name: "", code: "", data_type: "text", values: [{ label: "", value: "" }], variant_allowed: true });
+    setAttributeFormData({ name: "", code: "", data_type: "multi_select", values: [], variant_allowed: true, value: false });
   };
   const handleOpenAttributeModal = () => {
     resetAttributeForm();
@@ -774,17 +775,19 @@ export default function ProductsPage() {
     if (!attributeFormData.name.trim()) { toast.error("Attribute name is required"); return; }
     const finalCode = attributeFormData.code.trim() || attributeFormData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const dt = attributeFormData.data_type;
-    const normalizedValues = (attributeFormData.values || [])
-      .map((v) => {
-        const raw = (v?.value ?? v?.label ?? "").toString().trim();
-        if (!raw) return null;
-        if (dt === "number") {
-          if (!/^-?\d+(\.\d+)?$/.test(raw)) return null;
-          return { label: raw, value: raw };
-        }
-        return { label: raw, value: raw.toLowerCase() };
-      })
-      .filter(Boolean);
+    let normalizedValues;
+    if (dt === "boolean") {
+      const boolVal = attributeFormData.value === true ? "true" : "false";
+      normalizedValues = [{ label: boolVal === "true" ? "True" : "False", value: boolVal }];
+    } else {
+      normalizedValues = (attributeFormData.values || [])
+        .map((v) => {
+          const raw = (v?.value ?? v?.label ?? "").toString().trim();
+          if (!raw) return null;
+          return { label: raw, value: raw.toLowerCase() };
+        })
+        .filter(Boolean);
+    }
     const payload = {
       name: attributeFormData.name.trim(),
       code: finalCode,
@@ -1103,21 +1106,22 @@ export default function ProductsPage() {
                             </div>
                             
                             {/* PROFESSIONAL VARIANT ATTRIBUTES SECTION */}
-                            <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b" style={{ borderColor: "var(--border-color)" }}>
+                            <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                                 <div>
                                   <h4 className="flex items-center gap-2 text-sm font-bold">
                                     <Settings2 className="h-4 w-4" style={{ color: "var(--accent)" }} />
                                     Variant Attributes
                                   </h4>
-                                  <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>Define specific options for this product's variants</p>
+                                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Define specific options for this product's variants</p>
                                 </div>
-                                <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                                <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                                   <Plus className="h-3.5 w-3.5" /> Add Attribute
                                 </button>
                               </div>
+                              <div className="p-5">
                               {variantAllowedAttributes.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2">
                                   {variantAllowedAttributes.map(attr => {
                                     const assignedOptions = getAssignedOptionList(attr);
                                     const hasAssignedOptions = assignedOptions.length > 0;
@@ -1144,6 +1148,24 @@ export default function ProductsPage() {
                                             <span className="text-xs font-mono">{variant.option_values?.[attrCode] || '#000000'}</span>
                                             <AddAttributeValueControl attr={attr} onAdd={(a, v) => handleAddVariantAttributeValue(a, v, index)} />
                                           </div>
+                                        ) : dt === 'boolean' ? (
+                                          <div className="flex rounded-lg border overflow-hidden p-0.5" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-input)" }}>
+                                            {[{ id: "true", label: "True" }, { id: "false", label: "False" }].map((opt) => {
+                                              const isActive = String(storedValue).toLowerCase() === opt.id;
+                                              return (
+                                                <button
+                                                  key={opt.id}
+                                                  type="button"
+                                                  onClick={() => updateVariantOption(index, attrCode, opt.id)}
+                                                  className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all select-none ${isActive ? "text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                                                  style={isActive ? { backgroundColor: "var(--bg-tertiary)" } : {}}
+                                                >
+                                                  <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === "true" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                                                  {opt.label}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
                                         ) : (
                                           <div className="flex items-center gap-2">
                                             <input
@@ -1168,6 +1190,7 @@ export default function ProductsPage() {
                                   <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Click "Add Attribute" to create and assign one.</p>
                                 </div>
                               )}
+                              </div>
                             </div>
 
                             <div>
@@ -1343,11 +1366,10 @@ export default function ProductsPage() {
 
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "text", label: "Text", icon: <Icons.Text className="w-4 h-4" /> },
-                    { id: "number", label: "Number", icon: <Icons.Hash className="w-4 h-4" /> },
-                    { id: "multi_select", label: "Options", icon: <Icons.Filter className="w-4 h-4" /> },
+                    { id: "multi_select", label: "Multi Select", icon: <Icons.Filter className="w-4 h-4" /> },
+                    { id: "boolean", label: "Boolean", icon: <Icons.Text className="w-4 h-4" /> },
                   ].map((type) => {
                     const isActive = attributeFormData.data_type === type.id;
                     return (
@@ -1365,41 +1387,26 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              {attributeFormData.data_type === "text" && (
+              {attributeFormData.data_type === "boolean" && (
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
-                  <input
-                    type="text"
-                    value={(attributeFormData.values[0]?.label || attributeFormData.values[0]?.value || "").toString()}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setAttributeFormData({
-                        ...attributeFormData,
-                        values: [{ label: v, value: v.toLowerCase() }],
-                      });
-                    }}
-                    placeholder="Enter text value"
-                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  />
-                </div>
-              )}
-
-              {attributeFormData.data_type === "number" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Value</label>
-                  <input
-                    type="number"
-                    value={(attributeFormData.values[0]?.label || attributeFormData.values[0]?.value || "").toString()}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setAttributeFormData({
-                        ...attributeFormData,
-                        values: [{ label: v, value: v }],
-                      });
-                    }}
-                    placeholder="Enter number value"
-                    className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  />
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default State</label>
+                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                    {[{ id: true, label: "True" }, { id: false, label: "False" }].map((opt) => {
+                      const isActive = attributeFormData.value === opt.id;
+                      return (
+                        <button
+                          key={String(opt.id)}
+                          type="button"
+                          onClick={() => setAttributeFormData({ ...attributeFormData, value: opt.id, values: [{ label: opt.label, value: String(opt.id) }] })}
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                        >
+                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default True/False state for this attribute.</p>
                 </div>
               )}
 
@@ -1647,6 +1654,7 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
           onChange={(e) => {
             const v = e.target.value;
             if (v === "") return;
+            if (v === "__add_new__") { setAdding(true); return; }
             if (!multiple) {
               onChange(v);
             } else {
@@ -1660,6 +1668,7 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
           {options.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
+          <option value="__add_new__" style={{ color: "#34d399", fontWeight: 600 }}>+ Add {attr.name}</option>
         </select>
         <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
       </div>
@@ -1676,20 +1685,6 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
           )}
         </div>
       )}
-      {!multiple && selectedArr.length > 0 && (
-        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium whitespace-nowrap" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}>
-          {selectedArr[0]}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => setAdding(true)}
-        className="h-9 px-2 rounded-md text-xs font-semibold inline-flex items-center gap-1 whitespace-nowrap"
-        style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--accent)" }}
-        title={`Add new ${attr.name} value`}
-      >
-        <Plus className="h-3.5 w-3.5" /> Add
-      </button>
     </div>
   );
 }
