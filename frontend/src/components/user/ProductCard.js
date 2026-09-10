@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Heart, Plus, Check, Package, Tag, Truck, Zap, PackageOpen, Sparkles } from "lucide-react";
+import {
+  Heart,
+  Plus,
+  Check,
+  Package,
+  Tag,
+  Truck,
+  Zap,
+  PackageOpen,
+  Sparkles,
+} from "lucide-react";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { useDiscounts } from "./DiscountContext";
@@ -17,19 +27,51 @@ const getImageUrl = (url) => {
 
 function getDealBadgeConfig(deal) {
   if (!deal) return null;
-  
+
   const type = deal.type;
   const val = deal.discountValue || 0;
   const buyQty = deal.buyQuantity || 0;
   const getQty = deal.getQuantity || 0;
-  
-  if (type === "percentage") return { text: `${val}% OFF`, color: "bg-gradient-to-r from-green-500 to-emerald-600", icon: Tag };
-  if (type === "fixed_amount") return { text: `Rs. ${val} OFF`, color: "bg-gradient-to-r from-blue-500 to-cyan-600", icon: Tag };
-  if (type === "buy_x_get_y") return { text: buyQty > 0 && getQty > 0 ? `Buy ${buyQty} Get ${getQty}` : "Buy X Get Y", color: "bg-gradient-to-r from-purple-500 to-pink-600", icon: PackageOpen };
-  if (type === "bundle") return { text: "Bundle Deal", color: "bg-gradient-to-r from-indigo-500 to-purple-600", icon: Package };
-  if (type === "free_shipping") return { text: "Free Shipping", color: "bg-gradient-to-r from-orange-500 to-red-600", icon: Truck };
-  
-  return { text: deal.name || "Deal", color: "bg-gradient-to-r from-orange-500 to-red-600", icon: Tag };
+
+  if (type === "percentage")
+    return {
+      text: `${val}% OFF`,
+      color: "bg-gradient-to-r from-green-500 to-emerald-600",
+      icon: Tag,
+    };
+  if (type === "fixed_amount")
+    return {
+      text: `Rs. ${val} OFF`,
+      color: "bg-gradient-to-r from-blue-500 to-cyan-600",
+      icon: Tag,
+    };
+  if (type === "buy_x_get_y")
+    return {
+      text:
+        buyQty > 0 && getQty > 0
+          ? `Buy ${buyQty} Get ${getQty}`
+          : "Buy X Get Y",
+      color: "bg-gradient-to-r from-purple-500 to-pink-600",
+      icon: PackageOpen,
+    };
+  if (type === "bundle")
+    return {
+      text: "Bundle Deal",
+      color: "bg-gradient-to-r from-indigo-500 to-purple-600",
+      icon: Package,
+    };
+  if (type === "free_shipping")
+    return {
+      text: "Free Shipping",
+      color: "bg-gradient-to-r from-orange-500 to-red-600",
+      icon: Truck,
+    };
+
+  return {
+    text: deal.name || "Deal",
+    color: "bg-gradient-to-r from-orange-500 to-red-600",
+    icon: Tag,
+  };
 }
 
 export default function ProductCard({
@@ -53,19 +95,29 @@ export default function ProductCard({
 
   const variants = product.variants || [];
   const firstVariant = variants[0];
-  
-  const image = firstVariant?.images?.[0]?.img_url || product.image || product.images?.[0]?.img_url;
-  const variantPrice = Number(firstVariant?.selling_price || product.price || product.selling_price || 0);
+
+  const image =
+    firstVariant?.images?.[0]?.img_url ||
+    product.image ||
+    product.images?.[0]?.img_url;
+  const variantPrice = Number(
+    firstVariant?.selling_price || product.price || product.selling_price || 0,
+  );
   const variantOldPrice = Number(firstVariant?.price || product.price || 0);
 
   let price = variantPrice;
   let oldPrice = variantOldPrice;
   let hasDiscount = false;
   let matchedDeal = null;
-  let discInfo = null;   // ✅ poora discount object rakh lo
-  
-   try {
-    const disc = calculateProductDiscount(product, variantPrice, showDealPricing, deal);
+  let discInfo = null; // ✅ poora discount object rakh lo
+
+  try {
+    const disc = calculateProductDiscount(
+      product,
+      variantPrice,
+      showDealPricing,
+      deal,
+    );
     discInfo = disc;
     price = disc.discountedPrice;
     oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
@@ -77,16 +129,18 @@ export default function ProductCard({
 
   // ✅ When showDealPricing is false (regular listing), still detect deal membership
   // so we can show a subtle "Also available in deal" mention — without applying deal pricing.
-  const mentionDeal = !showDealPricing ? (deal || matchedDeal || getActiveDealForProduct(product)) : null;
+  const mentionDeal = !showDealPricing
+    ? deal || matchedDeal || getActiveDealForProduct(product)
+    : null;
 
   const totalStock = variants.length
     ? variants.reduce((s, v) => s + Number(v.quantity || 0), 0)
-    : (product.quantity || 99);
+    : product.quantity || 99;
 
   const brandName = product.brand_id?.name || product.brand || "";
   const out = totalStock < 1;
 
-  const activeDeal = showDealPricing ? (deal || matchedDeal) : deal;
+  const activeDeal = showDealPricing ? deal || matchedDeal : deal;
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
   const displayBadgeText = badgeConfig?.text || dealBadge;
 
@@ -102,7 +156,8 @@ export default function ProductCard({
     } else if ((t === "fixed_amount" || t === "fixed") && v > 0) {
       discountBadgeText = `Rs. ${v.toLocaleString()} OFF`;
     } else {
-      const pct = oldPrice > 0 ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
+      const pct =
+        oldPrice > 0 ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
       if (pct > 0) discountBadgeText = `${pct}% OFF`;
     }
   }
@@ -111,14 +166,14 @@ export default function ProductCard({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
-    
+
     if (activeDeal) {
       const dealInfo = {
         dealId: activeDeal._id,
         dealType: activeDeal.type,
         dealName: activeDeal.name,
         dealBadge: badgeConfig?.text || null,
-        savings: price > 0 ? (oldPrice - price) : 0,
+        savings: price > 0 ? oldPrice - price : 0,
         originalPrice: oldPrice,
         dealDiscountValue: Number(activeDeal.discountValue) || 0,
       };
@@ -138,14 +193,20 @@ export default function ProductCard({
     <Link
       href={
         showDealPricing
-          ? (dealId ? `/product/${productId}?source=deal&deal=${encodeURIComponent(dealId)}` : `/product/${productId}?source=deal`)
+          ? dealId
+            ? `/product/${productId}?source=deal&deal=${encodeURIComponent(dealId)}`
+            : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
       className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
     >
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
         {image ? (
-          <img src={getImageUrl(image)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <img
+            src={getImageUrl(image)}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Package size={44} className="text-[var(--user-text-subtle)]" />
@@ -156,8 +217,15 @@ export default function ProductCard({
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           {displayBadgeText && !hideDiscountBadge && (
-            <span className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}>
-              {badgeConfig?.icon ? <badgeConfig.icon size={9} /> : <Tag size={9} />} {displayBadgeText}
+            <span
+              className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}
+            >
+              {badgeConfig?.icon ? (
+                <badgeConfig.icon size={9} />
+              ) : (
+                <Tag size={9} />
+              )}{" "}
+              {displayBadgeText}
             </span>
           )}
 
@@ -169,24 +237,43 @@ export default function ProductCard({
           )}
 
           {out ? (
-            <span className="bg-[var(--user-danger)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">OUT OF STOCK</span>
+            <span className="bg-[var(--user-danger)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              OUT OF STOCK
+            </span>
           ) : totalStock < 5 ? (
-            <span className="bg-[var(--user-warning)] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">LOW STOCK</span>
+            <span className="bg-[var(--user-warning)] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+              LOW STOCK
+            </span>
           ) : null}
         </div>
 
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(productId); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(productId);
+          }}
           className="absolute top-2.5 right-2.5 z-10 w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/60 transition"
         >
-          <Heart size={15} className={liked ? "text-[var(--user-danger)] fill-[var(--user-danger)]" : "text-white"} />
+          <Heart
+            size={15}
+            className={
+              liked
+                ? "text-[var(--user-danger)] fill-[var(--user-danger)]"
+                : "text-white"
+            }
+          />
         </button>
 
         <button
           onClick={handleAdd}
           disabled={out}
           className={`absolute bottom-2.5 right-2.5 z-10 w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 active:scale-90 ${
-            out ? "bg-[var(--user-bg-hover)] text-[var(--user-text-disabled)] cursor-not-allowed" : added ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:scale-105"
+            out
+              ? "bg-[var(--user-bg-hover)] text-[var(--user-text-disabled)] cursor-not-allowed"
+              : added
+                ? "bg-[var(--user-success)] text-white"
+                : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:scale-105"
           } md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0`}
         >
           {added ? <Check size={18} /> : <Plus size={18} />}
@@ -194,8 +281,12 @@ export default function ProductCard({
       </div>
 
       <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
-        <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">{brandName || ""}</p>
-        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">{product.name}</h3>
+        <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">
+          {brandName || ""}
+        </p>
+        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">
+          {product.name}
+        </h3>
 
         <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
           {oldPrice > price && (
@@ -208,7 +299,8 @@ export default function ProductCard({
           </h4>
           {mentionDeal && (
             <span className="mt-1 text-[10px] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
-              <Sparkles size={10} className="text-orange-500" /> Also available in deal
+              <Sparkles size={10} className="text-orange-500" /> Also available
+              in deal
             </span>
           )}
         </div>

@@ -185,9 +185,9 @@ export default function CategoriesPage() {
 
   const ActionButtons = ({ category }) => (
     <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); handleViewDetail(category); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); handleEdit(category); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); handleDelete(category); }} disabled={isDeleting} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
+      <button onClick={(e) => { e.stopPropagation(); handleViewDetail(category); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
+      <button onClick={(e) => { e.stopPropagation(); handleEdit(category); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
+      <button onClick={(e) => { e.stopPropagation(); handleDelete(category); }} disabled={isDeleting} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
     </div>
   );
 
@@ -200,7 +200,7 @@ export default function CategoriesPage() {
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Category Management</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage category hierarchy and dynamic attributes</p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-1">
               <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
               <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
@@ -210,11 +210,11 @@ export default function CategoriesPage() {
         </div>
 
         {/* ===== Stat Cards ===== */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Total Categories</p><p className="text-[20px] font-bold mt-1">{allCategories}</p></div>
-          <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Root Categories</p><p className="text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
-          <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Child Categories</p><p className="text-[20px] font-bold mt-1 text-emerald-500">{childCategoriesCount}</p></div>
-          <div className="rounded-lg p-4" style={cardStyle}><p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>With Attributes</p><p className="text-[20px] font-bold mt-1 text-purple-500">{categoriesWithAttributes}</p></div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{allCategories}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Root Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Child Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{childCategoriesCount}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>With Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{categoriesWithAttributes}</p></div>
         </div>
 
         {/* ===== Search ===== */}
@@ -224,7 +224,7 @@ export default function CategoriesPage() {
         </div>
 
         {/* ===== Filters ===== */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <SelectFilter value={filterParent} onChange={(e) => setFilterParent(e.target.value)}>
             <option value="all">All Categories</option><option value="root">Root Categories</option><option value="child">Child Categories</option>
           </SelectFilter>
@@ -232,11 +232,11 @@ export default function CategoriesPage() {
 
         {/* ===== Bulk selection bar ===== */}
         {selectedIds.length > 0 && (
-          <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={handleBulkDelete} disabled={isDeleting} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
+              <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
             </div>
           </div>
         )}
@@ -250,7 +250,8 @@ export default function CategoriesPage() {
             {!search && filterParent === "all" && <button onClick={handleCreate} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ Add your first category</button>}
           </div>
         ) : viewMode === "list" ? (
-          <div className="rounded-lg overflow-hidden" style={cardStyle}>
+          <>
+          <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
@@ -301,21 +302,65 @@ export default function CategoriesPage() {
               </table>
             </div>
           </div>
+
+          {/* ✅ MOBILE-ONLY card list (replaces table on <768px) — layout only, reuses existing handlers */}
+          <div className="md:hidden space-y-2.5">
+            {paginatedCategories.map((category) => {
+              const isMobileSelected = selectedIds.includes(category._id);
+              const parentName = getCategoryName(category.parent_category_id, categories);
+              const isMobileActive = category.status !== "inactive";
+              return (
+                <div
+                  key={category._id}
+                  onClick={() => handleViewDetail(category)}
+                  className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
+                  style={{
+                    ...cardStyle,
+                    backgroundColor: isMobileSelected ? "var(--bg-tertiary)" : "var(--bg-card)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={isMobileSelected}
+                      onChange={() => toggleSelect(category._id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded cursor-pointer shrink-0"
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-4 h-4" /></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate leading-tight">{category.name}</p>
+                      <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "Root category" ? "Root" : parentName}</span>
+                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.2)" } : { backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}>{isMobileActive ? "Active" : "Inactive"}</span>
+                  </div>
+                  <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
+                    <ActionButtons category={category} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedCategories.map((category) => {
               const parentName = getCategoryName(category.parent_category_id, categories);
               return (
-                <div key={category._id} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
+                <div key={category._id} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-5 h-5" /></div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-[13px] truncate">{category.name}</p>
-                    <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
+                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{category.name}</p>
+                    <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                   </div>
-                  <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{parentName === "Root category" ? "Root" : parentName}</span>
+                  <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "Root category" ? "Root" : parentName}</span>
                     <ActionButtons category={category} />
                   </div>
                 </div>
@@ -329,6 +374,7 @@ export default function CategoriesPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {startIndex + 1}-{Math.min(endIndex, totalCategories)} of {totalCategories} categories</p>
             <div className="flex items-center gap-2">
+              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {currentPage} of {totalPages}</span>
               <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
@@ -354,11 +400,11 @@ export default function CategoriesPage() {
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
               <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? `Delete "${deleteTarget.categories[0].name}"?` : `Delete ${deleteTarget.categories.length} categories?`}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The category(ies) will be permanently removed.</p></div>
             </div>
-            <div className="flex items-center gap-3 mt-5 p-3 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mt-5 p-3 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-4 h-4" /></div>
               <div className="min-w-0"><p className="text-sm font-medium truncate">{deleteTarget.categories[0].name}</p><p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.categories.length === 1 ? deleteTarget.categories[0].category_code || "—" : `+ ${deleteTarget.categories.length - 1} more`}</p></div>
             </div>
-            <div className="flex gap-3 mt-6">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
               <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
               <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-semibold text-white disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{isDeleting ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}</button>
             </div>

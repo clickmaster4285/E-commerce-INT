@@ -567,7 +567,8 @@ export default function BrandsPage() {
             )}
           </div>
         ) : viewMode === "list" ? (
-          <div className="rounded-lg overflow-hidden" style={cardStyle}>
+          <>
+          <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
@@ -605,6 +606,66 @@ export default function BrandsPage() {
               </table>
             </div>
           </div>
+
+          {/* ✅ MOBILE-ONLY card list (replaces table on <768px) — layout only, reuses existing handlers/components */}
+          <div className="md:hidden space-y-2.5">
+            {paginatedBrands.map((brand) => {
+              const isMobileSelected = selectedIds.includes(brand._id);
+              return (
+                <div
+                  key={brand._id}
+                  onClick={() => handleViewBrand(brand._id)}
+                  className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
+                  style={{
+                    ...cardStyle,
+                    backgroundColor: isMobileSelected
+                      ? "var(--bg-tertiary)"
+                      : "var(--bg-card)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={isMobileSelected}
+                      onChange={() => toggleSelect(brand._id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded cursor-pointer shrink-0"
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <Avatar brand={brand} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate leading-tight">
+                        {brand.name}
+                      </p>
+                      <p
+                        className="text-[11px] font-mono truncate mt-0.5"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {brand.brand_code || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span
+                      className="text-[11px] truncate min-w-0"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {brand.country || "—"}
+                    </span>
+                    <StatusBadge active={brand.is_active} />
+                  </div>
+                  <div
+                    className="flex items-center justify-end pt-2"
+                    style={{ borderTop: "1px solid var(--border-color)" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ActionButtons brand={brand} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedBrands.map((brand) => (
