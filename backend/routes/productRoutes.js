@@ -1,17 +1,56 @@
 const express = require("express");
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct } = require("../controllers/productController");
+
+const {
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  toggleProductStatus,
+} = require("../controllers/productController");
+
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware"); // <--- Naya import
+const { checkPermission } = require("../middleware/checkPermission");
+
+const {
+  productImagesUpload,
+  validateProductImages,
+} = require("../middleware/productImageMiddleware");
+
+const saveProductImages = require("../middleware/saveProductImages");
 
 const router = express.Router();
 
-// Sirf ADMIN add, update, delete kar sakta hai
-router.post("/", authMiddleware, adminMiddleware, createProduct);
-router.put("/:id", authMiddleware, adminMiddleware, updateProduct);
-router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
+// ==========================================
+// 🌐 PUBLIC ROUTES — bina login (User GUI)
+// ==========================================
+router.get("/", getProducts);
+router.get("/:id", getProductById);
 
-// Sab (Admin aur User) dekh sakte hain
-router.get("/", authMiddleware, getProducts);
-router.get("/:id", authMiddleware, getProductById);
+// ==========================================
+// 🛡️ ADMIN ROUTES — login + permission
+// ==========================================
+router.post(
+  "/",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  createProduct,
+);
+
+router.put(
+  "/:id",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  updateProduct,
+);
+
+router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
 
 module.exports = router;

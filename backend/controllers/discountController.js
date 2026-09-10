@@ -1,0 +1,714 @@
+const Discount = require("../models/Discount");
+const Deal = require("../models/Deal");
+const { getIO } = require("../utils/socket");
+
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (_) {}
+};
+
+// =====================================================
+// HELPER
+// =====================================================
+
+const normalizeArray = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(Boolean);
+};
+
+const getApplyTo = (targetType) => {
+  switch (targetType) {
+    case "all_products":
+    case "all":
+      return "all";
+    case "product":
+    case "specific_product":
+    case "specific_products":
+      return "specific_products";
+    case "category":
+    case "specific_category":
+    case "specific_categories":
+      return "specific_categories";
+    case "brand":
+    case "specific_brand":
+    case "specific_brands":
+      return "specific_brands";
+    case "tag":
+    case "specific_tag":
+    case "specific_tags":
+      return "specific_tags";
+    case "size":
+    case "specific_size":
+    case "specific_sizes":
+      return "specific_sizes";
+    case "price_range":
+      return "price_range";
+    default:
+      return "all";
+  }
+};
+
+const getDiscountType = (valueType) => {
+  switch (valueType) {
+    case "fixed_amount":
+    case "fixed":
+      return "fixed";
+    case "fixed_price":
+      return "fixed_price";
+    case "percentage":
+    default:
+      return "percentage";
+  }
+};
+
+// =====================================================
+// CREATE DISCOUNT
+// =====================================================
+
+exports.createDiscount = async (req, res) => {
+  try {
+    const {
+      name,
+      code,
+      description,
+      target_type,
+      value_type,
+      value,
+      max_discount,
+      selected_product_ids,
+      selected_category_ids,
+      selected_brand_ids,
+      selected_tag_ids,
+      selected_size_ids,
+      price_min,
+      price_max,
+      min_order_amount,
+      min_quantity,
+      start_at,
+      end_at,
+      usage_limit,
+      usage_per_customer,
+      priority,
+      is_stackable,
+      status,
+    } = req.body;
+
+    // ===================================================
+    // VALIDATION
+    // ===================================================
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Discount name is required" });
+    }
+
+    if (value === undefined || value === null || value === "") {
+      return res.status(400).json({ message: "Discount value is required" });
+    }
+
+    // ✅ FIXED: Percentage validation updated to allow up to 100%
+    if (value_type === "percentage" && (Number(value) < 0 || Number(value) > 100)) {
+      return res.status(400).json({
+        message: "Percentage discount must be between 0 and 100",
+      });
+    }
+
+    // ===================================================
+    // TARGET
+    // ===================================================
+    const applyTo = getApplyTo(target_type);
+
+    // ===================================================
+    // TARGET VALIDATION
+    // ===================================================
+    if (applyTo === "specific_products" && normalizeArray(selected_product_ids).length === 0) {
+      return res.status(400).json({ message: "Please select at least one product" });
+    }
+    if (applyTo === "specific_categories" && normalizeArray(selected_category_ids).length === 0) {
+      return res.status(400).json({ message: "Please select at least one category" });
+    }
+    if (applyTo === "specific_brands" && normalizeArray(selected_brand_ids).length === 0) {
+      return res.status(400).json({ message: "Please select at least one brand" });
+    }
+    if (applyTo === "specific_tags" && normalizeArray(selected_tag_ids).length === 0) {
+      return res.status(400).json({ message: "Please select at least one tag" });
+    }
+    if (applyTo === "specific_sizes" && normalizeArray(selected_size_ids).length === 0) {
+      return res.status(400).json({ message: "Please select at least one size" });
+    }
+
+    // ===================================================
+    // PRICE RANGE VALIDATION
+    // ===================================================
+    if (applyTo === "price_range") {
+      if (price_min === undefined || price_min === "" || price_max === undefined || price_max === "") {
+        return res.status(400).json({ message: "Minimum and maximum price are required" });
+      }
+      if (Number(price_min) > Number(price_max)) {
+        return res.status(400).json({ message: "Minimum price cannot be greater than maximum price" });
+      }
+    }
+
+    // ===================================================
+    // DATE VALIDATION
+    // ===================================================
+    if (start_at && end_at) {
+      const startDate = new Date(start_at);
+      const endDate = new Date(end_at);
+      if (startDate >= endDate) {
+        return res.status(400).json({ message: "Start date must be before end date" });
+      }
+    }
+
+    // ===================================================
+    // STATUS
+    // ===================================================
+    const finalStatus = status || "draft";
+    const isActive = finalStatus === "active";
+
+    // ===================================================
+    // CREATE DATA
+    // ===================================================
+    const discountData = {
+      code: code && code.trim() ? code.trim().toUpperCase() : `DISC-${Date.now().toString().slice(-6)}`,
+      name: name.trim(),
+      description: description || "",
+      type: getDiscountType(value_type),
+      value: Number(value),
+      maxDiscountAmount: max_discount !== undefined && max_discount !== null && max_discount !== "" ? Number(max_discount) : null,
+      applyTo,
+      selectedProducts: normalizeArray(selected_product_ids),
+      selectedCategories: normalizeArray(selected_category_ids),
+      selectedBrands: normalizeArray(selected_brand_ids),
+      selectedTags: normalizeArray(selected_tag_ids),
+      selectedSizes: normalizeArray(selected_size_ids),
+      priceMin: applyTo === "price_range" ? Number(price_min) : null,
+      priceMax: applyTo === "price_range" ? Number(price_max) : null,
+      minOrderValue: min_order_amount !== undefined && min_order_amount !== null && min_order_amount !== "" ? Number(min_order_amount) : 0,
+      minQuantity: min_quantity !== undefined && min_quantity !== null && min_quantity !== "" ? Number(min_quantity) : null,
+      startDate: start_at ? new Date(start_at) : new Date(),
+      endDate: end_at ? new Date(end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      usageLimit: usage_limit !== undefined && usage_limit !== null && usage_limit !== "" ? Number(usage_limit) : null,
+      perUserLimit: usage_per_customer !== undefined && usage_per_customer !== null && usage_per_customer !== "" ? Number(usage_per_customer) : 1,
+      priority: priority !== undefined && priority !== "" ? Number(priority) : 1,
+      isStackable: Boolean(is_stackable),
+      status: finalStatus,
+      isActive,
+      createdBy: req.user?._id || req.user?.id,
+    };
+
+    // ===================================================
+    // CREATED BY CHECK (401 Prevention)
+    // ===================================================
+    if (!discountData.createdBy) {
+      return res.status(401).json({
+        message: "Authenticated user not found. Please ensure auth middleware is applied to this route.",
+      });
+    }
+
+    // ===================================================
+    // SAVE
+    // ===================================================
+    const newDiscount = await Discount.create(discountData);
+
+    // ===================================================
+    // SOCKET
+    // ===================================================
+    emitSocketEvent("discount:created", newDiscount);
+    emitSocketEvent("discountCreated", newDiscount);
+
+    return res.status(201).json({
+      message: "Discount created successfully",
+      data: newDiscount,
+    });
+  } catch (error) {
+    console.error("Create Discount Error:", error);
+
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((e) => e.message);
+      return res.status(400).json({ message: messages.join(", ") });
+    }
+
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Discount code already exists." });
+    }
+
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// =====================================================
+// GET ALL DISCOUNTS
+// =====================================================
+
+exports.getDiscounts = async (req, res) => {
+  try {
+    const discounts = await Discount.find({ is_deleted: false })
+      .populate("selectedProducts", "name sku selling_price")
+      .populate("selectedCategories", "name")
+      .populate("selectedBrands", "name")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email")
+      .sort({ createdAt: -1 });
+
+    // ✅ FIXED: Returning raw array so frontend can display it immediately
+    return res.status(200).json(discounts); 
+  } catch (error) {
+    console.error("Get Discounts Error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// =====================================================
+// GET SINGLE DISCOUNT
+// =====================================================
+
+exports.getDiscountById = async (req, res) => {
+  try {
+    const discount = await Discount.findOne({
+      _id: req.params.id,
+      is_deleted: false,
+    })
+      .populate("selectedProducts", "name sku selling_price")
+      .populate("selectedCategories", "name")
+      .populate("selectedBrands", "name")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
+
+    if (!discount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+
+    return res.status(200).json(discount);
+  } catch (error) {
+    console.error("Get Discount By ID Error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// =====================================================
+// UPDATE DISCOUNT
+// =====================================================
+
+exports.updateDiscount = async (req, res) => {
+  try {
+    const {
+      name,
+      code,
+      description,
+      target_type,
+      value_type,
+      value,
+      max_discount,
+      selected_product_ids,
+      selected_category_ids,
+      selected_brand_ids,
+      selected_tag_ids,
+      selected_size_ids,
+      price_min,
+      price_max,
+      min_order_amount,
+      min_quantity,
+      start_at,
+      end_at,
+      usage_limit,
+      usage_per_customer,
+      priority,
+      is_stackable,
+      status,
+    } = req.body;
+
+    // ===================================================
+    // FIND DISCOUNT
+    // ===================================================
+    const discount = await Discount.findOne({
+      _id: req.params.id,
+      is_deleted: false,
+    });
+
+    if (!discount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+
+    // ===================================================
+    // TARGET
+    // ===================================================
+    const applyTo = getApplyTo(target_type || discount.applyTo);
+
+    // ===================================================
+    // UPDATE BASIC
+    // ===================================================
+    if (name !== undefined) discount.name = name.trim();
+    if (code !== undefined) discount.code = code.trim().toUpperCase();
+    if (description !== undefined) discount.description = description;
+
+    // ===================================================
+    // VALUE
+    // ===================================================
+    if (value_type !== undefined) {
+      discount.type = getDiscountType(value_type);
+    }
+
+    if (value !== undefined) {
+      discount.value = Number(value);
+    }
+
+    // ✅ FIXED: Percentage validation for Update also updated to 100%
+    if (discount.type === "percentage" && (discount.value < 0 || discount.value > 100)) {
+      return res.status(400).json({
+        message: "Percentage discount must be between 0 and 100",
+      });
+    }
+
+    if (max_discount !== undefined) {
+      discount.maxDiscountAmount = max_discount === "" || max_discount === null ? null : Number(max_discount);
+    }
+
+    // ===================================================
+    // TARGET ARRAYS
+    // ===================================================
+    discount.applyTo = applyTo;
+    if (selected_product_ids !== undefined) discount.selectedProducts = normalizeArray(selected_product_ids);
+    if (selected_category_ids !== undefined) discount.selectedCategories = normalizeArray(selected_category_ids);
+    if (selected_brand_ids !== undefined) discount.selectedBrands = normalizeArray(selected_brand_ids);
+    if (selected_tag_ids !== undefined) discount.selectedTags = normalizeArray(selected_tag_ids);
+    if (selected_size_ids !== undefined) discount.selectedSizes = normalizeArray(selected_size_ids);
+
+    // ===================================================
+    // PRICE RANGE
+    // ===================================================
+    if (applyTo === "price_range") {
+      if (price_min !== undefined) discount.priceMin = Number(price_min);
+      if (price_max !== undefined) discount.priceMax = Number(price_max);
+
+      if (discount.priceMin !== null && discount.priceMax !== null && discount.priceMin > discount.priceMax) {
+        return res.status(400).json({ message: "Minimum price cannot be greater than maximum price" });
+      }
+    } else {
+      discount.priceMin = null;
+      discount.priceMax = null;
+    }
+
+    // ===================================================
+    // CONDITIONS & DATES & USAGE & RULES & STATUS
+    // ===================================================
+    if (min_order_amount !== undefined) {
+      discount.minOrderValue = min_order_amount === "" || min_order_amount === null ? 0 : Number(min_order_amount);
+    }
+    if (min_quantity !== undefined) {
+      discount.minQuantity = min_quantity === "" || min_quantity === null ? null : Number(min_quantity);
+    }
+    if (start_at !== undefined) discount.startDate = new Date(start_at);
+    if (end_at !== undefined) discount.endDate = new Date(end_at);
+
+    // ===================================================
+    // DATE VALIDATION
+    // ===================================================
+    if (discount.startDate && discount.endDate && discount.startDate >= discount.endDate) {
+      return res.status(400).json({ message: "Start date must be before end date" });
+    }
+    
+    if (usage_limit !== undefined) {
+      discount.usageLimit = usage_limit === "" || usage_limit === null ? null : Number(usage_limit);
+    }
+    if (usage_per_customer !== undefined) discount.perUserLimit = Number(usage_per_customer);
+    if (priority !== undefined) discount.priority = Number(priority);
+    if (is_stackable !== undefined) discount.isStackable = Boolean(is_stackable);
+    
+    if (status !== undefined) {
+      discount.status = status;
+      discount.isActive = status === "active";
+    }
+
+    // ===================================================
+    // UPDATED BY
+    // ===================================================
+    const userId = req.user?._id || req.user?.id;
+    if (userId) {
+      discount.updatedBy = userId;
+    }
+
+    // ===================================================
+    // SAVE
+    // ===================================================
+    const updatedDiscount = await discount.save();
+
+    // ===================================================
+    // SOCKET
+    // ===================================================
+    emitSocketEvent("discount:updated", updatedDiscount);
+    emitSocketEvent("discountUpdated", updatedDiscount);
+
+    return res.status(200).json({
+      message: "Discount updated successfully",
+      data: updatedDiscount,
+    });
+  } catch (error) {
+    console.error("Update Discount Error:", error);
+
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((e) => e.message);
+      return res.status(400).json({ message: messages.join(", ") });
+    }
+
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Discount code already exists." });
+    }
+
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// =====================================================
+// DELETE DISCOUNT
+// =====================================================
+
+exports.deleteDiscount = async (req, res) => {
+  try {
+    const deletedDiscount = await Discount.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: false },
+      { is_deleted: true },
+      { new: true }
+    );
+
+    if (!deletedDiscount) {
+      return res.status(404).json({ message: "Discount not found" });
+    }
+
+    emitSocketEvent("discount:deleted", req.params.id);
+    emitSocketEvent("discountDeleted", req.params.id);
+
+    return res.status(200).json({ message: "Discount deleted successfully" });
+  } catch (error) {
+    console.error("Delete Discount Error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+// =====================================================
+// GET ACTIVE DISCOUNTS (PUBLIC - NO AUTH)
+// =====================================================
+
+exports.getPublicDiscounts = async (req, res) => {
+  try {
+    const now = new Date();
+
+    const discounts = await Discount.find({
+      is_deleted: false,
+      isActive: true,
+      status: "active",
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    })
+      .populate("selectedProducts", "_id name selling_price")
+      .populate("selectedCategories", "_id name")
+      .populate("selectedBrands", "_id name")
+      .select("-createdBy -usageCount -__v")
+      .sort({ priority: -1, createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: discounts,
+    });
+  } catch (error) {
+    console.error("Get Public Discounts Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Server error",
+    });
+  }
+};
+
+// =====================================================
+// HELPER: Calculate Discounted Price for a Product
+// =====================================================
+
+const calculateDiscountedPrice = async (product, discounts) => {
+  const originalPriceSnapshot = Number(product.selling_price || product.price || 0);
+
+  // =====================================================
+  // DEAL PRIORITY: If product belongs to any active deal,
+  // do NOT apply discount on top of the deal's price.
+  // Deal price is already applied separately via the deal system.
+  // =====================================================
+  try {
+    const now = new Date();
+    const productIdStr = String(product._id || product.id || "");
+    const productCategoryId = String(
+      product.category?._id || product.category || product.categoryId || ""
+    );
+    const productBrandId = String(
+      product.brand?._id || product.brand || product.brandId || ""
+    );
+
+    const activeDeal = await Deal.findOne({
+      isActive: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+      $or: [
+        { applyTo: "all" },
+        { applyTo: "product", productIds: product._id },
+        { applyTo: "category", categoryIds: product.category?._id || product.category || product.categoryId },
+        { applyTo: "brand", brandIds: product.brand?._id || product.brand || product.brandId },
+      ],
+    }).lean();
+
+    if (activeDeal) {
+      const dealApplies =
+        activeDeal.applyTo === "all" ||
+        (activeDeal.applyTo === "product" &&
+          Array.isArray(activeDeal.productIds) &&
+          activeDeal.productIds.some(
+            (p) => String(p?._id || p) === productIdStr
+          )) ||
+        (activeDeal.applyTo === "category" &&
+          productCategoryId &&
+          Array.isArray(activeDeal.categoryIds) &&
+          activeDeal.categoryIds.some(
+            (c) => String(c?._id || c) === productCategoryId
+          )) ||
+        (activeDeal.applyTo === "brand" &&
+          productBrandId &&
+          Array.isArray(activeDeal.brandIds) &&
+          activeDeal.brandIds.some(
+            (b) => String(b?._id || b) === productBrandId
+          ));
+
+      if (dealApplies) {
+        // ✅ Apply the deal's OWN discount to the price.
+        // Percentage / fixed_amount → reduce price. buy_x_get_y / bundle /
+        // free_shipping → no price change (free items / shipping only).
+        // Regular (non-deal) discounts are skipped entirely for this product.
+        const dealType = activeDeal.type;
+        const dealValue = Number(activeDeal.discountValue || 0);
+
+        let dealDiscountedPrice = originalPriceSnapshot;
+        let dealHasDiscount = false;
+        let dealSavings = 0;
+
+        if (dealType === "percentage") {
+          dealDiscountedPrice = Math.round(originalPriceSnapshot * (1 - dealValue / 100) * 100) / 100;
+          dealHasDiscount = true;
+          dealSavings = Math.round((originalPriceSnapshot - dealDiscountedPrice) * 100) / 100;
+        } else if (dealType === "fixed_amount") {
+          dealDiscountedPrice = Math.max(0, originalPriceSnapshot - dealValue);
+          dealHasDiscount = dealDiscountedPrice < originalPriceSnapshot;
+          dealSavings = Math.round((originalPriceSnapshot - dealDiscountedPrice) * 100) / 100;
+        }
+
+        return {
+          hasDiscount: dealHasDiscount,
+          originalPrice: originalPriceSnapshot,
+          discountedPrice: dealDiscountedPrice,
+          discountValue: dealValue,
+          discountType: dealType,
+          discountName: activeDeal.name || "",
+          savings: dealSavings,
+          matchedDeal: activeDeal,
+        };
+      }
+    }
+  } catch (_) {
+    // If deal lookup fails, fall through to normal discount logic.
+  }
+
+  if (!discounts || !Array.isArray(discounts) || discounts.length === 0) {
+    return {
+      hasDiscount: false,
+      originalPrice: product.selling_price || product.price || 0,
+      discountedPrice: product.selling_price || product.price || 0,
+      discountValue: 0,
+      discountType: null,
+      discountName: null,
+    };
+  }
+
+  const originalPrice = Number(product.selling_price || product.price || 0);
+  let bestDiscount = null;
+  let bestFinalPrice = originalPrice;
+
+  for (const discount of discounts) {
+    if (!discount.isActive) continue;
+
+    // Check if discount applies to this product
+    let applies = false;
+
+    if (discount.applyTo === "all") {
+      applies = true;
+    } else if (discount.applyTo === "specific_products") {
+      applies = discount.selectedProducts.some(
+        (p) => String(p._id || p) === String(product._id || product.id)
+      );
+    } else if (discount.applyTo === "specific_categories") {
+      const productCategoryId = String(
+        product.category?._id || product.category || product.categoryId
+      );
+      applies = discount.selectedCategories.some(
+        (c) => String(c._id || c) === productCategoryId
+      );
+    } else if (discount.applyTo === "specific_brands") {
+      const productBrandId = String(
+        product.brand?._id || product.brand || product.brandId
+      );
+      applies = discount.selectedBrands.some(
+        (b) => String(b._id || b) === productBrandId
+      );
+    } else if (discount.applyTo === "price_range") {
+      applies =
+        discount.priceMin !== null &&
+        discount.priceMax !== null &&
+        originalPrice >= discount.priceMin &&
+        originalPrice <= discount.priceMax;
+    }
+
+    if (!applies) continue;
+
+    // Calculate final price for this discount
+    let finalPrice = originalPrice;
+
+    if (discount.type === "percentage") {
+      finalPrice = originalPrice * (1 - discount.value / 100);
+      if (
+        discount.maxDiscountAmount &&
+        originalPrice - finalPrice > discount.maxDiscountAmount
+      ) {
+        finalPrice = originalPrice - discount.maxDiscountAmount;
+      }
+    } else if (discount.type === "fixed") {
+      finalPrice = Math.max(0, originalPrice - discount.value);
+    } else if (discount.type === "fixed_price") {
+      finalPrice = discount.value;
+    }
+
+    // Pick the best discount (lowest final price)
+    if (finalPrice < bestFinalPrice) {
+      bestFinalPrice = finalPrice;
+      bestDiscount = discount;
+    }
+  }
+
+  if (!bestDiscount) {
+    return {
+      hasDiscount: false,
+      originalPrice,
+      discountedPrice: originalPrice,
+      discountValue: 0,
+      discountType: null,
+      discountName: null,
+    };
+  }
+
+  return {
+    hasDiscount: true,
+    originalPrice,
+    discountedPrice: Math.round(bestFinalPrice * 100) / 100,
+    discountValue: bestDiscount.value,
+    discountType: bestDiscount.type,
+    discountName: bestDiscount.name,
+    discountCode: bestDiscount.code,
+    savings: Math.round((originalPrice - bestFinalPrice) * 100) / 100,
+  };
+};
+
+// Export helper for use in other controllers
+exports.calculateDiscountedPrice = calculateDiscountedPrice;

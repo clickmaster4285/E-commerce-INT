@@ -3,34 +3,58 @@ const User = require("../models/User");
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    let token = null;
 
-    if (!authHeader) {
-      return res.status(401).json({ message: "Token required" });
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
     }
 
-    const token = authHeader.split(" ")[1];
+    if (!token && req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    }
 
     if (!token) {
-      return res.status(401).json({ message: "Token required" });
+      return res.status(401).json({ success: false, message: "Token required" });
     }
 
-    // 1. Token verify karke decoded data nikalo (jisme userId aur role hai)
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 2. Database se user dhundo
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(decoded.userId)
+      .select("-password")
+      .lean();
 
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
+    if (!user || user.is_deleted) {
+      return res.status(401).json({ success: false, message: "User not found or deleted" });
     }
 
-    // 3. Request mein user ka poora data (jisme role bhi shamil hai) save karo
-    req.user = user;
+    if (user.status === "inactive") {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Your account is inactive. Please contact admin." 
+      });
+    }
+
+    // ✅ FIX: Map storeId to tenant_id so existing controllers work correctly
+    req.user = {
+      ...user,
+      tenant_id: user.storeId || null,
+    };
 
     next();
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    if (process.env.NODE_ENV !== "production") {
+      console.error(" Auth Middleware Error:", error.message);
+    }
+
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Token expired. Please login again." });
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+
+    return res.status(500).json({ success: false, message: "Authentication failed" });
   }
 };
 

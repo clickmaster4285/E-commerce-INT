@@ -2,38 +2,10 @@ const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema(
   {
-    product_code: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
-
-    sku: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
-
-    barcode: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-      default: null,
-    },
-
     name: {
       type: String,
       required: true,
       trim: true,
-    },
-
-    description: {
-      type: String,
-      trim: true,
-      default: "",
     },
 
     category_id: {
@@ -48,97 +20,68 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
 
-    unit_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Unit",
-      default: null,
+    has_variants: {
+      type: Boolean,
+      default: false,
     },
 
-    purchase_price: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+    tag_ids: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Tag",
+      },
+    ],
 
-    selling_price: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    cost_price: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    tax_rate: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    weight: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    length: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    width: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    height: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    image_url: {
+    description: {
       type: String,
       trim: true,
       default: "",
     },
 
-    minimum_stock: {
+    tax: {
       type: Number,
       default: 0,
       min: 0,
+      max: 100,
     },
 
-    maximum_stock: {
-      type: Number,
-      default: 0,
-      min: 0,
+    // ✅ NEW: Dynamic specifications from category attributes
+    specifications: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
 
-    reorder_level: {
-      type: Number,
-      default: 0,
-      min: 0,
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
     },
 
-    is_serialized: {
+    createdby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    updatedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    deletedby: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    is_deleted: {
       type: Boolean,
       default: false,
     },
 
-    is_batch_tracked: {
-      type: Boolean,
-      default: false,
-    },
-
-    is_active: {
-      type: Boolean,
-      default: true,
+    deleted_at: {
+      type: Date,
+      default: null,
     },
   },
   {
@@ -148,5 +91,9 @@ const productSchema = new mongoose.Schema(
     },
   }
 );
+
+productSchema.index({ category_id: 1 });
+productSchema.index({ brand_id: 1 });
+productSchema.index({ status: 1, is_deleted: 1 });
 
 module.exports = mongoose.model("Product", productSchema);
