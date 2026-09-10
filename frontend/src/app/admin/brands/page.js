@@ -1049,7 +1049,7 @@ export default function BrandsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -1194,7 +1194,8 @@ export default function BrandsPage() {
             )}
           </div>
         ) : viewMode === "list" ? (
-          <div className="rounded-lg overflow-hidden" style={cardStyle}>
+          <>
+          <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead
@@ -1297,8 +1298,68 @@ export default function BrandsPage() {
               </table>
             </div>
           </div>
+
+          {/* ✅ MOBILE-ONLY card list (replaces table on <768px) — layout only, reuses existing handlers/components */}
+          <div className="md:hidden space-y-2.5">
+            {paginatedBrands.map((brand) => {
+              const isMobileSelected = selectedIds.includes(brand._id);
+              return (
+                <div
+                  key={brand._id}
+                  onClick={() => handleViewBrand(brand._id)}
+                  className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
+                  style={{
+                    ...cardStyle,
+                    backgroundColor: isMobileSelected
+                      ? "var(--bg-tertiary)"
+                      : "var(--bg-card)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={isMobileSelected}
+                      onChange={() => toggleSelect(brand._id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded cursor-pointer shrink-0"
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <Avatar brand={brand} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate leading-tight">
+                        {brand.name}
+                      </p>
+                      <p
+                        className="text-[11px] font-mono truncate mt-0.5"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {brand.brand_code || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span
+                      className="text-[11px] truncate min-w-0"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {brand.country || "—"}
+                    </span>
+                    <StatusBadge active={brand.is_active} />
+                  </div>
+                  <div
+                    className="flex items-center justify-end pt-2"
+                    style={{ borderTop: "1px solid var(--border-color)" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ActionButtons brand={brand} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedBrands.map((brand) => (
               <div key={brand._id} onClick={() => handleViewBrand(brand._id)} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                 <div className="flex items-start justify-between gap-2">
@@ -1329,6 +1390,12 @@ export default function BrandsPage() {
               {totalBrands} brands
             </p>
             <div className="flex items-center gap-2">
+              <span
+                className="sm:hidden text-[13px] font-medium whitespace-nowrap"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Page {currentPage} of {totalPages}
+              </span>
               <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
@@ -1513,7 +1580,7 @@ export default function BrandsPage() {
                 >
                   Brand Logo
                 </label>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col items-center sm:items-start sm:flex-row gap-3 sm:gap-4">
                   <div
                     className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden shrink-0"
                     style={{
@@ -1534,10 +1601,10 @@ export default function BrandsPage() {
                       />
                     )}
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 w-full sm:w-auto">
                     <label
                       htmlFor="logo-upload"
-                      className="cursor-pointer h-8 px-3 rounded-md text-xs font-medium flex items-center gap-2 transition hover:opacity-80 w-fit"
+                      className="cursor-pointer h-10 sm:h-8 px-3 rounded-md text-xs font-medium flex items-center gap-2 transition hover:opacity-80 w-full sm:w-fit"
                       style={{
                         backgroundColor: "var(--bg-tertiary)",
                         border: "1px solid var(--border-color)",

@@ -49,11 +49,6 @@ const PAYMENT_STATUS_CONFIG = {
   refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
 };
 
-const STATUS_ICON_MAP = {
-  pending: ClockIcon, confirmed: CheckCircleIcon, processing: BoxIcon,
-  shipped: TruckIcon, delivered: HomeIcon, cancelled: XCircleIcon,
-};
-
 function StatusBadge({ status }) {
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
   return (
@@ -123,7 +118,6 @@ function StatusStepper({ order }) {
         );
       })}
 
-      {/* 💰 Payment Received (last step) */}
       <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
         <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
           style={{
@@ -152,14 +146,14 @@ function StatusStepper({ order }) {
   );
 }
 
-/* ==================== ACTION BUTTONS (Smart by Status) ==================== */
+/* ==================== ACTION BUTTONS (Mobile Optimized) ==================== */
 function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending, isPaymentPending }) {
   const status = order.status;
   const payStatus = order.payment?.status || "pending";
 
   if (status === "cancelled") {
     return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg"
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
         <LockIcon className="w-4 h-4" style={{ color: "#f87171" }} />
         <span className="text-xs font-semibold" style={{ color: "#f87171" }}>This order is cancelled</span>
@@ -167,14 +161,13 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
     );
   }
 
-  // ✅ Delivered — last action = Payment Received
   if (status === "delivered") {
     if (payStatus !== "paid") {
       return (
         <button
           onClick={onPaymentReceived}
           disabled={isPaymentPending}
-          className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
+          className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "#10b981", color: "#fff" }}>
           {isPaymentPending ? <Spinner className="w-4 h-4" /> : <BanknoteIcon className="w-4 h-4" />}
           Payment Received
@@ -182,7 +175,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       );
     }
     return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg"
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
         <CheckCircleIcon className="w-4 h-4" style={{ color: "#34d399" }} />
         <span className="text-xs font-semibold" style={{ color: "#34d399" }}>Order completed & payment received</span>
@@ -191,10 +184,10 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full md:w-auto">
       {status === "pending" && (
         <button onClick={() => onUpdate("confirmed")} disabled={isPending}
-          className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
+          className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
           style={{ backgroundColor: "#3b82f6", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
           Confirm Order
@@ -203,7 +196,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 
       {(status === "confirmed" || status === "processing") && (
         <button onClick={() => onUpdate("shipped")} disabled={isPending}
-          className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
+          className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
           style={{ backgroundColor: "#6366f1", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <TruckIcon className="w-4 h-4" />}
           Mark as Shipped
@@ -212,7 +205,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 
       {status === "shipped" && (
         <button onClick={() => onUpdate("delivered")} disabled={isPending}
-          className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
+          className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "#10b981", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <HomeIcon className="w-4 h-4" />}
           Mark as Delivered
@@ -220,7 +213,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       )}
 
       <button onClick={onCancel} disabled={isPending}
-        className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
         <BanIcon className="w-4 h-4" />
         Cancel Order
@@ -247,7 +240,7 @@ export default function OrderDetailPage({ params }) {
   });
 
   const updateStatusMutation = useMutation({
-        mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
+    mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
@@ -257,7 +250,8 @@ export default function OrderDetailPage({ params }) {
     },
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
   });
-    const updatePaymentMutation = useMutation({
+
+  const updatePaymentMutation = useMutation({
     mutationFn: ({ id }) => orderApi.updatePayment(id, { status: "paid" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
@@ -269,7 +263,6 @@ export default function OrderDetailPage({ params }) {
   });
 
   const handlePaymentReceived = () => updatePaymentMutation.mutate({ id });
-
   const handleUpdate = (status) => updateStatusMutation.mutate({ id, status });
   const handleCancel = () => {
     if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
@@ -291,16 +284,16 @@ export default function OrderDetailPage({ params }) {
 
   if (isError || !order) {
     return (
-      <div className="w-full min-h-screen p-4" style={{ color: "var(--text-primary)" }}>
+      <div className="w-full min-h-screen p-3 sm:p-4" style={{ color: "var(--text-primary)" }}>
         <button onClick={() => router.push("/admin/orders")}
-          className="mb-4 h-9 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90"
+          className="mb-4 h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90"
           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-          <ArrowLeftIcon /> Back to Orders
+          <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" /> Back to Orders
         </button>
         <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
           <XCircleIcon className="w-8 h-8 opacity-60" />
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Order not found or failed to load.</p>
-          <button onClick={() => refetch()} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
+          <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Order not found or failed to load.</p>
+          <button onClick={() => refetch()} className="h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
         </div>
       </div>
@@ -309,29 +302,29 @@ export default function OrderDetailPage({ params }) {
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-5 p-4 md:p-0">
-        {/* Header with smart action buttons */}
+      <div className="w-full space-y-4 sm:space-y-5 p-3 sm:p-4">
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/admin/orders")}
               aria-label="Back to orders"
-              className="w-9 h-9 rounded-lg flex items-center justify-center transition hover:opacity-80"
+              className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-              <ArrowLeftIcon />
+              <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[22px] leading-7 font-bold tracking-tight">Order {order.order_number}</h1>
+                <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">Order {order.order_number}</h1>
                 <StatusBadge status={order.status} />
                 <PaymentBadge status={payStatus} />
               </div>
-              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-                Placed {formatDateTime(order.created_at)} • {order.items?.length || 0} items • {order.payment?.method?.toUpperCase() || "—"}
+              <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
+                Placed {formatDateTime(order.created_at)} • {order.items?.length || 0} items
               </p>
             </div>
           </div>
-          <div>
-                      <OrderActions
+          <div className="w-full md:w-auto">
+            <OrderActions
               order={order}
               onUpdate={handleUpdate}
               onCancel={() => setCancelConfirm(true)}
@@ -356,11 +349,11 @@ export default function OrderDetailPage({ params }) {
           <div className="lg:col-span-2 space-y-4">
             <InfoCard title="Customer">
               <div className="flex items-center gap-3 mb-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                <div className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full text-sm sm:text-xs font-bold"
                   style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
                   {(order.address_snapshot?.full_name || "U").charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold truncate">{order.address_snapshot?.full_name || user.name || "Unknown"}</p>
                   <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{user.email || order.address_snapshot?.phone}</p>
                 </div>
@@ -396,47 +389,50 @@ export default function OrderDetailPage({ params }) {
           </div>
 
           <div className="lg:col-span-3 space-y-4">
+            {/* MOBILE OPTIMIZED TABLE: Horizontal scroll wrapper */}
             <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
-              <table className="w-full text-[13px] box-border" style={{ tableLayout: "fixed", width: "100%" }}>
-                <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                  <tr>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
-                    <th className="w-[52px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
-                    <th className="w-[92px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
-                    <th className="w-[104px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(order.items || []).map((item, idx) => (
-                    <tr key={`${order._id}-item-${idx}`}
-                      style={{ borderBottom: idx < (order.items?.length || 0) - 1 ? "1px solid var(--border-color)" : "none" }}>
-                      <td className="px-3 py-2.5 box-border">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <OrderItemImage item={item} size={60} />
-                          <div className="min-w-0">
-                            <p className="font-medium truncate" title={item.name}>{item.name}</p>
-                            {(item.variantTitle || item.brand) && (
-                              <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
-                                {[item.variantTitle, item.brand].filter(Boolean).join(" • ")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">{item.qty}</td>
-                      <td className="px-3 py-2.5 text-right">
-                        {Number(item.savings) > 0 && (
-                          <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                            Rs. {Number(item.original_price || 0).toLocaleString()}
-                          </span>
-                        )}
-                        <span className="whitespace-nowrap">Rs. {item.price?.toLocaleString()}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-bold"><span className="whitespace-nowrap">Rs. {(item.price * item.qty)?.toLocaleString()}</span></td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px] min-w-[600px]" style={{ tableLayout: "fixed" }}>
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
+                      <th className="w-[52px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
+                      <th className="w-[92px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
+                      <th className="w-[104px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(order.items || []).map((item, idx) => (
+                      <tr key={`${order._id}-item-${idx}`}
+                        style={{ borderBottom: idx < (order.items?.length || 0) - 1 ? "1px solid var(--border-color)" : "none" }}>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <OrderItemImage item={item} size={60} />
+                            <div className="min-w-0">
+                              <p className="font-medium truncate" title={item.name}>{item.name}</p>
+                              {(item.variantTitle || item.brand) && (
+                                <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
+                                  {[item.variantTitle, item.brand].filter(Boolean).join(" • ")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">{item.qty}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          {Number(item.savings) > 0 && (
+                            <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                              Rs. {Number(item.original_price || 0).toLocaleString()}
+                            </span>
+                          )}
+                          <span className="whitespace-nowrap">Rs. {item.price?.toLocaleString()}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold"><span className="whitespace-nowrap">Rs. {(item.price * item.qty)?.toLocaleString()}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
@@ -453,12 +449,12 @@ export default function OrderDetailPage({ params }) {
         </div>
       </div>
 
-      {/* Cancel Confirmation Modal */}
+      {/* Cancel Confirmation Modal (Mobile Optimized: Slides up from bottom) */}
       {cancelConfirm && (
-        <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
-          <div className="w-full max-w-sm rounded-xl p-5 shadow-2xl border"
-            style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+        <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true">
+          <style>{`@keyframes modalSlideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } } @keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
+          <div className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-xl p-4 sm:p-5 shadow-2xl border"
+            style={{ ...cardStyle, animation: "modalSlideUp 0.3s ease-out" }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                 style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
@@ -466,7 +462,7 @@ export default function OrderDetailPage({ params }) {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">Cancel Order {order.order_number}?</h3>
-                               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   This will mark the order as cancelled and restore stock. This action cannot be undone.
                 </p>
                 <div className="mt-3">
@@ -478,22 +474,22 @@ export default function OrderDetailPage({ params }) {
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
                     placeholder="e.g. Stock unavailable, customer request..."
-                    className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
+                    className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
+            <div className="flex flex-col sm:flex-row gap-2 mt-5">
               <button onClick={() => setCancelConfirm(false)} disabled={updateStatusMutation.isPending}
-                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border"
+                className="h-11 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border order-2 sm:order-1"
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>
                 Keep Order
               </button>
-                           <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
-                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+              <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
+                className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
-                {updateStatusMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Cancelling...</> : "Yes, Cancel"}
+                {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel"}
               </button>
             </div>
           </div>

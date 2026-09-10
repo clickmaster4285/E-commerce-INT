@@ -3,231 +3,57 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import {
+  ArrowLeft, Image, Monitor, Tablet, Smartphone, Link2, Calendar,
+  Info, Check, Tag, Eye, Clock, Globe, Layers, Zap, Hash, Edit3,
+  Trash2, Plus, Pencil, AlertTriangle, Activity, User, Sparkles,
+  Settings, ExternalLink, Type, Palette, MousePointer, Target
+} from "lucide-react";
 import bannerAPI from "@/apis/admin/bannerApi";
 
 /* =========================================================
-ICONS
-========================================================= */
-function Ico({ d, className = "w-4 h-4", sw = 1.8 }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={sw}
-        d={d}
-      />
-    </svg>
-  );
-}
-
-const D = {
-  back: "M15 19l-7-7 7-7",
-  edit: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z",
-  image:
-    "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
-  calendar:
-    "M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z",
-  link: "M10 13a5 5 0 007.07.07l1.42-1.42a5 5 0 000-7.07 5 5 0 00-7.07 0L10 6m4 5a5 5 0 00-7.07-.07l-1.42 1.42a5 5 0 000 7.07 5 5 0 007.07 0L14 18",
-  monitor:
-    "M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm4 16h8m-4-4v4",
-  smartphone:
-    "M7 3h10a1 1 0 011 1v16a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm4 15h2",
-  tablet:
-    "M6 3h12a1 1 0 011 1v16a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1zm5 15h2",
-  check: "M5 13l4 4L19 7",
-  info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  chevron: "M9 5l7 7-7 7",
-  tag: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
-};
-
-// ✅ FIXED: Added missing icon components
-const ArrowLeftIcon = ({ className }) => (
-  <Ico d={D.back} className={className} />
-);
-const ImageIcon = ({ className }) => <Ico d={D.image} className={className} />;
-const MonitorIcon = ({ className }) => (
-  <Ico d={D.monitor} className={className} />
-);
-const TabletIcon = ({ className }) => (
-  <Ico d={D.tablet} className={className} />
-);
-const SmartphoneIcon = ({ className }) => (
-  <Ico d={D.smartphone} className={className} />
-);
-const LinkIcon = ({ className }) => <Ico d={D.link} className={className} />;
-const CalendarIcon = ({ className }) => (
-  <Ico d={D.calendar} className={className} />
-);
-const InfoIcon = ({ className }) => <Ico d={D.info} className={className} />;
-const CheckIcon = ({ className, style }) => (
-  <Ico d={D.check} className={className} style={style} />
-);
-
-// ✅ FIXED: Added missing UI components
-function StatusBadge({ status }) {
-  const styles = {
-    active: {
-      bg: "rgba(34,197,94,.10)",
-      color: "var(--success)",
-      border: "rgba(34,197,94,.25)",
-    },
-    scheduled: {
-      bg: "rgba(59,130,246,.10)",
-      color: "#60a5fa",
-      border: "rgba(59,130,246,.25)",
-    },
-    expired: {
-      bg: "rgba(107,114,128,.10)",
-      color: "#9ca3af",
-      border: "rgba(107,114,128,.25)",
-    },
-    draft: {
-      bg: "rgba(245,158,11,.10)",
-      color: "#fbbf24",
-      border: "rgba(245,158,11,.25)",
-    },
-    inactive: {
-      bg: "rgba(239,68,68,.10)",
-      color: "var(--danger)",
-      border: "rgba(239,68,68,.25)",
-    },
-  };
-  const item = styles[status] || styles.draft;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize"
-      style={{
-        backgroundColor: item.bg,
-        color: item.color,
-        border: `1px solid ${item.border}`,
-      }}
-    >
-      <span
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ backgroundColor: item.color }}
-      />
-      {status || "draft"}
-    </span>
-  );
-}
-
-function Spin({ className = "w-4 h-4" }) {
-  return (
-    <svg
-      className={`${className} animate-spin`}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-      />
-    </svg>
-  );
-}
-
-function Card({ children, className = "" }) {
-  return (
-    <div
-      className={`overflow-hidden rounded-xl ${className}`}
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Button({ children, onClick, primary = false, disabled = false }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3.5 text-[12px] font-semibold transition-all hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
-      style={{
-        backgroundColor: primary ? "var(--accent)" : "var(--bg-tertiary)",
-        color: primary ? "var(--accent-text)" : "var(--text-primary)",
-        border: primary ? "none" : "1px solid var(--border-color)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function CardHeader({ icon, title }) {
-  return (
-    <div
-      className="px-4 py-3 flex items-center gap-2"
-      style={{ borderBottom: "1px solid var(--border-color)" }}
-    >
-      {icon && <span style={{ color: "var(--accent)" }}>{icon}</span>}
-      <h3
-        className="text-[12px] font-semibold"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {title}
-      </h3>
-    </div>
-  );
-}
-
-function Tag({ children }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium"
-      style={{
-        backgroundColor: "rgba(16,185,129,.10)",
-        color: "#34d399",
-        border: "1px solid rgba(16,185,129,.25)",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-/* =========================================================
-HELPERS
+   HELPERS
 ========================================================= */
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
-const formatDateTime = (date) => {
+function ini(name) {
+  if (!name) return "??";
+  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
+}
+
+function fd(date) {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
+
+function fdt(date) {
   if (!date) return "—";
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
-};
+}
+
+function tago(date) {
+  if (!date) return "";
+  const m = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d < 30 ? `${d}d ago` : fd(date);
+}
 
 const formatType = (value) => {
   if (!value) return "—";
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
 const getImageUrl = (image) => {
@@ -238,126 +64,150 @@ const getImageUrl = (image) => {
 };
 
 /* =========================================================
-UI COMPONENTS
+   UI COMPONENTS
 ========================================================= */
-const Section = ({ title, description, icon, children }) => (
-  <section
-    className="rounded-lg border overflow-hidden"
-    style={{
-      backgroundColor: "var(--bg-card)",
-      borderColor: "var(--border-color)",
-    }}
-  >
-    <div
-      className="px-5 py-4 border-b"
-      style={{
-        borderColor: "var(--border-color)",
-        backgroundColor: "var(--bg-tertiary)",
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}
-        >
-          {icon}
-        </div>
-        <div>
-          <h2
-            className="text-sm font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {title}
-          </h2>
-          {description && (
-            <p
-              className="text-[11px] mt-0.5"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {description}
-            </p>
-          )}
+function StatusBadge({ status }) {
+  const config = {
+    active: { bg: "rgba(16,185,129,0.12)", color: "#10b981", border: "rgba(16,185,129,0.3)", label: "ACTIVE" },
+    scheduled: { bg: "rgba(59,130,246,0.12)", color: "#3b82f6", border: "rgba(59,130,246,0.3)", label: "SCHEDULED" },
+    expired: { bg: "rgba(107,114,128,0.12)", color: "#6b7280", border: "rgba(107,114,128,0.3)", label: "EXPIRED" },
+    draft: { bg: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "rgba(245,158,11,0.3)", label: "DRAFT" },
+    inactive: { bg: "rgba(239,68,68,0.12)", color: "#ef4444", border: "rgba(239,68,68,0.3)", label: "INACTIVE" },
+  };
+  const item = config[status] || config.draft;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide"
+      style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+      {item.label}
+    </span>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
+  const colors = {
+    emerald: { bg: "rgba(16,185,129,0.08)", text: "#10b981", border: "rgba(16,185,129,0.2)" },
+    blue: { bg: "rgba(59,130,246,0.08)", text: "#3b82f6", border: "rgba(59,130,246,0.2)" },
+    purple: { bg: "rgba(168,85,247,0.08)", text: "#a855f7", border: "rgba(168,85,247,0.2)" },
+    amber: { bg: "rgba(245,158,11,0.08)", text: "#f59e0b", border: "rgba(245,158,11,0.2)" },
+    red: { bg: "rgba(239,68,68,0.08)", text: "#ef4444", border: "rgba(239,68,68,0.2)" },
+  };
+  const c = colors[color] || colors.emerald;
+
+  return (
+    <div className="rounded-xl p-4 transition-all hover:shadow-md" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.bg, border: `1px solid ${c.border}` }}>
+          <Icon className="w-5 h-5" style={{ color: c.text }} />
         </div>
       </div>
+      <p className="text-[11px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
+      <p className="text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{value}</p>
+      {subValue && <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{subValue}</p>}
     </div>
-    <div className="p-5">{children}</div>
-  </section>
-);
+  );
+}
 
-const InfoItem = ({ label, value, children }) => (
-  <div className="space-y-1">
-    <p
-      className="text-[11px] font-medium uppercase tracking-wide"
-      style={{ color: "var(--text-muted)" }}
-    >
-      {label}
-    </p>
-    {children || (
-      <p
-        className="text-sm font-medium break-words"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {value ?? "—"}
-      </p>
-    )}
-  </div>
-);
+function InfoCard({ icon: Icon, title, children, action, bodyClassName = "" }) {
+  return (
+    <div className="rounded-xl overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="px-5 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+              <Icon className="w-4 h-4" />
+            </div>
+          )}
+          <h3 className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>{title}</h3>
+        </div>
+        {action}
+      </div>
+      <div className={`p-5 flex-1 ${bodyClassName}`}>{children}</div>
+    </div>
+  );
+}
 
-const ImageCard = ({ title, image, icon }) => {
+function DataRow({ label, value, mono, highlight, icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+      <div className="flex items-center gap-2.5">
+        {Icon && <Icon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />}
+        <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
+      </div>
+      <span className={`text-[13px] font-semibold text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
+        style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value || "—"}</span>
+    </div>
+  );
+}
+
+function Avatar({ user, size = "md", color = "emerald" }) {
+  const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
+  const colors = {
+    emerald: { bg: "rgba(16,185,129,0.12)", text: "#10b981" },
+    blue: { bg: "rgba(59,130,246,0.12)", text: "#3b82f6" },
+    purple: { bg: "rgba(168,85,247,0.12)", text: "#a855f7" },
+  };
+  const c = colors[color] || colors.emerald;
+
+  return (
+    <div className={`${sizes[size]} rounded-full flex items-center justify-center font-bold shrink-0`} style={{ backgroundColor: c.bg, color: c.text }}>
+      {ini(user?.name || user?.email || "?")}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, title, description, action }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+        <Icon className="w-7 h-7" style={{ color: "var(--text-muted)" }} />
+      </div>
+      <h3 className="text-base font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>{title}</h3>
+      <p className="text-[12px] max-w-sm mb-5" style={{ color: "var(--text-muted)" }}>{description}</p>
+      {action}
+    </div>
+  );
+}
+
+function DeviceImageCard({ title, image, icon: Icon, aspect = "video" }) {
   const imageUrl = getImageUrl(image);
   return (
-    <Card>
-      <CardHeader title={title} icon={icon} />
-      <div className="p-4">
+    <div className="rounded-xl overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="px-5 py-4 flex items-center gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <h3 className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>{title}</h3>
+      </div>
+      <div className="p-5 flex-1 flex items-center justify-center">
         {imageUrl ? (
-          <div
-            className="rounded-lg overflow-hidden aspect-video"
-            style={{ border: "1px solid var(--border-color)" }}
-          >
-            <img
-              src={imageUrl}
-              alt={title}
-              className="w-full h-full object-cover"
-            />
+          <div className="w-full overflow-hidden rounded-lg" style={{ border: "1px solid var(--border-color)" }}>
+            <img src={imageUrl} alt={title} className="w-full h-auto object-cover" />
           </div>
         ) : (
-          <div
-            className="aspect-video rounded-lg flex flex-col items-center justify-center"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              border: "1px dashed var(--border-color)",
-            }}
-          >
-            <ImageIcon className="w-7 h-7 mb-3" />
-            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-              No image uploaded
-            </p>
+          <div className="w-full aspect-video rounded-lg flex flex-col items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+            <Image className="w-10 h-10 mb-3" style={{ color: "var(--text-muted)" }} />
+            <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>No image uploaded</p>
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
-};
+}
 
 /* =========================================================
-MAIN PAGE
+   MAIN PAGE
 ========================================================= */
 export default function BannerDetailPage() {
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
-  const backPath =
-    pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/banners";
+  const backPath = pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/banners";
 
   const bannerId = params?.id;
   const [tab, setTab] = useState("info");
 
-  const {
-    data: banner,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
+  const { data: banner, isLoading, isError, error } = useQuery({
     queryKey: ["banner", bannerId],
     queryFn: async () => {
       const response = await bannerAPI.get(bannerId);
@@ -367,495 +217,346 @@ export default function BannerDetailPage() {
     retry: false,
   });
 
-  const images = useMemo(
-    () => ({
-      desktop: banner?.desktopImage,
-      tablet: banner?.tabletImage,
-      mobile: banner?.mobileImage,
-    }),
-    [banner],
-  );
+  const images = useMemo(() => ({
+    desktop: banner?.desktopImage,
+    tablet: banner?.tabletImage,
+    mobile: banner?.mobileImage,
+  }), [banner]);
 
   const pages = banner?.displayRules?.pages || [];
   const devices = banner?.displayRules?.devices || [];
+  const hasUpdates = Boolean(banner?.createdAt && banner?.updatedAt && banner.createdAt !== banner.updatedAt);
 
+  // Loading
   if (isLoading) {
     return (
-      <div className="w-full min-h-[500px] flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Spin className="w-5 h-5" />
-          <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Loading banner details...
-          </span>
+      <div className="w-full flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-[var(--accent)] border-t-transparent animate-spin" />
+          <p className="text-[13px] font-medium" style={{ color: "var(--text-muted)" }}>Loading banner details...</p>
         </div>
       </div>
     );
   }
 
+  // Not Found
   if (isError || !banner) {
     return (
-      <div className="w-full min-h-[500px] flex items-center justify-center">
-        <Card className="p-8 text-center max-w-sm">
-          <h2 className="text-lg font-semibold mb-2">Banner Not Found</h2>
-          <p
-            className="text-[12px] mb-4"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {error?.response?.data?.message ||
-              error?.message ||
-              "This banner does not exist or has been deleted."}
+      <div className="w-full flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center px-6 py-10 rounded-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+            <AlertTriangle className="w-7 h-7" style={{ color: "#ef4444" }} />
+          </div>
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Banner Not Found</h2>
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+            {error?.response?.data?.message || error?.message || "This banner does not exist or has been deleted."}
           </p>
-          <Button primary onClick={() => router.push(backPath)}>
-            Back to Banners
-          </Button>
-        </Card>
+          <button onClick={() => router.push(backPath)} className="mt-4 h-10 px-5 rounded-lg text-[13px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+            <ArrowLeft className="w-4 h-4" /> Back to Banners
+          </button>
+        </div>
       </div>
     );
   }
 
+  const tabList = [
+    { id: "info", label: "Overview", icon: Eye },
+    { id: "images", label: "Images", icon: Image, badge: "3" },
+    { id: "rules", label: "Rules & Schedule", icon: Settings },
+  ];
+
   return (
-    <div className="w-full pb-8" style={{ color: "var(--text-primary)" }}>
-      <div className="space-y-6">
-        {/* HEADER - ✅ FIXED: Properly closed structure */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <button
-              onClick={() => router.back()}
-              className="w-9 h-9 rounded-lg border flex items-center justify-center transition hover:opacity-80"
-              style={{
-                borderColor: "var(--border-color)",
-                backgroundColor: "var(--bg-card)",
-                color: "var(--text-secondary)",
-              }}
-              title="Back"
-            >
-              <ArrowLeftIcon className="w-4 h-4" />
-            </button>
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1
-                  className="text-xl sm:text-2xl font-bold tracking-tight"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {banner.title || "Banner Details"}
-                </h1>
-                <StatusBadge status={banner.status} />
+    <div className="w-full pb-8 space-y-6">
+      {/* HEADER */}
+      <div>
+        <button onClick={() => router.push(backPath)} className="flex items-center gap-2 text-[12px] font-medium mb-4 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
+          <ArrowLeft className="w-4 h-4" /> Back to Banners
+        </button>
+
+        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-6 md:p-8">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Banner Preview */}
+              <div className="w-full lg:w-64 shrink-0">
+                <div className="w-full aspect-video rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                  {images.desktop ? (
+                    <img src={getImageUrl(images.desktop)} alt={banner.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <Image className="w-16 h-16" style={{ color: "var(--text-muted)" }} />
+                  )}
+                </div>
               </div>
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Banner details and configuration
-              </p>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <h1 className="text-2xl md:text-3xl font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                        {banner.title || "Banner Details"}
+                      </h1>
+                      <StatusBadge status={banner.status} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                      <span className="flex items-center gap-1.5"><Type className="w-3.5 h-3.5" />{formatType(banner.bannerType)}</span>
+                      <span className="opacity-50">•</span>
+                      <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" />Position {banner.position ?? 0}</span>
+                      <span className="opacity-50">•</span>
+                      <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5" />{pages.length} Pages</span>
+                      <span className="opacity-50">•</span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{fd(banner.createdAt)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => router.push(backPath)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                      <ArrowLeft className="w-4 h-4" /> Back
+                    </button>
+                    <button onClick={() => router.push(`${backPath}?edit=${bannerId}`)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
+                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                      <Edit3 className="w-4 h-4" /> Edit Banner
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Type</p>
+                    <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{formatType(banner.bannerType)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Position</p>
+                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{banner.position ?? 0}</p>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Devices</p>
+                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{devices.length} configured</p>
+                  </div>
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Pages</p>
+                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{pages.length} pages</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* TABS */}
-        <div
-          className="flex items-center gap-6 overflow-x-auto border-b"
-          style={{ borderColor: "var(--border-color)" }}
-        >
-          {[
-            { id: "info", label: "Overview" },
-            { id: "images", label: "Images", badge: 3 },
-            { id: "rules", label: "Rules & Schedule" },
-          ].map((item) => {
-            const active = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className="relative flex items-center gap-2 py-3 text-[12px] font-medium whitespace-nowrap"
-                style={{
-                  color: active ? "var(--accent)" : "var(--text-muted)",
-                }}
-              >
-                {item.label}
-                {item.badge !== undefined && (
-                  <span
-                    className="px-1.5 py-0.5 rounded-full text-[9px]"
-                    style={{
-                      backgroundColor: active
-                        ? "rgba(34,197,94,.10)"
-                        : "var(--bg-tertiary)",
-                      color: active ? "var(--accent)" : "var(--text-muted)",
-                    }}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-                {active && (
-                  <span
-                    className="absolute left-0 right-0 bottom-[-1px] h-[2px]"
-                    style={{ backgroundColor: "var(--accent)" }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* OVERVIEW TAB */}
-        {tab === "info" && (
-          <>
-            {/* HERO PREVIEW */}
-            <div
-              className="rounded-lg border overflow-hidden"
+      {/* TABS */}
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", scrollbarWidth: "none" }}>
+        {tabList.map((tb) => {
+          const active = tab === tb.id;
+          const Icon = tb.icon;
+          return (
+            <button key={tb.id} type="button" onClick={() => setTab(tb.id)}
+              className="relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-lg text-[12px] font-semibold transition-all"
               style={{
-                backgroundColor: "var(--bg-card)",
-                borderColor: "var(--border-color)",
-              }}
-            >
-              <div
-                className="px-5 py-4 border-b flex items-center justify-between"
-                style={{
-                  borderColor: "var(--border-color)",
-                  backgroundColor: "var(--bg-tertiary)",
-                }}
-              >
-                <div>
-                  <h2
-                    className="text-sm font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Banner Preview
-                  </h2>
-                  <p
-                    className="text-[11px] mt-0.5"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Desktop banner preview
-                  </p>
-                </div>
-                <span
-                  className="text-xs px-2.5 py-1 rounded-md border"
-                  style={{
-                    borderColor: "var(--border-color)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  Position: {banner.position ?? 0}
+                backgroundColor: active ? "var(--bg-card)" : "transparent",
+                color: active ? "var(--accent)" : "var(--text-muted)",
+                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                border: active ? "1px solid var(--border-color)" : "1px solid transparent",
+              }}>
+              <Icon className="w-4 h-4" />
+              {tb.label}
+              {tb.badge && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold leading-none"
+                  style={{ backgroundColor: active ? "var(--accent-soft)" : "var(--bg-tertiary)", color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                  {tb.badge}
                 </span>
-              </div>
-              <div className="p-5">
-                {images.desktop ? (
-                  <div
-                    className="w-full overflow-hidden rounded-lg border"
-                    style={{
-                      borderColor: "var(--border-color)",
-                      backgroundColor: banner.backgroundColor || "transparent",
-                    }}
-                  >
-                    <img
-                      src={getImageUrl(images.desktop)}
-                      alt={banner.altText || banner.title || "Banner"}
-                      className="w-full max-h-[420px] object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="h-64 rounded-lg border border-dashed flex flex-col items-center justify-center gap-3"
-                    style={{
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    <ImageIcon className="w-10 h-10" />
-                    <span className="text-sm">No desktop image available</span>
-                  </div>
-                )}
-              </div>
-            </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-            {/* BASIC INFORMATION */}
-            <Section
-              title="Basic Information"
-              description="Core information about this banner"
-              icon={<InfoIcon />}
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <InfoItem label="Banner Title" value={banner.title} />
-                <InfoItem
-                  label="Banner Type"
-                  value={formatType(banner.bannerType)}
-                />
-                <InfoItem label="Position" value={banner.position ?? 0} />
-                <InfoItem label="Status">
-                  <StatusBadge status={banner.status} />
-                </InfoItem>
-                <InfoItem label="Alt Text" value={banner.altText || "—"} />
-                <InfoItem
-                  label="Background Color"
-                  value={banner.backgroundColor || "—"}
-                />
-                <InfoItem
-                  label="Created"
-                  value={formatDateTime(banner.createdAt)}
-                />
-                <InfoItem
-                  label="Last Updated"
-                  value={formatDateTime(banner.updatedAt)}
-                />
-              </div>
-            </Section>
+      {/* OVERVIEW TAB */}
+      {tab === "info" && (
+        <div className="space-y-6">
+          {/* Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard icon={Activity} label="Status" value={banner.status?.toUpperCase() || "DRAFT"} color={banner.status === "active" ? "emerald" : "amber"} />
+            <MetricCard icon={Hash} label="Position" value={String(banner.position ?? 0)} color="blue" />
+            <MetricCard icon={Tag} label="Type" value={formatType(banner.bannerType)} color="purple" />
+            <MetricCard icon={Target} label="Target Pages" value={String(pages.length)} subValue={`${devices.length} devices`} color="amber" />
+          </div>
 
-            {/* BANNER CONTENT */}
-            <Section
-              title="Banner Content"
-              description="Text displayed inside the banner"
-              icon={<InfoIcon />}
-            >
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <InfoItem
-                    label="Eyebrow / Small Heading"
-                    value={banner.eyebrow || "—"}
-                  />
-                  <InfoItem
-                    label="Main Heading"
-                    value={banner.heading || "—"}
-                  />
+          {/* Banner Preview */}
+          <InfoCard icon={Eye} title="Banner Preview" action={
+            <span className="text-[11px] font-medium px-2.5 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>
+              Desktop View
+            </span>
+          }>
+            {images.desktop ? (
+              <div className="w-full overflow-hidden rounded-lg" style={{ border: "1px solid var(--border-color)" }}>
+                <img src={getImageUrl(images.desktop)} alt={banner.altText || banner.title || "Banner"} className="w-full h-auto object-cover" />
+              </div>
+            ) : (
+              <EmptyState icon={Image} title="No Desktop Image" description="No desktop banner image has been uploaded." />
+            )}
+          </InfoCard>
+
+          {/* Info LEFT + Content RIGHT */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InfoCard icon={Info} title="Basic Information">
+              <div className="space-y-1">
+                <DataRow icon={Type} label="Banner Title" value={banner.title} />
+                <DataRow icon={Tag} label="Banner Type" value={formatType(banner.bannerType)} />
+                <DataRow icon={Hash} label="Position" value={String(banner.position ?? 0)} />
+                <DataRow icon={Activity} label="Status" value={banner.status?.toUpperCase()} highlight={banner.status === "active"} />
+                <DataRow icon={Palette} label="Background Color" value={banner.backgroundColor || "—"} mono />
+                <DataRow icon={Image} label="Alt Text" value={banner.altText || "—"} />
+              </div>
+            </InfoCard>
+
+            <InfoCard icon={Type} title="Banner Content" bodyClassName="flex flex-col">
+              <div className="space-y-4 flex-1">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Eyebrow / Small Heading</p>
+                  <p className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>{banner.eyebrow || "—"}</p>
                 </div>
                 <div>
-                  <p
-                    className="text-[11px] font-medium uppercase tracking-wide mb-2"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Description
-                  </p>
-                  <div
-                    className="rounded-lg border p-4 text-sm leading-6"
-                    style={{
-                      borderColor: "var(--border-color)",
-                      backgroundColor: "var(--bg-tertiary)",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Main Heading</p>
+                  <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>{banner.heading || "—"}</p>
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Description</p>
+                  <div className="p-3 rounded-lg text-[12px] leading-relaxed" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                     {banner.description || "No description provided."}
                   </div>
                 </div>
               </div>
-            </Section>
+            </InfoCard>
+          </div>
 
-            {/* CALL TO ACTION */}
-            <Section
-              title="Call to Action"
-              description="Button and destination configuration"
-              icon={<LinkIcon />}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <InfoItem
-                  label="Button Text"
-                  value={banner.primaryButton?.text || "—"}
-                />
-                <InfoItem
-                  label="Link Type"
-                  value={formatType(banner.primaryButton?.linkType)}
-                />
-                {banner.primaryButton?.linkType === "deal" &&
-                banner.primaryButton?.dealId ? (
-                  <InfoItem label="Linked Deal">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: "#34d399" }}
-                      >
-                        {typeof banner.primaryButton.dealId === "object"
-                          ? banner.primaryButton.dealId.name || "—"
-                          : "Deal"}
-                      </span>
-                      {typeof banner.primaryButton.dealId === "object" &&
-                        !banner.primaryButton.dealId.isActive && (
-                          <StatusBadge status="inactive" />
-                        )}
-                    </span>
-                  </InfoItem>
+          {/* Call to Action + Created/Updated */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InfoCard icon={Link2} title="Call to Action">
+              <div className="space-y-1">
+                <DataRow icon={MousePointer} label="Button Text" value={banner.primaryButton?.text || "—"} />
+                <DataRow icon={Link2} label="Link Type" value={formatType(banner.primaryButton?.linkType)} />
+                {banner.primaryButton?.linkType === "deal" && banner.primaryButton?.dealId ? (
+                  <DataRow icon={Tag} label="Linked Deal" value={typeof banner.primaryButton.dealId === "object" ? banner.primaryButton.dealId.name || "—" : "Deal"} highlight />
                 ) : (
-                  <InfoItem label="Target Link">
-                    {banner.primaryButton?.link ? (
-                      <div className="flex items-center gap-2">
-                        <LinkIcon
-                          className="w-3.5 h-3.5 shrink-0"
-                          style={{ color: "#34d399" }}
-                        />
-                        <span
-                          className="text-sm break-all"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {banner.primaryButton.link}
-                        </span>
-                      </div>
-                    ) : (
-                      <span
-                        className="text-sm"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        —
-                      </span>
-                    )}
-                  </InfoItem>
+                  <DataRow icon={ExternalLink} label="Target Link" value={banner.primaryButton?.link || "—"} mono />
                 )}
               </div>
-            </Section>
-          </>
-        )}
+            </InfoCard>
 
-        {/* IMAGES TAB */}
-        {tab === "images" && (
-          <Section
-            title="Responsive Images"
-            description="Images configured for different screen sizes"
-            icon={<ImageIcon />}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              <ImageCard
-                title="Desktop"
-                image={images.desktop}
-                icon={<MonitorIcon />}
-              />
-              <ImageCard
-                title="Tablet"
-                image={images.tablet}
-                icon={<TabletIcon />}
-              />
-              <ImageCard
-                title="Mobile"
-                image={images.mobile}
-                icon={<SmartphoneIcon />}
-              />
+            <InfoCard icon={User} title="Created & Updated">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Created</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#10b981" }}>
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {banner.createdBy?.name || banner.createdBy?.email || "System"}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        {fdt(banner.createdAt)} · {tago(banner.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {hasUpdates && (
+                  <div className="pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Last Updated</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>
+                        <Pencil className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {banner.updatedBy?.name || banner.updatedBy?.email || "System"}
+                        </p>
+                        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                          {fdt(banner.updatedAt)} · {tago(banner.updatedAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </InfoCard>
+          </div>
+        </div>
+      )}
+
+      {/* IMAGES TAB */}
+      {tab === "images" && (
+        <div className="space-y-6">
+          <InfoCard icon={Image} title="Responsive Images" action={
+            <span className="text-[11px] font-medium px-2.5 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>
+              3 Device Variants
+            </span>
+          }>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <DeviceImageCard title="Desktop" image={images.desktop} icon={Monitor} />
+              <DeviceImageCard title="Tablet" image={images.tablet} icon={Tablet} />
+              <DeviceImageCard title="Mobile" image={images.mobile} icon={Smartphone} />
             </div>
-          </Section>
-        )}
+          </InfoCard>
+        </div>
+      )}
 
-        {/* RULES TAB */}
-        {tab === "rules" && (
-          <>
-            <Section
-              title="Display Rules"
-              description="Where and on which devices this banner appears"
-              icon={<MonitorIcon />}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p
-                    className="text-[11px] font-medium uppercase tracking-wide mb-3"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Show On Pages
-                  </p>
-                  {pages.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {pages.map((page) => (
-                        <Tag key={page}>
-                          <CheckIcon
-                            className="w-3.5 h-3.5 mr-1"
-                            style={{ color: "#34d399" }}
-                          />
-                          {formatType(page)}
-                        </Tag>
-                      ))}
-                    </div>
-                  ) : (
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      No pages configured
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <p
-                    className="text-[11px] font-medium uppercase tracking-wide mb-3"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Show On Devices
-                  </p>
-                  {devices.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {devices.map((device) => (
-                        <Tag key={device}>
-                          <CheckIcon
-                            className="w-3.5 h-3.5 mr-1"
-                            style={{ color: "#34d399" }}
-                          />
-                          {formatType(device)}
-                        </Tag>
-                      ))}
-                    </div>
-                  ) : (
-                    <span
-                      className="text-sm"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      No devices configured
-                    </span>
-                  )}
-                </div>
+      {/* RULES TAB */}
+      {tab === "rules" && (
+        <div className="space-y-6">
+          {/* Display Rules */}
+          <InfoCard icon={Globe} title="Display Rules">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Show On Pages</p>
+                {pages.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {pages.map((page) => (
+                      <span key={page} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
+                        style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)" }}>
+                        <Check className="w-3 h-3" />
+                        {formatType(page)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No pages configured</p>
+                )}
               </div>
-            </Section>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Show On Devices</p>
+                {devices.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {devices.map((device) => (
+                      <span key={device} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
+                        style={{ backgroundColor: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.2)" }}>
+                        {device === "desktop" && <Monitor className="w-3 h-3" />}
+                        {device === "tablet" && <Tablet className="w-3 h-3" />}
+                        {device === "mobile" && <Smartphone className="w-3 h-3" />}
+                        {formatType(device)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No devices configured</p>
+                )}
+              </div>
+            </div>
+          </InfoCard>
 
-            <Section
-              title="Schedule"
-              description="Banner activation and expiration settings"
-              icon={<CalendarIcon />}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <InfoItem
-                  label="Start Date & Time"
-                  value={formatDateTime(banner.startDate)}
-                />
-                <InfoItem
-                  label="End Date & Time"
-                  value={formatDateTime(banner.endDate)}
-                />
-                <InfoItem label="Auto Publish">
-                  <span className="flex items-center gap-2 text-sm">
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: banner.autoPublish
-                          ? "rgba(16,185,129,0.12)"
-                          : "rgba(107,114,128,0.12)",
-                        color: banner.autoPublish ? "#34d399" : "#9ca3af",
-                      }}
-                    >
-                      {banner.autoPublish ? (
-                        <CheckIcon className="w-3.5 h-3.5" />
-                      ) : (
-                        "—"
-                      )}
-                    </span>
-                    {banner.autoPublish ? "Enabled" : "Disabled"}
-                  </span>
-                </InfoItem>
-                <InfoItem label="Auto Disable">
-                  <span className="flex items-center gap-2 text-sm">
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: banner.autoDisable
-                          ? "rgba(16,185,129,0.12)"
-                          : "rgba(107,114,128,0.12)",
-                        color: banner.autoDisable ? "#34d399" : "#9ca3af",
-                      }}
-                    >
-                      {banner.autoDisable ? (
-                        <CheckIcon className="w-3.5 h-3.5" />
-                      ) : (
-                        "—"
-                      )}
-                    </span>
-                    {banner.autoDisable ? "Enabled" : "Disabled"}
-                  </span>
-                </InfoItem>
-              </div>
-            </Section>
-          </>
-        )}
-      </div>
+          {/* Schedule */}
+          <InfoCard icon={Calendar} title="Schedule">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+              <DataRow icon={Calendar} label="Start Date & Time" value={fdt(banner.startDate)} />
+              <DataRow icon={Calendar} label="End Date & Time" value={fdt(banner.endDate)} />
+              <DataRow icon={Zap} label="Auto Publish" value={banner.autoPublish ? "Enabled" : "Disabled"} highlight={banner.autoPublish} />
+              <DataRow icon={Zap} label="Auto Disable" value={banner.autoDisable ? "Enabled" : "Disabled"} highlight={banner.autoDisable} />
+            </div>
+          </InfoCard>
+        </div>
+      )}
     </div>
   );
 }

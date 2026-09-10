@@ -25,8 +25,6 @@ const ClockIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fil
 const CheckCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const HomeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1m-2 0h4" /></svg>);
 const XCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
-
-// ✅ NEW: Banknote Icon for Payment Received
 const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
 
 /* ==================== HELPERS ==================== */
@@ -126,7 +124,7 @@ function FilterSelect({ value, onChange, options, width = 160 }) {
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter orders"
-        className="appearance-none h-9 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
+        className="appearance-none h-10 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
         style={{ width: `${width}px`, backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         {options.map(([val, label]) => (
           <option key={`${val}-${label}`} value={val}>{label}</option>
@@ -196,7 +194,6 @@ export default function OrdersPage() {
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
   });
 
-  // ✅ NEW: Payment Received Mutation
   const updatePaymentMutation = useMutation({
     mutationFn: ({ id }) => orderApi.updatePayment(id, { status: "paid" }),
     onSuccess: () => {
@@ -336,15 +333,15 @@ export default function OrdersPage() {
         {updateStatusMutation.isSuccess ? "Order status updated" : ""}
       </div>
 
-      <div className="w-full space-y-5 p-4 md:p-0">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="w-full space-y-4 sm:space-y-5 p-3 sm:p-4 md:p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight">Order Management</h1>
+            <h1 className="text-[22px] sm:text-[24px] leading-7 font-bold tracking-tight">Order Management</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Track, verify, and fulfil customer orders</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {isError && (
-              <button onClick={() => refetch()} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+              <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
                 style={{ backgroundColor: "var(--danger, #ef4444)", color: "#fff" }}>
                 Retry Loading
               </button>
@@ -352,83 +349,89 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {/* Stat Cards - Mobile Optimized Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {statCards.map((stat) => (
-            <div key={stat.title} className="rounded-lg p-4" style={cardStyle}>
-              <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{stat.title}</p>
-              <p className={`text-[20px] font-bold mt-1 ${stat.valueClass}`}>{stat.value}</p>
+            <div key={stat.title} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
+              <p className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{stat.title}</p>
+              <p className={`text-[18px] sm:text-[20px] font-bold mt-1 ${stat.valueClass}`}>{stat.value}</p>
             </div>
           ))}
         </div>
 
+        {/* Search - Full width on mobile */}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
           <input type="text" placeholder="Search order #, customer name or phone..."
             value={searchInput} onChange={(e) => handleSearchInput(e.target.value)} aria-label="Search orders"
-            className="w-full h-10 pl-9 pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
+            className="w-full h-11 sm:h-10 pl-10 sm:pl-9 pr-10 sm:pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
             style={inputStyle} />
           {searchInput && (
-            <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70"
+            <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
               style={{ color: "var(--text-muted)" }}>
-              <CloseIcon />
+              <CloseIcon className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Filters - Better mobile wrapping */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }}
             options={[["all", "All Status"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["processing", "Processing"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]]} />
-          <FilterSelect width={140} value={paymentFilter} onChange={setPaymentFilter}
+          <FilterSelect width={130} value={paymentFilter} onChange={setPaymentFilter}
             options={[["all", "All Payments"], ["paid", "Paid"], ["pending", "Unpaid"], ["failed", "Failed"]]} />
-          <FilterSelect width={150} value={shippingFilter} onChange={setShippingFilter}
+          <FilterSelect width={140} value={shippingFilter} onChange={setShippingFilter}
             options={[["all", "All Shipping"], ["standard", "Standard"], ["express", "Express"]]} />
-          <FilterSelect width={150} value={dateRange} onChange={setDateRange}
+          <FilterSelect width={130} value={dateRange} onChange={setDateRange}
             options={[["all", "All Time"], ["today", "Today"], ["yesterday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"]]} />
         </div>
 
+        {/* Active Filters */}
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {activeFilters.map((f) => (
-              <span key={f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-[11px] font-medium"
+              <span key={f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
                 style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", color: "#34d399" }}>
                 {f.label}
-                <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70"><XIcon className="w-3 h-3" /></button>
+                <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
               </span>
             ))}
-            <button onClick={clearAllFilters} className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
+            <button onClick={clearAllFilters} className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80 px-2 py-1"
               style={{ color: "var(--text-muted)" }}>Clear all</button>
           </div>
         )}
 
+        {/* Bulk Actions - Mobile optimized */}
         {selectedIds.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-2.5"
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-lg px-3 sm:px-4 py-3 sm:py-2.5"
             style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
             <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} order{selectedIds.length > 1 ? "s" : ""} selected</p>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => runBulkStatus("confirmed")} disabled={bulkBusy}
-                className="h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+                className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} Confirm Selected
+                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} Confirm
               </button>
               <button onClick={() => runBulkStatus("shipped")} disabled={bulkBusy}
-                className="h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+                className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                <TruckIcon className="w-3.5 h-3.5" /> Mark as Shipped
+                <TruckIcon className="w-3.5 h-3.5" /> Shipped
               </button>
-                           <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
-                className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+              <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
+                className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
-                <BanIcon className="w-3.5 h-3.5" /> Cancel Selected
+                <BanIcon className="w-3.5 h-3.5" /> Cancel
               </button>
               <button onClick={() => setSelectedIds([])}
-                className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80"
+                className="h-11 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Clear selection
+                Clear
               </button>
             </div>
           </div>
         )}
 
+        {/* Loading State */}
         {isLoading ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-6 py-4 flex items-center gap-2" style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
@@ -439,20 +442,20 @@ export default function OrdersPage() {
         ) : isError ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
             <AlertIcon className="w-8 h-8 opacity-60" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Failed to load orders. Please check your connection.</p>
-            <button onClick={() => refetch()} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
+            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Failed to load orders. Please check your connection.</p>
+            <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <BoxIcon className="w-8 h-8 mb-3 opacity-50" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>
               {search || statusFilter !== "all" || activeFilters.length > 0 ? "No orders match your filters" : "No orders yet"}
             </p>
           </div>
         ) : (
           <>
-            {/* DESKTOP TABLE */}
+            {/* DESKTOP TABLE - Hidden on mobile */}
             <div className="hidden md:block rounded-lg border relative" style={cardStyle}>
               {isFetching && !isLoading && (
                 <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden z-10">
@@ -596,13 +599,12 @@ export default function OrdersPage() {
                                     <MenuItem icon={<HomeIcon />} label="Mark as Delivered"
                                       onClick={() => { updateStatusMutation.mutate({ id: order._id, status: "delivered" }); setActionMenuFor(null); }} />
                                   )}
-                                                                  {/* ✅ Payment Received — sirf COD delivered orders ke liye */}
                                   {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
                                     <MenuItem icon={<BanknoteIcon />} label="Payment Received"
                                       onClick={() => { updatePaymentMutation.mutate({ id: order._id }); setActionMenuFor(null); }} />
                                   )}
                                   {["pending", "confirmed", "processing", "shipped"].includes(order.status) && (
-                                                                        <MenuItem icon={<BanIcon />} label="Cancel Order" danger
+                                    <MenuItem icon={<BanIcon />} label="Cancel Order" danger
                                       onClick={() => { openCancelModal([order._id]); setActionMenuFor(null); }} />
                                   )}
                                 </div>
@@ -638,7 +640,7 @@ export default function OrdersPage() {
               </table>
             </div>
 
-            {/* MOBILE CARDS */}
+            {/* MOBILE CARDS - Optimized for touch */}
             <div className="grid grid-cols-1 gap-3 md:hidden">
               {filteredOrders.map((order) => {
                 const isSelected = selectedIds.includes(order._id);
@@ -666,17 +668,18 @@ export default function OrdersPage() {
           </>
         )}
 
+        {/* Pagination - Mobile Optimized */}
         {!isLoading && !isError && total > 0 && (
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                Showing {filteredOrders.length > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + pageSize, total)} of {total} orders
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-3 sm:p-4" style={cardStyle}>
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>
+                Showing {filteredOrders.length > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + pageSize, total)} of {total}
               </p>
               <div className="flex items-center gap-2">
                 <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>Rows:</label>
                 <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
                   aria-label="Rows per page"
-                  className="appearance-none h-8 pl-2 pr-7 rounded-md text-[12px] outline-none cursor-pointer"
+                  className="appearance-none h-9 sm:h-8 pl-2 pr-7 rounded-md text-[12px] outline-none cursor-pointer"
                   style={{ ...inputStyle, backgroundColor: "var(--bg-tertiary)" }}>
                   {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
@@ -693,25 +696,25 @@ export default function OrdersPage() {
                       }
                     }}
                     aria-label="Jump to page"
-                    className="w-14 h-8 rounded-md text-[12px] text-center outline-none"
+                    className="w-16 sm:w-14 h-9 sm:h-8 rounded-md text-[12px] text-center outline-none"
                     style={inputStyle} />
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
               <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
-                className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
+                className="h-10 w-10 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <ChevronLeftIcon className="w-4 h-4" />
+                <ChevronLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
               <div className="flex items-center gap-1">
                 {renderPageNumbers().map((pageNum, index) =>
                   pageNum === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span>
+                    <span key={`ellipsis-${index}`} className="px-2 text-sm hidden sm:inline" style={{ color: "var(--text-muted)" }}>...</span>
                   ) : (
                     <button key={`page-${pageNum}`} type="button" onClick={() => setPage(pageNum)}
                       aria-current={page === pageNum ? "page" : undefined}
-                      className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
+                      className="h-10 w-10 sm:h-8 sm:min-w-[32px] sm:px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
                       style={{
                         backgroundColor: page === pageNum ? "var(--accent)" : "var(--bg-tertiary)",
                         color: page === pageNum ? "var(--accent-text)" : "var(--text-primary)",
@@ -723,20 +726,21 @@ export default function OrdersPage() {
                 )}
               </div>
               <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-                className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
+                className="h-10 w-10 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <ChevronRightIcon className="w-4 h-4" />
+                <ChevronRightIcon className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Cancel Modal - Mobile Optimized */}
       {bulkCancelConfirm && (
-        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
-          <div className="w-full max-w-md rounded-xl p-5 shadow-2xl border"
-            style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true">
+          <style>{`@keyframes modalSlideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } } @keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
+          <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-5 shadow-2xl border"
+            style={{ ...cardStyle, animation: "modalSlideUp 0.3s ease-out" }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                 style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
@@ -747,7 +751,7 @@ export default function OrdersPage() {
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   Orders will be marked as cancelled:{" "}
                   <span className="font-mono">{orders.filter((o) => selectedIds.includes(o._id)).map((o) => o.order_number).slice(0, 4).join(", ")}</span>
-                                   {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
+                  {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
@@ -758,20 +762,20 @@ export default function OrdersPage() {
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
                     placeholder="e.g. Stock unavailable, customer request..."
-                    className="w-full px-3 py-2 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
+                    className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
+            <div className="flex flex-col sm:flex-row gap-2 mt-5">
               <button onClick={() => setBulkCancelConfirm(false)} disabled={bulkBusy}
-                className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border"
+                className="h-11 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border order-2 sm:order-1"
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
               <button onClick={runCancelWithReason} disabled={bulkBusy || cancelBusy || !cancelReason.trim()}
-                                className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, #ef4444)" }}>
-                {bulkBusy ? <><Spinner className="w-3.5 h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
+                {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
               </button>
             </div>
           </div>
@@ -786,7 +790,7 @@ export default function OrdersPage() {
 function MenuItem({ icon, label, onClick, danger }) {
   return (
     <button role="menuitem" onClick={onClick}
-      className={`w-full px-3 py-2 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+      className={`w-full px-3 py-2.5 sm:py-2 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
       style={{ color: danger ? undefined : "var(--text-primary)" }}>
       {icon} {label}
     </button>
@@ -811,81 +815,89 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
   );
 }
 
+// Mobile Order Card - Optimized for touch
 function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
   return (
-    <div className="rounded-lg p-4 space-y-3 cursor-pointer transition box-border max-w-full"
+    <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"
       style={cardStyle} onClick={onOpen}>
+      {/* Header Section */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" checked={isSelected} onChange={onToggleSelect}
             aria-label={`Select order ${order.order_number}`}
-            className="w-4 h-4 rounded cursor-pointer shrink-0" style={{ accentColor: "var(--accent)" }} />
-          <div className="min-w-0">
-            <p className="font-semibold break-words">{order.order_number}</p>
+            className="w-5 h-5 rounded cursor-pointer shrink-0 mt-0.5" style={{ accentColor: "var(--accent)" }} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[15px] break-words">{order.order_number}</p>
             <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at)}</p>
           </div>
         </div>
         <div className="shrink-0 pt-0.5"><StatusBadge status={order.status} /></div>
       </div>
 
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-          style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+      {/* Customer Info */}
+      <div className="flex items-center gap-3 min-w-0 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+          style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
           {(order.address_snapshot?.full_name || "U").charAt(0).toUpperCase()}
         </div>
-        <div className="min-w-0 leading-snug">
-          <p className="font-medium break-words line-clamp-2">{order.address_snapshot?.full_name || order.user_id?.name || "Unknown"}</p>
+        <div className="min-w-0 flex-1 leading-snug">
+          <p className="font-medium text-[13px] break-words line-clamp-2">{order.address_snapshot?.full_name || order.user_id?.name || "Unknown"}</p>
           <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-muted)" }}>{order.user_id?.email || order.address_snapshot?.phone}</p>
         </div>
       </div>
 
+      {/* Items Preview */}
       {(order.items || []).length > 0 && (
         <div className="flex items-center gap-2 overflow-hidden">
-          {(order.items || []).slice(0, 4).map((item, idx) => (
-            <OrderItemImage key={`${order._id}-card-item-${idx}`} item={item} size={32} />
-          ))}
-          {(order.items || []).length > 4 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-              style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
-              +{order.items.length - 4}
+          <div className="flex -space-x-2">
+            {(order.items || []).slice(0, 3).map((item, idx) => (
+              <div key={`${order._id}-card-item-${idx}`} className="relative">
+                <OrderItemImage item={item} size={36} />
+              </div>
+            ))}
+          </div>
+          {(order.items || []).length > 3 && (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-md ml-1"
+              style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+              +{order.items.length - 3}
             </span>
           )}
-          <span className="ml-auto text-[11px] whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+          <span className="ml-auto text-[11px] whitespace-nowrap font-medium" style={{ color: "var(--text-secondary)" }}>
             {order.items.length} item{order.items.length === 1 ? "" : "s"}
           </span>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {/* Payment & Shipping Info */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
         <PaymentBadge status={payStatus} />
         <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
           {order.payment?.method || "—"} • {order.shipping_method || "standard"}
         </span>
       </div>
 
+      {/* Footer - Total & Actions */}
       <div className="flex items-center justify-between pt-3 relative" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-        <div>
+        <div className="flex-1 min-w-0 pr-3">
           <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total</p>
-          <p className="font-bold text-emerald-500">Rs. {order.total?.toLocaleString()}</p>
+          <p className="font-bold text-[18px] text-emerald-500">Rs. {order.total?.toLocaleString()}</p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button onClick={onToggleMenu} aria-label="Actions" aria-haspopup="menu" aria-expanded={menuOpen}
-            className="min-w-[44px] min-h-[44px] p-2.5 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-            style={{ color: "var(--text-secondary)" }}>
-            <DotsIcon />
+            className="min-w-[48px] min-h-[48px] p-3 rounded-xl transition hover:bg-white/5 flex items-center justify-center"
+            style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            <DotsIcon className="w-5 h-5" />
           </button>
         </div>
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-20" onClick={onCloseMenu} />
-            <div role="menu" className="absolute right-3 bottom-12 z-30 w-48 rounded-lg shadow-xl border py-1 text-left"
+            <div role="menu" className="absolute right-4 bottom-16 z-30 w-56 rounded-xl shadow-2xl border py-2 text-left"
               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
               <MenuItem icon={<EyeIcon />} label="View Details" onClick={onViewDetails} />
               {order.status === "pending" && <MenuItem icon={<CheckIcon />} label="Confirm Order" onClick={() => onQuickStatus("confirmed")} />}
               {(order.status === "confirmed" || order.status === "processing") && <MenuItem icon={<TruckIcon />} label="Mark as Shipped" onClick={() => onQuickStatus("shipped")} />}
               {order.status === "shipped" && <MenuItem icon={<HomeIcon />} label="Mark as Delivered" onClick={() => onQuickStatus("delivered")} />}
-              {/* ✅ NEW: Payment Received Option (Mobile) */}
-                            {/* ✅ Payment Received — sirf COD delivered orders ke liye */}
               {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
                 <MenuItem icon={<BanknoteIcon />} label="Payment Received" onClick={onMarkPayment} />
               )}

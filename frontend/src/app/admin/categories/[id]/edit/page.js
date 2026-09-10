@@ -731,22 +731,22 @@ export default function CategoryEditPage() {
           </section>
 
           {/* RIGHT â    ATTRIBUTES & FEATURES (SAME UI AS CREATE) */}
-          <section className="rounded-lg overflow-hidden flex flex-col max-h-[calc(100vh-140px)]" style={cardStyle}>
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-tertiary)]/30">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
+          <section className="rounded-lg overflow-hidden flex flex-col w-full min-w-0 max-h-[calc(100vh-140px)]" style={cardStyle}>
+            <div className="px-3 sm:px-5 py-4 border-b border-[var(--border-color)] flex flex-col items-stretch sm:flex-row sm:items-center sm:justify-between gap-2 bg-[var(--bg-tertiary)]/30">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
                   <Icons.Layers className="w-4 h-4" />
                 </div>
-                <div>
-                  <h2 className="text-sm font-bold text-[var(--text-primary)]">Attributes & Features</h2>
-                  <p className="text-[10px] text-[var(--text-muted)]">Define product specifications</p>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)] truncate">Attributes & Features</h2>
+                  <p className="text-[10px] text-[var(--text-muted)] truncate">Define product specifications</p>
                 </div>
               </div>
               {formData.category_type && (
                 <button
                   type="button"
                   onClick={() => setShowAttributeModal(true)}
-                  className="h-9 px-3 text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="h-10 sm:h-9 px-3 text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center justify-center sm:justify-start gap-1.5 transition-colors shadow-sm w-full sm:w-auto shrink-0"
                 >
                   <Icons.Plus className="w-3.5 h-3.5" /> Add Attribute
                 </button>
@@ -762,7 +762,7 @@ export default function CategoryEditPage() {
                   <p className="text-xs text-[var(--text-muted)] max-w-[240px]">Category type is required to configure attributes.</p>
                 </div>
               ) : formData.attributes.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
                   {formData.attributes.map((config, index) => {
                     const seedName = config.seed_name || `Attribute ${index + 1}`;
                     const inputKey = config.ui_key || `attr-${getAttributeId(config) || config.seed_code || index}`;
@@ -788,22 +788,22 @@ export default function CategoryEditPage() {
                         <button
                           type="button"
                           onClick={() => setOpenAttributeKey((prev) => (prev === inputKey ? null : inputKey))}
-                          className="w-full px-4 py-4 flex items-center justify-between text-left group"
+                          className="w-full px-4 py-4 flex flex-col lg:flex-row lg:items-center text-left group"
                         >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex items-start lg:items-center gap-3 min-w-0 flex-1 w-full lg:w-auto">
                             <div className={`w-10 h-10 flex items-center justify-center shrink-0 rounded-lg transition-colors ${isOpen ? "bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/25" : "bg-[var(--bg-input)] text-[var(--text-muted)] border border-[var(--border-color)] group-hover:border-[var(--text-muted)]"}`}>
                               <TypeIcon className="w-5 h-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <h4 className="text-sm font-bold text-[var(--text-primary)] truncate">{seedName}</h4>
-                                <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-[var(--bg-tertiary)] text-[var(--text-muted)] rounded border border-[var(--border-color)]">
-                                  {typeBadgeLabel}
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-2 lg:gap-y-1.5 mb-1.5 min-w-0">
+                                <h4 className="text-sm font-bold text-[var(--text-primary)] truncate w-full lg:w-auto">{seedName}</h4>
+                                <span className="inline-flex max-w-full min-w-0 items-center px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-[var(--bg-tertiary)] text-[var(--text-muted)] rounded border border-[var(--border-color)]">
+                                  <span className="truncate">{typeBadgeLabel}</span>
                                 </span>
                                 {isAssigned && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/25">
-                                    <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
-                                    Assigned
+                                  <span className="inline-flex max-w-full min-w-0 items-center gap-1 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/25">
+                                    <span className="w-1 h-1 rounded-full bg-[var(--accent)] shrink-0" />
+                                    <span className="truncate">Assigned</span>
                                   </span>
                                 )}
                               </div>
@@ -832,8 +832,8 @@ export default function CategoryEditPage() {
                                   selectedValues.length > 0 ? (
                                     <>
                                       {selectedValues.slice(0, 3).map((val, i) => (
-                                        <span key={i} className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/15">
-                                          {val}
+                                        <span key={i} className="inline-flex max-w-full min-w-0 items-center px-2 py-0.5 text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/15">
+                                          <span className="truncate">{val}</span>
                                         </span>
                                       ))}
                                       {selectedValues.length > 3 && (
@@ -846,8 +846,8 @@ export default function CategoryEditPage() {
                                 )}
                               </div>
                             </div>
+                            <Icons.ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180 text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`} />
                           </div>
-                          <Icons.ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180 text-[var(--accent)]" : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"}`} />
                         </button>
                         
                         {isOpen && (
@@ -907,7 +907,7 @@ export default function CategoryEditPage() {
                                               }
                                             }
                                           }}
-                                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                          className="w-9 h-9 sm:w-6 sm:h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
                                           aria-label={`Remove ${val}`}
                                         >
                                           <Icons.X className="w-3.5 h-3.5" />

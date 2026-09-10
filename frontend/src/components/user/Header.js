@@ -53,12 +53,16 @@ const getImageUrl = (url) => {
 const getIcon = (name) => {
   if (!name) return <FolderOpen size={17} />;
   const n = name.toLowerCase();
-  if (n.includes("mobile") || n.includes("phone")) return <Smartphone size={17} />;
-  if (n.includes("laptop") || n.includes("computer")) return <Laptop size={17} />;
+  if (n.includes("mobile") || n.includes("phone"))
+    return <Smartphone size={17} />;
+  if (n.includes("laptop") || n.includes("computer"))
+    return <Laptop size={17} />;
   if (n.includes("watch")) return <Watch size={17} />;
-  if (n.includes("headphone") || n.includes("earbud") || n.includes("audio")) return <Headphones size={17} />;
+  if (n.includes("headphone") || n.includes("earbud") || n.includes("audio"))
+    return <Headphones size={17} />;
   if (n.includes("camera") || n.includes("photo")) return <Camera size={17} />;
-  if (n.includes("deal") || n.includes("discount") || n.includes("offer")) return <Percent size={17} />;
+  if (n.includes("deal") || n.includes("discount") || n.includes("offer"))
+    return <Percent size={17} />;
   if (n.includes("tv") || n.includes("monitor")) return <Tv size={17} />;
   if (n.includes("game")) return <Gamepad2 size={17} />;
   if (n.includes("cloth") || n.includes("fashion")) return <Shirt size={17} />;
@@ -99,7 +103,10 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
 
   return (
     <div ref={ref} className="relative flex w-full items-center">
-      <Search size={16} className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none z-10" />
+      <Search
+        size={16}
+        className="absolute left-4 text-[var(--user-text-subtle)] pointer-events-none z-10"
+      />
       <input
         value={value}
         onChange={(e) => {
@@ -126,8 +133,17 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
         <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl overflow-hidden">
           <div className="max-h-80 overflow-y-auto">
             {results.map((p) => {
-              const img = p.variants?.[0]?.images?.[0]?.img_url || p.image || p.images?.[0]?.img_url || "";
-              const price = Number(p.variants?.[0]?.selling_price || p.price || p.selling_price || 0);
+              const img =
+                p.variants?.[0]?.images?.[0]?.img_url ||
+                p.image ||
+                p.images?.[0]?.img_url ||
+                "";
+              const price = Number(
+                p.variants?.[0]?.selling_price ||
+                  p.price ||
+                  p.selling_price ||
+                  0,
+              );
               return (
                 <button
                   key={p._id || p.id}
@@ -135,17 +151,30 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
                 >
                   {img ? (
-                    <img src={getImageUrl(img)} alt={p.name} className="w-10 h-10 rounded-lg object-cover border border-[var(--user-border)] shrink-0" />
+                    <img
+                      src={getImageUrl(img)}
+                      alt={p.name}
+                      className="w-10 h-10 rounded-lg object-cover border border-[var(--user-border)] shrink-0"
+                    />
                   ) : (
                     <div className="w-10 h-10 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
-                      <Package size={16} className="text-[var(--user-text-subtle)]" />
+                      <Package
+                        size={16}
+                        className="text-[var(--user-text-subtle)]"
+                      />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[var(--user-text)] truncate">{p.name}</p>
-                    <p className="text-[11px] text-[var(--user-text-muted)] capitalize truncate">{p.brand_id?.name || p.brand || ""}</p>
+                    <p className="text-sm font-semibold text-[var(--user-text)] truncate">
+                      {p.name}
+                    </p>
+                    <p className="text-[11px] text-[var(--user-text-muted)] capitalize truncate">
+                      {p.brand_id?.name || p.brand || ""}
+                    </p>
                   </div>
-                  <span className="text-sm font-bold text-[var(--user-accent)] whitespace-nowrap">Rs. {price.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-[var(--user-accent)] whitespace-nowrap">
+                    Rs. {price.toLocaleString()}
+                  </span>
                 </button>
               );
             })}
@@ -163,7 +192,9 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
 
   if (!url || failed) {
     return (
-      <div className={`${sizeClass} rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black ${textClass} flex items-center justify-center shrink-0`}>
+      <div
+        className={`${sizeClass} rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black ${textClass} flex items-center justify-center shrink-0`}
+      >
         {letter}
       </div>
     );
@@ -191,7 +222,9 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
 
   if (!logoUrl || failed) {
     return (
-      <span className={`${sizeClass} rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black text-base lg:text-lg flex items-center justify-center`}>
+      <span
+        className={`${sizeClass} rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black text-base lg:text-lg flex items-center justify-center`}
+      >
         {letter}
       </span>
     );
@@ -303,7 +336,8 @@ export default function Header() {
   const topCategories = useMemo(() => {
     const counts = {};
     products.forEach((p) => {
-      const id = typeof p.category_id === "object" ? p.category_id?._id : p.category_id;
+      const id =
+        typeof p.category_id === "object" ? p.category_id?._id : p.category_id;
       if (id) counts[id] = (counts[id] || 0) + 1;
     });
     return categories
@@ -330,7 +364,9 @@ export default function Header() {
   const searchResults = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (q.length < 1) return [];
-    return products.filter((p) => (p.name || "").toLowerCase().includes(q)).slice(0, 8);
+    return products
+      .filter((p) => (p.name || "").toLowerCase().includes(q))
+      .slice(0, 8);
   }, [searchTerm, products]);
 
   const handlePick = (p) => {
@@ -369,7 +405,10 @@ export default function Header() {
       <style>{`@keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }`}</style>
 
       {open && (
-        <div onClick={() => setOpen(false)} className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" />
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
+        />
       )}
 
       <header
@@ -417,16 +456,25 @@ export default function Header() {
                 {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
               </button>
 
-                          <button
+              <button
                 onClick={toggleTheme}
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={
+                  theme === "dark"
+                    ? "Switch to light mode"
+                    : "Switch to dark mode"
+                }
                 aria-label="Toggle theme"
                 className={iconBtn}
               >
                 {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
               </button>
 
-              <Link href="/wishlist" title="My Wishlist" aria-label="My Wishlist" className={iconBtn}>
+              <Link
+                href="/wishlist"
+                title="My Wishlist"
+                aria-label="My Wishlist"
+                className={iconBtn}
+              >
                 <Heart size={18} />
                 {wishlistCount > 0 && (
                   <span
@@ -440,7 +488,9 @@ export default function Header() {
               </Link>
 
               <button
-                onClick={() => (isMobile ? router.push("/cart") : setIsCartOpen(true))}
+                onClick={() =>
+                  isMobile ? router.push("/cart") : setIsCartOpen(true)
+                }
                 title="Cart"
                 aria-label={`Open cart, ${count} items`}
                 className={iconBtn}
@@ -464,7 +514,11 @@ export default function Header() {
                     aria-label="Account menu"
                     className="flex items-center gap-1 pl-0.5 pr-0.5 lg:pr-1.5 py-0.5 rounded-lg hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
                   >
-                    <Avatar user={user} sizeClass="w-8 h-8 lg:w-9 lg:h-9" textClass="text-xs lg:text-sm" />
+                    <Avatar
+                      user={user}
+                      sizeClass="w-8 h-8 lg:w-9 lg:h-9"
+                      textClass="text-xs lg:text-sm"
+                    />
                     <ChevronDown
                       size={12}
                       className={`hidden lg:block text-[var(--user-text-muted)] transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
@@ -473,20 +527,28 @@ export default function Header() {
 
                   {profileOpen && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setProfileOpen(false)}
+                      />
                       <div className="absolute right-0 top-11 w-60 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl shadow-[var(--user-shadow-lg)] z-50 p-2">
                         <div className="px-3 py-2.5 border-b border-[var(--user-border)] mb-1">
                           <p className="text-[var(--user-text)] text-sm font-semibold truncate">
                             {user.name || user.username}
                           </p>
-                          <p className="text-[var(--user-text-muted)] text-xs truncate">{user.email}</p>
+                          <p className="text-[var(--user-text-muted)] text-xs truncate">
+                            {user.email}
+                          </p>
                         </div>
                         <Link
                           href="/account"
                           onClick={() => setProfileOpen(false)}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
                         >
-                          <User size={16} className="text-[var(--user-accent)]" />
+                          <User
+                            size={16}
+                            className="text-[var(--user-accent)]"
+                          />
                           My Account
                         </Link>
                         <Link
@@ -494,7 +556,10 @@ export default function Header() {
                           onClick={() => setProfileOpen(false)}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
                         >
-                          <Package size={16} className="text-[var(--user-accent)]" />
+                          <Package
+                            size={16}
+                            className="text-[var(--user-accent)]"
+                          />
                           My Orders
                         </Link>
                         <div className="h-px bg-[var(--user-border)] my-1" />
@@ -558,7 +623,11 @@ export default function Header() {
 
         <div className="px-4 py-2.5 border-b border-[var(--user-border)] shrink-0 bg-gradient-to-br from-[var(--user-bg-card)] to-[var(--user-bg-hover)]">
           <div className="flex items-center justify-between">
-            <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2 group min-w-0">
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 group min-w-0"
+            >
               <div className="relative shrink-0">
                 <StoreLogo store={store} sizeClass="w-8 h-8" />
                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--user-success)] rounded-full border-2 border-[var(--user-bg-elevated)]" />
@@ -577,13 +646,19 @@ export default function Header() {
               aria-label="Close menu"
               className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90 shrink-0"
             >
-              <X size={14} className="text-[var(--user-text)] hover:text-white" />
+              <X
+                size={14}
+                className="text-[var(--user-text)] hover:text-white"
+              />
             </button>
           </div>
 
           {!user && (
             <button
-              onClick={() => { setOpen(false); setLoginOpen(true); }}
+              onClick={() => {
+                setOpen(false);
+                setLoginOpen(true);
+              }}
               className="w-full flex items-center justify-center gap-2 h-9 mt-2 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 transition active:scale-95"
             >
               <User size={14} />
@@ -604,7 +679,9 @@ export default function Header() {
                   <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
                     <User size={18} className="text-[var(--user-accent)]" />
                   </div>
-                  <span className="text-xs font-bold text-[var(--user-text)]">Account</span>
+                  <span className="text-xs font-bold text-[var(--user-text)]">
+                    Account
+                  </span>
                 </Link>
 
                 <Link
@@ -615,7 +692,9 @@ export default function Header() {
                   <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
                     <Package size={18} className="text-[var(--user-accent)]" />
                   </div>
-                  <span className="text-xs font-bold text-[var(--user-text)]">Orders</span>
+                  <span className="text-xs font-bold text-[var(--user-text)]">
+                    Orders
+                  </span>
                 </Link>
 
                 <Link
@@ -631,21 +710,27 @@ export default function Header() {
                       </span>
                     )}
                   </div>
-                  <span className="text-xs font-bold text-[var(--user-text)]">Wishlist</span>
+                  <span className="text-xs font-bold text-[var(--user-text)]">
+                    Wishlist
+                  </span>
                 </Link>
 
                 <Link
                   href="/account?tab=settings"
                   onClick={() => {
                     setOpen(false);
-                    window.dispatchEvent(new CustomEvent("account:tab", { detail: "settings" }));
+                    window.dispatchEvent(
+                      new CustomEvent("account:tab", { detail: "settings" }),
+                    );
                   }}
                   className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
                     <Settings size={18} className="text-[var(--user-accent)]" />
                   </div>
-                  <span className="text-xs font-bold text-[var(--user-text)]">Settings</span>
+                  <span className="text-xs font-bold text-[var(--user-text)]">
+                    Settings
+                  </span>
                 </Link>
               </div>
             </div>
@@ -677,7 +762,10 @@ export default function Header() {
                       {category.count} products
                     </span>
                   </div>
-                  <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
+                  <ChevronRight
+                    size={14}
+                    className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0"
+                  />
                 </Link>
               ))}
             </div>
@@ -692,7 +780,8 @@ export default function Header() {
             <div className="space-y-1">
               {topBrands.map((brand, idx) => {
                 const logoUrl = getLogoUrl(brand.logo);
-                const productCount = brandCounts?.[brand._id] || brand.products?.length || 0;
+                const productCount =
+                  brandCounts?.[brand._id] || brand.products?.length || 0;
                 return (
                   <Link
                     key={brand._id}
@@ -703,7 +792,11 @@ export default function Header() {
                   >
                     {logoUrl ? (
                       <span className="w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
-                        <img src={logoUrl} alt={brand.name} className="w-full h-full object-contain" />
+                        <img
+                          src={logoUrl}
+                          alt={brand.name}
+                          className="w-full h-full object-contain"
+                        />
                       </span>
                     ) : (
                       <span className="w-10 h-10 rounded-full bg-[var(--user-accent)] flex items-center justify-center text-[var(--user-accent-text)] text-sm font-black shrink-0 group-hover:shadow-md transition-shadow">
@@ -718,7 +811,10 @@ export default function Header() {
                         {productCount} products
                       </span>
                     </div>
-                    <ChevronRight size={14} className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0" />
+                    <ChevronRight
+                      size={14}
+                      className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0"
+                    />
                   </Link>
                 );
               })}
