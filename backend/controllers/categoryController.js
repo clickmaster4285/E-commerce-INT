@@ -580,5 +580,6 @@ module.exports = {
   updateCategory,
   deleteCategory,
   getCategoryAttributes,
+  getCategoryAttributesHierarchical,
   assignCategoryAttributes,
 };

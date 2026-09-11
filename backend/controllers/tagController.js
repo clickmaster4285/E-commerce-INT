@@ -15,6 +15,8 @@ const generateSlug = (text) => {
 const getAllTags = async (req, res) => {
   try {
     const tags = await Tag.find({ is_deleted: { $ne: true } })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .sort({ createdAt: -1 })
       .lean();
     return res.status(200).json(tags);
@@ -55,8 +57,8 @@ const createTag = async (req, res) => {
       updatedby: req.user?._id || null,
       is_deleted: false,
     });
-
-    return res.status(201).json(newTag);
+    const populatedTag = await Tag.findById(newTag._id).populate("createdby", "name email").populate("updatedby", "name email").lean();
+    return res.status(201).json(populatedTag);
   } catch (error) {
     console.error("❌ [createTag] Error:", error);
     // Handle duplicate key error specifically if it slips through
@@ -96,7 +98,8 @@ const updateTag = async (req, res) => {
       { 
         name: cleanName, 
         slug: slug, // ✅ Updating slug as well
-        updatedby: req.user?._id || null 
+        updatedby: req.user?._id || null,
+        updatedAt: new Date()
       },
       { new: true }
     );
@@ -105,7 +108,8 @@ const updateTag = async (req, res) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
-    return res.status(200).json(updatedTag);
+    const populatedTag = await Tag.findById(updatedTag._id).populate("createdby", "name email").populate("updatedby", "name email").lean();
+    return res.status(200).json(populatedTag);
   } catch (error) {
     console.error("❌ [updateTag] Error:", error);
     if (error.code === 11000) {

@@ -239,7 +239,7 @@ const [viewMode, setViewMode] = useState(() => {
   const [loadingAttributes, setLoadingAttributes] = useState(false);
 
   const [formData, setFormData] = useState({
-    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant()],
+    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [],
   });
   const [tagInput, setTagInput] = useState("");
 
@@ -427,7 +427,7 @@ const [viewMode, setViewMode] = useState(() => {
   }, [productsError, productsErrorMsg]);
 
   /* Mutations */
-  const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product created successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product creation failed", "product") });
+  const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product created successfully"); closeProductModal(); const newId = data?.data?._id || data?._id; if (newId) router.push(`/admin/products/${newId}`); }, onError: (e) => handlePermissionError(e, "Product creation failed", "product") });
   const updateMutation = useMutation({ mutationFn: ({ id, data }) => productApi.update(id, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product updated successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product update failed", "product") });
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
@@ -500,15 +500,11 @@ const [viewMode, setViewMode] = useState(() => {
   };
 
   const openNewProduct = async () => {
-    try {
-      const result = await variantApi.getNextSku();
-      const nextSku = result?.sku || result?.data?.sku || "";
-      setFormData({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [createEmptyVariant(nextSku)] });
-      setCategoryAttributes([]);
-      setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
-      setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
-      setShowModal(true);
-    } catch { toast.error("Unable to generate next SKU"); }
+    setFormData({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [] });
+    setCategoryAttributes([]);
+    setEditingProduct(null); setCurrentStep(1); setExpandedVariant(0);
+    setIsCategoryDropdownOpen(false); setIsBrandDropdownOpen(false);
+    setShowModal(true);
   };
 
   const getNextLocalSku = async () => {
@@ -544,9 +540,13 @@ const [viewMode, setViewMode] = useState(() => {
   };
 
   const removeVariant = (index) => {
-    if (formData.variants.length === 1) { toast.error("At least one variant is required"); return; }
     setFormData((prev) => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
-    setExpandedVariant((curr) => curr === index ? Math.max(0, Math.min(index, formData.variants.length - 2)) : curr > index ? curr - 1 : curr);
+    setExpandedVariant((curr) => {
+      const nextLength = formData.variants.length - 1;
+      if (nextLength <= 0) return 0;
+      if (curr === index) return Math.max(0, Math.min(index, nextLength - 1));
+      return curr > index ? curr - 1 : curr;
+    });
   };
 
   const updateVariant = (index, field, value) => {
@@ -590,22 +590,12 @@ const [viewMode, setViewMode] = useState(() => {
   };
 
   const handleEdit = (product) => {
-    const variants = product?.variants?.length
-      ? product.variants.map((v) => ({
-          _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
-          cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
-          quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
-          option_values: v.attributes || {},
-          images: (v.images || []).map((img) => ({ existing: true, metadata: img, preview: getImageUrl(img?.img_url) })),
-        }))
-      : [createEmptyVariant()];
-    
     const currentTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
     
     setFormData({
       category_id: normalizeId(product?.category_id), brand_id: normalizeId(product?.brand_id),
       name: product?.name || "", description: product?.description || "", tax: String(product?.tax ?? 0),
-      status: product?.status || "active", tag_names: currentTagNames, variants,
+      status: product?.status || "active", tag_names: currentTagNames, variants: [],
     });
     setTagInput("");
     setEditingProduct(product); setCurrentStep(1); setExpandedVariant(0);
@@ -625,20 +615,7 @@ const [viewMode, setViewMode] = useState(() => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    const skuSet = new Set();
-    for (const v of formData.variants) {
-      const sku = v.sku.trim();
-      if (!sku) { toast.error("SKU is required"); return; }
-      if (skuSet.has(sku.toLowerCase())) { toast.error(`Duplicate SKU: ${sku}`); return; }
-      skuSet.add(sku.toLowerCase());
-      if (!v.title.trim()) { toast.error("Variant title is required"); return; }
-      if (v.cost_price === "" || v.selling_price === "") { toast.error("Cost price and selling price are required"); return; }
-      const cp = Number(v.cost_price); const sp = Number(v.selling_price);
-      if (!Number.isFinite(cp) || !Number.isFinite(sp)) { toast.error("Please enter valid prices"); return; }
-      if (sp <= cp) { toast.error(`Selling Price must be greater than Cost Price for "${v.title || v.sku}"`); return; }
-      const mn = Number(v.min_qnt || 0); const mx = Number(v.max_qnt || 0);
-      if (mx > 0 && mn > mx) { toast.error(`Min Qty cannot be greater than Max Qty for "${v.title}"`); return; }
-    }
+    if (!formData.name.trim()) { toast.error("Product name is required"); return; }
 
     const data = new FormData();
     data.append("category_id", formData.category_id);
@@ -648,28 +625,6 @@ const [viewMode, setViewMode] = useState(() => {
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
-
-    const imageVariantIndexes = [];
-    const variantsPayload = formData.variants.map((v, idx) => {
-      const existingImgs = v.images.filter((i) => i.existing).map((i) => i.metadata);
-      v.images.filter((i) => !i.existing && i.file).forEach((i) => {
-        if (i.file) { data.append("images", i.file); imageVariantIndexes.push(idx); }
-      });
-      let finalSku = v.sku.trim();
-      if (editingProduct) {
-        const orig = editingProduct.variants?.find((ov) => ov._id && String(ov._id) === String(v._id));
-        if (orig) finalSku = orig.sku;
-      }
-      return {
-        _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description || "",
-        cost_price: Number(v.cost_price || 0), selling_price: Number(v.selling_price || 0),
-        quantity: Number(v.quantity || 0), min_qnt: Number(v.min_qnt || 0), max_qnt: Number(v.max_qnt || 0),
-        option_values: v.option_values,
-        existing_images: existingImgs,
-      };
-    });
-    data.append("variants", JSON.stringify(variantsPayload));
-    data.append("image_variant_indexes", JSON.stringify(imageVariantIndexes));
 
     if (editingProduct?._id) updateMutation.mutate({ id: editingProduct._id, data });
     else createMutation.mutate(data);
@@ -884,36 +839,33 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                <tr>{["Product", "Category", "Brand", "Tags", "Price", "Stock", "Status", "Actions"].map((h) => (
+                <tr>{["Product", "Category", "Brand", "Description", "Tax", "Status", "Actions"].map((h) => (
                   <th key={h} className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`} style={{ color: "var(--text-muted)" }}>{h}</th>
                 ))}</tr>
               </thead>
               <tbody>
                 {paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
                 ) : paginatedProducts.map((p) => {
-                  const fv = p?.variants?.[0];
-                  const qty = Number(fv?.quantity || 0);
-                  const min = Number(fv?.min_qnt || 0);
-                  const low = qty <= min;
-                  const img = fv?.images?.[0]?.img_url;
-                  const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
+                  const img = p?.variants?.[0]?.images?.[0]?.img_url;
+                  const firstVariantSku = p?.variants?.[0]?.sku || "";
                   return (
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
                           {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
                           <div className="min-w-0">
-                            <p className="max-w-[140px] truncate text-[13px] font-medium">{p.name}</p>
-                            <p className="max-w-[140px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{fv?.sku || "---"}</p>
+                            <p className="max-w-[160px] truncate text-[13px] font-medium">{p.name}</p>
+                            {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
-                      <td className="px-4 py-2.5"><TagList names={tnames} /></td>
-                      <td className="px-4 py-2.5 text-[13px] font-semibold text-emerald-500">Rs. {Number(fv?.selling_price || 0).toLocaleString()}</td>
-                      <td className="px-4 py-2.5"><div className="flex items-center gap-1.5"><span className={`text-[13px] font-medium ${low ? "text-red-500" : "text-emerald-500"}`}>{qty}</span>{low && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}</div></td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{p.description ? p.description : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-[13px] font-medium">{p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                       <td className="w-1 whitespace-nowrap px-4 py-2.5" onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></td>
                     </tr>
@@ -931,7 +883,7 @@ const [viewMode, setViewMode] = useState(() => {
           {paginatedProducts.map((p) => {
             const v = p?.variants?.[0];
             const img = v?.images?.[0]?.img_url;
-            const tnames = (p.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
+            const firstSku = v?.sku || "";
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
@@ -940,11 +892,11 @@ const [viewMode, setViewMode] = useState(() => {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold">{p.name}</p>
-                  <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{v?.sku || "---"}</p>
-                  {tnames.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{tnames.slice(0, 2).map((n, i) => <span key={`${n}-${i}`} className="inline-flex rounded px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{n}</span>)}{tnames.length > 2 && <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>+{tnames.length - 2}</span>}</div>}
+                  {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
+                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>{p.description ? (p.description.length > 60 ? p.description.slice(0, 60) + "..." : p.description) : "—"}</p>
+                  <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Tax: {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
                 <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>
-                  <span className="text-[13px] font-bold text-emerald-500">Rs. {Number(v?.selling_price || 0).toLocaleString()}</span>
                   <div onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></div>
                 </div>
               </div>
@@ -988,29 +940,17 @@ const [viewMode, setViewMode] = useState(() => {
       {/* PRODUCT MODAL */}
       {showModal && (
         <ModalOverlay zIndex="z-50">
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl shadow-2xl" style={cardStyle}>
+          <div className="max-h-[95vh] w-full max-w-[720px] overflow-y-auto rounded-xl shadow-2xl" style={cardStyle}>
             <div className="sticky top-0 z-20 flex items-center justify-between rounded-t-xl px-5 py-4" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
               <div>
                 <h3 className="text-base font-semibold">{editingProduct ? "Edit Product" : "New Product"}</h3>
-                <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>Add product and variant information</p>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>Create or edit basic product information</p>
               </div>
               <button type="button" onClick={closeProductModal} className="rounded p-1 transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
             </div>
-            <div className="flex items-center gap-4 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">{currentStep > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}</div>
-                <span className="text-xs font-medium">Product Info</span>
-              </div>
-              <div className="h-px w-8" style={{ backgroundColor: "var(--border-color)" }} />
-              <div className="flex items-center gap-2">
-                <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${currentStep === 2 ? "bg-emerald-500 text-white" : "bg-gray-700 text-gray-400"}`}>2</div>
-                <span className="text-xs font-medium">Variants</span>
-              </div>
-            </div>
-            <form onSubmit={handleSubmit} className="p-5">
-              {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <form onSubmit={handleSubmit} className="p-6">
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field label="Category *">
                       <div className="relative">
                         <button type="button" onClick={() => { setIsCategoryDropdownOpen(o => !o); setIsBrandDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
@@ -1040,209 +980,21 @@ const [viewMode, setViewMode] = useState(() => {
                       </div>
                     </Field>
                   </div>
-                  <Field label="Tags">
-                    <div className="flex gap-2">
-                      <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag()} placeholder="Type tag name & press Enter" className="h-9 flex-1 rounded-md px-3 text-sm outline-none" style={inputStyle} />
-                      <button type="button" onClick={addTag} className="flex h-9 w-9 items-center justify-center rounded-md transition hover:opacity-90" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><Plus className="h-4 w-4" /></button>
-                    </div>
-                    {formData.tag_names.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {formData.tag_names.map(tag => (
-                          <span key={tag} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                            {tag}
-                            <button type="button" onClick={() => removeTag(tag)} className="ml-0.5 rounded-full p-0.5 transition hover:bg-black/10"><X className="h-2.5 w-2.5" /></button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </Field>
                   <Field label="Product Name *"><input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
                   <Field label="Description"><textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field label="Tax (%)">
                       <input type="number" min="0" max="100" step="0.01" placeholder="%" value={formData.tax} onChange={e => { const v = e.target.value; if (v === "") { setFormData(p => ({ ...p, tax: "" })); return; } let n = Number(v); if (!Number.isFinite(n)) n = 0; n = Math.min(100, Math.max(0, n)); setFormData(p => ({ ...p, tax: String(n) })); }} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} />
                     </Field>
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button type="button" onClick={handleNextStep} className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Next: Variants <ChevronRight className="h-4 w-4" /></button>
-                  </div>
+                    <Field label="Status">
+                      <select value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value }))} className="h-9 w-full appearance-none rounded-md px-3 text-sm outline-none" style={inputStyle}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </Field>
+                   </div>
                 </div>
-              )}
-              {currentStep === 2 && (
-                <div className="space-y-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h4 className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4" style={{ color: "var(--accent)" }} /> Variants ({formData.variants.length})</h4>
-                      <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>SKU, pricing, stock, options and images</p>
-                    </div>
-                    <button type="button" onClick={addVariant} className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-3.5 w-3.5" /> Add Variant</button>
-                  </div>
-                  <div className="space-y-3">
-                    {formData.variants.map((variant, index) => (
-                      <div key={variant._id || `new-${index}`} className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
-                        <div className="flex cursor-pointer items-center justify-between px-4 py-3 transition hover:bg-black/[0.02]" style={{ backgroundColor: "var(--bg-tertiary)" }} onClick={() => setExpandedVariant(expandedVariant === index ? -1 : index)}>
-                          <div>
-                            <p className="text-sm font-semibold">{variant.sku || `Variant ${index + 1}`}</p>
-                            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{variant.title || `Variant #${index + 1}`}</p>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <IconButton title="Duplicate" onClick={e => { e.stopPropagation(); duplicateVariant(index); }}><Copy className="h-3.5 w-3.5" /></IconButton>
-                            <IconButton title="Delete" color="var(--danger)" background="rgba(239,68,68,.10)" onClick={e => { e.stopPropagation(); removeVariant(index); }}><Trash2 className="h-3.5 w-3.5" /></IconButton>
-                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} />
-                          </div>
-                        </div>
-                        {expandedVariant === index && (
-                          <div className="space-y-5 p-4">
-                            <div>
-                              <SectionTitle>Identification</SectionTitle>
-                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <Field label="SKU *">
-                                  <input required type="text" placeholder="e.g. sku_4" value={variant.sku} readOnly={!!editingProduct && !!variant._id} onChange={e => updateVariant(index, "sku", e.target.value)} className={`h-9 w-full rounded-md px-3 text-sm ${editingProduct && variant._id ? "cursor-not-allowed opacity-60" : ""}`} style={inputStyle} />
-                                </Field>
-                                <Field label="Variant Title *">
-                                  <input required type="text" placeholder="e.g. Black - Large" value={variant.title} onChange={e => updateVariant(index, "title", e.target.value)} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} />
-                                </Field>
-                              </div>
-                              <div className="mt-3">
-                                <Field label="Variant Description">
-                                  <textarea rows={2} placeholder="Enter variant description..." value={variant.description} onChange={e => updateVariant(index, "description", e.target.value)} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} />
-                                </Field>
-                              </div>
-                            </div>
-                            
-                            {/* PROFESSIONAL VARIANT ATTRIBUTES SECTION */}
-                            <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                                <div>
-                                  <h4 className="flex items-center gap-2 text-sm font-bold">
-                                    <Settings2 className="h-4 w-4" style={{ color: "var(--accent)" }} />
-                                    Variant Attributes
-                                  </h4>
-                                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Define specific options for this product's variants</p>
-                                </div>
-                                <button type="button" onClick={handleOpenAttributeModal} className="flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                                  <Plus className="h-3.5 w-3.5" /> Add Attribute
-                                </button>
-                              </div>
-                              <div className="p-5">
-                              {variantAllowedAttributes.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2">
-                                  {variantAllowedAttributes.map(attr => {
-                                    const assignedOptions = getAssignedOptionList(attr);
-                                    const hasAssignedOptions = assignedOptions.length > 0;
-                                    const dt = String(attr.data_type || "").toLowerCase().trim();
-                                    const renderAsSelect = hasAssignedOptions;
-                                    const attrCode = String(attr.code || attr._id || "");
-                                    const storedRaw = variant.option_values?.[attrCode];
-                                    const storedValue = Array.isArray(storedRaw) ? (storedRaw[0] || "") : (storedRaw || "");
-                                    return (
-                                      <Field key={String(attr._id || attr.code || Math.random())} label={attr.name}>
-                                        {renderAsSelect ? (
-                                          <VariantAttributeSelect
-                                            attr={attr}
-                                            options={assignedOptions}
-                                            value={storedValue}
-                                            multiple={false}
-                                            onChange={(val) => updateVariantOption(index, attrCode, val)}
-                                            onAddValue={(a, v) => handleAddVariantAttributeValue(a, v, index)}
-                                            inputStyle={inputStyle}
-                                          />
-                                        ) : dt === 'color' ? (
-                                          <div className="flex items-center gap-2">
-                                            <input type="color" value={variant.option_values?.[attrCode] || '#000000'} onChange={(e) => updateVariantOption(index, attrCode, e.target.value)} className="h-9 w-12 cursor-pointer rounded border p-1" style={{ borderColor: "var(--border-color)" }} />
-                                            <span className="text-xs font-mono">{variant.option_values?.[attrCode] || '#000000'}</span>
-                                            <AddAttributeValueControl attr={attr} onAdd={(a, v) => handleAddVariantAttributeValue(a, v, index)} />
-                                          </div>
-                                        ) : dt === 'boolean' ? (
-                                          <div className="flex rounded-lg border overflow-hidden p-0.5" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-input)" }}>
-                                            {[{ id: "true", label: "True" }, { id: "false", label: "False" }].map((opt) => {
-                                              const isActive = String(storedValue).toLowerCase() === opt.id;
-                                              return (
-                                                <button
-                                                  key={opt.id}
-                                                  type="button"
-                                                  onClick={() => updateVariantOption(index, attrCode, opt.id)}
-                                                  className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all select-none ${isActive ? "text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-                                                  style={isActive ? { backgroundColor: "var(--bg-tertiary)" } : {}}
-                                                >
-                                                  <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === "true" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                                                  {opt.label}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        ) : (
-                                          <div className="flex items-center gap-2">
-                                            <input
-                                              type={dt === 'number' || dt === 'decimal' || dt === 'float' ? 'number' : 'text'}
-                                              value={variant.option_values?.[attrCode] || ""}
-                                              onChange={(e) => updateVariantOption(index, attrCode, e.target.value)}
-                                              placeholder={`Enter ${attr.name}`}
-                                              className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
-                                              style={inputStyle}
-                                            />
-                                            <AddAttributeValueControl attr={attr} onAdd={(a, v) => handleAddVariantAttributeValue(a, v, index)} />
-                                          </div>
-                                        )}
-                                      </Field>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg" style={{ borderColor: "var(--border-color)" }}>
-                                  <Settings2 className="h-8 w-8 mb-2 opacity-30" style={{ color: "var(--text-muted)" }} />
-                                  <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>No attributes assigned to this category yet.</p>
-                                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Click "Add Attribute" to create and assign one.</p>
-                                </div>
-                              )}
-                              </div>
-                            </div>
-
-                            <div>
-                              <SectionTitle>Pricing & Stock</SectionTitle>
-                              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                                <NumberField label="Cost Price *" placeholder="1000" value={variant.cost_price} onChange={v => updateVariant(index, "cost_price", v)} />
-                                <NumberField label="Selling Price *" placeholder="1500" value={variant.selling_price} onChange={v => updateVariant(index, "selling_price", v)} />
-                                <NumberField label="Quantity" placeholder="50" value={variant.quantity} onChange={v => updateVariant(index, "quantity", v)} />
-                                <NumberField label="Min Qty" placeholder="5" value={variant.min_qnt} onChange={v => updateVariant(index, "min_qnt", v)} />
-                                <NumberField label="Max Qty" placeholder="100" value={variant.max_qnt} onChange={v => updateVariant(index, "max_qnt", v)} />
-                              </div>
-                              {variant.cost_price !== "" && variant.selling_price !== "" && Number(variant.selling_price) <= Number(variant.cost_price) && (
-                                <div className="mt-2 flex items-center gap-2 rounded border border-red-500/30 bg-red-500/10 px-3 py-2">
-                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                                  <p className="text-xs font-medium text-red-500">Selling Price must be greater than Cost Price</p>
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <SectionTitle>Product Images</SectionTitle>
-                              <label className="block cursor-pointer rounded-lg border-2 border-dashed p-5 text-center transition hover:bg-black/[0.02]" style={{ borderColor: "var(--border-color)" }}>
-                                <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handleImageUpload(index, e)} />
-                                <Upload className="mx-auto mb-2 h-6 w-6" style={{ color: "var(--text-muted)" }} />
-                                <p className="text-xs font-medium">Click to select images</p>
-                                <p className="mt-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>JPG, PNG or WebP • Auto optimized</p>
-                              </label>
-                              {variant.images.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {variant.images.map((image, imageIndex) => (
-                                    <div key={imageIndex} className="group relative">
-                                      <img src={image.preview} alt="" className="h-16 w-16 rounded border object-cover" style={{ borderColor: "var(--border-color)" }} />
-                                      <button type="button" onClick={() => removeImage(index, imageIndex)} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-red-600"><X className="h-3 w-3" /></button>
-                                      {image.existing && <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[8px] text-white">Saved</span>}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-between border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
-                <button type="button" onClick={() => setCurrentStep(1)} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><ChevronLeft className="h-4 w-4" /> Back</button>
+              <div className="flex justify-end border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
                 <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}<Check className="h-4 w-4" /></button>
               </div>
             </form>
@@ -1374,7 +1126,7 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: "multi_select", label: "Multi Select", icon: <Icons.Filter className="w-4 h-4" /> },
-                    { id: "boolean", label: "Boolean", icon: <Icons.Text className="w-4 h-4" /> },
+                    { id: "boolean", label: "Yes / No", icon: <Icons.Text className="w-4 h-4" /> },
                   ].map((type) => {
                     const isActive = attributeFormData.data_type === type.id;
                     return (

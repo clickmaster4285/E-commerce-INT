@@ -76,6 +76,7 @@ router.get("/next-code", authMiddleware, checkPermission("products"), getNextCod
 router.get("/", authMiddleware, checkPermission("products"), getCategories);
 router.get("/:id", authMiddleware, checkPermission("products"), getCategoryById);
 router.get("/:id/attributes", authMiddleware, checkPermission("products"), getCategoryAttributes);
+router.get("/:id/attributes-hierarchy", authMiddleware, checkPermission("products"), getCategoryAttributesHierarchical);
 router.post("/", authMiddleware, checkPermission("products"), createCategory);
 router.put("/:id", authMiddleware, checkPermission("products"), updateCategory);
 router.put("/:id/attributes", authMiddleware, checkPermission("products"), assignCategoryAttributes);

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
+import { attributeApi } from "@/apis/admin/attributeApi";
 
 const API_ORIGIN =
   process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -45,238 +46,279 @@ const createEmptyVariant = (sku = "") => ({
 });
 
 // ===========================================================
-// Professional Hierarchical Attribute Group Component
-// Renders: Main Attribute (e.g. Processor) → Sub-Attributes
-// (e.g. Brand, Series) → Values (e.g. Intel)
-//
-// Storage shape (preserved in DB):
-//   { "Processor": { "Brand": "Intel", "Series": "Core i5" }, ... }
-// ===========================================================
-function HierarchicalAttributeGroup({ mainAttribute, selectedValues, onChange }) {
-  const [expanded, setExpanded] = useState(true);
-
-  const subAttributes = Array.isArray(mainAttribute.sub_attributes)
-    ? mainAttribute.sub_attributes
-    : [];
-
-  const directValues = Array.isArray(mainAttribute.values)
-    ? mainAttribute.values.map((v) => (typeof v === "string" ? v : v?.label || v?.value)).filter(Boolean)
-    : [];
-
-  const mainGroup = selectedValues?.[mainAttribute.name] || {};
-  const totalSelected = subAttributes.reduce(
-    (acc, sub) => acc + (mainGroup?.[sub.name] ? 1 : 0),
-    0
-  );
-
-  return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{
-        backgroundColor: "var(--bg-tertiary)",
-        border: "1px solid var(--border-color)",
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => setExpanded((p) => !p)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left transition hover:bg-white/[0.03]"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-8 h-8 rounded-md flex items-center justify-center text-[11px] font-bold shrink-0"
-            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-          >
-            {mainAttribute.name?.[0]?.toUpperCase() || "?"}
-          </div>
-          <div className="min-w-0">
-            <p
-              className="text-sm font-semibold truncate"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {mainAttribute.name}
-            </p>
-            <p
-              className="text-[11px] truncate"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {subAttributes.length > 0
-                ? `${subAttributes.length} sub-attribute${subAttributes.length !== 1 ? "s" : ""}${totalSelected > 0 ? ` • ${totalSelected} selected` : ""}`
-                : `${directValues.length} value${directValues.length !== 1 ? "s" : ""}`}
-            </p>
-          </div>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 transition-transform shrink-0 ${expanded ? "rotate-180" : ""}`}
-          style={{ color: "var(--text-muted)" }}
-        />
-      </button>
-
-      {expanded && (
-        <div
-          className="px-4 pb-4 pt-1 space-y-3 border-t"
-          style={{ borderColor: "var(--border-color)" }}
-        >
-          {subAttributes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
-              {subAttributes.map((sub) => {
-                const subValues = Array.isArray(sub.values)
-                  ? sub.values
-                      .map((v) => (typeof v === "string" ? v : v?.label || v?.value))
-                      .filter(Boolean)
-                  : [];
-
-                return (
-                  <SubAttributeSelect
-                    key={sub._id}
-                    subAttribute={sub}
-                    values={subValues}
-                    selectedValue={mainGroup?.[sub.name] || ""}
-                    onChange={(val) => onChange(mainAttribute.name, sub.name, val)}
-                  />
-                );
-              })}
-            </div>
-          ) : directValues.length > 0 ? (
-            <div className="pt-3">
-              <SubAttributeSelect
-                subAttribute={{ _id: mainAttribute._id, name: mainAttribute.name }}
-                values={directValues}
-                selectedValue={mainGroup?.[mainAttribute.name] || ""}
-                onChange={(val) => onChange(mainAttribute.name, mainAttribute.name, val)}
-              />
-            </div>
-          ) : (
-            <p
-              className="text-[11px] text-center py-3"
-              style={{ color: "var(--text-muted)" }}
-            >
-              No sub-attributes defined.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ===========================================================
-// Professional Sub-Attribute Select (Dropdown with search)
+// Compact Sub-Attribute Select
 // ===========================================================
 function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addText, setAddText] = useState("");
+  const [addError, setAddError] = useState("");
+  const [saving, setSaving] = useState(false);
   const dropdownRef = useRef(null);
+
+  // Derive value objects from subAttribute (database source of truth) with local update support
+  const [localValueObjects, setLocalValueObjects] = useState(() => {
+    if (subAttribute?.values && Array.isArray(subAttribute.values)) return subAttribute.values;
+    if (Array.isArray(values) && values.length) return values.map((v, i) => ({ label: String(v), value: String(v), sort_order: i, is_active: true }));
+    return [];
+  });
+
+  // Sync when prop updates
+  useEffect(() => {
+    if (subAttribute?.values && Array.isArray(subAttribute.values)) {
+      setLocalValueObjects(subAttribute.values);
+    }
+  }, [subAttribute?.values]);
+
+  const valueObjects = localValueObjects;
+
+  const stringValues = valueObjects.map((v) => String(v?.label || v?.value || v || "").trim()).filter(Boolean);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setOpen(false);
+        setShowAdd(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filtered = values.filter((v) =>
+  const filtered = stringValues.filter((v) =>
     String(v).toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div className="space-y-1.5">
-      <label
-        className="block text-[11px] font-semibold uppercase tracking-wide"
-        style={{ color: "var(--text-muted)" }}
-      >
-        {subAttribute.name}
-      </label>
-      <div className="relative" ref={dropdownRef}>
-        <button
-          type="button"
-          onClick={() => setOpen((p) => !p)}
-          className="w-full h-9 px-3 rounded-lg text-sm flex items-center justify-between outline-none transition focus:ring-1 focus:ring-[var(--accent)]"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-color)",
-            color: selectedValue ? "var(--text-primary)" : "var(--text-muted)",
-          }}
-        >
-          <span className="truncate">{selectedValue || `Select ${subAttribute.name}...`}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-            style={{ color: "var(--text-muted)" }}
-          />
-        </button>
+  const handleAddNew = async () => {
+    const trimmed = addText.trim();
+    if (!trimmed) {
+      setAddError("Enter a value.");
+      return;
+    }
 
-        {open && (
-          <div
-            className="absolute z-50 mt-1 w-full rounded-lg shadow-lg overflow-hidden"
+    const exists = valueObjects.some(
+      (v) => String(v?.value || v?.label || v).trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      setAddError("Value already exists.");
+      return;
+    }
+
+    setSaving(true);
+    setAddError("");
+    try {
+      const updatedValues = [
+        ...valueObjects,
+        { label: trimmed, value: trimmed, sort_order: valueObjects.length, is_active: true },
+      ];
+      await attributeApi.update(subAttribute._id, { values: updatedValues });
+      setLocalValueObjects(updatedValues);
+      setAddText("");
+      setShowAdd(false);
+      setOpen(false);
+      onChange(trimmed);
+      toast.success(`Added "${trimmed}"`);
+    } catch (err) {
+      console.error("Add value error:", err);
+      setAddError("Failed to save value.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setShowAdd(false);
+    setAddText("");
+    setAddError("");
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") {
+      handleCancel();
+    } else if (e.key === "Enter") {
+      handleAddNew();
+    }
+  };
+
+  return (
+    <div ref={dropdownRef}>
+      {!showAdd ? (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setOpen((p) => !p);
+              if (showAdd) setShowAdd(false);
+            }}
+            className="w-full h-10 px-3 rounded-lg text-sm flex items-center justify-between outline-none transition border"
             style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
+              backgroundColor: "var(--bg-tertiary)",
+              borderColor: "var(--border-color)",
+              color: selectedValue ? "var(--text-primary)" : "var(--text-muted)",
             }}
           >
-            <div
-              className="p-2 border-b"
-              style={{ borderColor: "var(--border-color)" }}
-            >
-              <input
-                type="text"
-                placeholder={`Search ${subAttribute.name}...`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-7 px-2 text-xs rounded outline-none"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  color: "var(--text-primary)",
-                }}
-                autoFocus
-              />
-            </div>
+            <span className="truncate">{selectedValue || `Select...`}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+              style={{ color: "var(--text-muted)" }}
+            />
+          </button>
 
-            <div className="max-h-48 overflow-y-auto py-1">
-              {filtered.map((v) => {
-                const isSelected = String(selectedValue) === String(v);
-                return (
+          {open && (
+            <div
+              className="absolute z-50 mt-1 w-full rounded-lg shadow-xl overflow-hidden"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <div
+                className="p-2 border-b"
+                style={{ borderColor: "var(--border-color)" }}
+              >
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full h-8 px-2.5 text-xs rounded outline-none border"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    borderColor: "var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                  autoFocus
+                />
+              </div>
+              <div
+                className="flex flex-col"
+                style={{ maxHeight: "260px" }}
+              >
+                <div className="overflow-y-auto">
+                  <div className="py-1">
+                    {filtered.map((v) => {
+                      const isSelected = String(selectedValue) === String(v);
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => {
+                            onChange(isSelected ? "" : v);
+                            setOpen(false);
+                            setSearch("");
+                          }}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-[var(--bg-tertiary)] transition flex items-center gap-2.5"
+                          style={{
+                            color: isSelected ? "var(--accent)" : "var(--text-primary)",
+                          }}
+                        >
+                          <span
+                            className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "bg-[var(--accent)] border-[var(--accent)]" : ""}`}
+                            style={{
+                              borderColor: isSelected ? undefined : "var(--border-color)",
+                            }}
+                          >
+                            {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                          </span>
+                          <span className="truncate">{v}</span>
+                        </button>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <div
+                        className="px-3 py-2.5 text-xs text-center"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        No values found
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className="border-t shrink-0 bg-[var(--bg-card)]"
+                  style={{ borderColor: "var(--border-color)" }}
+                >
                   <button
-                    key={v}
                     type="button"
                     onClick={() => {
-                      onChange(isSelected ? "" : v);
+                      setShowAdd(true);
                       setOpen(false);
                       setSearch("");
+                      setAddError("");
+                      setAddText("");
+                      onChange("");
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs hover:bg-[var(--bg-tertiary)] transition flex items-center gap-2"
-                    style={{
-                      color: isSelected ? "var(--accent)" : "var(--text-primary)",
-                    }}
+                    className="w-full px-3 py-2.5 text-left text-xs font-semibold transition hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
+                    style={{ color: "var(--accent)" }}
                   >
-                    <span
-                      className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "bg-[var(--accent)] border-[var(--accent)]" : ""}`}
-                      style={
-                        !isSelected
-                          ? { borderColor: "var(--border-color)" }
-                          : undefined
-                      }
-                    >
-                      {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
-                    </span>
-                    {v}
+                    <span>+</span>
+                    <span>Add new value</span>
                   </button>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div
-                  className="px-3 py-2 text-xs text-center"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No values found
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Enter new value..."
+            value={addText}
+            onChange={(e) => {
+              setAddText(e.target.value);
+              setAddError("");
+            }}
+            onKeyDown={handleKeyDown}
+            className="flex-1 h-10 px-3 rounded-lg text-sm outline-none border"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              borderColor: addError ? "#ef4444" : "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={handleAddNew}
+            disabled={saving || !addText.trim()}
+            className="h-10 px-4 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-40 transition shrink-0"
+            style={{
+              backgroundColor: "var(--accent)",
+              color: "var(--accent-text)",
+              border: "none",
+              cursor: saving || !addText.trim() ? "not-allowed" : "pointer",
+            }}
+          >
+            {saving ? (
+              <div
+                className="w-3 h-3 animate-spin rounded-full border-2 border-t-transparent"
+                style={{ borderColor: "var(--accent-text)", borderTopColor: "transparent" }}
+              />
+            ) : (
+              "Add"
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="h-10 px-3 rounded-lg text-xs font-medium inline-flex items-center transition hover:bg-[var(--bg-tertiary)] shrink-0"
+            style={{
+              backgroundColor: "transparent",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-muted)",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {addError && (
+        <p className="text-[11px] text-red-500 mt-1">{addError}</p>
+      )}
     </div>
   );
 }
@@ -316,7 +358,7 @@ export default function AddVariantPage() {
   });
 
   // ----------------------------------------------------------------
-  // Category Attributes Hierarchy Query (Main → Sub → Values)
+  // Category Attributes Hierarchy Query
   // ----------------------------------------------------------------
   const categoryId = product?.category_id?._id || product?.category_id || null;
 
@@ -337,7 +379,9 @@ export default function AddVariantPage() {
       queryClient.invalidateQueries({ queryKey: ["product", id] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(isEditMode ? "Variant updated!" : "Variant added!");
-      router.push(`/admin/products/${id}`);
+      const tabParam = searchParams?.get("tab");
+      const redirectUrl = `/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`;
+      router.push(redirectUrl);
     },
     onError: (err) => {
       console.error("Save Error:", err);
@@ -429,9 +473,7 @@ export default function AddVariantPage() {
   };
 
   // ----------------------------------------------------------------
-  // Initialize variant attributes state from the loaded variant data.
-  // Stored as: { MainAttributeName: { SubAttributeName: value } }
-  // This preserves the Main → Sub → Value hierarchy in the database.
+  // Initialize variant attributes state
   // ----------------------------------------------------------------
   const initAttrsRef = useRef(false);
   useEffect(() => {
@@ -444,7 +486,6 @@ export default function AddVariantPage() {
     const existingAttributes = variantData?.attributes || {};
     if (!existingAttributes || Object.keys(existingAttributes).length === 0) return;
 
-    // Build a flat id → attribute map for lookup
     const flat = [];
     const collect = (nodes) => {
       nodes.forEach((n) => {
@@ -456,9 +497,6 @@ export default function AddVariantPage() {
 
     const byId = new Map(flat.map((a) => [String(a._id), a]));
 
-    // Detect the saved shape:
-    //   1) Hierarchical: { MainName: { SubName: value } } → hydrate as-is.
-    //   2) Flat id → value: rebuild by resolving ids against the category tree.
     const isHierarchical = (val) =>
       val && typeof val === "object" && !Array.isArray(val) &&
       Object.values(val).every(
@@ -485,7 +523,6 @@ export default function AddVariantPage() {
     }
 
     if (next && Object.keys(next).length > 0) {
-      // Defer to next tick to avoid cascading-render warnings.
       Promise.resolve().then(() => {
         setVariantAttributes(next);
         initAttrsRef.current = true;
@@ -493,13 +530,10 @@ export default function AddVariantPage() {
     }
   }, [product, initialized, categoryAttributesTree, isEditMode, editVariantId]);
 
-  // Reset the initializer ref when leaving edit mode / new variant creation
   useEffect(() => {
     if (!isEditMode) initAttrsRef.current = false;
   }, [isEditMode]);
 
-  // Update a single sub-attribute's selected value, preserving the
-  // Main Attribute → Sub-Attribute → Value hierarchy.
   const updateVariantAttribute = (mainName, subName, value) => {
     setVariantAttributes((prev) => {
       const next = { ...prev };
@@ -655,7 +689,6 @@ export default function AddVariantPage() {
 
       const imageVariantIndexes = [];
 
-      // ✅ FIXED: Ensure attributes object is explicitly sent as empty {}
       const variantsPayload = [variant].map((v, index) => {
         const existingImages = (v.images || [])
           .filter((image) => image.existing)
@@ -685,10 +718,7 @@ export default function AddVariantPage() {
           selling_price: Number(v.selling_price || 0),
           quantity: Number(v.quantity || 0),
           min_qnt: Number(v.min_qnt || 0),
-          max_qnt: Number(v.max_qnt || 0),
-          // ✅ Persist hierarchical (Main → Sub → Value) selections as a flat map
-          // keyed by the sub-attribute id; the backend stores it as Mixed so the
-          // structure is preserved on read.
+          max_qnt: Number(v.max_qnt ?? 0),
           attributes: variantAttributes,
           existing_images: existingImages,
         };
@@ -711,10 +741,10 @@ export default function AddVariantPage() {
     return (
       <div
         className="fixed inset-0 flex items-center justify-center z-[9999]"
-        style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+        style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
       >
         <div
-          className="rounded-xl py-12 px-16 flex flex-col items-center gap-3"
+          className="rounded-xl py-10 px-14 flex flex-col items-center gap-3"
           style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
         >
           <div
@@ -742,7 +772,10 @@ export default function AddVariantPage() {
           </p>
           <button
             type="button"
-            onClick={() => router.push(`/admin/products/${id}`)}
+            onClick={() => {
+              const tabParam = searchParams?.get("tab");
+              router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
+            }}
             className="mt-4 px-4 py-2 rounded-lg text-sm"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
@@ -755,90 +788,93 @@ export default function AddVariantPage() {
 
   const variant = formData.variants[0];
 
-  // ----------------------------------------------------------------
-  // Main Render
-  // ----------------------------------------------------------------
   return (
     <>
       {/* Background Overlay */}
       <div
         className="fixed inset-0 z-[9999]"
         style={{
-          backgroundColor: "rgba(0,0,0,0.65)",
+          backgroundColor: "rgba(0,0,0,0.6)",
           backdropFilter: "blur(5px)",
         }}
         onClick={() => router.push(`/admin/products/${id}`)}
       />
 
       {/* Modal */}
-      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-[10000] flex items-start justify-center p-4 pointer-events-none overflow-y-auto">
         <div
-          className="w-full max-w-4xl rounded-xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden"
+          className="w-full max-w-[780px] rounded-xl shadow-2xl flex flex-col pointer-events-auto my-6"
           style={{
-            maxHeight: "90vh",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
           }}
         >
-          <form
-            onSubmit={handleSubmit}
-            className="flex-1 overflow-y-auto custom-scrollbar"
-          >
-            <div className="p-6 space-y-6">
-              
+          <form onSubmit={handleSubmit} className="flex flex-col">
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+              <div className="flex items-center gap-3 mb-1.5">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+                >
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
+                    Add New Variant
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Configure variant details for this product.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 space-y-6">
               {/* Identification */}
-              <div className="space-y-3">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider"
+              <section>
+                <h3
+                  className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
                   Identification
-                </p>
+                </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label
-                      className="block text-xs mb-1.5 font-medium"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
+                    <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                       SKU <span className="text-red-500">*</span>
                     </label>
                     <input
                       required
                       type="text"
-                      placeholder="e.g. sku_4"
+                      placeholder="e.g. SKU-001"
                       value={variant.sku}
                       readOnly={!!variant._id}
                       onChange={(ev) => updateVariant("sku", ev.target.value)}
-                      className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
                       style={inputStyle}
                     />
                   </div>
-
                   <div>
-                    <label
-                      className="block text-xs mb-1.5 font-medium"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
+                    <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                       Variant Title <span className="text-red-500">*</span>
                     </label>
                     <input
                       required
                       type="text"
-                      placeholder="e.g. Black - Large"
+                      placeholder="e.g. Black / Large"
                       value={variant.title}
                       onChange={(ev) => updateVariant("title", ev.target.value)}
-                      className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
                       style={inputStyle}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label
-                    className="block text-xs mb-1.5 font-medium"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                <div className="mt-3">
+                  <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                     Variant Description
                   </label>
                   <textarea
@@ -846,22 +882,100 @@ export default function AddVariantPage() {
                     placeholder="Optional description..."
                     value={variant.description}
                     onChange={(ev) => updateVariant("description", ev.target.value)}
-                    className="px-3 py-2 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
+                    className="px-3 py-2.5 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
                     style={inputStyle}
                   />
                 </div>
-              </div>
+              </section>
+
+              {/* Category Attributes */}
+              {categoryAttributesTree.length > 0 && (
+                <section>
+                  <div className="mb-3">
+                    <h3
+                      className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Category Attributes
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {categoryAttributesTree.map((mainAttr) => {
+                      const subAttributes = Array.isArray(mainAttr.sub_attributes)
+                        ? mainAttr.sub_attributes
+                        : [];
+                      const directValues = Array.isArray(mainAttr.values)
+                        ? mainAttr.values
+                            .map((v) => (typeof v === "string" ? v : v?.label || v?.value))
+                            .filter(Boolean)
+                        : [];
+
+                      const mainGroup = variantAttributes?.[mainAttr.name] || {};
+
+                      // If sub-attributes exist, render each sub-attribute as its own card in the 2-col grid
+                      if (subAttributes.length > 0) {
+                        return subAttributes.map((sub) => {
+                          const subValues = Array.isArray(sub.values)
+                            ? sub.values
+                                .map((v) => (typeof v === "string" ? v : v?.label || v?.value))
+                                .filter(Boolean)
+                            : [];
+                          return (
+                            <div key={`${mainAttr._id}-${sub._id}`} className="space-y-1.5">
+                              <label
+                                className="block text-xs font-medium"
+                                style={{ color: "var(--text-secondary)" }}
+                              >
+                                {sub.name}
+                              </label>
+                              <SubAttributeSelect
+                                subAttribute={sub}
+                                values={subValues}
+                                selectedValue={mainGroup?.[sub.name] || ""}
+                                onChange={(val) => updateVariantAttribute(mainAttr.name, sub.name, val)}
+                              />
+                            </div>
+                          );
+                        });
+                      }
+
+                      // Direct attribute (no sub-attributes)
+                      if (directValues.length > 0) {
+                        return (
+                          <div key={mainAttr._id} className="space-y-1.5">
+                            <label
+                              className="block text-xs font-medium"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {mainAttr.name}
+                            </label>
+                            <SubAttributeSelect
+                              subAttribute={{ _id: mainAttr._id, name: mainAttr.name }}
+                              values={directValues}
+                              selectedValue={mainGroup?.[mainAttr.name] || ""}
+                              onChange={(val) => updateVariantAttribute(mainAttr.name, mainAttr.name, val)}
+                            />
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })}
+                  </div>
+                </section>
+              )}
 
               {/* Pricing & Stock */}
-              <div className="space-y-3">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider"
+              <section>
+                <h3
+                  className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
                   Pricing & Stock
-                </p>
+                </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {[
                     { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
                     { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
@@ -870,10 +984,7 @@ export default function AddVariantPage() {
                     { l: "Max Qty", f: "max_qnt", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
-                      <label
-                        className="block text-xs mb-1.5 font-medium"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
+                      <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                         {l}
                         {req && <span className="text-red-500"> *</span>}
                       </label>
@@ -881,10 +992,11 @@ export default function AddVariantPage() {
                         required={req}
                         type="number"
                         min="0"
+                        step="0.01"
                         placeholder={placeholder}
                         value={variant[f]}
                         onChange={(ev) => updateVariant(f, ev.target.value)}
-                        className="h-9 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                        className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
                         style={inputStyle}
                       />
                     </div>
@@ -894,59 +1006,26 @@ export default function AddVariantPage() {
                 {variant.cost_price !== "" &&
                   variant.selling_price !== "" &&
                   Number(variant.selling_price) <= Number(variant.cost_price) && (
-                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20">
+                    <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20 mt-2">
                       <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
                       <p className="text-xs font-medium text-red-500">
                         Selling Price must be greater than Cost Price
                       </p>
                     </div>
                   )}
-              </div>
-
-              {/* Category Attributes (Main Attribute → Sub-Attribute → Values) */}
-              {categoryAttributesTree.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p
-                      className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      <Layers className="w-3 h-3" />
-                      Category Attributes
-                    </p>
-                    <span
-                      className="text-[10px]"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {categoryAttributesTree.length} main attribute
-                      {categoryAttributesTree.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {categoryAttributesTree.map((mainAttr) => (
-                      <HierarchicalAttributeGroup
-                        key={mainAttr._id}
-                        mainAttribute={mainAttr}
-                        selectedValues={variantAttributes}
-                        onChange={updateVariantAttribute}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              </section>
 
               {/* Product Images */}
-              <div className="space-y-3">
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider"
+              <section>
+                <h3
+                  className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
                   Product Images
-                </p>
+                </h3>
 
                 <label
-                  className="block cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/50"
+                  className="block cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"
                   style={{ borderColor: "var(--border-color)" }}
                 >
                   <input
@@ -956,40 +1035,29 @@ export default function AddVariantPage() {
                     accept="image/jpeg,image/png,image/webp"
                     onChange={handleImageUpload}
                   />
-
-                  <Upload
-                    className="mx-auto mb-2 w-5 h-5"
-                    style={{ color: "var(--text-muted)" }}
-                  />
-
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <Upload className="mx-auto mb-2 w-5 h-5" style={{ color: "var(--text-muted)" }} />
+                  <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
                     Click to select images
                   </p>
-
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                     JPG, PNG or WebP • Auto-optimized
                   </p>
                 </label>
 
                 {variant.images.length > 0 && (
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-3 mt-3">
                     {variant.images.map((image, imageIndex) => (
                       <div key={imageIndex} className="relative group">
                         <img
                           src={image.preview}
                           alt=""
-                          className="h-20 w-20 rounded-lg object-cover border border-[var(--border-color)]"
+                          className="h-16 w-16 rounded-lg object-cover border"
+                          style={{ borderColor: "var(--border-color)" }}
                         />
                         <button
                           type="button"
                           onClick={() => removeImage(imageIndex)}
-                          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all shadow-md hover:bg-red-600"
+                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition shadow-md hover:bg-red-700"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -997,17 +1065,20 @@ export default function AddVariantPage() {
                     ))}
                   </div>
                 )}
-              </div>
+              </section>
             </div>
 
             {/* Footer */}
             <div
-              className="sticky bottom-0 px-6 py-4 flex items-center justify-between bg-[var(--bg-card)] border-t"
-              style={{ borderColor: "var(--border-color)" }}
+              className="px-6 py-4 flex items-center justify-between border-t"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}
             >
               <button
                 type="button"
-                onClick={() => router.push(`/admin/products/${id}`)}
+                onClick={() => {
+                  const tabParam = searchParams?.get("tab");
+                  router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
+                }}
                 className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition hover:bg-[var(--bg-tertiary)]"
                 style={{
                   backgroundColor: "transparent",
@@ -1023,7 +1094,7 @@ export default function AddVariantPage() {
               <button
                 type="submit"
                 disabled={updateMutation.isPending}
-                className="h-9 px-6 rounded-lg text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50 transition hover:opacity-90 shadow-lg shadow-green-900/20"
+                className="h-9 px-5 rounded-lg text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50 transition hover:opacity-90"
                 style={{
                   backgroundColor: "var(--accent)",
                   color: "var(--accent-text)",
@@ -1034,18 +1105,14 @@ export default function AddVariantPage() {
                 {updateMutation.isPending ? (
                   <>
                     <div
-                      className="w-4 h-4 animate-spin rounded-full border-2 border-t-transparent"
-                      style={{
-                        borderColor: "var(--accent-text)",
-                        borderTopColor: "transparent",
-                      }}
+                      className="w-3.5 h-3.5 animate-spin rounded-full border-2 border-t-transparent"
+                      style={{ borderColor: "var(--accent-text)", borderTopColor: "transparent" }}
                     />
                     Saving...
                   </>
                 ) : (
                   <>
-                    {isEditMode ? "Update Variant" : "Save Variant"}
-                    <Check className="w-4 h-4" />
+                    Save Variant <Check className="w-4 h-4" />
                   </>
                 )}
               </button>
