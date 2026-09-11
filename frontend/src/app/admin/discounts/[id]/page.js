@@ -354,18 +354,15 @@ export default function DiscountDetailPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", scrollbarWidth: "none" }}>
+      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
         {tabList.map((tb) => {
           const active = tab === tb.id;
           const Icon = tb.icon;
           return (
             <button key={tb.id} type="button" onClick={() => setTab(tb.id)}
-              className="relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-lg text-[12px] font-semibold transition-all"
+              className="relative flex items-center gap-2 whitespace-nowrap pb-2.5 text-[12px] font-semibold transition-all bg-transparent border-none shadow-none"
               style={{
-                backgroundColor: active ? "var(--bg-card)" : "transparent",
                 color: active ? "var(--accent)" : "var(--text-muted)",
-                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                border: active ? "1px solid var(--border-color)" : "1px solid transparent",
               }}>
               <Icon className="w-4 h-4" />
               {tb.label}
@@ -375,6 +372,7 @@ export default function DiscountDetailPage() {
                   {tb.badge}
                 </span>
               )}
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full transition-all" style={{ backgroundColor: active ? "var(--accent)" : "transparent" }} />
             </button>
           );
         })}

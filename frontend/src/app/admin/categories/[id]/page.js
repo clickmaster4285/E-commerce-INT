@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   useMutation,
   useQuery,
@@ -105,7 +105,7 @@ function sanitizeOptionLabels(raw) {
 }
 
 function getDataTypeLabel(type) {
-  const map = { multi_select: "Multi Select", select: "Select", color: "Color", boolean: "Boolean" };
+  const map = { multi_select: "Multi Select", select: "Select", color: "Color", boolean: "Yes / No" };
   return map[type] || type || "Multi Select";
 }
 
@@ -317,7 +317,7 @@ function ProfessionalMultiSelect({ attribute, value, onChange, onAddNewOption })
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen]);
 
-  const options = sanitizeOptionLabels(attribute?.values);
+  const options = sanitizeOptionLabels(attribute?.seed_options || attribute?.values || []);
   const selected = sanitizeOptionLabels(Array.isArray(value) ? value : []).filter((v) => options.includes(v));
   const filteredValues = options.filter((l) => l.toLowerCase().includes(search.toLowerCase()));
 
@@ -407,16 +407,12 @@ function ProfessionalMultiSelect({ attribute, value, onChange, onAddNewOption })
 
 export default function CategoryDetailPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useParams();
   const queryClient = useQueryClient();
 
   const categoryId = getId(params?.id);
   const { socket } = useSocket();
-  // Fallback path logic
-  const backPath = pathname.includes('/edit') 
-    ? pathname.substring(0, pathname.lastIndexOf("/")) 
-    : "/admin/categories";
+  const backPath = "/admin/categories";
 
   const [tab, setTab] = useState("overview");
   const [showEdit, setShowEdit] = useState(false);
@@ -1296,7 +1292,7 @@ export default function CategoryDetailPage() {
               </button>
             </div>
 
-            <form onSubmit={submitEdit} className="flex-1 overflow-y-auto p-6 space-y-6">
+            <form onSubmit={submitEdit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
               {/* Category Information */}
               <div className="space-y-4">
                 <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Category Information</h3>
@@ -1423,7 +1419,7 @@ export default function CategoryDetailPage() {
                       const isOpen = openAttributeKey === inputKey;
                       const selectedValues = Array.isArray(config.value) ? config.value : [];
                       const TypeIcon = config.seed_type === "boolean" ? D.check : D.box;
-                      const typeBadgeLabel = config.seed_type === "multi_select" ? "Multi Select" : "Boolean";
+                      const typeBadgeLabel = config.seed_type === "multi_select" ? "Multi Select" : "Yes / No";
 
                       return (
                         <div
@@ -1596,8 +1592,9 @@ export default function CategoryDetailPage() {
       {/* ADD ATTRIBUTE MODAL */}
       {showAttributeModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(600px, 85vh)" }}>
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3 shrink-0">
               <div className="flex items-start gap-3 min-w-0">
                 <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
                   <Ico d={D.edit} className="w-4 h-4" />
@@ -1610,50 +1607,62 @@ export default function CategoryDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowAttributeModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
               >
                 <Ico d={D.close} className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Scrollable Body */}
+            <div className="px-5 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
+              {/* Attribute Name */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={newAttributeData.name}
                   onChange={(e) => setNewAttributeData({ ...newAttributeData, name: e.target.value })}
                   autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                   placeholder="e.g. Color, Size, RAM"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
+              {/* Data Type */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "multi_select", label: "Options" },
-                    { id: "boolean", label: "Boolean" },
+                    { id: "multi_select", label: "Multiple Options", desc: "Choose from a list of values" },
+                    { id: "boolean", label: "Yes / No", desc: "Set this attribute to Yes or No" },
                   ].map((type) => {
                     const isActive = newAttributeData.data_type === type.id;
                     return (
                       <button
                         key={type.id}
                         type="button"
-                        onClick={() => setNewAttributeData({ ...newAttributeData, data_type: type.id })}
-                        className={`h-12 text-[11px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-colors ${isActive ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)]"}`}
+                        onClick={() => setNewAttributeData({
+                          ...newAttributeData,
+                          data_type: type.id,
+                          ...(type.id === "boolean" ? { values: [], value: "yes" } : { value: "" }),
+                        })}
+                        className={`h-auto py-3 px-3 text-left rounded-lg border transition-all ${isActive
+                          ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm ring-1 ring-[var(--accent)]/10"
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        }`}
                       >
-                        <span>{type.label}</span>
+                        <span className="block text-[11px] font-semibold leading-tight">{type.label}</span>
+                        <span className={`block text-[10px] mt-1 leading-tight ${isActive ? "text-[var(--accent)]/70" : "text-[var(--text-muted)]"}`}>{type.desc}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
+              {/* Multiple Options Section */}
               {newAttributeData.data_type === "multi_select" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>
                   <div className="space-y-1.5">
                     {(newAttributeData.values || []).map((opt, idx) => (
                       <div key={`opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
@@ -1679,7 +1688,7 @@ export default function CategoryDetailPage() {
                       type="text"
                       id="new-attr-option-input"
                       placeholder="Add an option (e.g. 8 GB)"
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1704,16 +1713,54 @@ export default function CategoryDetailPage() {
                         setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
                         input.value = "";
                       }}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                     >
                       <Ico d={D.box} className="w-3 h-3" /> Add
                     </button>
                   </div>
                 </div>
               )}
+
+              {/* Yes / No Section */}
+              {newAttributeData.data_type === "boolean" && (
+                <div className="space-y-2.5">
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: "yes", label: "Yes" },
+                      { id: "no", label: "No" },
+                    ].map((opt) => {
+                      const isActive = newAttributeData.value === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setNewAttributeData({ ...newAttributeData, value: opt.id })}
+                          className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive
+                            ? opt.id === "yes"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
+                              : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
+                            : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                          }`}
+                        >
+                          <span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive
+                            ? opt.id === "yes"
+                              ? "bg-emerald-500 border-emerald-500"
+                              : "bg-[var(--text-muted)] border-[var(--text-muted)]"
+                            : "border-[var(--border-color)] bg-transparent"
+                          }`} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default value for this attribute.</p>
+                </div>
+              )}
             </div>
 
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3">
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowAttributeModal(false)}

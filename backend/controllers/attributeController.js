@@ -266,7 +266,7 @@ const updateAttributeCategories = async (req, res) => {
           { _id: cat._id },
           {
             $pull: {
-              attributes: { attribute_id: require("mongoose").Types.ObjectId(attributeId) },
+              attributes: { attribute_id: new (require("mongoose").Types.ObjectId)(attributeId) },
             },
           }
         );
