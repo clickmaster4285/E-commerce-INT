@@ -1,72 +1,82 @@
 "use client";
 
-import { use, useState, useMemo } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/user/productApi";
 import { categoryApi } from "@/apis/user/categoryApi";
 import ProductCard from "@/components/user/ProductCard";
-import { ChevronRight, Package, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Package, SlidersHorizontal } from "lucide-react";
+
+const PAGE_SIZE = 12;
 
 export default function CategoryPage({ params }) {
   const { id } = use(params);
+
+  return (
+    <main className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
+      <CategoryContent categoryId={id} />
+    </main>
+  );
+}
+
+function CategoryContent({ categoryId }) {
   const [sortBy, setSortBy] = useState("featured");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [sortBy]);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
   });
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+  const category = categories.find((c) => c._id === categoryId);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["products", "category", categoryId, page, sortBy],
+    queryFn: () =>
+      productApi.getAllPaginated({
+        page,
+        limit: PAGE_SIZE,
+        category_id: categoryId,
+        sort: sortBy,
+      }),
+    enabled: !!categoryId,
+    staleTime: 60 * 1000,
   });
 
-  // ✅ Find category by _id
-  const category = categories.find((c) => c._id === id);
+  const products = data?.products || [];
+  const pagination = data?.pagination || { total: 0, page: 1, pages: 1 };
+  const totalPages = Math.max(1, pagination.pages || 1);
 
-  // ✅ Filter products for this category
-  const filtered = useMemo(() => {
-    if (!category) return [];
-    return products.filter(
-      (p) => (p.category_id?._id || p.category_id) === category._id
-    );
-  }, [products, category]);
+  const goToPage = (p) => {
+    if (p < 1 || p > totalPages || p === page) return;
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  // ✅ Apply sorting
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    switch (sortBy) {
-      case "price-asc":
-        return arr.sort((a, b) => {
-          const priceA = Number(a.variants?.[0]?.selling_price || 0);
-          const priceB = Number(b.variants?.[0]?.selling_price || 0);
-          return priceA - priceB;
-        });
-      case "price-desc":
-        return arr.sort((a, b) => {
-          const priceA = Number(a.variants?.[0]?.selling_price || 0);
-          const priceB = Number(b.variants?.[0]?.selling_price || 0);
-          return priceB - priceA;
-        });
-      case "newest":
-        return arr.sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-      default:
-        return arr;
-    }
-  }, [filtered, sortBy]);
+  const getPageItems = () => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
+    if (page >= totalPages - 3)
+      return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
+  const rangeStart = products.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = Math.min(page * PAGE_SIZE, pagination.total);
 
   return (
-    <main className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
+    <>
       {/* BREADCRUMB */}
       <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
         <Link href="/" className="hover:text-[var(--user-accent)] transition">
           Home
         </Link>
-
-        <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
+        <ChevronRightIcon size={12} className="text-[var(--user-text-subtle)]" />
         <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[180px] sm:max-w-[220px]">
           {category?.name || "Category"}
         </span>
@@ -84,20 +94,9 @@ export default function CategoryPage({ params }) {
         )}
       </div>
 
-      {/* TOOLBAR — Sort + Count */}
-      <div className="flex items-center justify-between mb-5 lg:mb-6 pb-4 lg:pb-5 border-b border-[var(--user-border)]">
-        <p className="text-[11px] lg:text-xs text-[var(--user-text-muted)]">
-          {isLoading ? (
-            "Loading products..."
-          ) : (
-            <>
-              <span className="text-[var(--user-text)] font-semibold">{sorted.length}</span>{" "}
-              {sorted.length === 1 ? "product" : "products"} available
-            </>
-          )}
-        </p>
-
-        {sorted.length > 1 && (
+      {/* TOOLBAR */}
+      {!isLoading && pagination.total > 1 && (
+        <div className="flex items-center justify-end mb-5 lg:mb-6 pb-4 lg:pb-5 border-b border-[var(--user-border)]">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={13} className="text-[var(--user-text-muted)] lg:w-[14px] lg:h-[14px]" />
             <select
@@ -111,8 +110,8 @@ export default function CategoryPage({ params }) {
               <option value="price-desc">Price: High to Low</option>
             </select>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* LOADING */}
       {isLoading && (
@@ -129,18 +128,75 @@ export default function CategoryPage({ params }) {
       )}
 
       {/* PRODUCTS GRID */}
-      {!isLoading && sorted.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
-          {sorted.map((p) => (
+      {!isLoading && products.length > 0 && (
+        <div
+          className={`grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5 transition-opacity ${
+            isFetching ? "opacity-60 pointer-events-none" : "opacity-100"
+          }`}
+        >
+          {products.map((p) => (
             <ProductCard key={p._id} product={p} />
           ))}
         </div>
       )}
 
+      {/* PAGINATION CONTROLS */}
+      {!isLoading && totalPages > 1 && (
+        <div className="mt-8 lg:mt-12 flex flex-col items-center gap-3">
+          <p className="text-[11px] lg:text-xs text-[var(--user-text-muted)]">
+            Showing{" "}
+            <span className="font-semibold text-[var(--user-text)]">
+              {rangeStart}–{rangeEnd}
+            </span>{" "}
+            of <span className="font-semibold text-[var(--user-text)]">{pagination.total}</span> products
+          </p>
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page === 1}
+              aria-label="Previous page"
+              className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={15} />
+            </button>
+
+            {getPageItems().map((item, i) =>
+              item === "..." ? (
+                <span key={`gap-${i}`} className="px-1 text-[var(--user-text-muted)] text-xs">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  onClick={() => goToPage(item)}
+                  aria-current={page === item ? "page" : undefined}
+                  className={`h-9 min-w-[36px] px-2 lg:h-10 lg:min-w-[40px] rounded-lg lg:rounded-xl text-[11px] lg:text-xs font-bold transition ${
+                    page === item
+                      ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border border-[var(--user-accent)]"
+                      : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/60"
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            )}
+
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page === totalPages}
+              aria-label="Next page"
+              className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* EMPTY STATE */}
-      {!isLoading && sorted.length === 0 && category && (
-        <div className="py-16 lg:py-24 text-center">
-          <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5 lg:mb-6">
+      {!isLoading && products.length === 0 && category && (
+        <div className="py-16 lg:py-24 text-center rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)]">
+          <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-5 lg:mb-6">
             <Package size={28} className="text-[var(--user-accent)] lg:w-8 lg:h-8 opacity-60" />
           </div>
           <h2 className="text-lg lg:text-xl font-bold text-[var(--user-text)] mb-2">
@@ -160,8 +216,8 @@ export default function CategoryPage({ params }) {
 
       {/* CATEGORY NOT FOUND */}
       {!isLoading && !category && (
-        <div className="py-16 lg:py-24 text-center">
-          <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5 lg:mb-6">
+        <div className="py-16 lg:py-24 text-center rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)]">
+          <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-5 lg:mb-6">
             <Package size={28} className="text-[var(--user-danger)] lg:w-8 lg:h-8 opacity-60" />
           </div>
           <h2 className="text-lg lg:text-xl font-bold text-[var(--user-text)] mb-2">
@@ -178,6 +234,6 @@ export default function CategoryPage({ params }) {
           </Link>
         </div>
       )}
-    </main>
+    </>
   );
 }

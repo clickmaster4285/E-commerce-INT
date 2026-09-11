@@ -223,17 +223,20 @@ function ProductRow({ title, subtitle, href, products }) {
 // ✅ CATEGORY SHOWCASE — Top 3 categories rows
 // ==========================================
 export function CategoryShowcase() {
+  // ✅ Client-side slice for display only; endpoint has no server pagination yet
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
+  const categoriesSlice = categories.slice(0, 3);
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+  const { data: paginatedProducts, isLoading } = useQuery({
+    queryKey: ["products", "paginated", 1],
+    queryFn: () => productApi.getAllPaginated({ page: 1, limit: 8, sort: "newest" }),
     staleTime: 5 * 60 * 1000,
   });
+  const products = paginatedProducts?.products || [];
 
   const top = useMemo(() => {
     const counts = {};
@@ -241,12 +244,12 @@ export function CategoryShowcase() {
       const id = typeof p.category_id === "object" ? p.category_id?._id : p.category_id;
       if (id) counts[id] = (counts[id] || 0) + 1;
     });
-    return categories
+    return categoriesSlice
       .map((c) => ({ ...c, count: counts[c._id] || 0 }))
       .filter((c) => c.count > 0)
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
-  }, [categories, products]);
+  }, [categoriesSlice, products]);
 
   if (isLoading) {
     return (
@@ -281,17 +284,20 @@ export function CategoryShowcase() {
 // ✅ BRAND SHOWCASE — Top 3 brands rows
 // ==========================================
 export function BrandShowcase() {
-  const { data: brands = [] } = useQuery({
+  // ✅ Client-side slice for display only; endpoint has no server pagination yet
+  const { data: brandsRaw = [] } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
+  const brands = brandsRaw.slice(0, 3);
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+  const { data: paginatedProducts, isLoading } = useQuery({
+    queryKey: ["products", "paginated", 1],
+    queryFn: () => productApi.getAllPaginated({ page: 1, limit: 8, sort: "newest" }),
     staleTime: 5 * 60 * 1000,
   });
+  const products = paginatedProducts?.products || [];
 
   const top = useMemo(() => {
     const counts = {};

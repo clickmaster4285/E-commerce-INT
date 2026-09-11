@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createPortal } from "react-dom";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
 
@@ -11,17 +10,11 @@ import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
 const SearchIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
 );
-const CheckIcon = ({ className = "w-3.5 h-3.5" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-);
 const EditIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
 );
 const TrashIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
-);
-const ArrowLeftIcon = ({ className = "w-4 h-4" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
 );
 const SlidersIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
@@ -51,37 +44,58 @@ const ATTRS_PER_PAGE = 15;
 
 export default function AttributesPage() {
   useAttributeSocketSync();
+  const queryClient = useQueryClient();
 
   // State
   const [attributeSearch, setAttributeSearch] = useState("");
+  const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [attributePage, setAttributePage] = useState(1);
+
+  // Debounced search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(attributeSearch.trim());
+      setAttributePage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [attributeSearch]);
 
   // Add Attribute Modal State
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
 
-  // Queries
-  const { data: attributes = [], isLoading: attributesLoading } = useQuery({
-    queryKey: ["attributes"],
-    queryFn: () => attributeApi.getAll(),
+  // Edit Attribute Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAttribute, setEditingAttribute] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", data_type: "multi_select", values: [], value: false });
+  const [editOptionInput, setEditOptionInput] = useState("");
+
+  // ===== SERVER-SIDE PAGINATED QUERY =====
+  const { data: paginatedAttrsData, isLoading: attributesLoading, isFetching } = useQuery({
+    queryKey: ["attributes", "paginated", attributePage, search],
+    queryFn: () =>
+      attributeApi.getAllPaginated({
+        page: attributePage,
+        limit: ATTRS_PER_PAGE,
+        search,
+      }),
     retry: false,
     staleTime: 0,
+    keepPreviousData: true,
   });
 
-  const queryClient = useQueryClient();
+  // Normalize response (handles both paginated and legacy array)
+  const attributesRaw = Array.isArray(paginatedAttrsData)
+    ? paginatedAttrsData
+    : paginatedAttrsData?.items || paginatedAttrsData?.data || paginatedAttrsData?.attributes || [];
+  const pagination = Array.isArray(paginatedAttrsData)
+    ? { total: attributesRaw.length, page: 1, limit: ATTRS_PER_PAGE, pages: 1 }
+    : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: ATTRS_PER_PAGE, pages: 1 };
 
-  const goToAttributePage = (p) => p >= 1 && p <= totalAttributePages && setAttributePage(p);
-
-  // Filtered & sorted attributes
-  const filteredAttributes = useMemo(() => {
-    if (!attributeSearch) return attributes;
-    const s = attributeSearch.toLowerCase();
-    return attributes.filter((attr) => attr.name?.toLowerCase().includes(s) || attr.code?.toLowerCase().includes(s));
-  }, [attributes, attributeSearch]);
-
+  // Client-side sort within the current page (server handles search + paging)
   const sortedAttributes = useMemo(() => {
-    const arr = [...filteredAttributes];
+    const arr = [...attributesRaw];
     if (!sortConfig.key) return arr;
     arr.sort((a, b) => {
       let va, vb;
@@ -96,14 +110,25 @@ export default function AttributesPage() {
       return 0;
     });
     return arr;
-  }, [filteredAttributes, sortConfig]);
+  }, [attributesRaw, sortConfig]);
 
-  const totalAttributes = sortedAttributes.length;
-  const totalAttributePages = Math.ceil(totalAttributes / ATTRS_PER_PAGE);
-  const attrStartIndex = (attributePage - 1) * ATTRS_PER_PAGE;
-  const paginatedAttributes = sortedAttributes.slice(attrStartIndex, attrStartIndex + ATTRS_PER_PAGE);
+  const totalAttributes = pagination.total || 0;
+  const totalAttributePages = Math.max(1, pagination.pages || 1);
+  const attrStartIndex = totalAttributes === 0 ? 0 : (attributePage - 1) * ATTRS_PER_PAGE + 1;
+  const attrEndIndex = Math.min(attributePage * ATTRS_PER_PAGE, totalAttributes);
 
-  // Add Attribute Mutation
+  // Scroll to top on page change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [attributePage]);
+
+  const goToAttributePage = (p) => {
+    if (p >= 1 && p <= totalAttributePages && p !== attributePage) {
+      setAttributePage(p);
+    }
+  };
+
+  // ===== ADD ATTRIBUTE MUTATION =====
   const addAttributeMutation = useMutation({
     mutationFn: async (data) => {
       const created = await attributeApi.create(data);
@@ -133,12 +158,7 @@ export default function AttributesPage() {
     });
   };
 
-  // Edit Attribute Modal State
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingAttribute, setEditingAttribute] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", data_type: "multi_select", values: [], value: false });
-  const [editOptionInput, setEditOptionInput] = useState("");
-
+  // ===== EDIT ATTRIBUTE =====
   const openEditModal = (attr) => {
     setEditingAttribute(attr);
     const dataType = attr.data_type || "multi_select";
@@ -147,7 +167,6 @@ export default function AttributesPage() {
       const vals = attr.values || [];
       const trueEntry = vals.find((v) => (v.value || v).toString() === "true" || (v.label || v).toString().toLowerCase() === "yes");
       if (trueEntry) booleanValue = true;
-      else booleanValue = false;
     }
     const values = (attr.values || []).map((v) => {
       const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
@@ -202,7 +221,7 @@ export default function AttributesPage() {
     setEditForm({ ...editForm, values: (editForm.values || []).filter((_, i) => i !== idx) });
   };
 
-  // Render Helpers
+  // ===== RENDER HELPERS =====
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
@@ -219,16 +238,16 @@ export default function AttributesPage() {
   const Pagination = ({ current, total, go, label }) => {
     if (total <= 1) return null;
     const pages = [];
-    if (total <= 5) for(let i=1;i<=total;i++) pages.push(i);
-    else if (current <= 3) pages.push(1,2,3,4,"...",total);
-    else if (current >= total-2) pages.push(1,"...",total-3,total-2,total-1,total);
-    else pages.push(1,"...",current-1,current,current+1,"...",total);
+    if (total <= 5) for (let i = 1; i <= total; i++) pages.push(i);
+    else if (current <= 3) pages.push(1, 2, 3, 4, "...", total);
+    else if (current >= total - 2) pages.push(1, "...", total - 3, total - 2, total - 1, total);
+    else pages.push(1, "...", current - 1, current, current + 1, "...", total);
 
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4 mt-4" style={cardStyle}>
         <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{label}</p>
         <div className="flex items-center gap-2">
-          <button onClick={() => go(current-1)} disabled={current===1}
+          <button onClick={() => go(current - 1)} disabled={current === 1}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page">
             <ChevronLeftIcon className="w-4 h-4" />
@@ -245,7 +264,7 @@ export default function AttributesPage() {
               </React.Fragment>
             ))}
           </span>
-          <button onClick={() => go(current+1)} disabled={current===total}
+          <button onClick={() => go(current + 1)} disabled={current === total}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page">
             <ChevronRightIcon className="w-4 h-4" />
@@ -295,15 +314,15 @@ export default function AttributesPage() {
         </div>
 
         {/* Attribute Table */}
-        <div className="rounded-lg overflow-hidden" style={cardStyle}>
+        <div className={`rounded-lg overflow-hidden transition-opacity ${isFetching && !attributesLoading ? "opacity-60" : "opacity-100"}`} style={cardStyle}>
           {attributesLoading ? (
             <div className="rounded-lg py-14 flex items-center justify-center gap-2">
               <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading attributes...</span>
             </div>
-          ) : paginatedAttributes.length === 0 ? (
+          ) : sortedAttributes.length === 0 ? (
             <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3">
               <SlidersIcon className="w-10 h-10" style={{ color: "var(--text-muted)" }} />
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>{attributeSearch ? "No attributes found" : "No attributes available"}</p>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No attributes found" : "No attributes available"}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -319,12 +338,12 @@ export default function AttributesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedAttributes.map((attr, index) => {
+                  {sortedAttributes.map((attr, index) => {
                     const isActive = attr.is_active !== false;
                     const opts = attr.values?.length || 0;
                     return (
                       <tr key={attr._id} className="transition cursor-pointer"
-                        style={{ borderBottom: index < paginatedAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
+                        style={{ borderBottom: index < sortedAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
                         onClick={() => openEditModal(attr)}>
@@ -376,11 +395,11 @@ export default function AttributesPage() {
         </div>
 
         <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
-          label={`Showing ${attrStartIndex + 1}-${Math.min(attrStartIndex + ATTRS_PER_PAGE, totalAttributes)} of ${totalAttributes} attributes`} />
+          label={totalAttributes > 0 ? `Showing ${attrStartIndex}–${attrEndIndex} of ${totalAttributes} attributes` : "No attributes"} />
 
       </div>
 
-      {/* Add Attribute Modal */}
+      {/* ===== Add Attribute Modal ===== */}
       {showAttributeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
@@ -394,11 +413,8 @@ export default function AttributesPage() {
                   <p className="text-[11px] text-[var(--text-muted)]">Configure properties for products.</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAttributeModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-              >
+              <button type="button" onClick={() => setShowAttributeModal(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
                 <span>×</span>
               </button>
             </div>
@@ -406,14 +422,10 @@ export default function AttributesPage() {
             <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newAttributeData.name}
-                  onChange={(e) => setNewAttributeData({ ...newAttributeData, name: e.target.value })}
-                  autoFocus
+                <input type="text" value={newAttributeData.name}
+                  onChange={(e) => setNewAttributeData({ ...newAttributeData, name: e.target.value })} autoFocus
                   className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM"
-                />
+                  placeholder="e.g. Color, Size, RAM" />
               </div>
 
               <div className="space-y-2">
@@ -425,15 +437,11 @@ export default function AttributesPage() {
                   ].map((type) => {
                     const isActive = newAttributeData.data_type === type.id;
                     return (
-                      <button
-                        key={type.id}
-                        type="button"
+                      <button key={type.id} type="button"
                         onClick={() => setNewAttributeData({ ...newAttributeData, data_type: type.id })}
                         className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
                           ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
-                        }`}
-                      >
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
                         <span>{type.label}</span>
                       </button>
                     );
@@ -451,25 +459,20 @@ export default function AttributesPage() {
                           {idx + 1}
                         </span>
                         <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button
-                          type="button"
+                        <button type="button"
                           onClick={() => {
                             const next = (newAttributeData.values || []).filter((_, i) => i !== idx);
                             setNewAttributeData({ ...newAttributeData, values: next });
                           }}
                           className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option"
-                        >
+                          aria-label="Remove option">
                           <span>×</span>
                         </button>
                       </div>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      id="new-attr-option-input"
-                      placeholder="Add an option (e.g. 8 GB)"
+                    <input type="text" id="new-attr-option-input" placeholder="Add an option (e.g. 8 GB)"
                       className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -481,10 +484,8 @@ export default function AttributesPage() {
                           setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
                           e.currentTarget.value = "";
                         }
-                      }}
-                    />
-                    <button
-                      type="button"
+                      }} />
+                    <button type="button"
                       onClick={() => {
                         const input = document.getElementById("new-attr-option-input");
                         if (!input) return;
@@ -495,8 +496,7 @@ export default function AttributesPage() {
                         setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
                         input.value = "";
                       }}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
-                    >
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
                       <span>+ Add</span>
                     </button>
                   </div>
@@ -511,12 +511,9 @@ export default function AttributesPage() {
                     {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
                       const isActive = newAttributeData.value === opt.id;
                       return (
-                        <button
-                          key={String(opt.id)}
-                          type="button"
+                        <button key={String(opt.id)} type="button"
                           onClick={() => setNewAttributeData({ ...newAttributeData, value: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-                        >
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
                           <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
                           {opt.label}
                         </button>
@@ -529,19 +526,12 @@ export default function AttributesPage() {
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
-              <button
-                type="button"
-                onClick={() => setShowAttributeModal(false)}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
-              >
+              <button type="button" onClick={() => setShowAttributeModal(false)}
+                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleAddAttributeFromModal}
-                disabled={addAttributeMutation.isPending}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
-              >
+              <button type="button" onClick={handleAddAttributeFromModal} disabled={addAttributeMutation.isPending}
+                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
                 {addAttributeMutation.isPending ? "Adding..." : "Add Attribute"}
               </button>
             </div>
@@ -549,7 +539,7 @@ export default function AttributesPage() {
         </div>
       )}
 
-      {/* Edit Attribute Modal */}
+      {/* ===== Edit Attribute Modal ===== */}
       {showEditModal && editingAttribute && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-[420px] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
@@ -563,11 +553,8 @@ export default function AttributesPage() {
                   <p className="text-[11px] text-[var(--text-muted)]">Update attribute details and values.</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-              >
+              <button type="button" onClick={() => setShowEditModal(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
                 <span>×</span>
               </button>
             </div>
@@ -575,14 +562,10 @@ export default function AttributesPage() {
             <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  autoFocus
+                <input type="text" value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} autoFocus
                   className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM"
-                />
+                  placeholder="e.g. Color, Size, RAM" />
               </div>
 
               <div className="space-y-2">
@@ -594,15 +577,11 @@ export default function AttributesPage() {
                   ].map((type) => {
                     const isActive = editForm.data_type === type.id;
                     return (
-                      <button
-                        key={type.id}
-                        type="button"
+                      <button key={type.id} type="button"
                         onClick={() => setEditForm({ ...editForm, data_type: type.id, values: type.id === "boolean" ? editForm.values : editForm.values })}
                         className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
                           ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
-                        }`}
-                      >
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
                         <span>{type.label}</span>
                       </button>
                     );
@@ -620,33 +599,21 @@ export default function AttributesPage() {
                           {idx + 1}
                         </span>
                         <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeEditOption(idx)}
+                        <button type="button" onClick={() => removeEditOption(idx)}
                           className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option"
-                        >
+                          aria-label="Remove option">
                           <span>×</span>
                         </button>
                       </div>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add an option..."
-                      value={editOptionInput}
+                    <input type="text" placeholder="Add an option..." value={editOptionInput}
                       onChange={(e) => setEditOptionInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { e.preventDefault(); addEditOption(); }
-                      }}
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={addEditOption}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
-                    >
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEditOption(); } }}
+                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" />
+                    <button type="button" onClick={addEditOption}
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
                       <span>+ Add</span>
                     </button>
                   </div>
@@ -660,12 +627,9 @@ export default function AttributesPage() {
                     {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
                       const isActive = editForm.value === opt.id;
                       return (
-                        <button
-                          key={String(opt.id)}
-                          type="button"
+                        <button key={String(opt.id)} type="button"
                           onClick={() => setEditForm({ ...editForm, value: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-                        >
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
                           <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
                           {opt.label}
                         </button>
@@ -677,19 +641,12 @@ export default function AttributesPage() {
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
-              >
+              <button type="button" onClick={() => setShowEditModal(false)}
+                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleSaveEdit}
-                disabled={editAttributeMutation.isPending}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
-              >
+              <button type="button" onClick={handleSaveEdit} disabled={editAttributeMutation.isPending}
+                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
                 {editAttributeMutation.isPending ? "Saving..." : "Save Changes"}
               </button>
             </div>

@@ -5,6 +5,24 @@ const Variant = require("../models/Variant");
 const Tag = require("../models/Tag");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
+// ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
+const loadBrandModel = () => {
+  const paths = [
+    "../models/Brand",
+    "../models/brand",
+    "../models/Brands",
+    "../models/brands",
+  ];
+  for (const p of paths) {
+    try {
+      return require(p);
+    } catch (e) {
+      // agla path try karo
+    }
+  }
+  return null;
+};
+const Brand = loadBrandModel();
 
 const { getNextSku } = require("../utils/skuHelper");
 const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
@@ -175,67 +193,162 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 // ======================================================
 // GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
 // ======================================================
+// ======================================================
+// GET ALL PRODUCTS (OPTIONAL SERVER-SIDE PAGINATION)
+// ✅ Non-breaking: agar ?limit= nahi bheja gaya to purana full-array response hi milega
+// ======================================================
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({
-      is_deleted: { $ne: true },
-    })
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const search = String(req.query.search || req.query.q || "").trim();
+    const sort = String(req.query.sort || "newest");
+    const brandId = req.query.brand_id;
+
+    // ---- Filter build ----
+    const filter = { is_deleted: { $ne: true } };
+    if (brandId) filter.brand_id = brandId;
+
+    if (search) {
+      const rx = { $regex: escapeRegex(search), $options: "i" };
+      const [brandDocs, catDocs, variantDocs] = await Promise.all([
+Brand
+  ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
+  : Promise.resolve([]),
+          Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
+        Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
+      ]);
+      filter.$or = [
+        { name: rx },
+        { brand_id: { $in: brandDocs.map((b) => b._id) } },
+        { category_id: { $in: catDocs.map((c) => c._id) } },
+        { _id: { $in: variantDocs.map((v) => v.product_id) } },
+      ];
+    }
+
+    const isPriceSort = sort === "price-asc" || sort === "price-desc";
+
+    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    if (!limit) {
+      const products = await Product.find(filter)
+        .populate("category_id", "name")
+        .populate("brand_id", "name")
+        .populate("tag_ids", "name")
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email")
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (!products.length) return res.status(200).json([]);
+
+      const variants = await Variant.find({
+        product_id: { $in: products.map((p) => p._id) },
+        is_deleted: { $ne: true },
+      }).sort({ created_at: 1 }).lean();
+
+      const variantsMap = {};
+      variants.forEach((v) => {
+        const pid = String(v.product_id);
+        (variantsMap[pid] = variantsMap[pid] || []).push(v);
+      });
+
+      const result = products.map((p) => ({
+        ...p,
+        variants: variantsMap[String(p._id)] || [],
+        price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
+      }));
+
+      return res.status(200).json(result);
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Product.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+    const skip = (safePage - 1) * limit;
+
+    let pageIds = [];
+
+    if (isPriceSort) {
+      const idDocs = await Product.find(filter).select("_id").lean();
+      const ids = idDocs.map((d) => d._id);
+      if (ids.length) {
+        const priceDocs = await Variant.aggregate([
+          { $match: { is_deleted: { $ne: true }, product_id: { $in: ids } } },
+          { $sort: { created_at: 1 } },
+          { $group: { _id: "$product_id", p: { $first: "$selling_price" } } },
+        ]);
+        const priceMap = new Map(priceDocs.map((d) => [String(d._id), Number(d.p) || 0]));
+        ids.sort((a, b) => {
+          const pa = priceMap.get(String(a)) || 0;
+          const pb = priceMap.get(String(b)) || 0;
+          return sort === "price-asc" ? pa - pb : pb - pa;
+        });
+        pageIds = ids.slice(skip, skip + limit);
+      }
+    } else {
+      const idDocs = await Product.find(filter)
+        .select("_id")
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+      pageIds = idDocs.map((d) => d._id);
+    }
+
+    if (!pageIds.length) {
+      return res.status(200).json({
+        products: [],
+        pagination: { total, page: safePage, limit, pages, hasNext: false, hasPrev: safePage > 1 },
+      });
+    }
+
+    const products = await Product.find({ _id: { $in: pageIds } })
       .populate("category_id", "name")
       .populate("brand_id", "name")
       .populate("tag_ids", "name")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
-      .sort({ created_at: -1 })
       .lean();
 
-    if (!products.length) {
-      return res.status(200).json([]);
-    }
-
-    const productIds = products.map((product) => product._id);
+    // page order preserve karo
+    const orderMap = new Map(pageIds.map((id, i) => [String(id), i]));
+    products.sort((a, b) => orderMap.get(String(a._id)) - orderMap.get(String(b._id)));
 
     const variants = await Variant.find({
-      product_id: { $in: productIds },
+      product_id: { $in: pageIds },
       is_deleted: { $ne: true },
-    })
-      .sort({ created_at: 1 })
-      .lean();
+    }).sort({ created_at: 1 }).lean();
 
     const variantsMap = {};
-    variants.forEach((variant) => {
-      const productId = String(variant.product_id);
-      if (!variantsMap[productId]) {
-        variantsMap[productId] = [];
-      }
-      variantsMap[productId].push(variant);
+    variants.forEach((v) => {
+      const pid = String(v.product_id);
+      (variantsMap[pid] = variantsMap[pid] || []).push(v);
     });
 
-    // ✅ UPDATED: Price calculation logic added here
-    const result = products.map((product) => {
-      const productVariants = variantsMap[String(product._id)] || [];
-      
-      // Pehli active variant ki selling_price ko 'price' ke tor par assign karna
-      let calculatedPrice = 0;
-      if (productVariants.length > 0) {
-        calculatedPrice = Number(productVariants[0].selling_price) || 0;
-      }
+    const result = products.map((p) => ({
+      ...p,
+      variants: variantsMap[String(p._id)] || [],
+      price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
+    }));
 
-      return {
-        ...product,
-        variants: productVariants,
-        price: calculatedPrice, // Frontend ke liye direct price field
-      };
+    return res.status(200).json({
+      products: result,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
     });
-
-    return res.status(200).json(result);
   } catch (error) {
     console.error(" [getProducts] Error:", error);
-    return res.status(500).json({
-      message: error.message || "Failed to fetch products",
-    });
+    return res.status(500).json({ message: error.message || "Failed to fetch products" });
   }
 };
-
 // ======================================================
 // GET PRODUCT BY ID
 // ======================================================

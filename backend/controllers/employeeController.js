@@ -97,19 +97,97 @@ const needsPermissionMigration = (perms) => {
 
 exports.getAllEmployees = async (req, res) => {
   try {
-    const employees = await Employee.find({
-      is_deleted: false,
-    })
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const search = String(req.query.search || "").trim();
+    const statusFilter = String(req.query.status || "all").trim();
+    const departmentFilter = String(req.query.department || "all").trim();
+
+    const filter = { is_deleted: false };
+    if (search) {
+      filter.$or = [
+        { "userId.name": { $regex: search, $options: "i" } },
+        { "userId.email": { $regex: search, $options: "i" } },
+        { "userId.phone": { $regex: search, $options: "i" } },
+      ];
+    }
+    if (statusFilter && statusFilter !== "all") {
+      filter.$or = filter.$or || [];
+      filter.$or.push({ "userId.status": statusFilter });
+    }
+    if (departmentFilter && departmentFilter !== "all") {
+      filter.department = departmentFilter;
+    }
+
+    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    if (!limit) {
+      const employees = await Employee.find({
+        is_deleted: false,
+      })
+        .populate({
+          path: "userId",
+          select:
+            "name email phone role status avatar permissions twoFactorEnabled created_at",
+        })
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email")
+        .sort({
+          created_at: -1,
+        })
+        .lean();
+
+      const validEmployees = employees.filter(
+        (employee) => employee.userId !== null
+      );
+
+      for (const employee of validEmployees) {
+        if (!employee.userId) continue;
+
+        if (needsPermissionMigration(employee.userId.permissions)) {
+          const fixedPermissions = fixPermissions(
+            employee.userId.permissions || {}
+          );
+
+          await User.findByIdAndUpdate(
+            employee.userId._id,
+            {
+              $set: {
+                permissions: fixedPermissions,
+              },
+            }
+          );
+
+          employee.userId.permissions = fixedPermissions;
+        } else {
+          employee.userId.permissions = fixPermissions(
+            employee.userId.permissions
+          );
+        }
+      }
+
+      return res.json({
+        success: true,
+        data: validEmployees,
+      });
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Employee.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const employees = await Employee.find(filter)
       .populate({
         path: "userId",
-        select:
-          "name email phone role status avatar permissions twoFactorEnabled created_at",
+        select: "name email phone role status avatar permissions twoFactorEnabled created_at",
       })
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
-      .sort({
-        created_at: -1,
-      })
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     const validEmployees = employees.filter(
@@ -118,21 +196,14 @@ exports.getAllEmployees = async (req, res) => {
 
     for (const employee of validEmployees) {
       if (!employee.userId) continue;
-
       if (needsPermissionMigration(employee.userId.permissions)) {
         const fixedPermissions = fixPermissions(
           employee.userId.permissions || {}
         );
-
         await User.findByIdAndUpdate(
           employee.userId._id,
-          {
-            $set: {
-              permissions: fixedPermissions,
-            },
-          }
+          { $set: { permissions: fixedPermissions } }
         );
-
         employee.userId.permissions = fixedPermissions;
       } else {
         employee.userId.permissions = fixPermissions(
@@ -144,6 +215,14 @@ exports.getAllEmployees = async (req, res) => {
     return res.json({
       success: true,
       data: validEmployees,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
     });
   } catch (error) {
     console.error(

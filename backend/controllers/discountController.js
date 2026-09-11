@@ -244,16 +244,65 @@ exports.createDiscount = async (req, res) => {
 
 exports.getDiscounts = async (req, res) => {
   try {
-    const discounts = await Discount.find({ is_deleted: false })
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "all").trim();
+
+    const filter = { is_deleted: false };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { code: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+
+    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    if (!limit) {
+      const discounts = await Discount.find(filter)
+        .populate("selectedProducts", "name sku selling_price")
+        .populate("selectedCategories", "name")
+        .populate("selectedBrands", "name")
+        .populate("createdBy", "name email")
+        .populate("updatedBy", "name email")
+        .sort({ createdAt: -1 });
+      return res.status(200).json(discounts);
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Discount.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const discounts = await Discount.find(filter)
       .populate("selectedProducts", "name sku selling_price")
       .populate("selectedCategories", "name")
       .populate("selectedBrands", "name")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    // ✅ FIXED: Returning raw array so frontend can display it immediately
-    return res.status(200).json(discounts); 
+    return res.status(200).json({
+      success: true,
+      data: discounts,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
   } catch (error) {
     console.error("Get Discounts Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });

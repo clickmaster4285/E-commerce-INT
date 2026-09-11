@@ -83,7 +83,12 @@ export default function CategoriesPage() {
 
   const [search, setSearch] = useState("");
   const [filterParent, setFilterParent] = useState("all");
-  const [viewMode, setViewMode] = useState("list");
+const [viewMode, setViewMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth < 768 ? "grid" : "list";
+  }
+  return "list";
+});
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);

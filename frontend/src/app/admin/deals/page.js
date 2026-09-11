@@ -183,7 +183,13 @@ export default function DealsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
-  const [viewMode, setViewMode] = useState("list");
+
+const [viewMode, setViewMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth < 768 ? "grid" : "list";
+  }
+  return "list";
+});
   const [showModal, setShowModal] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });

@@ -183,19 +183,15 @@ useEmployeeSocketSync();
     return () => clearTimeout(timer);
   }, [search]);
 
-  // ✅ FIX: employeeApi.getAll use karein instead of employeeSocketApi.getAll
-  const {
-    data: employees = [],
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["employees"],
-    queryFn: employeeApi.getAll, // ✅ Direct HTTP API - fresh data
-staleTime: 60 * 1000,
+  // ✅ Server-side pagination for employees
+  const { data: paginatedEmployeesData, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["employees", "paginated", currentPage, debouncedSearch, filterStatus],
+    queryFn: () => employeeApi.getAllPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: debouncedSearch, status: filterStatus === "all" ? "" : filterStatus, department: "" }),
+    staleTime: 60 * 1000,
     retry: 2,
   });
+  const employees = paginatedEmployeesData?.items || paginatedEmployeesData || normalizeArrayResponse(paginatedEmployeesData);
+  const pagination = paginatedEmployeesData?.pagination || { total: employees.length, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
 
   const staffEmployees = useMemo(() => {
     return employees.filter((emp) => {
@@ -423,11 +419,8 @@ const toggleStatusMutation = useMutation({
     return result;
   }, [staffEmployees, debouncedSearch, filterStatus, sortConfig]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE));
-  const paginatedEmployees = filteredEmployees.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const paginatedEmployees = employees; // server paginated; no client .slice()
+  const totalPages = pagination.pages || 1;
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -777,11 +770,11 @@ const toggleStatusMutation = useMutation({
         </div>
       </div>
 
-      {filteredEmployees.length > ITEMS_PER_PAGE && (
+      {pagination.total > ITEMS_PER_PAGE && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
-            {Math.min(currentPage * ITEMS_PER_PAGE, filteredEmployees.length)} of {filteredEmployees.length}{" "}
+            {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)} of {pagination.total || employees.length}{" "}
             employees
           </p>
           <div className="flex items-center gap-2">

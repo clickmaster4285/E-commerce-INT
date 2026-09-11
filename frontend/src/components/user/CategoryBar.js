@@ -7,11 +7,13 @@ import { Package } from "lucide-react";
 
 export default function CategoryBar() {
   // ✅ Real categories database se
-  const { data: categories = [], isLoading, isError } = useQuery({
+  // ✅ Client-side slice for display only; endpoint has no server pagination yet
+  const { data: categoriesRaw = [], isLoading, isError } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
+  const categories = categoriesRaw.slice(0, 12);
 
   return (
     <section className="px-3 lg:px-6 py-5 lg:py-8">

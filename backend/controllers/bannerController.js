@@ -31,21 +31,51 @@ exports.getBanner = async (req, res) => {
 
 exports.getAllBanners = async (req, res) => {
   try {
-    const { status, bannerType, page = 1, limit = 20, search } = req.query;
+    const { status, bannerType, page = 1, limit = 0, search } = req.query; // 0 = legacy mode
     const filter = {};
     if (status) filter.status = status;
     if (bannerType) filter.bannerType = bannerType;
     if (search) filter.title = { $regex: search, $options: "i" };
 
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.min(Number(limit), 100) : 0;
+
+    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    if (!limitNum) {
+      const banners = await Banner.find(filter)
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email")
+        .sort({ position: 1, createdAt: -1 })
+        .lean();
+      return res.status(200).json({ success: true, data: banners });
+    }
+
+    // ---- PAGINATED MODE ----
     const total = await Banner.countDocuments(filter);
+    const safePage = Math.min(pageNum, Math.max(1, Math.ceil(total / limitNum)));
+    const pages = Math.max(1, Math.ceil(total / limitNum));
+    const skip = (safePage - 1) * limitNum;
+
     const banners = await Banner.find(filter)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .sort({ position: 1, createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
 
-    res.json({ success: true, data: banners, pagination: { total, page: Number(page), pages: Math.ceil(total / limit) } });
+    res.status(200).json({
+      success: true,
+      data: banners,
+      pagination: {
+        total,
+        page: safePage,
+        limit: limitNum,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

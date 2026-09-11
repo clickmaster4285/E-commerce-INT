@@ -9,11 +9,13 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 export default function BrandSection() {
   // ✅ Real brands database se
-  const { data: brands = [], isLoading, isError } = useQuery({
+  // ✅ Client-side slice for display only; endpoint has no server pagination yet
+  const { data: brandsRaw = [], isLoading, isError } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
+  const brands = brandsRaw.slice(0, 12);
 
   // ✅ Logo URL helper
   const getLogoUrl = (logo) => {

@@ -15,6 +15,20 @@ const unwrap = (response) => {
 // ============================================================
 // EMPLOYEE API
 // ============================================================
+const paginated = (res, fallbackLimit) => {
+  const d = res?.data;
+  if (Array.isArray(d)) {
+    return {
+      items: d,
+      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
+    };
+  }
+  return {
+    items: Array.isArray(d?.data) ? d.data : [],
+    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+  };
+};
+
 export const employeeApi = {
   // ==========================================================
   // GET ALL EMPLOYEES
@@ -28,6 +42,15 @@ export const employeeApi = {
       if (error.code === 'ECONNABORTED') throw new Error("Request timed out. Backend respond nahi kar raha.");
       throw new Error(error.response?.data?.message || "Failed to fetch employees");
     }
+  },
+
+  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", department = "all" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (status && status !== "all") params.status = status;
+    if (department && department !== "all") params.department = department;
+    const response = await axiosInstance.get("/employees", { params, timeout: 10000 });
+    return paginated(response, limit);
   },
 
   // ==========================================================
