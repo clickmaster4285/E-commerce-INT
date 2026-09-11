@@ -1,5 +1,5 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -166,12 +166,17 @@ function EmptyState({ icon: Icon, title, description, action }) {
 export default function ProductDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   useProductSocketSync();
   const { socket, isConnected } = useSocket();
   const id = params?.id;
   const [liveEvents, setLiveEvents] = useState([]);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams?.get("tab");
+    const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
+    return validTabs.includes(tabParam) ? tabParam : "overview";
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -183,8 +188,9 @@ export default function ProductDetailPage() {
   const [showVariantTagsModal, setShowVariantTagsModal] = useState(false);
   const [variantTagInput, setVariantTagInput] = useState("");
   const [newGlobalTag, setNewGlobalTag] = useState("");
-  const [editingGlobalTagId, setEditingGlobalTagId] = useState(null);
-  const [editingGlobalTagName, setEditingGlobalTagName] = useState("");
+  const [showEditTagModal, setShowEditTagModal] = useState(false);
+  const [editingTagId, setEditingTagId] = useState(null);
+  const [editingTagName, setEditingTagName] = useState("");
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [attributeTargetVariant, setAttributeTargetVariant] = useState(null);
   const [newAttributeData, setNewAttributeData] = useState({
@@ -255,7 +261,7 @@ export default function ProductDetailPage() {
 
   const updateTagMutation = useMutation({
     mutationFn: ({ id, data }) => tagApi.update(id, data),
-    onSuccess: () => { refetchTags(); setEditingGlobalTagId(null); toast.success("Tag updated successfully"); },
+    onSuccess: () => { refetchTags(); setShowEditTagModal(false); setEditingTagId(null); setEditingTagName(""); toast.success("Tag updated successfully"); },
     onError: (err) => toast.error(err.response?.data?.message || "Failed to update tag"),
   });
 
@@ -379,7 +385,7 @@ export default function ProductDetailPage() {
     setShowModal(true);
   };
 
-  const handleAddVariantFromTab = () => { if (!product) return; router.push(`/admin/products/${id}/add-variant`); };
+  const handleAddVariantFromTab = () => { if (!product) return; router.push(`/admin/products/${id}/add-variant?tab=${activeTab}`); };
 
   const closeProductModal = () => {
     formData.variants.forEach((v) => { v.images.forEach((img) => { if (img.preview?.startsWith("blob:")) URL.revokeObjectURL(img.preview); }); });
@@ -478,8 +484,9 @@ export default function ProductDetailPage() {
     createTagMutation.mutate({ name: newTagModalValue.trim() }, { onSuccess: () => { setShowCreateTagModal(false); setNewTagModalValue(""); } });
   };
 
-  const startEditGlobalTag = (tag) => { setEditingGlobalTagId(tag._id); setEditingGlobalTagName(tag.name); };
-  const saveEditGlobalTag = (tagId) => { if (!editingGlobalTagName.trim()) return; updateTagMutation.mutate({ id: tagId, data: { name: editingGlobalTagName } }); };
+  const startEditGlobalTag = (tag) => { setEditingTagId(tag._id); setEditingTagName(tag.name); setShowEditTagModal(true); };
+  const saveEditGlobalTag = () => { if (!editingTagName.trim() || !editingTagId) return; updateTagMutation.mutate({ id: editingTagId, data: { name: editingTagName } }); };
+  const cancelEditTag = () => { setShowEditTagModal(false); setEditingTagId(null); setEditingTagName(""); };
   const deleteGlobalTag = (tagId) => deleteTagMutation.mutate(tagId);
 
   const compressProductImage = (file) => new Promise((resolve) => {
@@ -650,101 +657,79 @@ export default function ProductDetailPage() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-5 pb-10">
       {/* HEADER */}
-      <div>
-        <button onClick={() => router.push("/admin/products")} className="flex items-center gap-2 text-[12px] font-medium mb-4 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Products
-        </button>
-        
-        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Product Image */}
-              <div className="w-full lg:w-48 shrink-0">
-                <div className="w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                  {productImage ? (
-                    <img src={productImage} alt={product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Package className="w-16 h-16" style={{ color: "var(--text-muted)" }} />
-                  )}
-                </div>
-              </div>
-
-              {/* Product Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h1 className="text-2xl md:text-3xl font-bold truncate" style={{ color: "var(--text-primary)" }}>{product.name}</h1>
-                      <StatusBadge active={product.status === "active"} size="md" />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      <span className="flex items-center gap-1.5 font-mono"><Hash className="w-3.5 h-3.5" />{product.product_code || product.sku || "N/A"}</span>
-                      <span className="opacity-50">•</span>
-                      <span>{totalVariants} Variants</span>
-                      <span className="opacity-50">•</span>
-                      <span>{totalStock} Units in Stock</span>
-                      <span className="opacity-50">•</span>
-                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Created {fd(product.created_at)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={handleEdit} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Pencil className="w-4 h-4" /> Edit Product
-                    </button>
-                    <button onClick={handleDelete} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
-                      <Trash2 className="w-4 h-4" /> Delete
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Price Range</p>
-                    <p className="text-[14px] font-bold" style={{ color: "#10b981" }}>{priceRange}</p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Category</p>
-                    <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.category_id?.name || "—"}</p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Brand</p>
-                    <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.brand_id?.name || "—"}</p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Tax Rate</p>
-                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{product.tax || 0}%</p>
-                  </div>
-                </div>
-              </div>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <button
+            onClick={() => router.push("/admin/products")}
+            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-1"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <div className="flex items-center gap-3 mb-1.5">
+              <h1 className="text-[22px] md:text-[26px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
+                {product.name}
+              </h1>
+              <StatusBadge active={product.status === "active"} size="md" />
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              <span className="flex items-center gap-1.5 font-mono text-[11px]">{product.product_code || product.sku || "N/A"}</span>
+              <span className="opacity-40">|</span>
+              <span>{totalVariants} Variants</span>
+              <span className="opacity-40">|</span>
+              <span>{totalStock} Units</span>
+              <span className="opacity-40">|</span>
+              <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Created {fd(product.created_at)}</span>
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleEdit}
+            className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition-all hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+          >
+            <Pencil className="w-4 h-4" /> Edit Product
+          </button>
+          <button
+            onClick={handleDelete}
+            className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition-all hover:opacity-90"
+            style={{ backgroundColor: "transparent", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}
+          >
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
         </div>
       </div>
 
       {/* TABS */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", scrollbarWidth: "none" }}>
-        {tabList.map((tb) => {
-          const active = activeTab === tb.id;
-          const Icon = tb.icon;
+      <div className="flex items-center gap-6 border-b" style={{ borderColor: "var(--border-color)" }}>
+        {[
+          { id: "overview", label: "Overview" },
+          { id: "variants", label: "Variants", count: totalVariants > 0 ? totalVariants : null },
+          { id: "tags", label: "Tags", count: displayTagNames.length > 0 ? displayTagNames.length : null },
+          { id: "category", label: "Category" },
+          { id: "brand", label: "Brand" },
+          { id: "activity", label: "History", count: wasUp ? 2 : 1 },
+        ].map((t) => {
+          const active = activeTab === t.id;
           return (
-            <button key={tb.id} type="button" onClick={() => setActiveTab(tb.id)}
-              className="relative flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-lg text-[12px] font-semibold transition-all"
-              style={{
-                backgroundColor: active ? "var(--bg-card)" : "transparent",
-                color: active ? "var(--accent)" : "var(--text-muted)",
-                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                border: active ? "1px solid var(--border-color)" : "1px solid transparent",
-              }}>
-              <Icon className="w-4 h-4" />
-              {tb.label}
-              {tb.badge && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold leading-none"
-                  style={{ backgroundColor: active ? "var(--accent-soft)" : "var(--bg-tertiary)", color: active ? "var(--accent)" : "var(--text-muted)" }}>
-                  {tb.badge}
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              className="relative py-3 text-[13px] font-medium transition-colors outline-none whitespace-nowrap"
+              style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
+            >
+              {t.label}
+              {t.count !== null && (
+                <span className="ml-1.5 text-[11px] font-medium" style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}>
+                  ({t.count})
                 </span>
+              )}
+              {active && (
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ backgroundColor: "var(--accent)" }} />
               )}
             </button>
           );
@@ -754,199 +739,226 @@ export default function ProductDetailPage() {
       {/* TAB CONTENT */}
       <div className="space-y-6">
              {activeTab === "overview" && (
-          <div className="space-y-6">
-            {/* Key Metrics — full width */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricCard icon={Layers3} label="Variants" value={totalVariants} color="blue" />
-              <MetricCard icon={Box} label="Total Stock" value={totalStock} subValue={totalStock === 0 ? "Out of stock" : "In stock"} color={totalStock === 0 ? "red" : "emerald"} />
-              <MetricCard icon={TrendingUp} label="Total Value" value={`Rs. ${totalValue.toLocaleString()}`} color="purple" />
-              <MetricCard icon={DollarSign} label="Avg Price" value={`Rs. ${totalVariants > 0 ? Math.round(totalValue / totalStock).toLocaleString() : 0}`} color="amber" />
-            </div>
-
-            {/* ✅ Product Information (LEFT) + Description (RIGHT) — equal space */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <InfoCard icon={Package} title="Product Information">
-                <div className="space-y-1">
-                  <DataRow icon={Hash} label="Product Code" value={product.product_code || product.sku || "N/A"} mono />
-                  <DataRow icon={FolderOpen} label="Category" value={product.category_id?.name || "—"} />
-                  <DataRow icon={Store} label="Brand" value={product.brand_id?.name || "—"} />
-                  <DataRow icon={Activity} label="Status" value={product.status === "active" ? "Active" : "Inactive"} highlight={product.status === "active"} />
-                  <DataRow icon={DollarSign} label="Tax Rate" value={`${product.tax || 0}%`} />
-                  <DataRow icon={TrendingUp} label="Price Range" value={priceRange} highlight />
-                </div>
-
-                {displayTagNames.length > 0 && (
-                  <div className="mt-5 pt-5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Tags</p>
-                    <div className="flex flex-wrap gap-2">
-                      {displayTagNames.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
-                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
-                          <TagIcon className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                          {tag}
-                        </span>
-                      ))}
+          <div className="space-y-5">
+            {/* Product Details + Description - 2 column */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
+              <div className="lg:col-span-3 self-start">
+                {/* Product Details */}
+                <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
+                      <p className="text-[10px] text-[var(--text-muted)]">Basic information and configuration</p>
                     </div>
                   </div>
-                )}
-              </InfoCard>
-
-              <InfoCard icon={FileText} title="Description">
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                  {product.description || "No description provided for this product."}
-                </p>
-              </InfoCard>
-            </div>
-
-            {/* ✅ Created By (LEFT) + Last Updated (RIGHT) — equal space */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <InfoCard icon={User} title="Created By">
-                {product.createdby ? (
-                  <div className="flex items-center gap-3">
-                    <Avatar user={product.createdby} size="lg" color="emerald" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.createdby.name || product.createdby.email}</p>
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{product.createdby.email}</p>
-                      <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>{fd(product.created_at)} · {tago(product.created_at)}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>System</p>
-                )}
-              </InfoCard>
-
-              <InfoCard icon={Pencil} title="Last Updated">
-                {wasUp ? (
-                  product.updatedby ? (
-                    <div className="flex items-center gap-3">
-                      <Avatar user={product.updatedby} size="lg" color="blue" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.updatedby.name || product.updatedby.email}</p>
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{product.updatedby.email}</p>
-                        <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>{fd(product.updated_at)} · {tago(product.updated_at)}</p>
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
+                      <div>
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Code</p>
+                        <p className="text-[14px] font-mono text-[var(--text-secondary)]">{product.product_code || product.sku || "N/A"}</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Brand</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.brand_id?.name || "—"}</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)]">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Status</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? "Active" : "Inactive"}</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)]">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Tax Rate</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.tax || 0}%</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)]">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Price Range</p>
+                        <p className="text-[14px] font-semibold text-[var(--accent)]">{priceRange}</p>
+                      </div>
+                      <div className="py-4 border-t border-[var(--border-color)]">
+                        <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Total Stock</p>
+                        <p className="text-[14px] font-medium text-[var(--text-primary)]">{totalStock} units</p>
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{fd(product.updated_at)} · {tago(product.updated_at)}</p>
-                  )
-                ) : (
-                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet — product has not been modified since creation.</p>
+
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 flex flex-col gap-3 self-start">
+                {/* Description */}
+                <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-[var(--text-primary)]">Description</h3>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
+                      {product.description || "No description provided for this product."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Created By */}
+                <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                    <h3 className="text-sm font-bold text-[var(--text-primary)]">Created By</h3>
+                  </div>
+                  <div className="p-3">
+                    {product.createdby ? (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                          <Avatar user={product.createdby} size="md" color="emerald" />
+                          <div>
+                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">{product.createdby.name || product.createdby.email}</p>
+                            <p className="text-[11px] text-[var(--text-muted)]">{product.createdby.email || "—"}</p>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-1">Created At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at)}</span></p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">System</p>
+                        <p className="text-[11px] text-[var(--text-muted)]">Created At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at)}</span></p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {wasUp && (
+                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                    <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                      <h3 className="text-sm font-bold text-[var(--text-primary)]">Updated By</h3>
+                    </div>
+                  <div className="p-3">
+                    {product.updatedby ? (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-3">
+                            <Avatar user={product.updatedby} size="md" color="blue" />
+                            <div>
+                              <p className="text-[13px] font-semibold text-[var(--text-primary)]">{product.updatedby.name || product.updatedby.email}</p>
+                              <p className="text-[11px] text-[var(--text-muted)]">{product.updatedby.email || "—"}</p>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
+                          <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </InfoCard>
+              </div>
             </div>
+
           </div>
         )}
 
         {/* VARIANTS TAB */}
         {activeTab === "variants" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricCard icon={Layers3} label="Total Variants" value={totalVariants} color="blue" />
-              <MetricCard icon={Box} label="Total Stock" value={totalStock} color={totalStock === 0 ? "red" : "emerald"} />
-              <MetricCard icon={DollarSign} label="Price Range" value={priceRange} color="purple" />
-              <MetricCard icon={TrendingUp} label="Total Value" value={`Rs. ${totalValue.toLocaleString()}`} color="emerald" />
-            </div>
-
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Product Variants</h2>
-              <button onClick={handleAddVariantFromTab} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <div>
+                <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
+                <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{totalVariants} {totalVariants === 1 ? "variant" : "variants"} · {totalStock} units total</p>
+              </div>
+              <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                 <Plus className="w-4 h-4" /> Add Variant
               </button>
             </div>
 
             {variants.length === 0 ? (
-              <div className="rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                <EmptyState
-                  icon={Package}
-                  title="No Variants"
-                  description="This product doesn't have any variants yet. Create your first variant to start managing inventory."
-                  action={
-                    <button onClick={handleAddVariantFromTab} className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Plus className="w-4 h-4" /> Create First Variant
-                    </button>
-                  }
-                />
+              <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                  <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
+                </div>
+                <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
+                <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
+                <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  <Plus className="w-4 h-4" /> Create First Variant
+                </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {variants.map((variant, index) => {
-                  const imageUrl = variant.images?.[0] ? getImageUrl(variant.images[0].img_url) : null;
-                  const isLowStock = Number(variant.quantity) <= Number(variant.min_qnt);
-                  return (
-                    <div key={variant._id || index} className="rounded-xl overflow-hidden transition-all hover:shadow-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      {/* Image */}
-                      <div className="relative aspect-video overflow-hidden" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                        {imageUrl ? (
-                          <img src={imageUrl} alt={variant.title || `Variant ${index + 1}`} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="w-12 h-12" style={{ color: "var(--text-muted)" }} />
-                          </div>
-                        )}
-                        {variant.images?.length > 1 && (
-                          <span className="absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.7)", color: "#fff" }}>
-                            +{variant.images.length - 1} images
-                          </span>
-                        )}
-                        {isLowStock && (
-                          <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.9)", color: "#fff" }}>
-                            Low Stock
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="p-4 space-y-4">
-                        <div>
-                          <h3 className="text-[14px] font-bold truncate mb-1" style={{ color: "var(--text-primary)" }}>{variant.title || `Variant ${index + 1}`}</h3>
-                          <p className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{variant.sku}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Price</p>
-                            <p className="text-[16px] font-bold" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Stock</p>
-                            <p className="text-[16px] font-bold" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</p>
-                          </div>
-                        </div>
-
-                        {variant.tags?.length > 0 && (
-                          <div>
-                            <p className="text-[10px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Tags</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {variant.tags.slice(0, 3).map((tag, idx) => (
-                                <span key={`${tag}-${idx}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium"
-                                  style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)" }}>
-                                  <TagIcon className="w-2.5 h-2.5" />
-                                  {tag}
-                                </span>
-                              ))}
-                              {variant.tags.length > 3 && (
-                                <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>+{variant.tags.length - 3}</span>
-                              )}
+              <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <table className="w-full text-[12px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">SKU</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Variant</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Price</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Stock</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Status</th>
+                      <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map((variant, index) => {
+                      const isLowStock = Number(variant.quantity) <= Number(variant.min_qnt);
+                      return (
+                        <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                          <td className="px-5 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[160px]">{variant.sku}</td>
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[200px]">{variant.title || `Variant ${index + 1}`}</p>
+                            {variant.tags?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {variant.tags.slice(0, 2).map((tag, idx) => (
+                                  <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">
+                                    {tag}
+                                  </span>
+                                ))}
+                                {variant.tags.length > 2 && (
+                                  <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 font-semibold text-[13px]" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
+                          <td className="px-5 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
+                          <td className="px-5 py-4">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                              style={{
+                                backgroundColor: variant.status === "active" || !variant.status ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                                color: variant.status === "active" || !variant.status ? "#10b981" : "#ef4444",
+                                border: `1px solid ${variant.status === "active" || !variant.status ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                              }}>
+                              <span className="w-1 h-1 rounded-full" style={{ backgroundColor: variant.status === "active" || !variant.status ? "#10b981" : "#ef4444" }} />
+                              {variant.status === "active" || !variant.status ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`)}
+                                className="h-8 px-3 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition border hover:opacity-80"
+                                style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" /> Edit
+                              </button>
+                              <button
+                                onClick={() => { setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); setShowVariantTagsModal(true); setVariantTagInput(""); }}
+                                className="h-8 px-3 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition border hover:opacity-80"
+                                style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
+                              >
+                                <TagIcon className="w-3.5 h-3.5" /> Tags
+                              </button>
                             </div>
-                          </div>
-                        )}
-
-                        <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                          <button onClick={() => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}`)}
-                            className="flex-1 h-9 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
-                            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                            <Edit3 className="w-3.5 h-3.5" /> Edit
-                          </button>
-                          <button onClick={() => { setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); setShowVariantTagsModal(true); setVariantTagInput(""); }}
-                            className="flex-1 h-9 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
-                            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                            <TagIcon className="w-3.5 h-3.5" /> Tags
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -954,52 +966,88 @@ export default function ProductDetailPage() {
 
         {/* TAGS TAB */}
         {activeTab === "tags" && (
-          <div className="space-y-6">
-            <InfoCard icon={TagIcon} title="Global Tags" action={
-              <button onClick={() => setShowCreateTagModal(true)} className="h-9 px-4 rounded-lg text-[11px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                <Plus className="w-3.5 h-3.5" /> Create Tag
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Tags</h2>
+                <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{globalTags.length} {globalTags.length === 1 ? "tag" : "tags"} available</p>
+              </div>
+              <button
+                onClick={() => setShowCreateTagModal(true)}
+                className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+                style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+              >
+                <Plus className="w-4 h-4" /> Add Tag
               </button>
-            }>
-              {globalTags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {globalTags.map((tag) => (
-                    <div key={tag._id} className="flex items-center gap-2 px-3 py-2 rounded-lg group transition-colors"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                      {editingGlobalTagId === tag._id ? (
-                        <div className="flex items-center gap-2">
-                          <input type="text" value={editingGlobalTagName} onChange={(e) => setEditingGlobalTagName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && saveEditGlobalTag(tag._id)} autoFocus
-                            className="h-7 px-2.5 rounded text-[11px] w-32 outline-none" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--accent)", color: "var(--text-primary)" }} />
-                          <button onClick={() => saveEditGlobalTag(tag._id)} disabled={updateTagMutation.isPending} className="p-1.5 rounded hover:bg-green-500/20 text-green-500">
-                            <Save className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => setEditingGlobalTagId(null)} className="p-1.5 rounded hover:bg-red-500/20 text-red-500">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <TagIcon className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                          <span className="text-[12px] font-medium capitalize">{tag.name}</span>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                            <button onClick={() => startEditGlobalTag(tag)} className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400 transition-colors" title="Edit">
-                              <Edit3 className="w-3.5 h-3.5" />
+            </div>
+
+            {globalTags.length === 0 ? (
+              <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <TagIcon className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
+                <p className="text-[13px] font-medium text-[var(--text-secondary)]">No tags yet</p>
+                <p className="text-[12px] text-[var(--text-muted)]">Create tags to organize and categorize your products.</p>
+                <button
+                  onClick={() => setShowCreateTagModal(true)}
+                  className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2"
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+                >
+                  <Plus className="w-4 h-4" /> Create First Tag
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <table className="w-full text-[12px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Tag Name</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Created By</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Created At</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Updated By</th>
+                      <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Updated At</th>
+                      <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalTags.map((tag, index) => (
+                      <tr key={tag._id} style={{ borderBottom: index < globalTags.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                        <td className="px-5 py-3.5">
+                          <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
+                        </td>
+                        <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
+                          {tag.createdby ? (typeof tag.createdby === "object" ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "System"}
+                        </td>
+                        <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">{fd(tag.created_at || tag.createdAt)}</td>
+                        <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
+                          {tag.updatedby ? (typeof tag.updatedby === "object" ? (tag.updatedby.name || tag.updatedby.email || "—") : tag.updatedby) : (tag.updated_at ? "—" : "")}
+                        </td>
+                        <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">
+                          {tag.updated_at ? fd(tag.updated_at || tag.updatedAt) : ""}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => startEditGlobalTag(tag)}
+                              className="h-8 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1 transition border hover:opacity-80"
+                              style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" /> Edit
                             </button>
-                            <button onClick={() => deleteGlobalTag(tag._id)} disabled={deleteTagMutation.isPending}
-                              className="p-1.5 rounded hover:bg-red-500/20 text-red-400 transition-colors" title="Delete">
-                              <Trash2 className="w-3.5 h-3.5" />
+                            <button
+                              onClick={() => deleteGlobalTag(tag._id)}
+                              disabled={deleteTagMutation.isPending}
+                              className="h-8 px-2.5 rounded-md text-[11px] font-medium flex items-center gap-1 transition border hover:opacity-80"
+                              style={{ backgroundColor: "transparent", borderColor: "rgba(239,68,68,0.25)", color: "#ef4444" }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
                             </button>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState icon={TagIcon} title="No Tags Yet" description="Create tags to organize and categorize your products."
-                  action={<button onClick={() => setShowCreateTagModal(true)} className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="w-4 h-4" /> Create First Tag</button>} />
-              )}
-            </InfoCard>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -1179,8 +1227,8 @@ export default function ProductDetailPage() {
       {/* EDIT MODAL - Kept same as original but with better styling */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-4xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <div className="w-full max-w-3xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div>
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Edit Product</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Update product and variant information</p>
@@ -1189,7 +1237,7 @@ export default function ProductDetailPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex items-center gap-4 px-6 py-3 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+            <div className="flex items-center gap-4 px-4 py-2 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
                   style={{ backgroundColor: currentStep > 1 ? "#10b981" : "var(--bg-card)", color: currentStep > 1 ? "#fff" : "var(--text-muted)" }}>
@@ -1204,14 +1252,14 @@ export default function ProductDetailPage() {
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 2 ? "var(--text-primary)" : "var(--text-muted)" }}>Variants</span>
               </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} className="p-4 overflow-y-auto flex-1">
               {currentStep === 1 && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                       <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Category *</label>
                       <select required value={formData.category_id} onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                        className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                        className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                         <option value="">Select category</option>
                         {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                       </select>
@@ -1219,7 +1267,7 @@ export default function ProductDetailPage() {
                     <div>
                       <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Brand *</label>
                       <select required value={formData.brand_id} onChange={(e) => setFormData({...formData, brand_id: e.target.value})}
-                        className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                        className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                         <option value="">Select brand</option>
                         {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                       </select>
@@ -1229,21 +1277,21 @@ export default function ProductDetailPage() {
                     <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Product Name *</label>
                     <input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                      className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Tags</label>
                     <div className="flex gap-2">
                       <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTag()}
-                        placeholder="Type tag name & press Enter" className="h-10 px-3 rounded-lg text-[12px] flex-1 outline-none"
+                        placeholder="Type tag name & press Enter" className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                      <button type="button" onClick={addTag} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"
+                      <button type="button" onClick={addTag} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"
                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
                     {formData.tag_names.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-2 flex flex-wrap gap-2">
                         {formData.tag_names.map(tag => (
                           <span key={tag} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
@@ -1258,7 +1306,7 @@ export default function ProductDetailPage() {
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Description</label>
-                    <textarea rows={4} placeholder="Enter product description..." value={formData.description}
+                    <textarea rows={3} placeholder="Enter product description..." value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
                       className="px-3 py-2.5 rounded-lg text-[12px] w-full outline-none resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                   </div>
@@ -1267,18 +1315,18 @@ export default function ProductDetailPage() {
                       <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Tax (%)</label>
                       <input type="number" min="0" placeholder="e.g. 18" value={formData.tax}
                         onChange={(e) => setFormData({...formData, tax: e.target.value})}
-                        className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                        className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Status</label>
                       <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}
-                        className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                        className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                         <option value="active">Active</option><option value="inactive">Inactive</option>
                       </select>
                     </div>
                   </div>
                   <div className="flex justify-end pt-4">
-                    <button type="button" onClick={handleNextStep} className="h-10 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2"
+                    <button type="button" onClick={handleNextStep} className="h-9 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2"
                       style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                       Next: Variants <ChevronRight className="w-4 h-4" />
                     </button>
@@ -1286,7 +1334,7 @@ export default function ProductDetailPage() {
                 </div>
               )}
               {currentStep === 2 && (
-                <div className="space-y-5">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="flex items-center gap-2 text-base font-bold">
@@ -1323,35 +1371,35 @@ export default function ProductDetailPage() {
                           </div>
                         </div>
                         {expandedVariant === index && (
-                          <div className="space-y-5 p-5">
+                          <div className="space-y-3 p-4">
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Identification</p>
-                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Identification</p>
+                              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                 <div>
                                   <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>SKU *</label>
                                   <input required type="text" placeholder="e.g. sku_4" value={variant.sku}
                                     readOnly={!!editingProduct && !!variant._id}
                                     onChange={(e) => updateVariant(index, "sku", e.target.value)}
-                                    className={`h-10 px-3 rounded-lg text-[12px] w-full outline-none ${editingProduct && variant._id ? "opacity-60 cursor-not-allowed" : ""}`}
+                                    className={`h-9 px-3 rounded-lg text-[12px] w-full outline-none ${editingProduct && variant._id ? "opacity-60 cursor-not-allowed" : ""}`}
                                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                 </div>
                                 <div>
                                   <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Variant Title *</label>
                                   <input required type="text" placeholder="e.g. Black - Large" value={variant.title}
                                     onChange={(e) => updateVariant(index, "title", e.target.value)}
-                                    className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                                    className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                 </div>
                               </div>
-                              <div className="mt-3">
+                              <div className="mt-2">
                                 <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Variant Description</label>
-                                <textarea rows={3} placeholder="Enter variant description..." value={variant.description}
+                                <textarea rows={2} placeholder="Enter variant description..." value={variant.description}
                                   onChange={(e) => updateVariant(index, "description", e.target.value)}
                                   className="px-3 py-2.5 rounded-lg text-[12px] w-full outline-none resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                               </div>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
-                              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
+                              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
                                 {[{l:"Cost Price *",f:"cost_price",p:"1000"},{l:"Selling Price *",f:"selling_price",p:"1500"},
                                   {l:"Quantity",f:"quantity",p:"50"},{l:"Min Qty",f:"min_qnt",p:"5"},{l:"Max Qty",f:"max_qnt",p:"100"}
                                 ].map(({l,f,p}) => (
@@ -1359,7 +1407,7 @@ export default function ProductDetailPage() {
                                     <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>{l}</label>
                                     <input type="number" min="0" placeholder={p} value={variant[f]}
                                       onChange={(e) => updateVariant(index, f, e.target.value)}
-                                      className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+                                      className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                   </div>
                                 ))}
                               </div>
@@ -1371,13 +1419,13 @@ export default function ProductDetailPage() {
                               )}
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Variant Tags</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Variant Tags</p>
                               <div className="flex gap-2 mb-3">
                                 <input type="text" value={variant.tagInput || ""} onChange={(e) => updateVariantTagInput(index, e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && addVariantTag(index, e)} placeholder="Add specific tag for this variant..."
-                                  className="h-10 px-3 rounded-lg text-[12px] flex-1 outline-none"
+                                  className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
                                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                                <button type="button" onClick={(e) => addVariantTag(index, e)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"
+                                <button type="button" onClick={(e) => addVariantTag(index, e)} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"
                                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                                   <Plus className="w-4 h-4" />
                                 </button>
@@ -1397,8 +1445,8 @@ export default function ProductDetailPage() {
                               )}
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Attributes</p>
-                              <div className="space-y-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Attributes</p>
+                              <div className="space-y-2">
                                 {variant.attributes.map((attr, ai) => {
                                   const preset = ATTRIBUTE_PRESETS.find(p => p.name === attr.name);
                                   const isMulti = preset?.data_type === "multi_select";
@@ -1413,7 +1461,7 @@ export default function ProductDetailPage() {
                                   };
                                   return (
                                     <div key={ai} className="flex flex-wrap items-center gap-2">
-                                      <div className="h-10 px-3 rounded-lg text-[12px] min-w-[140px] flex-1 flex items-center gap-2 font-semibold truncate"
+                                      <div className="h-9 px-3 rounded-lg text-[12px] min-w-[140px] flex-1 flex items-center gap-2 font-semibold truncate"
                                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                                         <span className="truncate">{attr.name || "—"}</span>
                                         {attr._creating && <span className="text-[10px] font-normal italic" style={{ color: "var(--text-muted)" }}>creating…</span>}
@@ -1446,12 +1494,12 @@ export default function ProductDetailPage() {
                                         ) : (
                                           <input type={isNumber ? "number" : "text"} value={attr.value || ""} onChange={(e) => setSingleValue(e.target.value)}
                                             placeholder={`Enter ${preset.name.toLowerCase()} value...`}
-                                            className="h-10 px-3 rounded-lg text-[12px] min-w-[140px] flex-1 outline-none"
+                                            className="h-9 px-3 rounded-lg text-[12px] min-w-[140px] flex-1 outline-none"
                                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                         )
                                       ) : (
                                         <input type="text" placeholder="Value e.g. Black" value={attr.value || ""} onChange={(e) => setSingleValue(e.target.value)}
-                                          className="h-10 px-3 rounded-lg text-[12px] flex-1 outline-none"
+                                          className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
                                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                       )}
                                       <button type="button" onClick={() => removeAttribute(index,ai)} className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "#ef4444" }}>
@@ -1466,18 +1514,18 @@ export default function ProductDetailPage() {
                               </div>
                             </div>
                             <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Product Images</p>
-                              <label className="block cursor-pointer rounded-xl border-2 border-dashed p-6 text-center transition hover:border-[var(--accent)]" style={{ borderColor: "var(--border-color)" }}>
+                              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Product Images</p>
+                              <label className="block cursor-pointer rounded-xl border-2 border-dashed p-4 text-center transition hover:border-[var(--accent)]" style={{ borderColor: "var(--border-color)" }}>
                                 <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleImageUpload(index,e)} />
                                 <Upload className="mx-auto mb-2 w-6 h-6" style={{ color: "var(--text-muted)" }} />
                                 <p className="text-[12px] font-semibold">Click to select images</p>
                                 <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>JPG, PNG or WebP • Auto-optimized</p>
                               </label>
                               {variant.images.length > 0 && (
-                                <div className="mt-4 flex flex-wrap gap-3">
+                                <div className="mt-2 flex flex-wrap gap-2">
                                   {variant.images.map((img, ii) => (
                                     <div key={ii} className="relative group">
-                                      <img src={img.preview} alt="" className="h-20 w-20 rounded-lg object-cover" style={{ border: "1px solid var(--border-color)" }} />
+                                      <img src={img.preview} alt="" className="h-14 w-14 rounded-lg object-cover" style={{ border: "1px solid var(--border-color)" }} />
                                       <button type="button" onClick={() => removeImage(index,ii)}
                                         className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600">
                                         <X className="w-3.5 h-3.5" />
@@ -1492,11 +1540,11 @@ export default function ProductDetailPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between pt-5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <button type="button" onClick={() => setCurrentStep(1)} className="h-10 px-5 rounded-lg text-[12px] font-semibold"
+                  <div className="flex justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+                    <button type="button" onClick={() => setCurrentStep(1)} className="h-9 px-5 rounded-lg text-[12px] font-semibold"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>← Back</button>
                     <button type="submit" disabled={updateMutation.isPending}
-                      className="h-10 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
+                      className="h-9 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
                       style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                       {updateMutation.isPending ? "Saving..." : "Update Product"} <Check className="w-4 h-4" />
                     </button>
@@ -1532,6 +1580,37 @@ export default function ProductDetailPage() {
                   className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                   <Plus className="w-4 h-4" /> {createTagMutation.isPending ? "Creating..." : "Create Tag"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Tag Modal */}
+      {showEditTagModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Edit Tag</h3>
+              <button onClick={cancelEditTag} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition" style={{ color: "var(--text-muted)" }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Tag Name</label>
+                <input type="text" value={editingTagName} onChange={(e) => setEditingTagName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveEditGlobalTag()} placeholder="Enter tag name..." autoFocus
+                  className="h-10 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button onClick={cancelEditTag} className="h-10 px-5 rounded-lg text-[12px] font-semibold"
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button onClick={saveEditGlobalTag} disabled={updateTagMutation.isPending || !editingTagName.trim()}
+                  className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  <Save className="w-4 h-4" /> {updateTagMutation.isPending ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>

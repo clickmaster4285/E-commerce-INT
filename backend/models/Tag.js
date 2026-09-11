@@ -10,6 +10,7 @@ const tagSchema = new mongoose.Schema({
     },
     // Audit fields (optional but good practice)
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     is_deleted: { type: Boolean, default: false },
   },
   { timestamps: true }

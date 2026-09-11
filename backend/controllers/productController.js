@@ -302,9 +302,10 @@ const createProduct = async (req, res) => {
 
     const variants = parseJSON(req.body.variants, []);
 
-    if (!Array.isArray(variants) || !variants.length) {
-      return res.status(400).json({ message: "At least one variant is required" });
-    }
+    // Variants are optional — can be empty (will be created later from Product Detail)
+    // if (!Array.isArray(variants) || !variants.length) {
+    //   return res.status(400).json({ message: "At least one variant is required" });
+    // }
 
     const tagNames = parseJSON(req.body.tag_names, []);
     const tagIds = await resolveTags(tagNames, req.user?._id);
