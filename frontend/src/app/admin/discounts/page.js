@@ -300,7 +300,12 @@ export default function DiscountsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
-  const [viewMode, setViewMode] = useState("list");
+const [viewMode, setViewMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth < 768 ? "grid" : "list";
+  }
+  return "list";
+});
   const [showModal, setShowModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
@@ -322,8 +327,12 @@ export default function DiscountsPage() {
     start_at: "", end_at: "", status: "active",
   });
 
-  const { data: discountsResponse, isLoading } = useQuery({ queryKey: ["discounts"], queryFn: discountApi.getAll });
-  const discounts = useMemo(() => normalizeArrayResponse(discountsResponse), [discountsResponse]);
+  const { data: paginatedDiscountsData, isLoading } = useQuery({
+    queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
+    queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: search || "", status: statusFilter === "all" ? "" : statusFilter, applyTo: targetFilter === "all" ? "" : targetFilter }),
+  });
+  const discounts = paginatedDiscountsData?.items || paginatedDiscountsData || normalizeArrayResponse(paginatedDiscountsData);
+  const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
   const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
@@ -396,9 +405,9 @@ export default function DiscountsPage() {
     });
   }, [discounts, search, statusFilter, targetFilter]);
 
-  const totalDiscounts = filteredDiscounts.length;
-  const totalPages = Math.ceil(totalDiscounts / itemsPerPage);
-  const paginatedDiscounts = filteredDiscounts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedDiscounts = discounts; // server paginated; no client .slice()
+  const totalPages = pagination.pages || 1;
+  const totalDiscounts = pagination.total || discounts.length;
 
   const stats = useMemo(() => ({
     total: discounts.length,

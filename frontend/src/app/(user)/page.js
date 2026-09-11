@@ -37,12 +37,14 @@ function MobileCategoryStrip() {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (!categories.length) return null;
+  // ✅ Client-side slice for display only; endpoint has no server pagination yet
+  const categoriesSlice = categories.slice(0, 12);
+  if (!categoriesSlice.length) return null;
 
   return (
     <div className="md:hidden px-3 pt-3 pb-1">
       <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
-        {categories.slice(0, 10).map((c) => (
+        {categoriesSlice.map((c) => (
           <Link key={c._id} href={`/category/${c._id}`} className="flex flex-col items-center gap-1.5 shrink-0 w-16 active:scale-95 transition">
             <span className="w-14 h-14 rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] shadow-sm">
               {getCatIcon(c.name)}

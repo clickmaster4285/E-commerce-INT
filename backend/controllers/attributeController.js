@@ -93,8 +93,12 @@ const getAttributeById = async (req, res) => {
 const getAttributes = async (req, res) => {
   try {
     const { search, category } = req.query;
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+
     const filter = { is_deleted: { $ne: true } };
-    
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -107,8 +111,31 @@ const getAttributes = async (req, res) => {
       filter.category = { $regex: new RegExp(`^${category}$`, 'i') };
     }
 
-    const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).lean();
-    res.status(200).json({ success: true, data: attributes });
+    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    if (!limit) {
+      const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).lean();
+      return res.status(200).json({ success: true, data: attributes });
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Attribute.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).skip(skip).limit(limit).lean();
+    return res.status(200).json({
+      success: true,
+      data: attributes,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
   } catch (error) {
     console.error("Error in getAttributes:", error);
     res.status(500).json({ success: false, message: error.message });

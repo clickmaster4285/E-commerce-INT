@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+const PAGE_SIZE = 10;
+
 const getImgUrl = (img) => {
   const raw = typeof img === "string" ? img : img?.img_url;
   if (!raw) return null;
@@ -247,6 +249,62 @@ const DraftProgress = ({ step }) => (
   </div>
 );
 
+/* ============ PAGINATION CONTROLS COMPONENT ============ */
+const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd, goToPage, getPageItems }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-8 lg:mt-10 flex flex-col items-center gap-3">
+      <p className="text-[11px] lg:text-xs text-[var(--user-text-muted)]">
+        Showing{" "}
+        <span className="font-semibold text-[var(--user-text)]">
+          {rangeStart}–{rangeEnd}
+        </span>{" "}
+        of <span className="font-semibold text-[var(--user-text)]">{pagination.total}</span> orders
+      </p>
+      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+        <button
+          onClick={() => goToPage(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous page"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft size={15} />
+        </button>
+
+        {getPageItems().map((item, i) =>
+          item === "..." ? (
+            <span key={`gap-${i}`} className="px-1 text-[var(--user-text-muted)] text-xs">
+              ...
+            </span>
+          ) : (
+            <button
+              key={item}
+              onClick={() => goToPage(item)}
+              aria-current={page === item ? "page" : undefined}
+              className={`h-9 min-w-[36px] px-2 lg:h-10 lg:min-w-[40px] rounded-lg lg:rounded-xl text-[11px] lg:text-xs font-bold transition ${
+                page === item
+                  ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border border-[var(--user-accent)]"
+                  : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/60"
+              }`}
+            >
+              {item}
+            </button>
+          )
+        )}
+
+        <button
+          onClick={() => goToPage(page + 1)}
+          disabled={page === totalPages}
+          aria-label="Next page"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ChevronRight size={15} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function OrdersPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -258,6 +316,7 @@ export default function OrdersPage() {
   const [timeRange, setTimeRange] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -265,9 +324,36 @@ export default function OrdersPage() {
     retry: false,
   });
 
-  const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: !!user,
+  // ✅ SERVER-SIDE PAGINATION query (for non-draft orders)
+  const isDraftFilter = filter === "draft";
+  const { data, isLoading: ordersLoading, isFetching } = useQuery({
+    queryKey: ["myOrders", "paginated", page, filter, search, sortBy, timeRange],
+    queryFn: () =>
+      orderApi.getMyOrdersPaginated({
+        page,
+        limit: PAGE_SIZE,
+        status: filter,
+        search,
+        sort: sortBy,
+        timeRange,
+      }),
+    enabled: !!user && !isDraftFilter,
+    staleTime: 60 * 1000,
   });
+
+  // ✅ Legacy full fetch for "all" filter — needed for status counts + draft filter
+  const { data: allOrders = [], isLoading: allLoading } = useQuery({
+    queryKey: ["myOrders"],
+    queryFn: orderApi.myOrders,
+    enabled: !!user && isDraftFilter,
+  });
+
+  const orders = isDraftFilter ? allOrders : (data?.items || []);
+  const pagination = data?.pagination || { total: 0, page: 1, pages: 1 };
+  const serverCounts = data?.counts || {};
+  const totalOrders = data?.totalOrders ?? allOrders.length;
+
+  const isLoading = userLoading || ordersLoading || allLoading;
 
   const { data: drafts = [] } = useQuery({
     queryKey: ["checkoutDrafts"],
@@ -276,6 +362,30 @@ export default function OrdersPage() {
   });
 
   const hasDrafts = drafts.length > 0;
+
+  // ✅ Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search, sortBy, timeRange]);
+
+  const totalPages = Math.max(1, isDraftFilter ? 1 : (pagination.pages || 1));
+
+  const goToPage = (p) => {
+    if (p < 1 || p > totalPages || p === page) return;
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const getPageItems = () => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 4) return [1, 2, 3, 4, 5, "...", totalPages];
+    if (page >= totalPages - 3)
+      return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, "...", page - 1, page, page + 1, "...", totalPages];
+  };
+
+  const rangeStart = orders.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = Math.min(page * PAGE_SIZE, pagination.total);
 
   const deleteDraft = async (draftId, items) => {
     try {
@@ -302,7 +412,7 @@ export default function OrdersPage() {
 
   useEffect(() => { if (!userLoading && !user) router.replace("/login?redirect=/orders"); }, [user, userLoading, router]);
 
-  if (userLoading || ordersLoading) {
+  if (isLoading) {
     return (
     <>
       <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
@@ -311,33 +421,25 @@ export default function OrdersPage() {
     );
   }
 
-  const counts = orders.reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc; }, {});
-  const activeCount = orders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
+  // ✅ Use server-side counts when available, else compute from full list
+  const counts = isDraftFilter
+    ? allOrders.reduce((acc, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc; }, {})
+    : serverCounts;
+  const activeCount = isDraftFilter
+    ? allOrders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length
+    : (totalOrders - (counts.delivered || 0) - (counts.cancelled || 0));
 
-  // ✅ PROFESSIONAL FILTERING: status + search + time + sort
-  let filtered = orders;
-  if (filter !== "all" && filter !== "draft") filtered = filtered.filter((o) => o.status === filter);
-  if (search.trim()) {
-    const q = search.toLowerCase();
-    filtered = filtered.filter((o) => o.order_number.toLowerCase().includes(q) || (o.items || []).some((i) => (i.name || "").toLowerCase().includes(q)));
+  // ✅ CLIENT-SIDE FILTERING: only for draft view or when using allOrders fallback
+  let filtered = isDraftFilter ? [] : orders;
+  if (!isDraftFilter) {
+    // Server already filtered by status/search/sort/timeRange — no client-side re-filter needed
   }
-  if (timeRange !== "all") {
-    const cutoff = Date.now() - Number(timeRange) * 86400000;
-    filtered = filtered.filter((o) => new Date(o.created_at).getTime() >= cutoff);
-  }
-  filtered = [...filtered].sort((a, b) => {
-    if (sortBy === "newest") return new Date(b.created_at) - new Date(a.created_at);
-    if (sortBy === "oldest") return new Date(a.created_at) - new Date(b.created_at);
-    if (sortBy === "total_high") return (b.total || 0) - (a.total || 0);
-    if (sortBy === "total_low") return (a.total || 0) - (b.total || 0);
-    return 0;
-  });
 
   const hasActiveFilters = search.trim() || filter !== "all" || timeRange !== "all" || sortBy !== "newest";
   const clearFilters = () => { setSearch(""); setFilter("all"); setTimeRange("all"); setSortBy("newest"); };
 
   const statusOptions = [
-    { value: "all", label: "All Orders", icon: Package, count: orders.length },
+    { value: "all", label: "All Orders", icon: Package, count: isDraftFilter ? allOrders.length : (totalOrders || 0) },
     { value: "draft", label: "Drafts", icon: ShoppingBag, count: drafts.length },
     ...Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label, icon: cfg.icon, color: cfg.color, count: counts[key] || 0 })),
   ];
@@ -417,15 +519,15 @@ export default function OrdersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl lg:text-3xl font-black text-[var(--user-text)]">My Orders</h1>
-          <p className="text-sm text-[var(--user-text-muted)] mt-1">{orders.length} total orders · {activeCount} active</p>
+          <p className="text-sm text-[var(--user-text-muted)] mt-1">{isDraftFilter ? allOrders.length : (totalOrders || 0)} total orders · {activeCount} active</p>
         </div>
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--user-accent)] hover:opacity-80 transition">
           <ShoppingBag size={16} /> Continue Shopping
         </Link>
       </div>
 
-      {/* ✅ PROFESSIONAL TOOLBAR (Search + Dropdowns) */}
-      {(orders.length > 0 || hasDrafts) && (
+      {/* TOOLBAR (Search + Dropdowns) */}
+      {(totalOrders > 0 || hasDrafts) && (
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4 mb-6 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto] gap-3">
             {/* SEARCH */}
@@ -442,7 +544,7 @@ export default function OrdersPage() {
               )}
             </div>
 
-            {/* STATUS DROPDOWN (default All Orders) */}
+            {/* STATUS DROPDOWN */}
             <FilterDropdown icon={Package} options={statusOptions} value={filter} onChange={setFilter} buttonClass={dropdownBtn} />
 
             {/* SORT DROPDOWN */}
@@ -455,7 +557,7 @@ export default function OrdersPage() {
           {/* RESULT COUNT + CLEAR */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--user-border)]">
             <p className="text-[11px] font-semibold text-[var(--user-text-muted)]">
-              Showing <span className="font-black text-[var(--user-text)]">{filter === "draft" ? drafts.length : filtered.length}</span> of {orders.length} orders
+              Showing <span className="font-black text-[var(--user-text)]">{isDraftFilter ? drafts.length : (pagination.total || orders.length)}</span> of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders
             </p>
             {hasActiveFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1 text-[11px] font-bold text-[var(--user-accent)] hover:opacity-80 transition">
@@ -475,11 +577,11 @@ export default function OrdersPage() {
       )}
 
       {/* EMPTY */}
-      {filter !== "draft" && filtered.length === 0 && !(filter === "all" && hasDrafts) && (
+      {filter !== "draft" && orders.length === 0 && !(filter === "all" && hasDrafts) && (
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 text-center">
           <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4"><ShoppingBag size={28} className="text-[var(--user-text-subtle)]" /></div>
-          <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">{orders.length === 0 ? "No orders yet" : "No orders match your filters"}</h2>
-          <p className="text-sm text-[var(--user-text-muted)] mb-5">{orders.length === 0 ? "Start shopping to see your orders here." : "Try adjusting your search or filters."}</p>
+          <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">{(totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}</h2>
+          <p className="text-sm text-[var(--user-text-muted)] mb-5">{(totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your search or filters."}</p>
           {hasActiveFilters ? (
             <button onClick={clearFilters} className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">Clear Filters</button>
           ) : (
@@ -489,9 +591,9 @@ export default function OrdersPage() {
       )}
 
       {/* ORDERS LIST */}
-      {filter !== "draft" && filtered.length > 0 && (
-        <div className="space-y-4">
-          {filtered.map((order) => {
+      {filter !== "draft" && orders.length > 0 && (
+        <div className={`space-y-4 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+          {orders.map((order) => {
             const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const StatusIcon = cfg.icon;
             const pay = PAYMENT_LABEL[order.payment?.method] || PAYMENT_LABEL.cod;
@@ -576,6 +678,19 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* DESKTOP PAGINATION */}
+      {!isDraftFilter && (
+        <PaginationControls
+          page={page}
+          totalPages={totalPages}
+          pagination={pagination}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          goToPage={goToPage}
+          getPageItems={getPageItems}
+        />
+      )}
+
       {deleteTarget && (
         <DeleteConfirmModal orderNumber={deleteTarget.order_number} deleting={deleting} onClose={() => setDeleteTarget(null)} onConfirm={handleDeleteOrder} />
       )}
@@ -595,14 +710,14 @@ export default function OrdersPage() {
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">My Orders</p>
-            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{orders.length} {orders.length === 1 ? "order" : "orders"}</p>
+            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {totalOrders === 1 ? "order" : "orders"}</p>
           </div>
         </div>
       </div>
 
       <div className="px-3 pt-3 pb-24 space-y-2.5">
         {/* Status filter chips (horizontal scrollable) */}
-        {(orders.length > 0 || hasDrafts) && (
+        {(totalOrders > 0 || hasDrafts) && (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3" style={{ scrollbarWidth: "none" }}>
             <button
               type="button"
@@ -613,7 +728,7 @@ export default function OrdersPage() {
                   : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
               }`}
             >
-              All ({orders.length})
+              All ({isDraftFilter ? allOrders.length : (totalOrders || 0)})
             </button>
             {hasDrafts && (
               <button
@@ -675,16 +790,16 @@ export default function OrdersPage() {
         )}
 
         {/* Empty */}
-        {filter !== "draft" && filtered.length === 0 && !(filter === "all" && hasDrafts) && (
+        {filter !== "draft" && orders.length === 0 && !(filter === "all" && hasDrafts) && (
           <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-8 text-center">
             <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center mb-4">
               <Package size={36} className="text-[var(--user-accent)]" />
             </div>
             <h2 className="text-base font-black text-[var(--user-text)] mb-1.5">
-              {orders.length === 0 ? "No orders yet" : "No orders match your filters"}
+              {(totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}
             </h2>
             <p className="text-xs text-[var(--user-text-muted)] mb-5">
-              {orders.length === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
+              {(totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
             </p>
             {hasActiveFilters ? (
               <button onClick={clearFilters} className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
@@ -699,9 +814,9 @@ export default function OrdersPage() {
         )}
 
         {/* Orders list */}
-        {filter !== "draft" && filtered.length > 0 && (
-          <div className="space-y-2">
-                                  {filtered.map((order) => {
+        {filter !== "draft" && orders.length > 0 && (
+          <div className={`space-y-2 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+                                  {orders.map((order) => {
               const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
               const visibleItems = (order.items || []).slice(0, 2);
@@ -721,14 +836,14 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                                 {/* ✅ Desktop wala hi product card — mobile pe chota (scroll + arrows) */}
+                                 {/* Product card */}
                   {order.items?.length > 0 && (
                     <div className="p-2.5 pb-1.5">
                       <ProductScrollList items={order.items} />
                     </div>
                   )}
 
-                  {/* ✅ Single-line footer — total + status + view */}
+                  {/* Single-line footer — total + status + view */}
                   <div className="flex items-center justify-between gap-2 px-2.5 py-2 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
                     <p className="text-[13px] font-black text-[var(--user-accent)] leading-none">
                       Rs. {order.total.toLocaleString()}
@@ -747,6 +862,19 @@ export default function OrdersPage() {
               );
             })}
           </div>
+        )}
+
+        {/* MOBILE PAGINATION */}
+        {!isDraftFilter && (
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            pagination={pagination}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            goToPage={goToPage}
+            getPageItems={getPageItems}
+          />
         )}
       </div>
     </div>

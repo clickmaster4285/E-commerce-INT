@@ -31,53 +31,98 @@ const emitSocketEvent = (event, data) => {
 
 const getStockOverview = async (req, res) => {
   try {
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const search = String(req.query.search || "").trim();
+    const statusFilter = String(req.query.status || "all").trim();
+
+    const filter = { is_deleted: { $ne: true } };
+    if (search) {
+      filter.$or = [
+        { "product_id.name": { $regex: search, $options: "i" } },
+        { sku: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    if (!limit) {
+      const variants = await Variant.find({
+        is_deleted: { $ne: true },
+      })
+        .populate({
+          path: "product_id",
+          select: "name is_deleted",
+          match: { is_deleted: { $ne: true } },
+        })
+        .select("sku title quantity min_qnt max_qnt product_id")
+        .sort({ created_at: -1 })
+        .lean();
+
+      const items = variants
+        .filter((v) => v.product_id)
+        .map((v) => ({
+          _id: v._id,
+          sku: v.sku || "",
+          title: v.title || "",
+          quantity: v.quantity ?? 0,
+          min_qnt: v.min_qnt ?? 0,
+          max_qnt: v.max_qnt ?? 0,
+          product_id: v.product_id?._id || null,
+          product_name: v.product_id?.name || "Unknown Product",
+        }));
+
+      return res.status(200).json({ success: true, data: items });
+    }
+
+    // ---- PAGINATED MODE ----
+    const totalVariants = await Variant.countDocuments({ is_deleted: { $ne: true } });
+    const totalItems = totalVariants; // no additional product filter since products are linked via populate
+    const pages = Math.max(1, Math.ceil(totalItems / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
     const variants = await Variant.find({
       is_deleted: { $ne: true },
     })
       .populate({
         path: "product_id",
         select: "name is_deleted",
-        // ✅ Deleted products ko exclude karo
         match: { is_deleted: { $ne: true } },
       })
-      .select(
-        "sku title quantity min_qnt max_qnt product_id"
-      )
+      .select("sku title quantity min_qnt max_qnt product_id")
       .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     const items = variants
-      // ✅ Deleted product wale variants yahan null hote hain,
-      //    is liye ye filter unhe hata deta hai
       .filter((v) => v.product_id)
       .map((v) => ({
         _id: v._id,
-
         sku: v.sku || "",
-
         title: v.title || "",
-
         quantity: v.quantity ?? 0,
-
         min_qnt: v.min_qnt ?? 0,
-
         max_qnt: v.max_qnt ?? 0,
-
-        product_id:
-          v.product_id?._id || null,
-
-        product_name:
-          v.product_id?.name ||
-          "Unknown Product",
+        product_id: v.product_id?._id || null,
+        product_name: v.product_id?.name || "Unknown Product",
       }));
 
-    res.status(200).json(items);
+    return res.status(200).json({
+      success: true,
+      data: items,
+      pagination: {
+        total: totalItems,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
   } catch (error) {
-    console.error(
-      "Get stock overview error:",
-      error
-    );
-
+    console.error("Get stock overview error:", error);
     res.status(500).json({
       message: error.message,
     });
@@ -332,32 +377,51 @@ const adjustStock = async (req, res) => {
 const getStockHistory = async (req, res) => {
   try {
     const filter = {};
-
     if (req.query.variant_id) {
-      filter.variant_id =
-        req.query.variant_id;
+      filter.variant_id = req.query.variant_id;
     }
 
-    const limit = Math.min(
-      parseInt(req.query.limit, 10) || 200,
-      500
-    );
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
-    const history = await StockHistory.find(
-      filter
-    )
+    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    if (!limit) {
+      const history = await StockHistory.find(filter)
+        .select("-__v")
+        .sort({ created_at: -1 })
+        .limit(500)
+        .lean();
+      return res.status(200).json(history);
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await StockHistory.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const history = await StockHistory.find(filter)
       .select("-__v")
       .sort({ created_at: -1 })
+      .skip(skip)
       .limit(limit)
       .lean();
 
-    res.status(200).json(history);
+    return res.status(200).json({
+      success: true,
+      data: history,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
   } catch (error) {
-    console.error(
-      "Get stock history error:",
-      error
-    );
-
+    console.error("Get stock history error:", error);
     res.status(500).json({
       message: error.message,
     });

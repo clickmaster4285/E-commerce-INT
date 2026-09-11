@@ -76,13 +76,16 @@ export default function AttributesPage() {
   const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
 
-  // Queries
-  const { data: attributes = [], isLoading: attributesLoading } = useQuery({
-    queryKey: ["attributes"],
-    queryFn: () => attributeApi.getAll(),
+  // Queries — paginated server-side for attributes
+  const { data: paginatedAttrsData, isLoading: attributesLoading } = useQuery({
+    queryKey: ["attributes", "paginated", attributePage, attributeSearch, selectedCategoryId],
+    queryFn: () => attributeApi.getAllPaginated({ page: attributePage, limit: ATTRS_PER_PAGE, search: attributeSearch, category: selectedCategoryId || "" }),
     retry: false,
     staleTime: 0,
   });
+  const paginatedAttributesRaw = paginatedAttrsData?.items || paginatedAttrsData || [];
+  const pagination = paginatedAttrsData?.pagination || { total: 0, page: 1, limit: ATTRS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+  const attributes = paginatedAttributesRaw;
 
   const { data: categories = [] } = useQuery({
     queryKey: ["admin-categories"],
@@ -100,14 +103,15 @@ export default function AttributesPage() {
     return map;
   }, [activeCategories]);
 
-  // Calculate Stats for Top Boxes
+  // Stats: use paginated results (same count for current page)
   const stats = useMemo(() => {
     const totalCats = activeCategories.length;
-    const totalUniqueAttrs = attributes.length;
-    const activeAttrs = attributes.filter(a => a.is_active !== false).length;
-    const inactiveAttrs = totalUniqueAttrs - activeAttrs;
+    const allAttrs = paginatedAttributesRaw; // paginated set from server
+    const totalUniqueAttrs = pagination.total || paginatedAttributesRaw.length;
+    const activeAttrs = allAttrs.filter(a => a.is_active !== false).length;
+    const inactiveAttrs = Math.max(0, totalUniqueAttrs - activeAttrs);
     return { totalCats, totalUniqueAttrs, activeAttrs, inactiveAttrs };
-  }, [activeCategories, attributes]);
+  }, [activeCategories, paginatedAttributesRaw, pagination]);
 
   const filteredCategories = useMemo(() => {
     if (!categorySearch) return activeCategories;
@@ -160,10 +164,10 @@ export default function AttributesPage() {
     return arr;
   }, [filteredAttributes, sortConfig]);
 
-  const totalAttributes = sortedAttributes.length;
-  const totalAttributePages = Math.ceil(totalAttributes / ATTRS_PER_PAGE);
-  const attrStartIndex = (attributePage - 1) * ATTRS_PER_PAGE;
-  const paginatedAttributes = sortedAttributes.slice(attrStartIndex, attrStartIndex + ATTRS_PER_PAGE);
+  // Server pagination: results already paginated; pagination info from server
+  const totalAttributes = pagination.total || paginatedAttributesRaw.length || 0;
+  const totalAttributePages = pagination.pages || 1;
+  const paginatedAttributes = paginatedAttributesRaw;
 
   // Effects & Handlers
   useEffect(() => {
@@ -543,8 +547,11 @@ export default function AttributesPage() {
               )}
             </div>
 
-            <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage} 
-              label={`Showing ${attrStartIndex+1}-${Math.min(attrStartIndex+ATTRS_PER_PAGE, totalAttributes)} of ${totalAttributes} attributes`} />
+  const paginationLabelStart = Math.min((attributePage - 1) * ATTRS_PER_PAGE + 1, pagination.total || totalAttributes);
+  const paginationLabelEnd = Math.min(attributePage * ATTRS_PER_PAGE, pagination.total || totalAttributes);
+
+            <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
+              label={`Showing ${paginationLabelStart}-${paginationLabelEnd} of ${totalAttributes} attributes`} />
           </div>
         )}
       </div>

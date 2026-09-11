@@ -46,10 +46,33 @@ bannerAxios.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const paginated = (res, fallbackLimit) => {
+  const d = res?.data;
+  if (Array.isArray(d)) {
+    return {
+      items: d,
+      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
+    };
+  }
+  return {
+    items: Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [],
+    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+  };
+};
+
 const adminBannerApi = {
   getAll: async () => {
     const res = await bannerAxios.get("/banners");
     return res.data.data || [];
+  },
+
+  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", bannerType = "all" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (status && status !== "all") params.status = status;
+    if (bannerType && bannerType !== "all") params.bannerType = bannerType;
+    const res = await bannerAxios.get("/banners", { params });
+    return paginated(res, limit);
   },
   create: async (data) => {
     const res = await bannerAxios.post("/banners", data, {
@@ -348,7 +371,12 @@ export default function BannersPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
-  const [viewMode, setViewMode] = useState("list");
+const [viewMode, setViewMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth < 768 ? "grid" : "list";
+  }
+  return "list";
+});
   const [sortConfig, setSortConfig] = useState({ key: "position", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -378,11 +406,13 @@ export default function BannersPage() {
   };
 
   // --- React Query ---
-  const { data: banners = [], isLoading: loading } = useQuery({
-    queryKey: ["adminBanners"],
-    queryFn: adminBannerApi.getAll,
+  const { data: paginatedBannersData, isLoading: loading } = useQuery({
+    queryKey: ["adminBanners", "paginated", currentPage, search, filterStatus, filterType],
+    queryFn: () => adminBannerApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search, status: filterStatus === "all" ? "" : filterStatus, bannerType: filterType === "all" ? "" : filterType }),
     retry: false,
   });
+  const banners = paginatedBannersData?.items || paginatedBannersData || normalizeArrayResponse(paginatedBannersData);
+  const pagination = paginatedBannersData?.pagination || { total: banners.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
 
   const { data: deals = [] } = useQuery({
     queryKey: ["banner-deal-options"],
@@ -440,10 +470,10 @@ export default function BannersPage() {
     return arr;
   }, [filteredBanners, sortConfig]);
 
-  const totalBanners = sortedBanners.length;
-  const totalPages = Math.ceil(totalBanners / itemsPerPage);
+  const paginatedBanners = banners; // server paginated; no client .slice()
+  const totalPages = pagination.pages || 1;
+  const totalBanners = pagination.total || banners.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedBanners = sortedBanners.slice(startIndex, startIndex + itemsPerPage);
 
   useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterType]);
 
@@ -1037,4 +1067,4 @@ export default function BannersPage() {
       </div>
     </div>
   );
-}
+} 

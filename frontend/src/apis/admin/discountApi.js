@@ -1,5 +1,19 @@
 import axiosInstance from "../axiosInstance"; // ✅ Curly braces {} ke baghair (Default Import)
 
+const paginated = (res, fallbackLimit) => {
+  const d = res?.data;
+  if (Array.isArray(d)) {
+    return {
+      items: d,
+      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
+    };
+  }
+  return {
+    items: Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [],
+    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+  };
+};
+
 export const discountApi = {
   // ✅ GET ALL DISCOUNTS
   getAll: async () => {
@@ -11,6 +25,13 @@ export const discountApi = {
       console.error("❌ Error fetching discounts:", error);
       throw error;
     }
+  },
+
+  getAllPaginated: async ({ page = 1, limit = 15, search = "", status = "all" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (status && status !== "all") params.status = status;
+    return axiosInstance.get("/discounts", { params }).then((res) => paginated(res, limit));
   },
 
   // ✅ GET SINGLE DISCOUNT

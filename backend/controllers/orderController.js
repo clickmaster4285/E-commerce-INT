@@ -245,14 +245,95 @@ const placeOrder = async (req, res) => {
 };
 
 // ==========================================
-// GET /api/orders/my — Meri orders
+// GET /api/orders/my — Meri orders (optional server-side pagination)
+// ✅ Non-breaking: agar ?limit= nahi bheja to purana full-array response
 // ==========================================
 const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user_id: req.user._id })
-      .sort({ created_at: -1 })
-      .lean();
-    res.status(200).json({ success: true, data: orders });
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const status = String(req.query.status || "all").trim();
+    const search = String(req.query.search || "").trim();
+    const sort = String(req.query.sort || "newest");
+    const timeRange = String(req.query.timeRange || "all");
+
+    const filter = { user_id: req.user._id };
+
+    // Status filter
+    if (status && status !== "all" && status !== "draft") {
+      filter.status = status;
+    }
+
+    // Search filter
+    if (search) {
+      const rx = { $regex: search, $options: "i" };
+      filter.$or = [
+        { order_number: rx },
+        { "items.name": rx },
+      ];
+    }
+
+    // Time range filter
+    if (timeRange && timeRange !== "all") {
+      const days = Number(timeRange);
+      if (Number.isFinite(days) && days > 0) {
+        const cutoff = new Date(Date.now() - days * 86400000);
+        filter.created_at = { $gte: cutoff };
+      }
+    }
+
+    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    if (!limit) {
+      let query = Order.find(filter);
+      // Sort
+      if (sort === "oldest") query = query.sort({ created_at: 1 });
+      else if (sort === "total_high") query = query.sort({ total: -1 });
+      else if (sort === "total_low") query = query.sort({ total: 1 });
+      else query = query.sort({ created_at: -1 }); // newest (default)
+
+      const orders = await query.lean();
+      return res.status(200).json({ success: true, data: orders });
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Order.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    let query = Order.find(filter);
+    // Sort
+    if (sort === "oldest") query = query.sort({ created_at: 1 });
+    else if (sort === "total_high") query = query.sort({ total: -1 });
+    else if (sort === "total_low") query = query.sort({ total: 1 });
+    else query = query.sort({ created_at: -1 }); // newest (default)
+
+    const orders = await query.skip(skip).limit(limit).lean();
+
+    // Status counts (for filter chips)
+    const counts = await Order.aggregate([
+      { $match: { user_id: req.user._id } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+    const statusCounts = {};
+    counts.forEach((c) => { statusCounts[c._id] = c.count; });
+    const totalOrders = counts.reduce((s, c) => s + c.count, 0);
+
+    return res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+      counts: statusCounts,
+      totalOrders,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

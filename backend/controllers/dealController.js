@@ -342,27 +342,62 @@ const toggleDealStatus = async (req, res) => {
 };
 // ==========================================
 // GET ACTIVE DEALS (PUBLIC — User GUI)
+// ✅ Non-breaking: agar ?limit= nahi bheja to purana full-array response
 // ==========================================
 
 const getActiveDeals = async (req, res) => {
   try {
     const now = new Date();
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
-    const deals = await Deal.find({
+    const query = {
       isActive: true,
       startDate: { $lte: now },
       endDate: { $gte: now },
-    })
+    };
+
+    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    if (!limit) {
+      const deals = await Deal.find(query)
+        .populate("productIds", "name sku images selling_price variants")
+        .populate("categoryIds", "name code")
+        .populate("brandIds", "name")
+        .populate("bundleProducts.product", "name sku images selling_price")
+        .sort({ priority: -1, createdAt: -1 })
+        .lean();
+
+      return res.status(200).json({ success: true, data: deals });
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Deal.countDocuments(query);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const deals = await Deal.find(query)
       .populate("productIds", "name sku images selling_price variants")
       .populate("categoryIds", "name code")
       .populate("brandIds", "name")
       .populate("bundleProducts.product", "name sku images selling_price")
       .sort({ priority: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: deals,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
     });
   } catch (error) {
     console.error("Get Active Deals Error:", error);

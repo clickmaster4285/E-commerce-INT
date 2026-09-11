@@ -195,7 +195,12 @@ export default function ProductsPage() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [viewMode, setViewMode] = useState("list");
+const [viewMode, setViewMode] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth < 768 ? "grid" : "list";
+  }
+  return "list";
+});
   const [currentPage, setCurrentPage] = useState(1);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
