@@ -108,6 +108,19 @@ exports.createBanner = async (req, res) => {
       if (req.files.mobileImage) data.mobileImage = `uploads/banners/${req.files.mobileImage[0].filename}`;
     }
 
+    // Position validation: must be positive integer
+    const position = parseInt(data.position, 10);
+    if (!Number.isFinite(position) || position < 1) {
+      return res.status(400).json({ success: false, message: "Position must be a positive whole number (1 or greater)" });
+    }
+    data.position = position;
+
+    // Duplicate position check
+    const existingBanner = await Banner.findOne({ position }).lean();
+    if (existingBanner) {
+      return res.status(400).json({ success: false, message: `Position ${position} is already used by "${existingBanner.title}". Please choose another position.` });
+    }
+
     if (data.autoPublish && data.startDate) {
       data.status = new Date(data.startDate) > new Date() ? "scheduled" : "active";
     }
@@ -143,6 +156,21 @@ exports.updateBanner = async (req, res) => {
           data[field] = `uploads/banners/${req.files[field][0].filename}`;
         }
       });
+    }
+
+    // Position validation: must be positive integer
+    if (data.position !== undefined) {
+      const position = parseInt(data.position, 10);
+      if (!Number.isFinite(position) || position < 1) {
+        return res.status(400).json({ success: false, message: "Position must be a positive whole number (1 or greater)" });
+      }
+      data.position = position;
+
+      // Duplicate position check (exclude current banner)
+      const existingBanner = await Banner.findOne({ position, _id: { $ne: req.params.id } }).lean();
+      if (existingBanner) {
+        return res.status(400).json({ success: false, message: `Position ${position} is already used by "${existingBanner.title}". Please choose another position.` });
+      }
     }
 
     data.updatedby = req.user?._id || null;
@@ -185,6 +213,14 @@ exports.duplicateBanner = async (req, res) => {
     delete copy._id; delete copy.createdAt; delete copy.updatedAt;
     copy.title = `${original.title} (Copy)`;
     copy.status = "draft";
+
+    // Assign next available position
+    const allPositions = await Banner.distinct("position");
+    const usedPositions = new Set(allPositions.filter((p) => Number.isInteger(p) && p >= 1));
+    let nextPos = 1;
+    while (usedPositions.has(nextPos)) nextPos++;
+    copy.position = nextPos;
+
     copy.createdby = req.user?._id || null;
     copy.updatedby = req.user?._id || null;
     const newBanner = await Banner.create(copy);

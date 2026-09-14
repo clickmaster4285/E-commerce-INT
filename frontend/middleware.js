@@ -28,8 +28,11 @@ export function middleware(request) {
   // ✅ Baqi sab ADMIN pages — protected
   if (pathname.startsWith('/admin')) {
     if (!hasToken) {
+      // ❌ Failure case: token missing — redirect to login
+      console.warn('🔒 Middleware blocked:', pathname, '| accessToken cookie missing');
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
+    // ✅ Success case: token present — allow through
   }
 
   return NextResponse.next();
