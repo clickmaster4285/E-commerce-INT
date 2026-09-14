@@ -9,6 +9,16 @@ import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "./ProductCard";
 
+// ✅ Helper: Extract a clean string ID from any value (string, ObjectId, or { _id: ... } object)
+const getStrId = (x) => String(typeof x === "object" ? (x?._id || "") : (x || ""));
+
+// ✅ Helper: Safe ID comparison — handles string, ObjectId, or populated { _id: ... } refs
+const safeIdCompare = (a, b) => {
+  const idA = getStrId(a);
+  const idB = getStrId(b);
+  return idA !== "" && idA === idB;
+};
+
 // ✅ ARROW — dark semi-transparent circular button on the outer carousel edge
 function ArrowBtn({ dir, onClick, disabled, onHover }) {
   return (
@@ -56,13 +66,11 @@ function ProductRow({ title, subtitle, href, products }) {
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
-  // ✅ Continuous hover-scroll state (per-frame drift while hovering an arrow)
-  const hoverRef = useRef(null);      // { dir, vel, max }
-  const hoverDirRef = useRef(null);   // currently-hovered arrow direction
+  const hoverRef = useRef(null);
+  const hoverDirRef = useRef(null);
   const rafRef = useRef(0);
-  const resumeRef = useRef(0);        // timeout to resume drift after a click-push
+  const resumeRef = useRef(0);
 
-  // ✅ Stop hover-scroll smoothly — brief momentum glide-out, never a hard cut
   const stopHoverScroll = () => {
     const st = hoverRef.current;
     if (!st) return;
@@ -81,12 +89,11 @@ function ProductRow({ title, subtitle, href, products }) {
     glide();
   };
 
-  // ✅ Start hover-scroll — slow, continuous movement for as long as hovered
   const startHoverScroll = (dir) => {
     const node = scrollRef.current;
     if (!node) return;
     cancelAnimationFrame(rafRef.current);
-    node.style.scrollBehavior = "auto"; // per-frame writes must be instant
+    node.style.scrollBehavior = "auto";
     const prev = hoverRef.current;
     const card = node.querySelector("a");
     const gap = parseFloat(getComputedStyle(node).columnGap) || 16;
@@ -103,7 +110,7 @@ function ProductRow({ title, subtitle, href, products }) {
         rafRef.current = 0;
         return;
       }
-      st.vel = Math.min(st.vel + st.max / 30, st.max); // soft ease-in
+      st.vel = Math.min(st.vel + st.max / 30, st.max);
       const max = el.scrollWidth - el.clientWidth;
       const atEnd =
         st.dir === "right" ? el.scrollLeft >= max - 1 : el.scrollLeft <= 1;
@@ -113,7 +120,6 @@ function ProductRow({ title, subtitle, href, products }) {
     rafRef.current = requestAnimationFrame(tick);
   };
 
-  // ✅ Hover handler — track direction so click can resume drift afterwards
   const handleHover = (dir) => {
     hoverDirRef.current = dir;
     clearTimeout(resumeRef.current);
@@ -141,24 +147,20 @@ function ProductRow({ title, subtitle, href, products }) {
     };
   }, [products]);
 
-  // ✅ CLICK — instant smooth push, hover-drift resumes after it lands
   const scroll = (dir) => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Click takes over: kill the hover loop INSTANTLY (no glide) so the
-    // native smooth scroll is never interrupted by per-frame writes.
     cancelAnimationFrame(rafRef.current);
     rafRef.current = 0;
     hoverRef.current = null;
-    el.style.scrollBehavior = ""; // restore CSS smooth for scrollBy
+    el.style.scrollBehavior = "";
 
     const card = el.querySelector("a");
     const gap = parseFloat(getComputedStyle(el).columnGap) || 16;
     const step = card ? (card.offsetWidth + gap) * 2 : 480;
     el.scrollBy({ left: dir === "left" ? -step : step, behavior: "smooth" });
 
-    // If the arrow is still hovered, resume the continuous drift once the push lands
     if (hoverDirRef.current) {
       clearTimeout(resumeRef.current);
       resumeRef.current = setTimeout(() => {
@@ -171,7 +173,6 @@ function ProductRow({ title, subtitle, href, products }) {
 
   return (
     <section className="max-w-[1400px] mx-auto px-3 lg:px-6">
-      {/* HEADER — title + See all */}
       <div className="flex items-center justify-between mb-3 lg:mb-4 gap-2">
         <div className="min-w-0">
           <Link href={href} className="group inline-block">
@@ -190,7 +191,6 @@ function ProductRow({ title, subtitle, href, products }) {
         </Link>
       </div>
 
-      {/* PRODUCTS ROW — horizontal slide + side arrows */}
       <div className="relative">
         <ArrowBtn
           dir="left"
@@ -220,36 +220,43 @@ function ProductRow({ title, subtitle, href, products }) {
 }
 
 // ==========================================
-// ✅ CATEGORY SHOWCASE — Top 3 categories rows
+// ✅ CATEGORY SHOWCASE — Top 3 categories by product count
+// Row 1 = sabse zyada products wali category
+// Row 2 = dusre number wali
+// Row 3 = teesre number wali
 // ==========================================
 export function CategoryShowcase() {
-  // ✅ Client-side slice for display only; endpoint has no server pagination yet
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const categoriesSlice = categories.slice(0, 3);
 
-  const { data: paginatedProducts, isLoading } = useQuery({
-    queryKey: ["products", "paginated", 1],
-    queryFn: () => productApi.getAllPaginated({ page: 1, limit: 8, sort: "newest" }),
+  const { data: allProducts = [], isLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: productApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const products = paginatedProducts?.products || [];
+  const products = allProducts;
 
+  // ✅ POORI categories list mein se top 3 by product count
   const top = useMemo(() => {
+    // Step 1: Har category ke products count karo
     const counts = {};
     products.forEach((p) => {
-      const id = typeof p.category_id === "object" ? p.category_id?._id : p.category_id;
+      const id = getStrId(p.category_id);
       if (id) counts[id] = (counts[id] || 0) + 1;
     });
-    return categoriesSlice
-      .map((c) => ({ ...c, count: counts[c._id] || 0 }))
-      .filter((c) => c.count > 0)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
-  }, [categoriesSlice, products]);
+
+    // Step 2: Poore categories mein se top 3 nikalo (zyada products wale pehle)
+    const topCategories = categories
+      .map((c) => ({ ...c, count: counts[getStrId(c._id)] || 0 }))
+      .filter((c) => c.count > 0)          // sirf jisme products hain
+      .sort((a, b) => b.count - a.count)   // descending order
+      .slice(0, 3);                         // top 3
+
+    return topCategories;
+  }, [categories, products]);
 
   if (isLoading) {
     return (
@@ -271,9 +278,7 @@ export function CategoryShowcase() {
           title={cat.name}
           subtitle={`${cat.count} products`}
           href={`/category/${cat._id}`}
-          products={products.filter(
-            (p) => (p.category_id?._id || p.category_id) === cat._id
-          )}
+          products={products.filter((p) => safeIdCompare(p.category_id, cat._id))}
         />
       ))}
     </div>
@@ -281,35 +286,42 @@ export function CategoryShowcase() {
 }
 
 // ==========================================
-// ✅ BRAND SHOWCASE — Top 3 brands rows
+// ✅ BRAND SHOWCASE — Top 3 brands by product count
+// Row 1 = sabse zyada products wala brand
+// Row 2 = dusre number wala
+// Row 3 = teesre number wala
 // ==========================================
 export function BrandShowcase() {
-  // ✅ Client-side slice for display only; endpoint has no server pagination yet
-  const { data: brandsRaw = [] } = useQuery({
+  const { data: brands = [] } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const brands = brandsRaw.slice(0, 3);
 
-  const { data: paginatedProducts, isLoading } = useQuery({
-    queryKey: ["products", "paginated", 1],
-    queryFn: () => productApi.getAllPaginated({ page: 1, limit: 8, sort: "newest" }),
+  const { data: allProducts = [], isLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: productApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  const products = paginatedProducts?.products || [];
+  const products = allProducts;
 
+  // ✅ POORE brands list mein se top 3 by product count
   const top = useMemo(() => {
+    // Step 1: Har brand ke products count karo
     const counts = {};
     products.forEach((p) => {
-      const id = typeof p.brand_id === "object" ? p.brand_id?._id : p.brand_id;
+      const id = getStrId(p.brand_id);
       if (id) counts[id] = (counts[id] || 0) + 1;
     });
-    return brands
-      .map((b) => ({ ...b, count: counts[b._id] || b.products?.length || 0 }))
-      .filter((b) => b.count > 0)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
+
+    // Step 2: Poore brands mein se top 3 nikalo (zyada products wale pehle)
+    const topBrands = brands
+      .map((b) => ({ ...b, count: counts[getStrId(b._id)] || 0 }))
+      .filter((b) => b.count > 0)          // sirf jisme products hain
+      .sort((a, b) => b.count - a.count)   // descending order
+      .slice(0, 3);                         // top 3
+
+    return topBrands;
   }, [brands, products]);
 
   if (isLoading) {
@@ -332,9 +344,7 @@ export function BrandShowcase() {
           title={brand.name}
           subtitle={`${brand.count} products`}
           href={`/brand/${brand._id}`}
-          products={products.filter(
-            (p) => (p.brand_id?._id || p.brand_id) === brand._id
-          )}
+          products={products.filter((p) => safeIdCompare(p.brand_id, brand._id))}
         />
       ))}
     </div>

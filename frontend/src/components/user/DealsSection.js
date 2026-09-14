@@ -89,17 +89,16 @@ function matchDealProducts(deal, products) {
         : products;
       break;
   }
-  return out.slice(0, 12);
+  return out;
 }
 
 export default function DealsSection() {
-  const { data: paginatedDeals, isLoading } = useQuery({
-    queryKey: ["activeDeals", "paginated"],
-    queryFn: () => dealApi.getActivePaginated({ page: 1, limit: 8 }),
+  const { data: deals = [], isLoading } = useQuery({
+    queryKey: ["activeDeals"],
+    queryFn: dealApi.getActive,
     staleTime: 60 * 1000,
     refetchInterval: 3 * 60 * 1000,
   });
-  const deals = paginatedDeals?.items || [];
 
   if (isLoading) return <DealsSkeleton />;
   if (!deals || deals.length === 0) return null;
@@ -147,14 +146,12 @@ function DealEngine({ deals }) {
   const goPrev = () => goTo((current - 1 + deals.length) % deals.length);
   const goNext = () => goTo((current + 1) % deals.length);
 
-  // ✅ Products yahan compute (strip mein count + row dono ke liye)
-  // Paginated: load only what deal section displays (matchDealProducts slices to 12)
-  const { data: paginatedProductsData } = useQuery({
-    queryKey: ["products", "paginated", 1],
-    queryFn: () => productApi.getAllPaginated({ page: 1, limit: 12, sort: "newest" }),
-    staleTime: 60 * 1000,
+  // ✅ Full product list for deal matching
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productApi.getAll,
+    staleTime: 5 * 60 * 1000,
   });
-  const allProducts = paginatedProductsData?.products || [];
 
   const activeDeal = deals[current];
   const cfg = getDealConfig(activeDeal.type);
