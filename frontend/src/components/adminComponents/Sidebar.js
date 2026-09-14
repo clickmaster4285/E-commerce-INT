@@ -32,6 +32,37 @@ import {
 } from "lucide-react";
 
 // ============================================================
+// SIDEBAR SECTIONS (logical grouping for UI)
+// ============================================================
+
+const sidebarSections = [
+  {
+    title: "OVERVIEW",
+    items: ["Dashboard"],
+  },
+  {
+    title: "CATALOG",
+    items: ["Brands", "Categories", "Attributes", "Products"],
+  },
+  {
+    title: "SALES & MARKETING",
+    items: ["Discounts", "Deals", "Banners"],
+  },
+  {
+    title: "OPERATIONS",
+    items: ["Manage Stock", "Orders", "Shipping"],
+  },
+  {
+    title: "STORE",
+    items: ["Store Info"],
+  },
+  {
+    title: "TEAM & ACCOUNT",
+    items: ["Employees", "Profile"],
+  },
+];
+
+// ============================================================
 // MENU ITEMS
 // ============================================================
 
@@ -501,43 +532,56 @@ export default function Sidebar({ onNavigate, userData }) {
             NAVIGATION
         ================================================== */}
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2">
-          <div className="space-y-0.5">
-            {visibleMenuItems.map((item) => {
-              const Icon = item.icon;
-              const active =
-                pathname === item.path ||
-                pathname.startsWith(`${item.path}/`) ||
-                (item.path === "/admin/employees" && pathname === "/admin/employee");
+          {sidebarSections.map((section) => {
+            const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
+            if (sectionItems.length === 0) return null;
+            return (
+              <div key={section.title} className="mb-0.5">
+                <div className="px-2.5 pt-1.5 pb-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    {section.title}
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  {sectionItems.map((item) => {
+                    const Icon = item.icon;
+                    const active =
+                      pathname === item.path ||
+                      pathname.startsWith(`${item.path}/`) ||
+                      (item.path === "/admin/employees" && pathname === "/admin/employee");
 
-              return (
-                <Link
-                  key={item.name}
-                  href={item.path}
-                  onClick={handleCloseMobile}
-                  aria-current={active ? "page" : undefined}
-                  className={`
-                    flex h-8
-                    items-center gap-2
-                    rounded-md
-                    px-2.5
-                    text-xs font-medium
-                    transition-colors
-                    ${
-                      active
-                        ? "bg-[var(--bg-sidebar-active)] text-white"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary)]"
-                    }
-                  `}
-                >
-                  <Icon
-                    size={16}
-                    className={`shrink-0 ${active ? "text-white" : "text-[var(--text-muted)]"}`}
-                  />
-                  <span className="truncate">{item.name}</span>
-                </Link>
-              );
-            })}
-          </div>
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.path}
+                        onClick={handleCloseMobile}
+                        aria-current={active ? "page" : undefined}
+                        className={`
+                          flex h-8
+                          items-center gap-2
+                          rounded-md
+                          px-2.5
+                          text-xs font-medium
+                          transition-colors
+                          ${
+                            active
+                              ? "bg-[var(--bg-sidebar-active)] text-white"
+                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary)]"
+                          }
+                        `}
+                      >
+                        <Icon
+                          size={16}
+                          className={`shrink-0 ${active ? "text-white" : "text-[var(--text-muted)]"}`}
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         {/* ==================================================

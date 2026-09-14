@@ -58,22 +58,26 @@ function getLayoutPermSocket() {
 // USER PROFILE API
 // ==========================================
 const getProfile = async () => {
-  const response = await axiosInstance.get('/users/profile');
+  try {
+    const response = await axiosInstance.get('/users/profile', { timeout: 10000 });
 
+    let extractedUser = null;
 
-  let extractedUser = null;
+    if (response.data?.user) {
+      extractedUser = response.data.user;
+    } else if (response.data?.data?.user) {
+      extractedUser = response.data.data.user;
+    } else if (response.data?.role) {
+      extractedUser = response.data;
+    } else if (response.data?.data?.role) {
+      extractedUser = response.data.data;
+    }
 
-  if (response.data?.user) {
-    extractedUser = response.data.user;
-  } else if (response.data?.data?.user) {
-    extractedUser = response.data.data.user;
-  } else if (response.data?.role) {
-    extractedUser = response.data;
-  } else if (response.data?.data?.role) {
-    extractedUser = response.data.data;
+    return extractedUser;
+  } catch (err) {
+    console.error('❌ getProfile failed:', err?.message || err, '| code:', err?.code || 'N/A');
+    throw err;
   }
-
-  return extractedUser;
 };
 
 // ==========================================
@@ -141,6 +145,28 @@ export default function AdminLayout({ children }) {
     refetchOnWindowFocus: false,
   });
 
+  const [authTimeoutError, setAuthTimeoutError] = useState(null);
+
+  // ==========================================
+  // AUTH TIMEOUT GUARD — spinner hang hone se roke
+  // ==========================================
+  useEffect(() => {
+    if (!userLoading) {
+      setAuthTimeoutError(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const msg = 'Auth verification timed out (>10s). Server may be unreachable or cookie/token missing.';
+      console.error('❌ ' + msg);
+      setAuthTimeoutError(new Error(msg));
+      // Force query to fail so authResult resolves
+      queryClient.invalidateQueries({ queryKey: ['admin-user-profile'] });
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [userLoading, queryClient]);
+
   // ==========================================
   // DERIVED AUTH + PERMISSION RESULT
   // (setState ki jagah render ke waqt derive)
@@ -150,11 +176,22 @@ export default function AdminLayout({ children }) {
       return { isAuthenticated: true, checkComplete: true, redirectTo: null };
     }
 
-    if (userLoading) {
+    if (userLoading && !authTimeoutError) {
       return {
         isAuthenticated: null,
         checkComplete: false,
         redirectTo: null,
+      };
+    }
+
+    // Timeout guard triggered
+    if (authTimeoutError) {
+      return {
+        isAuthenticated: false,
+        checkComplete: true,
+        redirectTo: '/admin/login',
+        redirectMode: 'push',
+        timeoutError: true,
       };
     }
 
@@ -221,7 +258,7 @@ export default function AdminLayout({ children }) {
       checkComplete: true,
       redirectTo: null,
     };
-  }, [isLoginPage, userLoading, userError, userData, pathname]);
+  }, [isLoginPage, userLoading, userError, userData, pathname, authTimeoutError]);
 
   // ==========================================
   // STORE QUERY
@@ -264,7 +301,7 @@ export default function AdminLayout({ children }) {
     if (authResult.redirectMode === 'push') {
       console.error(
         '❌ Auth failed:',
-        userQueryError?.message || 'Authentication failed'
+        authResult.timeoutError ? 'Verification timeout (>10s)' : (userQueryError?.message || 'Authentication failed')
       );
 
       router.push(authResult.redirectTo);
@@ -477,10 +514,43 @@ export default function AdminLayout({ children }) {
   }
 
   // ==========================================
-  // NOT AUTHENTICATED
+  // NOT AUTHENTICATED / TIMEOUT ERROR FALLBACK
   // ==========================================
   if (!authResult.isAuthenticated) {
-    return null;
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center flex-col gap-4 px-6"
+        style={{ backgroundColor: '#0a0c14' }}
+      >
+        <div className="text-red-400 text-4xl">⚠️</div>
+        <div className="text-center">
+          <h2 className="text-white text-lg font-bold">Access Verification Failed</h2>
+          <p className="text-sm text-white/50 mt-2 max-w-md">
+            {authResult.timeoutError
+              ? 'Verification timed out (>10s). The backend may be unreachable, cookies may be blocked over HTTP, or the auth service is down.'
+              : 'You are not authorized to view this page. Please log in again.'}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            window.location.href = '/admin/login';
+          }}
+          className="mt-4 px-5 py-2.5 rounded-md text-sm font-semibold text-white transition hover:opacity-90"
+          style={{ backgroundColor: '#10b981' }}
+        >
+          Go to Login
+        </button>
+        <button
+          onClick={() => {
+            setAuthTimeoutError(null);
+            queryClient.invalidateQueries({ queryKey: ['admin-user-profile'] });
+          }}
+          className="text-xs text-white/40 hover:text-white/70 underline mt-2"
+        >
+          Retry verification
+        </button>
+      </div>
+    );
   }
 
   // ==========================================
@@ -584,7 +654,7 @@ export default function AdminLayout({ children }) {
         />
 
         {/* Page */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[var(--bg-secondary)] p-4 sm:p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
           {children}
         </main>
 

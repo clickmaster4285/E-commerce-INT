@@ -427,7 +427,9 @@ const [viewMode, setViewMode] = useState(() => {
   }, [productsError, productsErrorMsg]);
 
   /* Mutations */
-  const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product created successfully"); closeProductModal(); const newId = data?.data?._id || data?._id; if (newId) router.push(`/admin/products/${newId}`); }, onError: (e) => handlePermissionError(e, "Product creation failed", "product") });
+  const [createLoading, setCreateLoading] = useState(false);
+
+  const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["products"] }); const newId = data?.product?._id || data?.data?._id || data?._id; closeProductModal(); if (newId) { setCreateLoading(true); setTimeout(() => { router.push(`/admin/products/${newId}/add-variant`); setCreateLoading(false); }, 800); } else { toast.success("Product created successfully"); } }, onError: (e) => { setCreateLoading(false); handlePermissionError(e, "Product creation failed", "product"); } });
   const updateMutation = useMutation({ mutationFn: ({ id, data }) => productApi.update(id, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product updated successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product update failed", "product") });
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
@@ -794,7 +796,16 @@ const [viewMode, setViewMode] = useState(() => {
   if (isLoading) return <div className="flex h-[60vh] items-center justify-center"><div className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></div>;
 
   return (
-    <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
+    <>
+      {createLoading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}>
+          <div className="rounded-xl px-8 py-6 flex flex-col items-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--text-muted)", borderTopColor: "transparent" }} />
+            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>Redirecting...</span>
+          </div>
+        </div>
+      )}
+      <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
       {/* HEADER */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -1265,6 +1276,7 @@ const [viewMode, setViewMode] = useState(() => {
         </div>
       )}
     </div>
+    </>
   );
 }
 

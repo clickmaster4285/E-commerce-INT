@@ -408,10 +408,10 @@ export default function ManageStockPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedItems.map((item, index) => {
+                        {paginatedStockItems.map((item, index) => {
                           const status = getStockStatus(item);
                           return (
-                            <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
+                            <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
                               <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={item.product_name} /><span className="font-medium text-[13px] truncate max-w-[160px]">{item.product_name}</span></div></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
@@ -434,7 +434,7 @@ export default function ManageStockPage() {
 
                 {/* ✅ MOBILE-ONLY card list (replaces table on <768px) */}
                 <div className="md:hidden space-y-2.5">
-                  {paginatedItems.map((item) => {
+                  {paginatedStockItems.map((item) => {
                     const status = getStockStatus(item);
                     return (
                       <div

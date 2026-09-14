@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
@@ -45,6 +45,13 @@ bannerAxios.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+const normalizeArrayResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.items)) return response.items;
+  return [];
+};
 
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
@@ -388,7 +395,7 @@ const [viewMode, setViewMode] = useState(() => {
   const itemsPerPage = 20;
 
   const defaultForm = {
-    title: "", bannerType: "homepage_hero", position: 0,
+    title: "", bannerType: "homepage_hero", position: 1,
     desktopImage: null, tabletImage: null, mobileImage: null,
     altText: "", backgroundColor: "#ffffff",
     eyebrow: "", heading: "", description: "",
@@ -399,11 +406,7 @@ const [viewMode, setViewMode] = useState(() => {
   };
 
   const [form, setForm] = useState(defaultForm);
-
-  const resetForm = () => {
-    setForm(defaultForm);
-    setEditingBanner(null);
-  };
+  const [positionDuplicate, setPositionDuplicate] = useState("");
 
   // --- React Query ---
   const { data: paginatedBannersData, isLoading: loading } = useQuery({
@@ -413,6 +416,35 @@ const [viewMode, setViewMode] = useState(() => {
   });
   const banners = paginatedBannersData?.items || paginatedBannersData || normalizeArrayResponse(paginatedBannersData);
   const pagination = paginatedBannersData?.pagination || { total: banners.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+
+  // Smallest available positive position (must be after banners is defined)
+  const getNextPosition = useCallback(() => {
+    const used = new Set(banners.map((b) => b.position).filter((p) => Number.isInteger(p) && p >= 1));
+    let pos = 1;
+    while (used.has(pos)) pos++;
+    return pos;
+  }, [banners]);
+
+  const resetForm = () => {
+    setForm({ ...defaultForm, position: getNextPosition() });
+    setEditingBanner(null);
+    setPositionDuplicate("");
+  };
+
+  // Check if a position is duplicate (respects edit mode)
+  const checkPositionDuplicate = useCallback((pos, excludeId = null) => {
+    const n = parseInt(pos, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      setPositionDuplicate(n < 1 && n !== "" ? "Position must be 1 or greater" : "");
+      return;
+    }
+    const match = banners.find((b) => b.position === n && b._id !== excludeId);
+    if (match) {
+      setPositionDuplicate(`Position ${n} is already used by "${match.title}". Please choose another position.`);
+    } else {
+      setPositionDuplicate("");
+    }
+  }, [banners]);
 
   const { data: deals = [] } = useQuery({
     queryKey: ["banner-deal-options"],
@@ -492,6 +524,20 @@ const [viewMode, setViewMode] = useState(() => {
   // --- Handlers ---
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Prevent submit if position is duplicate
+    if (positionDuplicate) {
+      toast.error(positionDuplicate);
+      return;
+    }
+
+    // Prevent submit if position is invalid
+    const pos = parseInt(form.position, 10);
+    if (!Number.isFinite(pos) || pos < 1) {
+      toast.error("Position must be a positive whole number (1 or greater)");
+      return;
+    }
+
     const fd = new FormData();
 
     Object.entries(form).forEach(([key, value]) => {
@@ -530,6 +576,7 @@ const [viewMode, setViewMode] = useState(() => {
 
   const handleEdit = (banner) => {
     setEditingBanner(banner);
+    setPositionDuplicate("");
     const formatDateInput = (d) => (d ? new Date(d).toISOString().slice(0, 16) : "");
     setForm({
       ...banner,
@@ -836,6 +883,33 @@ const [viewMode, setViewMode] = useState(() => {
                       </Select>
                     </FormField>
                   </div>
+                  <div className="mt-4">
+                    <FormField label="Position" required helpText="Display order (lowest first). Auto-suggested to next available.">
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                          value={form.position}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateForm("position", val === "" ? "" : val);
+                            if (val !== "") checkPositionDuplicate(val, editingBanner?._id || null);
+                            else setPositionDuplicate("");
+                          }}
+                          placeholder="e.g., 1"
+                          style={positionDuplicate ? { borderColor: "#ef4444" } : {}}
+                        />
+                        {positionDuplicate && (
+                          <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#ef4444" }}>
+                            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            {positionDuplicate}
+                          </p>
+                        )}
+                      </div>
+                    </FormField>
+                  </div>
                 </FormSection>
 
                 {/* 2. Responsive Images */}
@@ -1016,7 +1090,7 @@ const [viewMode, setViewMode] = useState(() => {
                   </button>
                   <button
                     type="submit"
-                    disabled={bannerMutation.isPending}
+                    disabled={bannerMutation.isPending || !!positionDuplicate}
                     className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
                   >
                     {bannerMutation.isPending ? (
