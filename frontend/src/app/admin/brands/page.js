@@ -6,6 +6,7 @@ import { adminBrandApi } from "@/apis/admin/brandApi";
 import { Country } from "country-state-city";
 import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
 import { toast } from "sonner";
+import { createPortal } from "react-dom";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -54,6 +55,12 @@ const ImageIcon = ({ className = "w-6 h-6" }) => (
 );
 const EyeIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+);
+const DotsVerticalIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" /></svg>
+);
+const ShieldCheckIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
 );
 const CheckIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
@@ -339,6 +346,22 @@ const [viewMode, setViewMode] = useState(() => {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newActive }) => {
+      const fd = new FormData();
+      fd.append("is_active", String(newActive));
+      return adminBrandApi.update(id, fd);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["adminBrands"] });
+      toast.success(variables.newActive ? "Brand enabled" : "Brand disabled");
+    },
+    onError: (error) => {
+      const msg = error.response?.data?.message || error.message || "Failed to update status";
+      toast.error(msg);
+    },
+  });
+
   /* ---------- Derived data ---------- */
   const filteredBrands = useMemo(() => {
     return brands.filter((b) => {
@@ -479,19 +502,85 @@ const [viewMode, setViewMode] = useState(() => {
     </div>
   );
 
-  const ActionButtons = ({ brand }) => (
-    <div className="flex items-center justify-end gap-0.5 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); handleViewBrand(brand._id); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details">
-        <EyeIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); handleEdit(brand); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
-        <EditIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); handleDelete(brand); }} disabled={isDeleting} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete">
-        <TrashIcon className="w-4 h-4" />
-      </button>
-    </div>
-  );
+  const ActionButtons = ({ brand }) => {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef(null);
+    const menuRef = useRef(null);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0, flipUp: false });
+
+    const isActive = brand.is_active !== false;
+
+    const openMenu = () => {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuH = 200;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = spaceBelow < menuH;
+      setMenuPos({
+        top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4,
+        left: Math.min(rect.right - 176, window.innerWidth - 180),
+        flipUp,
+      });
+      setOpen(true);
+    };
+
+    useEffect(() => {
+      if (!open) return;
+      const handleClick = (e) => {
+        if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      };
+      const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("keydown", handleKey);
+      return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKey); };
+    }, [open]);
+
+    return (
+      <div className="relative">
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
+          className="h-7 px-2.5 rounded-md text-[12px] font-medium inline-flex items-center gap-1.5 border transition hover:bg-white/5 whitespace-nowrap"
+          style={{ color: "var(--text-secondary)", borderColor: "var(--border-color)", backgroundColor: "transparent" }}
+          title="Actions"
+        >
+          Actions <ChevronDownIcon className="w-3 h-3" />
+        </button>
+        {open && createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[9999] w-44 rounded-lg border shadow-xl py-1"
+            style={{ top: menuPos.top, left: menuPos.left, backgroundColor: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+          >
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewBrand(brand._id); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
+              <EyeIcon className="w-4 h-4" style={{ color: "#34d399" }} /> View Details
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(brand); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
+              <EditIcon className="w-4 h-4" style={{ color: "var(--text-secondary)" }} /> Edit
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(brand); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "#f87171" }}>
+              <TrashIcon className="w-4 h-4" /> Delete
+            </button>
+            <div className="my-1 border-t" style={{ borderColor: "var(--border-color)" }} />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                toggleStatusMutation.mutate({ id: brand._id, newActive: !isActive });
+              }}
+              disabled={toggleStatusMutation.isPending}
+              className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 disabled:opacity-50"
+              style={{ color: isActive ? "#f87171" : "#34d399" }}
+            >
+              <ShieldCheckIcon className="w-4 h-4" /> {isActive ? "Disable" : "Enable"}
+            </button>
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -575,7 +664,7 @@ const [viewMode, setViewMode] = useState(() => {
           <>
           <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full min-w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
@@ -584,7 +673,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Description</th>
                     <SortHeader label="Country" sortKey="country" />
                     <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -603,7 +692,7 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{brand.description || "—"}</p></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><StatusBadge active={brand.is_active} /></td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap w-1"><ActionButtons brand={brand} /></td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap"><ActionButtons brand={brand} /></td>
                       </tr>
                     );
                   })}

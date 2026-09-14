@@ -27,6 +27,8 @@ const CheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fil
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>);
 const FilterIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1.994 1.994 0 013 6.586V4z" /></svg>);
 const FileTextIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
+const DotsVerticalIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" /></svg>);
+const ShieldCheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>);
 
 const SortIndicator = ({ active, direction }) => (
   <svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -158,6 +160,16 @@ const [viewMode, setViewMode] = useState(() => {
       setDeleteTarget(null);
     },
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Category delete failed"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newStatus }) => categoryApi.update(id, { status: newStatus }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast.success(variables.newStatus === "active" ? "Category enabled" : "Category disabled");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update status"),
   });
 
   // ================= FORM MUTATIONS =================
@@ -612,13 +624,89 @@ const [viewMode, setViewMode] = useState(() => {
     </div>
   );
 
-  const ActionButtons = ({ category }) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); handleViewDetail(category); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); handleEdit(category); }} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); handleDelete(category); }} disabled={isDeleting} className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
-    </div>
-  );
+  const ActionButtons = ({ category }) => {
+    const [open, setOpen] = useState(false);
+    const btnRef = useRef(null);
+    const menuRef = useRef(null);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0, flipUp: false });
+
+    const isActive = category.status !== "inactive";
+
+    const openMenu = () => {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuH = 200;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = spaceBelow < menuH;
+      setMenuPos({
+        top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4,
+        left: Math.min(rect.right - 176, window.innerWidth - 180),
+        flipUp,
+      });
+      setOpen(true);
+    };
+
+    useEffect(() => {
+      if (!open) return;
+      const handleClick = (e) => {
+        if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      };
+      const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("keydown", handleKey);
+      return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKey); };
+    }, [open]);
+
+    return (
+      <div className="relative">
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
+          className="h-7 px-2.5 rounded-md text-[12px] font-medium inline-flex items-center gap-1.5 border transition hover:bg-white/5 whitespace-nowrap"
+          style={{ color: "var(--text-secondary)", borderColor: "var(--border-color)", backgroundColor: "transparent" }}
+          title="Actions"
+        >
+          Actions <ChevronDownIcon className="w-3 h-3" />
+        </button>
+        {open && createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[9999] w-44 rounded-lg border shadow-xl py-1"
+            style={{ top: menuPos.top, left: menuPos.left, backgroundColor: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+          >
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewDetail(category); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
+              <EyeIcon className="w-4 h-4" style={{ color: "#34d399" }} /> View Details
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(category); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
+              <EditIcon className="w-4 h-4" style={{ color: "var(--text-secondary)" }} /> Edit
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(category); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "#f87171" }}>
+              <TrashIcon className="w-4 h-4" /> Delete
+            </button>
+            <div className="my-1 border-t" style={{ borderColor: "var(--border-color)" }} />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                if (isActive) {
+                  toggleStatusMutation.mutate({ id: category._id, newStatus: "inactive" });
+                } else {
+                  toggleStatusMutation.mutate({ id: category._id, newStatus: "active" });
+                }
+              }}
+              disabled={toggleStatusMutation.isPending}
+              className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 disabled:opacity-50"
+              style={{ color: isActive ? "#f87171" : "#34d399" }}
+            >
+              <ShieldCheckIcon className="w-4 h-4" /> {isActive ? "Disable" : "Enable"}
+            </button>
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
 
   /* ================= MODAL RENDERER ================= */
   const renderCategoryFormModal = () => {
@@ -1006,7 +1094,7 @@ const [viewMode, setViewMode] = useState(() => {
           <>
           <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full min-w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
@@ -1015,7 +1103,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Description</th>
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Parent</th>
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1046,7 +1134,7 @@ const [viewMode, setViewMode] = useState(() => {
                             {isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap w-1"><ActionButtons category={category} /></td>
+                        <td className="px-4 py-2.5 whitespace-nowrap"><ActionButtons category={category} /></td>
                       </tr>
                     );
                   })}
