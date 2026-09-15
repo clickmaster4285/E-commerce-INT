@@ -126,34 +126,4 @@ export const employeeApi = {
       throw new Error(error.response?.data?.message || "Failed to toggle employee status");
     }
   },
-
-  // ==========================================================
-  // GET EMPLOYEE BY USER ID
-  // ==========================================================
-  getByUserId: async (userId) => {
-    if (!userId) throw new Error("User ID is required");
-    try {
-      const response = await axiosInstance.get(`/employees/by-user/${userId}`, { timeout: 10000 });
-      return unwrap(response.data);
-    } catch (error) {
-      console.error(`❌ getEmployeeByUserId (${userId}) error:`, error);
-      throw new Error(error.response?.data?.message || "Failed to fetch employee by user ID");
-    }
-  },
-
-  // ==========================================================
-  // BULK DELETE
-  // ==========================================================
-  bulkDelete: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) {
-      throw new Error("At least one employee ID is required");
-    }
-    try {
-      const response = await axiosInstance.post("/employees/bulk-delete", { ids }, { timeout: 10000 });
-      return unwrap(response.data);
-    } catch (error) {
-      console.error("❌ bulkDelete error:", error);
-      throw new Error(error.response?.data?.message || "Failed to delete employees");
-    }
-  },
 };

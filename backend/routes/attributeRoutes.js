@@ -9,6 +9,7 @@ const {
   updateAttribute,
   getAttributeCategories,
   updateAttributeCategories,
+  deleteAttribute,
 } = require("../controllers/attributeController");
 
 router.get("/", authMiddleware, checkPermission("products"), getAttributes);
@@ -17,5 +18,6 @@ router.get("/:id/categories", authMiddleware, checkPermission("products"), getAt
 router.put("/:id/categories", authMiddleware, checkPermission("products"), updateAttributeCategories);
 router.get("/:id", authMiddleware, checkPermission("products"), getAttributeById);
 router.put("/:id", authMiddleware, checkPermission("products"), updateAttribute);
+router.delete("/:id", authMiddleware, checkPermission("products"), deleteAttribute);
 
 module.exports = router;

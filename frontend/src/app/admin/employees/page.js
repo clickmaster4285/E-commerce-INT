@@ -15,6 +15,13 @@ import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSoc
 const ITEMS_PER_PAGE = 20;
 const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
 
+const normalizeArrayResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.employees)) return response.employees;
+  return [];
+};
+
 // ==========================================
 // DEPARTMENT DROPDOWN COMPONENT
 // ==========================================
@@ -391,33 +398,6 @@ const toggleStatusMutation = useMutation({
       <SortDesc className="w-3 h-3 inline ml-1" />
     );
   };
-
-  const filteredEmployees = useMemo(() => {
-    let result = staffEmployees.filter((emp) => {
-      const name = emp.userId?.name || emp.name || "";
-      const email = emp.userId?.email || emp.email || "";
-      const status = emp.userId?.status || emp.status || "active";
-      
-      const matchSearch =
-        name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        email.toLowerCase().includes(debouncedSearch.toLowerCase());
-      const matchStatus = filterStatus === "all" || status === filterStatus;
-      return matchSearch && matchStatus;
-    });
-
-    if (sortConfig.key) {
-      result.sort((a, b) => {
-        let va = a[sortConfig.key] || (a.userId ? a.userId[sortConfig.key] : "") || "";
-        let vb = b[sortConfig.key] || (b.userId ? b.userId[sortConfig.key] : "") || "";
-        if (typeof va === "string") va = va.toLowerCase();
-        if (typeof vb === "string") vb = vb.toLowerCase();
-        if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
-        if (va > vb) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-    return result;
-  }, [staffEmployees, debouncedSearch, filterStatus, sortConfig]);
 
   const paginatedEmployees = employees; // server paginated; no client .slice()
   const totalPages = pagination.pages || 1;

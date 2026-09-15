@@ -547,8 +547,7 @@ export default function Sidebar({ onNavigate, userData }) {
                     const Icon = item.icon;
                     const active =
                       pathname === item.path ||
-                      pathname.startsWith(`${item.path}/`) ||
-                      (item.path === "/admin/employees" && pathname === "/admin/employee");
+                      pathname.startsWith(`${item.path}/`);
 
                     return (
                       <Link
