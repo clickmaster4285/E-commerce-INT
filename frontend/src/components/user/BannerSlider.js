@@ -173,13 +173,19 @@ export default function BannerSlider() {
 
 function ButtonLink({ button, primary }) {
   const href = button.link || "#";
-  const cls = primary
-    ? "bg-white text-black hover:bg-white/90"
-    : "bg-white/10 backdrop-blur text-white border border-white/30 hover:bg-white/20";
+  
   return (
     <Link
       href={href}
-      className={`${cls} px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-sm font-black uppercase tracking-wider transition shadow-xl`}
+      className={`px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-[11px] sm:text-sm font-black uppercase tracking-wider transition-all duration-300 ${
+        primary 
+          ? "bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/30" 
+          : "bg-white/10 backdrop-blur text-white border border-white/30 hover:bg-white/20"
+      }`}
+      style={primary ? { 
+        backgroundColor: "#dc2626",
+        color: "#ffffff"
+      } : {}}
     >
       {button.text}
     </Link>

@@ -34,7 +34,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
-
+const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
@@ -173,7 +173,18 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     </div>
   );
 };
-
+/* ==================== DROPDOWN MENU ITEM ==================== */
+const MenuItem = ({ icon, label, onClick, danger }) => (
+  <button
+    role="menuitem"
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+    style={{ color: danger ? undefined : "var(--text-primary)" }}
+  >
+    {icon} {label}
+  </button>
+);
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const queryClient = useQueryClient();
@@ -194,6 +205,7 @@ const [viewMode, setViewMode] = useState(() => {
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [activeFormType, setActiveFormType] = useState(null);
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const typeMenuRef = useRef(null);
@@ -229,7 +241,16 @@ const [viewMode, setViewMode] = useState(() => {
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
-
+useEffect(() => {
+  if (!actionMenu) return;
+  const close = () => setActionMenu(null);
+  window.addEventListener("scroll", close, true);
+  window.addEventListener("resize", close);
+  return () => {
+    window.removeEventListener("scroll", close, true);
+    window.removeEventListener("resize", close);
+  };
+}, [actionMenu]);
   const resetForm = () => {
     setFormData({
       name: "", code: "", description: "", target_type: "all",
@@ -407,13 +428,73 @@ const [viewMode, setViewMode] = useState(() => {
     setShowModal(true);
   };
 
-  const ActionButtons = ({ deal }) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); handleViewDeal(deal._id); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); openEdit(deal); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([deal]); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
+ const ActionButtons = ({ deal }) => {
+  const id = deal._id || deal.id;
+  const open = actionMenu?.id === id;
+
+  const toggleMenu = (e) => {
+    e.stopPropagation();
+    if (open) { setActionMenu(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 148;
+    const menuWidth = 176;
+    const top = rect.bottom + 6 + menuHeight > window.innerHeight
+      ? rect.top - 6 - menuHeight
+      : rect.bottom + 6;
+    const left = Math.max(8, rect.right - menuWidth);
+    setActionMenu({ id, top, left });
+  };
+
+  return (
+    <div className="flex items-center justify-end">
+      <button
+        onClick={toggleMenu}
+        aria-label={`Actions for ${deal?.name || "deal"}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+        style={{ color: "var(--text-secondary)" }}
+        title="Actions"
+      >
+        <DotsIcon className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+          <div
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+            style={{
+              top: actionMenu.top,
+              left: actionMenu.left,
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <MenuItem
+              icon={<EyeIcon className="w-4 h-4" />}
+              label="View Details"
+              onClick={() => { setActionMenu(null); handleViewDeal(id); }}
+            />
+            <MenuItem
+              icon={<EditIcon className="w-4 h-4" />}
+              label="Edit Deal"
+              onClick={() => { setActionMenu(null); openEdit(deal); }}
+            />
+            <MenuItem
+              icon={<TrashIcon className="w-4 h-4" />}
+              label="Delete"
+              danger
+              onClick={() => { setActionMenu(null); setDeleteTarget([deal]); }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
+};
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>

@@ -16,7 +16,9 @@ const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fi
 const ListIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>);
 const GridIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>);
 const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>);
+
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
+const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
@@ -289,7 +291,18 @@ const getProductAttributes = (product) => {
   });
   return list;
 };
-
+/* ==================== DROPDOWN MENU ITEM ==================== */
+const MenuItem = ({ icon, label, onClick, danger }) => (
+  <button
+    role="menuitem"
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+    style={{ color: danger ? undefined : "var(--text-primary)" }}
+  >
+    {icon} {label}
+  </button>
+);
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
   const queryClient = useQueryClient();
@@ -310,6 +323,7 @@ const [viewMode, setViewMode] = useState(() => {
   const [editingDiscount, setEditingDiscount] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [activeFormType, setActiveFormType] = useState(null);
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const typeMenuRef = useRef(null);
@@ -349,7 +363,16 @@ const [viewMode, setViewMode] = useState(() => {
   }, []);
 
   useEffect(() => { setCurrentPage(1); }, [search, statusFilter, targetFilter]);
-
+useEffect(() => {
+  if (!actionMenu) return;
+  const close = () => setActionMenu(null);
+  window.addEventListener("scroll", close, true);
+  window.addEventListener("resize", close);
+  return () => {
+    window.removeEventListener("scroll", close, true);
+    window.removeEventListener("resize", close);
+  };
+}, [actionMenu]);
   const resetForm = () => {
     setFormData({
       name: "", code: "", description: "",
@@ -534,13 +557,73 @@ const [viewMode, setViewMode] = useState(() => {
     return pages;
   };
 
-  const ActionButtons = ({ discount }) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); handleView(discount._id || discount.id); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View Details"><EyeIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); openEdit(discount); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit"><EditIcon className="w-4 h-4" /></button>
-      <button onClick={(e) => { e.stopPropagation(); setDeleteTarget([discount]); }} className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center" title="Delete"><TrashIcon className="w-4 h-4" /></button>
+const ActionButtons = ({ discount }) => {
+  const id = discount._id || discount.id;
+  const open = actionMenu?.id === id;
+
+  const toggleMenu = (e) => {
+    e.stopPropagation();
+    if (open) { setActionMenu(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 148;
+    const menuWidth = 176;
+    const top = rect.bottom + 6 + menuHeight > window.innerHeight
+      ? rect.top - 6 - menuHeight
+      : rect.bottom + 6;
+    const left = Math.max(8, rect.right - menuWidth);
+    setActionMenu({ id, top, left });
+  };
+
+  return (
+    <div className="flex items-center justify-end">
+      <button
+        onClick={toggleMenu}
+        aria-label={`Actions for ${discount?.name || "discount"}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+        style={{ color: "var(--text-secondary)" }}
+        title="Actions"
+      >
+        <DotsIcon className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+          <div
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+            style={{
+              top: actionMenu.top,
+              left: actionMenu.left,
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <MenuItem
+              icon={<EyeIcon className="w-4 h-4" />}
+              label="View Details"
+              onClick={() => { setActionMenu(null); handleView(id); }}
+            />
+            <MenuItem
+              icon={<EditIcon className="w-4 h-4" />}
+              label="Edit Discount"
+              onClick={() => { setActionMenu(null); openEdit(discount); }}
+            />
+            <MenuItem
+              icon={<TrashIcon className="w-4 h-4" />}
+              label="Delete"
+              danger
+              onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
+};
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -846,23 +929,16 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
           <div className="p-5 sm:p-6 space-y-6">
 
             {/* BASIC INFORMATION */}
+                        {/* BASIC INFORMATION */}
             <section>
               <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your discount a clear identity" />
               <div className="rounded-lg p-4" style={cardStyle}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Discount Name" required>
+                <div className="space-y-4">
+                  <FormField label="Discount Name" required fullWidth>
                     <TextInput
                       value={formData.name}
                       onChange={(v) => setFormData({ ...formData, name: v })}
                       placeholder="e.g., Summer Sale 2026"
-                      style={inputStyle}
-                    />
-                  </FormField>
-                  <FormField label="Coupon Code" hint="Optional">
-                    <TextInput
-                      value={formData.code}
-                      onChange={(v) => setFormData({ ...formData, code: v.toUpperCase() })}
-                      placeholder="SUMMER20"
                       style={inputStyle}
                     />
                   </FormField>
@@ -1046,6 +1122,7 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
             </section>
 
             {/* CONDITIONS & LIMITS */}
+                     {/* CONDITIONS & LIMITS */}
             <section>
               <SectionHeader icon={LayersIcon} title="Conditions & Limits" subtitle="Control when and how often the discount can be used" />
               <div className="rounded-lg p-4" style={cardStyle}>
@@ -1062,24 +1139,6 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
                   <FormField label="Per Customer Limit" hint="Leave empty for unlimited">
                     <TextInput type="number" value={formData.usage_per_customer} onChange={(v) => setFormData({ ...formData, usage_per_customer: v })} placeholder="Unlimited" style={inputStyle} />
                   </FormField>
-                  <FormField label="Priority" hint="Higher number = applied first">
-                    <TextInput type="number" value={formData.priority} onChange={(v) => setFormData({ ...formData, priority: v })} placeholder="1" style={inputStyle} />
-                  </FormField>
-                  <div className="flex items-center">
-                    <label
-                      className="flex w-full items-center gap-3 px-3 h-9 rounded-md cursor-pointer transition hover:opacity-90"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
-                    >
-                      {/* <input
-                        type="checkbox"
-                        checked={formData.is_stackable}
-                        onChange={(e) => setFormData({ ...formData, is_stackable: e.target.checked })}
-                        className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
-                      />
-                      <span className="text-[13px] font-semibold">Stackable</span>
-                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Allow with other discounts</span> */}
-                    </label>
-                  </div>
                 </div>
               </div>
             </section>

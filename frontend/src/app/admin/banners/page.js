@@ -122,7 +122,7 @@ const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill=
 const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>);
 const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
-
+const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 // ==========================================
 // HELPERS
 // ==========================================
@@ -365,7 +365,22 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
     </div>
   );
 };
+/* ==================== DROPDOWN MENU ITEM ==================== */
+const MenuItem = ({ icon, label, onClick, danger }) => (
+  <button
+    role="menuitem"
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+    style={{ color: danger ? undefined : "var(--text-primary)" }}
+  >
+    {icon} {label}
+  </button>
+);
 
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -389,6 +404,7 @@ const [viewMode, setViewMode] = useState(() => {
   const [showModal, setShowModal] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [currentPage, setCurrentPage] = useState(1);
   const [showDealCreator, setShowDealCreator] = useState(false);
   
@@ -508,6 +524,16 @@ const [viewMode, setViewMode] = useState(() => {
   const startIndex = (currentPage - 1) * itemsPerPage;
 
   useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterType]);
+  useEffect(() => {
+  if (!actionMenu) return;
+  const close = () => setActionMenu(null);
+  window.addEventListener("scroll", close, true);
+  window.addEventListener("resize", close);
+  return () => {
+    window.removeEventListener("scroll", close, true);
+    window.removeEventListener("resize", close);
+  };
+}, [actionMenu]);
 
   const stats = useMemo(() => ({
     total: banners.length,
@@ -645,22 +671,84 @@ const [viewMode, setViewMode] = useState(() => {
     </div>
   );
 
-  const ActionButtons = ({ banner }) => (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); router.push(`${pathname}/${banner._id}`); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-emerald-500/10 flex items-center justify-center" style={{ color: "#34d399" }} title="View">
-        <EyeIcon className="w-4 h-4" />
+ const ActionButtons = ({ banner }) => {
+  const id = banner._id;
+  const open = actionMenu?.id === id;
+
+  const toggleMenu = (e) => {
+    e.stopPropagation();
+    if (open) { setActionMenu(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 196; // 4 items height
+    const menuWidth = 176;
+    const top = rect.bottom + 6 + menuHeight > window.innerHeight
+      ? rect.top - 6 - menuHeight
+      : rect.bottom + 6;
+    const left = Math.max(8, rect.right - menuWidth);
+    setActionMenu({ id, top, left });
+  };
+
+  return (
+    <div className="flex items-center justify-end">
+      <button
+        onClick={toggleMenu}
+        aria-label={`Actions for ${banner?.title || "banner"}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+        style={{ color: "var(--text-secondary)" }}
+        title="Actions"
+      >
+        <DotsIcon className="w-4 h-4" />
       </button>
-      <button onClick={(e) => { e.stopPropagation(); handleEdit(banner); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Edit">
-        <EditIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); adminBannerApi.duplicate(banner._id).then(() => { queryClient.invalidateQueries({ queryKey: ["adminBanners"] }); toast.success("Duplicated"); }); }} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center" style={{ color: "var(--text-secondary)" }} title="Duplicate">
-        <CopyIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); handleDelete(banner); }} disabled={deleteMutation.isPending} className="flex-shrink-0 min-w-[34px] min-h-[34px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center" title="Delete">
-        <TrashIcon className="w-4 h-4" />
-      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+          <div
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+            style={{
+              top: actionMenu.top,
+              left: actionMenu.left,
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-color)",
+            }}
+          >
+            <MenuItem
+              icon={<EyeIcon className="w-4 h-4" />}
+              label="View Details"
+              onClick={() => { setActionMenu(null); router.push(`${pathname}/${id}`); }}
+            />
+            <MenuItem
+              icon={<EditIcon className="w-4 h-4" />}
+              label="Edit Banner"
+              onClick={() => { setActionMenu(null); handleEdit(banner); }}
+            />
+            <MenuItem
+              icon={<CopyIcon className="w-4 h-4" />}
+              label="Duplicate"
+              onClick={() => { 
+                setActionMenu(null); 
+                adminBannerApi.duplicate(id).then(() => { 
+                  queryClient.invalidateQueries({ queryKey: ["adminBanners"] }); 
+                  toast.success("Duplicated"); 
+                }); 
+              }}
+            />
+            <MenuItem
+              icon={<TrashIcon className="w-4 h-4" />}
+              label="Delete"
+              danger
+              onClick={() => { setActionMenu(null); handleDelete(banner); }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
+};
 
   const renderPageNumbers = () => {
     const pages = [];
