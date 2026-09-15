@@ -1258,37 +1258,6 @@ export default function EmployeeDetailPage() {
       label: "Activity Log",
       icon: Clock,
     },
-
-    {
-      id: "employee",
-      label: "Employee Activity",
-      icon: Users,
-    },
-
-    {
-      id: "brand",
-      label: "Brand Activity",
-      icon: Store,
-    },
-
-    {
-      id: "product",
-      label: "Product Activity",
-      icon: Package,
-    },
-
-    {
-      id: "category",
-      label: "Category Activity",
-      icon: Tag,
-    },
-
-    {
-      id: "discount",
-      label: "Discount Activity",
-      icon: Percent,
-    },
-
     {
       id: "permissions",
       label: "Permissions",

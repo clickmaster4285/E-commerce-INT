@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
+import CategoryFormModal from "@/components/adminComponents/CategoryFormModal";
 import { useProductSocketSync } from "@/hooks/useProductSocketSync";
 import {
   AlertTriangle,
@@ -66,7 +67,7 @@ const Icons = {
 function createEmptyVariant(sku = "") {
   return {
     _id: null, sku, title: "", description: "", cost_price: "", selling_price: "",
-    quantity: "0", min_qnt: "0", max_qnt: "0",
+    quantity: "0",
     option_values: {},
     images: [],
   };
@@ -205,10 +206,8 @@ const [viewMode, setViewMode] = useState(() => {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
   
-  // Category Modal States
+  // Category Modal State (shared component handles its own form)
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
-  const [categoryFormData, setCategoryFormData] = useState({ category_code: "", name: "", description: "" });
-  const [loadingCategoryCode, setLoadingCategoryCode] = useState(false);
 
   // Brand Modal States
   const [showNewBrandModal, setShowNewBrandModal] = useState(false);
@@ -434,8 +433,6 @@ const [viewMode, setViewMode] = useState(() => {
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
   
-  const createCategoryMutation = useMutation({ mutationFn: (data) => categoryApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["categories"] }); const nc = res?.data || res; if (nc?._id) { setFormData((p) => ({ ...p, category_id: String(nc._id) })); toast.success("Category created and selected!"); } else { toast.success("Category created successfully"); } setShowNewCategoryModal(false); resetCategoryForm(); }, onError: (e) => handlePermissionError(e, "Failed to create category", "category") });
-  
   const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
   
   const assignAttributeToCategoryMutation = useMutation({
@@ -645,31 +642,7 @@ const [viewMode, setViewMode] = useState(() => {
     setFormData(prev => ({ ...prev, tag_names: prev.tag_names.filter(t => t !== tagName) }));
   };
 
-  const resetCategoryForm = () => { setCategoryFormData({ category_code: "", name: "", description: "" }); setLoadingCategoryCode(false); };
-  const fetchNextCategoryCode = async () => {
-    try {
-      setLoadingCategoryCode(true);
-      const res = await categoryApi.getNextCode();
-      const code = res?.nextCode || res?.data?.nextCode;
-      if (code && typeof code === "string") { setCategoryFormData((p) => ({ ...p, category_code: code })); return; }
-      throw new Error("Invalid code format");
-    } catch (e) {
-      const coded = categories.filter((c) => c?.category_code && /^CAT-\d+$/i.test(c.category_code));
-      let next = 1;
-      if (coded.length) {
-        const nums = coded.map((c) => parseInt(c.category_code.split("-")[1], 10)).filter(Number.isFinite);
-        if (nums.length) next = Math.max(...nums) + 1;
-      }
-      setCategoryFormData((p) => ({ ...p, category_code: `CAT-${String(next).padStart(3, "0")}` }));
-    } finally { setLoadingCategoryCode(false); }
-  };
-  const handleOpenCategoryModal = () => { resetCategoryForm(); setShowNewCategoryModal(true); fetchNextCategoryCode(); };
-  const handleCategorySubmit = (e) => {
-    e.preventDefault();
-    if (!categoryFormData.category_code.trim()) { toast.error("Category code is required"); return; }
-    if (!categoryFormData.name.trim()) { toast.error("Category name is required"); return; }
-    createCategoryMutation.mutate({ ...categoryFormData, category_code: categoryFormData.category_code.trim(), name: categoryFormData.name.trim(), description: categoryFormData.description.trim() });
-  };
+  const handleOpenCategoryModal = () => { setShowNewCategoryModal(true); };
 
   const resetBrandForm = () => {
     if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
@@ -971,7 +944,7 @@ const [viewMode, setViewMode] = useState(() => {
                         {isCategoryDropdownOpen && (
                           <Dropdown>
                             {categories.map(c => <button type="button" key={c._id} onClick={() => { setFormData(p => ({ ...p, category_id: String(c._id) })); setIsCategoryDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.category_id) === String(c._id) ? "var(--accent)" : "var(--text-primary)" }}>{c.name}</button>)}
-                            <button type="button" onClick={() => { setIsCategoryDropdownOpen(false); handleOpenCategoryModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Category</button>
+                            <button type="button" onClick={() => { setIsCategoryDropdownOpen(false); handleOpenCategoryModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Category</button>
                           </Dropdown>
                         )}
                       </div>
@@ -985,7 +958,7 @@ const [viewMode, setViewMode] = useState(() => {
                         {isBrandDropdownOpen && (
                           <Dropdown>
                             {brands.map(b => <button type="button" key={b._id} onClick={() => { setFormData(p => ({ ...p, brand_id: String(b._id) })); setIsBrandDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.brand_id) === String(b._id) ? "var(--accent)" : "var(--text-primary)" }}>{b.name}</button>)}
-                            <button type="button" onClick={() => { setIsBrandDropdownOpen(false); handleOpenBrandModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5" style={{ borderColor: "var(--border-color)", color: "var(--accent)" }}><Plus className="h-4 w-4" /> Create New Brand</button>
+                            <button type="button" onClick={() => { setIsBrandDropdownOpen(false); handleOpenBrandModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Brand</button>
                           </Dropdown>
                         )}
                       </div>
@@ -1013,33 +986,18 @@ const [viewMode, setViewMode] = useState(() => {
         </ModalOverlay>
       )}
 
-      {/* CATEGORY MODAL */}
-      {showNewCategoryModal && (
-        <ModalOverlay zIndex="z-[60]">
-          <div className="w-full max-w-lg overflow-visible rounded-xl shadow-2xl" style={cardStyle}>
-            <div className="flex items-center justify-between rounded-t-xl px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">Create New Category</h3>
-              <button type="button" onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }} disabled={createCategoryMutation.isPending || loadingCategoryCode} className="rounded p-1 transition hover:opacity-70 disabled:opacity-50" style={{ color: "var(--text-muted)" }}><X className="h-5 w-5" /></button>
-            </div>
-            <form onSubmit={handleCategorySubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category Code *">
-                  <div className="relative">
-                    <input type="text" value={categoryFormData.category_code} onChange={e => setCategoryFormData(p => ({ ...p, category_code: e.target.value }))} required disabled={createCategoryMutation.isPending || loadingCategoryCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingCategoryCode ? "Generating..." : "CAT-001"} />
-                    {loadingCategoryCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
-                  </div>
-                </Field>
-                <Field label="Category Name *"><input type="text" value={categoryFormData.name} onChange={e => setCategoryFormData(p => ({ ...p, name: e.target.value }))} required disabled={createCategoryMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Electronics" /></Field>
-              </div>
-              <Field label="Description"><textarea value={categoryFormData.description} onChange={e => setCategoryFormData(p => ({ ...p, description: e.target.value }))} rows={3} disabled={createCategoryMutation.isPending} className="w-full resize-none rounded-md px-3 py-2 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Category details..." /></Field>
-              <div className="flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowNewCategoryModal(false); resetCategoryForm(); }} disabled={createCategoryMutation.isPending} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={createCategoryMutation.isPending || loadingCategoryCode} className="h-9 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{createCategoryMutation.isPending ? "Creating..." : "Create & Select"}</button>
-              </div>
-            </form>
-          </div>
-        </ModalOverlay>
-      )}
+      {/* CATEGORY MODAL — uses shared CategoryFormModal component */}
+      <CategoryFormModal
+        open={showNewCategoryModal}
+        onClose={() => setShowNewCategoryModal(false)}
+        onCreated={(newCategory) => {
+          queryClient.invalidateQueries({ queryKey: ["categories"] });
+          if (newCategory?._id) {
+            setFormData((p) => ({ ...p, category_id: String(newCategory._id) }));
+            toast.success("Category created and selected!");
+          }
+        }}
+      />
 
       {/* BRAND MODAL */}
       {showNewBrandModal && (

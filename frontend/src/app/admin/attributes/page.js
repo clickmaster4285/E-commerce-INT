@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { attributeApi } from "../../../apis/admin/attributeApi";
@@ -33,6 +34,18 @@ const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (
 const ChevronRightIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
 );
+const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+);
+const DotsVerticalIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" /></svg>
+);
+const EyeIcon = ({ className = "w-4 h-4", style }) => (
+  <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+);
+const ShieldCheckIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+);
 
 // --- Helpers ---
 const getDataTypeLabel = (type) => {
@@ -63,13 +76,19 @@ export default function AttributesPage() {
 
   // Add Attribute Modal State
   const [showAttributeModal, setShowAttributeModal] = useState(false);
-  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
+  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "", is_active: true });
 
   // Edit Attribute Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAttribute, setEditingAttribute] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", data_type: "multi_select", values: [], value: false });
+  const [editForm, setEditForm] = useState({ name: "", data_type: "multi_select", values: [], value: false, is_active: true });
   const [editOptionInput, setEditOptionInput] = useState("");
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // ===== SERVER-SIDE PAGINATED QUERY =====
   const { data: paginatedAttrsData, isLoading: attributesLoading, isFetching } = useQuery({
@@ -137,7 +156,7 @@ export default function AttributesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowAttributeModal(false);
-      setNewAttributeData({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
+      setNewAttributeData({ name: "", code: "", data_type: "multi_select", values: [], value: "", is_active: true });
       toast.success("Attribute added successfully");
     },
     onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to add attribute"),
@@ -155,6 +174,7 @@ export default function AttributesPage() {
       name: newAttributeData.name,
       data_type: newAttributeData.data_type,
       values: valuesPayload,
+      is_active: newAttributeData.is_active !== false,
     });
   };
 
@@ -172,7 +192,7 @@ export default function AttributesPage() {
       const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
       return String(label);
     }).filter(Boolean);
-    setEditForm({ name: attr.name || "", data_type: dataType, values, value: booleanValue });
+    setEditForm({ name: attr.name || "", data_type: dataType, values, value: booleanValue, is_active: attr.is_active !== false });
     setEditOptionInput("");
     setShowEditModal(true);
   };
@@ -185,7 +205,7 @@ export default function AttributesPage() {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowEditModal(false);
       setEditingAttribute(null);
-      setEditForm({ name: "", data_type: "multi_select", values: [], value: false });
+      setEditForm({ name: "", data_type: "multi_select", values: [], value: false, is_active: true });
       setEditOptionInput("");
       toast.success("Attribute updated successfully");
     },
@@ -206,6 +226,7 @@ export default function AttributesPage() {
       name: editForm.name.trim(),
       data_type: editForm.data_type,
       values: valuesPayload,
+      is_active: editForm.is_active !== false,
     });
   };
 
@@ -220,6 +241,46 @@ export default function AttributesPage() {
   const removeEditOption = (idx) => {
     setEditForm({ ...editForm, values: (editForm.values || []).filter((_, i) => i !== idx) });
   };
+
+  // ===== TOGGLE ATTRIBUTE STATUS =====
+  const handleToggleAttributeActive = async (attr) => {
+    if (!attr) return;
+    const attrId = attr._id;
+    const currentActive = attr.is_active !== false;
+    try {
+      await attributeApi.update(attrId, { is_active: !currentActive });
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      toast.success(currentActive ? "Attribute disabled" : "Attribute enabled");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute status");
+    }
+  };
+
+  // ===== DELETE ATTRIBUTE =====
+  const deleteAttributeMutation = useMutation({
+    mutationFn: async (id) => {
+      return attributeApi.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      setDeleteTarget(null);
+      toast.success("Attribute deleted successfully");
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to delete attribute"),
+  });
+
+  const handleDeleteAttribute = () => {
+    if (!deleteTarget) return;
+    deleteAttributeMutation.mutate(deleteTarget._id);
+  };
+
+  // ===== CLIENT-SIDE STATUS FILTER =====
+  const filteredAttributes = useMemo(() => {
+    if (statusFilter === "all") return sortedAttributes;
+    if (statusFilter === "active") return sortedAttributes.filter((a) => a.is_active !== false);
+    if (statusFilter === "inactive") return sortedAttributes.filter((a) => a.is_active === false);
+    return sortedAttributes;
+  }, [sortedAttributes, statusFilter]);
 
   // ===== RENDER HELPERS =====
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
@@ -274,20 +335,121 @@ export default function AttributesPage() {
     );
   };
 
-  const ActionButtons = ({ attr }) => (
-    <div className="flex items-center justify-end gap-0.5 sm:gap-2">
-      <button onClick={(e) => { e.stopPropagation(); openEditModal(attr); }}
-        className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-        style={{ color: "var(--text-secondary)" }} title="Edit">
-        <EditIcon className="w-4 h-4" />
-      </button>
-      <button onClick={(e) => { e.stopPropagation(); /* Delete handler placeholder */ }}
-        className="flex-shrink-0 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] p-1.5 sm:p-2 rounded-md transition text-red-500 hover:bg-red-500/10 flex items-center justify-center"
-        title="Delete">
-        <TrashIcon className="w-4 h-4" />
-      </button>
-    </div>
-  );
+  const ActionButtons = ({ attr }) => {
+    const [open, setOpen] = useState(false);
+    const btnRef = React.useRef(null);
+    const menuRef = React.useRef(null);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+    const isActive = attr.is_active !== false;
+
+    const openMenu = () => {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuW = 170;
+      const menuH = 200;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = spaceBelow < menuH;
+      const left = rect.right - menuW;
+      const adjustedLeft = left < 8 ? 8 : left + menuW > window.innerWidth - 8 ? window.innerWidth - menuW - 8 : left;
+      setMenuPos({
+        top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4,
+        left: adjustedLeft,
+      });
+      setOpen(true);
+    };
+
+    useEffect(() => {
+      if (!open) return;
+      const handleClick = (e) => {
+        if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      };
+      const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("keydown", handleKey);
+      return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKey); };
+    }, [open]);
+
+    const menuItemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150";
+
+    return (
+      <div className="relative">
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+          style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
+          aria-label="More actions"
+          aria-haspopup="true"
+          aria-expanded={open}
+          title="More actions"
+        >
+          <DotsVerticalIcon className="w-[18px] h-[18px]" />
+        </button>
+        {open && ReactDOM.createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[9999] w-[170px] rounded-lg border shadow-lg py-1"
+            style={{
+              top: menuPos.top,
+              left: menuPos.left,
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); openEditModal(attr); }}
+              className={menuItemClass}
+              style={{ color: "var(--text-primary)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); openEditModal(attr); }}
+              className={menuItemClass}
+              style={{ color: "var(--text-primary)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                handleToggleAttributeActive(attr);
+              }}
+              className={menuItemClass}
+              style={{ color: isActive ? "#f87171" : "#34d399" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Disable" : "Enable"}
+            </button>
+            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); setDeleteTarget(attr); }}
+              className={menuItemClass}
+              style={{ color: "#f87171" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
+            </button>
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -300,6 +462,19 @@ export default function AttributesPage() {
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>All attributes</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setAttributePage(1); }}
+                className="h-9 pl-3 pr-8 rounded-lg text-[13px] font-medium appearance-none cursor-pointer outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+                style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+            </div>
             <button onClick={() => setShowAttributeModal(true)} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
               <span>+ Add Attribute</span>
             </button>
@@ -314,12 +489,12 @@ export default function AttributesPage() {
         </div>
 
         {/* Attribute Table */}
-        <div className={`rounded-lg overflow-hidden transition-opacity ${isFetching && !attributesLoading ? "opacity-60" : "opacity-100"}`} style={cardStyle}>
+        <div className={`rounded-lg transition-opacity ${isFetching && !attributesLoading ? "opacity-60" : "opacity-100"}`} style={cardStyle}>
           {attributesLoading ? (
             <div className="rounded-lg py-14 flex items-center justify-center gap-2">
               <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading attributes...</span>
             </div>
-          ) : sortedAttributes.length === 0 ? (
+          ) : filteredAttributes.length === 0 ? (
             <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3">
               <SlidersIcon className="w-10 h-10" style={{ color: "var(--text-muted)" }} />
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No attributes found" : "No attributes available"}</p>
@@ -334,16 +509,16 @@ export default function AttributesPage() {
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
                     <SortHeader label="Options Count" sortKey="options" />
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedAttributes.map((attr, index) => {
+                  {filteredAttributes.map((attr, index) => {
                     const isActive = attr.is_active !== false;
                     const opts = attr.values?.length || 0;
                     return (
                       <tr key={attr._id} className="transition cursor-pointer"
-                        style={{ borderBottom: index < sortedAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
+                        style={{                         borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
                         onClick={() => openEditModal(attr)}>
@@ -382,9 +557,7 @@ export default function AttributesPage() {
                             {isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap w-1">
-                          <ActionButtons attr={attr} />
-                        </td>
+                        <td className="px-4 py-2.5 text-right"><ActionButtons attr={attr} /></td>
                       </tr>
                     );
                   })}
@@ -523,6 +696,27 @@ export default function AttributesPage() {
                   <p className="text-[10px] text-[var(--text-muted)]">This will be the default Yes/No state for this attribute.</p>
                 </div>
               )}
+
+              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
+                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                  {[
+                    { id: true, label: "Active", color: "#34d399" },
+                    { id: false, label: "Inactive", color: "#f87171" },
+                  ].map((opt) => {
+                    const isSel = newAttributeData.is_active === opt.id;
+                    return (
+                      <button key={String(opt.id)} type="button"
+                        onClick={() => setNewAttributeData({ ...newAttributeData, is_active: opt.id })}
+                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
+                        <span className={`w-2 h-2 rounded-full transition-colors ${isSel ? "bg-[" + opt.color + "]" : "bg-transparent"}`} style={isSel ? { backgroundColor: opt.color } : {}} />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
+              </div>
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
@@ -638,6 +832,27 @@ export default function AttributesPage() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
+                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                  {[
+                    { id: true, label: "Active", color: "#34d399" },
+                    { id: false, label: "Inactive", color: "#f87171" },
+                  ].map((opt) => {
+                    const isSel = editForm.is_active === opt.id;
+                    return (
+                      <button key={String(opt.id)} type="button"
+                        onClick={() => setEditForm({ ...editForm, is_active: opt.id })}
+                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
+                        <span className="w-2 h-2 rounded-full transition-colors" style={isSel ? { backgroundColor: opt.color } : { backgroundColor: "transparent" }} />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
+              </div>
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
@@ -648,6 +863,35 @@ export default function AttributesPage() {
               <button type="button" onClick={handleSaveEdit} disabled={editAttributeMutation.isPending}
                 className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
                 {editAttributeMutation.isPending ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Delete Confirmation Modal ===== */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+                <TrashIcon className="w-5 h-5" style={{ color: "#f87171" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete &quot;{deleteTarget.name}&quot;?</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The attribute will be permanently removed.</p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleteAttributeMutation.isPending}
+                className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                Cancel
+              </button>
+              <button onClick={handleDeleteAttribute} disabled={deleteAttributeMutation.isPending}
+                className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
               </button>
             </div>
           </div>

@@ -323,4 +323,22 @@ const updateAttributeCategories = async (req, res) => {
   }
 };
 
-module.exports = { getAttributeById, getAttributes, createAttribute, updateAttribute, getAttributeCategories, updateAttributeCategories };
+const deleteAttribute = async (req, res) => {
+  try {
+    const attribute = await Attribute.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      { is_deleted: true, deleted_at: new Date(), deletedby: req.user?._id || null },
+      { new: true }
+    );
+    if (!attribute) {
+      return res.status(404).json({ success: false, message: "Attribute not found" });
+    }
+    emitSocket("attributeDeleted", attribute.toObject());
+    res.status(200).json({ success: true, message: "Attribute deleted successfully" });
+  } catch (error) {
+    console.error("Error in deleteAttribute:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getAttributeById, getAttributes, createAttribute, updateAttribute, getAttributeCategories, updateAttributeCategories, deleteAttribute };

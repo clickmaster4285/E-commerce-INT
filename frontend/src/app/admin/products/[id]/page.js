@@ -29,7 +29,7 @@ const getImageUrl = (url) => {
 
 const createEmptyVariant = (sku = "") => ({
   _id: null, sku, title: "", description: "",
-  cost_price: "", selling_price: "", quantity: "0", min_qnt: "0", max_qnt: "0",
+  cost_price: "", selling_price: "", quantity: "0",
   attributes: [{ name: "Color", value: "Black", isCustom: false }],
   images: [],
   tags: [],
@@ -177,6 +177,14 @@ export default function ProductDetailPage() {
     const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
     return validTabs.includes(tabParam) ? tabParam : "overview";
   });
+
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
+    if (validTabs.includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -353,7 +361,7 @@ export default function ProductDetailPage() {
       ? prod.variants.map((v) => ({
           _id: v._id, sku: v.sku || "", title: v.title || "", description: v.description || "",
           cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
-          quantity: String(v.quantity ?? 0), min_qnt: String(v.min_qnt ?? 0), max_qnt: String(v.max_qnt ?? 0),
+          quantity: String(v.quantity ?? 0),
           attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
             const strValue = String(value ?? "");
             const preset = rawAttributes.find((a) => a.name === name);
@@ -567,7 +575,7 @@ export default function ProductDetailPage() {
       return {
         _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description,
         cost_price: Number(v.cost_price||0), selling_price: Number(v.selling_price||0),
-        quantity: Number(v.quantity||0), min_qnt: Number(v.min_qnt||0), max_qnt: Number(v.max_qnt||0),
+        quantity: Number(v.quantity||0),
         attributes, existing_images: existingImages, tags: v.tags || [],
       };
     });
@@ -904,7 +912,7 @@ export default function ProductDetailPage() {
                   </thead>
                   <tbody>
                     {variants.map((variant, index) => {
-                      const isLowStock = Number(variant.quantity) <= Number(variant.min_qnt);
+                      const isLowStock = Number(variant.quantity) <= 5;
                       return (
                         <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                           <td className="px-5 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[160px]">{variant.sku}</td>
@@ -1252,7 +1260,8 @@ export default function ProductDetailPage() {
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 2 ? "var(--text-primary)" : "var(--text-muted)" }}>Variants</span>
               </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-4 overflow-y-auto flex-1">
+            <div className="flex-1 overflow-y-auto min-h-0">
+            <form id="product-edit-form" onSubmit={handleSubmit} className="p-4">
               {currentStep === 1 && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1399,9 +1408,9 @@ export default function ProductDetailPage() {
                             </div>
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
-                              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                                 {[{l:"Cost Price *",f:"cost_price",p:"1000"},{l:"Selling Price *",f:"selling_price",p:"1500"},
-                                  {l:"Quantity",f:"quantity",p:"50"},{l:"Min Qty",f:"min_qnt",p:"5"},{l:"Max Qty",f:"max_qnt",p:"100"}
+                                  {l:"Quantity",f:"quantity",p:"50"}
                                 ].map(({l,f,p}) => (
                                   <div key={f}>
                                     <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>{l}</label>
@@ -1540,18 +1549,32 @@ export default function ProductDetailPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <button type="button" onClick={() => setCurrentStep(1)} className="h-9 px-5 rounded-lg text-[12px] font-semibold"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>← Back</button>
-                    <button type="submit" disabled={updateMutation.isPending}
-                      className="h-9 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
-                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      {updateMutation.isPending ? "Saving..." : "Update Product"} <Check className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
               )}
             </form>
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              {currentStep === 2 ? (
+                <>
+                  <button type="button" onClick={() => setCurrentStep(1)} className="h-9 px-5 rounded-lg text-[12px] font-semibold"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>← Back</button>
+                  <button type="submit" form="product-edit-form" disabled={updateMutation.isPending}
+                    className="h-9 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
+                    style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                    {updateMutation.isPending ? "Saving..." : "Update Product"} <Check className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div />
+                  <button type="submit" form="product-edit-form" disabled={updateMutation.isPending}
+                    className="h-9 px-6 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
+                    style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                    {updateMutation.isPending ? "Saving..." : "Next →"} <Check className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

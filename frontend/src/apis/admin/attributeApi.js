@@ -60,4 +60,7 @@ export const attributeApi = {
 
   updateCategories: (id, categoryIds) =>
     axiosInstance.put(`/attributes/${id}/categories`, { category_ids: categoryIds }).then(unwrapObject),
+
+  delete: (id) =>
+    axiosInstance.delete(`/attributes/${id}`).then((res) => res.data),
 };
