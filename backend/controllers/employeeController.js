@@ -105,16 +105,23 @@ exports.getAllEmployees = async (req, res) => {
     const departmentFilter = String(req.query.department || "all").trim();
 
     const filter = { is_deleted: false };
+    const conditions = [];
     if (search) {
-      filter.$or = [
-        { "userId.name": { $regex: search, $options: "i" } },
-        { "userId.email": { $regex: search, $options: "i" } },
-        { "userId.phone": { $regex: search, $options: "i" } },
-      ];
+      conditions.push({
+        $or: [
+          { "userId.name": { $regex: search, $options: "i" } },
+          { "userId.email": { $regex: search, $options: "i" } },
+          { "userId.phone": { $regex: search, $options: "i" } },
+        ],
+      });
     }
     if (statusFilter && statusFilter !== "all") {
-      filter.$or = filter.$or || [];
-      filter.$or.push({ "userId.status": statusFilter });
+      conditions.push({ "userId.status": statusFilter });
+    }
+    if (conditions.length > 1) {
+      filter.$and = conditions;
+    } else if (conditions.length === 1) {
+      Object.assign(filter, conditions[0]);
     }
     if (departmentFilter && departmentFilter !== "all") {
       filter.department = departmentFilter;

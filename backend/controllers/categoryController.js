@@ -202,7 +202,6 @@ const getCategoryAttributesList = async (categoryId) => {
   const attributes = await Attribute.find({
     _id: { $in: attributeIds },
     is_deleted: false,
-    is_active: true,
   }).lean();
 
   const attributeMap = new Map(attributes.map((item) => [String(item._id), item]));

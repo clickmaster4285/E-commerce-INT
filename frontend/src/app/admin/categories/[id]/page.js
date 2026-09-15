@@ -1102,7 +1102,10 @@ export default function CategoryDetailPage() {
                         <tr
                           key={attr._id}
                           className="transition-colors hover:bg-[var(--bg-tertiary)]/30"
-                          style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none" }}
+                          style={{
+                            borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none",
+                            opacity: isActive ? 1 : 0.5,
+                          }}
                         >
                           {/* Attribute Name */}
                           <td className="px-5 py-3.5">
@@ -1125,6 +1128,14 @@ export default function CategoryDetailPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                       </svg>
                                       Variant
+                                    </span>
+                                  )}
+                                  {!isActive && (
+                                    <span
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0"
+                                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
+                                    >
+                                      Disabled
                                     </span>
                                   )}
                                 </div>

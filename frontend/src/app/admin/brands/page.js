@@ -512,12 +512,15 @@ const [viewMode, setViewMode] = useState(() => {
 
     const openMenu = () => {
       const rect = btnRef.current.getBoundingClientRect();
-      const menuH = 200;
+      const menuW = 170;
+      const menuH = 220;
       const spaceBelow = window.innerHeight - rect.bottom;
       const flipUp = spaceBelow < menuH;
+      const left = rect.right - menuW;
+      const adjustedLeft = left < 8 ? 8 : left + menuW > window.innerWidth - 8 ? window.innerWidth - menuW - 8 : left;
       setMenuPos({
         top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4,
-        left: Math.min(rect.right - 176, window.innerWidth - 180),
+        left: adjustedLeft,
         flipUp,
       });
       setOpen(true);
@@ -534,34 +537,56 @@ const [viewMode, setViewMode] = useState(() => {
       return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKey); };
     }, [open]);
 
+    const menuItemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150";
+
     return (
       <div className="relative">
         <button
           ref={btnRef}
           type="button"
           onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
-          className="h-7 px-2.5 rounded-md text-[12px] font-medium inline-flex items-center gap-1.5 border transition hover:bg-white/5 whitespace-nowrap"
-          style={{ color: "var(--text-secondary)", borderColor: "var(--border-color)", backgroundColor: "transparent" }}
-          title="Actions"
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
+          className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+          style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
+          aria-label="More actions"
+          aria-haspopup="true"
+          aria-expanded={open}
+          title="More actions"
         >
-          Actions <ChevronDownIcon className="w-3 h-3" />
+          <DotsVerticalIcon className="w-[18px] h-[18px]" />
         </button>
         {open && createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[9999] w-44 rounded-lg border shadow-xl py-1"
-            style={{ top: menuPos.top, left: menuPos.left, backgroundColor: "var(--bg-secondary)", borderColor: "var(--border-color)" }}
+            className="fixed z-[9999] w-[170px] rounded-lg border shadow-lg py-1"
+            style={{
+              top: menuPos.top,
+              left: menuPos.left,
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+            }}
           >
-            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewBrand(brand._id); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
-              <EyeIcon className="w-4 h-4" style={{ color: "#34d399" }} /> View Details
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewBrand(brand._id); }}
+              className={menuItemClass}
+              style={{ color: "var(--text-primary)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
             </button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(brand); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "var(--text-primary)" }}>
-              <EditIcon className="w-4 h-4" style={{ color: "var(--text-secondary)" }} /> Edit
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(brand); }}
+              className={menuItemClass}
+              style={{ color: "var(--text-primary)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
             </button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(brand); }} className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5" style={{ color: "#f87171" }}>
-              <TrashIcon className="w-4 h-4" /> Delete
-            </button>
-            <div className="my-1 border-t" style={{ borderColor: "var(--border-color)" }} />
             <button
               type="button"
               onClick={(e) => {
@@ -570,10 +595,23 @@ const [viewMode, setViewMode] = useState(() => {
                 toggleStatusMutation.mutate({ id: brand._id, newActive: !isActive });
               }}
               disabled={toggleStatusMutation.isPending}
-              className="w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 disabled:opacity-50"
+              className={menuItemClass + " disabled:opacity-50"}
               style={{ color: isActive ? "#f87171" : "#34d399" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <ShieldCheckIcon className="w-4 h-4" /> {isActive ? "Disable" : "Enable"}
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
+            </button>
+            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(brand); }}
+              className={menuItemClass}
+              style={{ color: "#f87171" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
             </button>
           </div>,
           document.body
@@ -662,9 +700,9 @@ const [viewMode, setViewMode] = useState(() => {
           </div>
         ) : viewMode === "list" ? (
           <>
-          <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
+          <div className="hidden md:block rounded-lg" style={cardStyle}>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-full text-[13px]">
+              <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
@@ -673,7 +711,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Description</th>
                     <SortHeader label="Country" sortKey="country" />
                     <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -692,7 +730,7 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{brand.description || "—"}</p></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><StatusBadge active={brand.is_active} /></td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap"><ActionButtons brand={brand} /></td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-right"><ActionButtons brand={brand} /></td>
                       </tr>
                     );
                   })}

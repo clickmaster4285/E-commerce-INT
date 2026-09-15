@@ -262,6 +262,9 @@ export default function ManageStockPage() {
   const historySafePage = Math.min(historyPage, Math.max(1, historyTotalPages));
   const historyTotalItems = historyPagination?.total || historyItems.length;
 
+  const paginationStart = (currentPage - 1) * itemsPerPage + 1;
+  const paginationEnd = Math.min(currentPage * itemsPerPage, stockPagination?.total || stockItems.length);
+
   const handleSearchChange = (value) => { setSearch(value); setCurrentPage(1); };
   const handleStatusFilterChange = (value) => { setStatusFilter(value); setCurrentPage(1); };
   const handleTabChange = (value) => { setTab(value); setHistoryPage(1); };
@@ -473,9 +476,6 @@ export default function ManageStockPage() {
                 </div>
               </>
             )}
-
-  const paginationStart = (currentPage - 1) * itemsPerPage + 1;
-  const paginationEnd = Math.min(currentPage * itemsPerPage, stockPagination?.total || stockItems.length);
 
             {!loading && !isError && (stockPagination?.total || 0) > itemsPerPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>

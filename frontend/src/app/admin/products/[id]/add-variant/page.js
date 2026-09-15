@@ -40,8 +40,6 @@ const createEmptyVariant = (sku = "") => ({
   cost_price: "",
   selling_price: "",
   quantity: "0",
-  min_qnt: "0",
-  max_qnt: "0",
   images: [],
 });
 
@@ -407,8 +405,6 @@ export default function AddVariantPage() {
       cost_price: String(v.cost_price ?? ""),
       selling_price: String(v.selling_price ?? ""),
       quantity: String(v.quantity ?? 0),
-      min_qnt: String(v.min_qnt ?? 0),
-      max_qnt: String(v.max_qnt ?? 0),
       attributes: v.attributes || {},
       images: (v.images || []).map((img) => ({
         existing: true,
@@ -717,8 +713,6 @@ export default function AddVariantPage() {
           cost_price: Number(v.cost_price || 0),
           selling_price: Number(v.selling_price || 0),
           quantity: Number(v.quantity || 0),
-          min_qnt: Number(v.min_qnt || 0),
-          max_qnt: Number(v.max_qnt ?? 0),
           attributes: variantAttributes,
           existing_images: existingImages,
         };
@@ -803,15 +797,14 @@ export default function AddVariantPage() {
       {/* Modal */}
       <div className="fixed inset-0 z-[10000] flex items-start justify-center p-4 pointer-events-none overflow-y-auto">
         <div
-          className="w-full max-w-[780px] rounded-xl shadow-2xl flex flex-col pointer-events-auto my-6"
+          className="w-full max-w-[780px] rounded-xl shadow-2xl flex flex-col pointer-events-auto my-6 max-h-[92vh]"
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
           }}
         >
-          <form onSubmit={handleSubmit} className="flex flex-col">
-            {/* Header */}
-            <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: "var(--border-color)" }}>
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4 border-b shrink-0" style={{ borderColor: "var(--border-color)" }}>
               <div className="flex items-center gap-3 mb-1.5">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -831,7 +824,8 @@ export default function AddVariantPage() {
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 space-y-6">
+            <div className="flex-1 overflow-y-auto min-h-0">
+            <form id="variant-add-form" onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
               {/* Identification */}
               <section>
                 <h3
@@ -975,13 +969,11 @@ export default function AddVariantPage() {
                   Pricing & Stock
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
                     { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
                     { l: "Quantity", f: "quantity", p: "0", req: false },
-                    { l: "Min Qty", f: "min_qnt", p: "0", req: false },
-                    { l: "Max Qty", f: "max_qnt", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
                       <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
@@ -1066,11 +1058,12 @@ export default function AddVariantPage() {
                   </div>
                 )}
               </section>
+            </form>
             </div>
 
             {/* Footer */}
             <div
-              className="px-6 py-4 flex items-center justify-between border-t"
+              className="shrink-0 px-6 py-4 flex items-center justify-between border-t"
               style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)" }}
             >
               <button
@@ -1093,6 +1086,7 @@ export default function AddVariantPage() {
 
               <button
                 type="submit"
+                form="variant-add-form"
                 disabled={updateMutation.isPending}
                 className="h-9 px-5 rounded-lg text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50 transition hover:opacity-90"
                 style={{
@@ -1117,7 +1111,6 @@ export default function AddVariantPage() {
                 )}
               </button>
             </div>
-          </form>
         </div>
       </div>
     </>
