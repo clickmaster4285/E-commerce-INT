@@ -383,7 +383,7 @@ export default function ManageStockPage() {
           ))}
         </div>
 
-        {/* ================= STOCK TAB ================= */}
+       
         {tab === "stock" && (
           <>
             <div className="relative">
