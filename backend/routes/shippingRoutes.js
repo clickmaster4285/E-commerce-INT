@@ -16,11 +16,11 @@ router.get("/rules", getActiveShippingRules);
 router.post("/quote", authMiddleware, quoteShipping);
 
 // Admin
-router.put("/admin/config", authMiddleware, checkPermission("store"), updateShippingConfig);
-router.get("/admin/rules", authMiddleware, checkPermission("store"), getShippingRules);
-router.post("/admin/rules", authMiddleware, checkPermission("store"), createShippingRule);
-router.put("/admin/rules/:id", authMiddleware, checkPermission("store"), updateShippingRule);
-router.delete("/admin/rules/:id", authMiddleware, checkPermission("store"), deleteShippingRule);
-router.patch("/admin/rules/:id/toggle", authMiddleware, checkPermission("store"), toggleShippingRule);
+router.put("/admin/config", authMiddleware, checkPermission("shipping"), updateShippingConfig);
+router.get("/admin/rules", authMiddleware, checkPermission("shipping"), getShippingRules);
+router.post("/admin/rules", authMiddleware, checkPermission("shipping"), createShippingRule);
+router.put("/admin/rules/:id", authMiddleware, checkPermission("shipping"), updateShippingRule);
+router.delete("/admin/rules/:id", authMiddleware, checkPermission("shipping"), deleteShippingRule);
+router.patch("/admin/rules/:id/toggle", authMiddleware, checkPermission("shipping"), toggleShippingRule);
 
 module.exports = router;

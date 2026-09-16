@@ -17,12 +17,13 @@ import { io } from 'socket.io-client';
 // ==========================================
 const ROUTE_PERMISSIONS = {
   '/admin/brands': 'brands',
-    '/admin/orders': 'orders',       // ✅ YE LINE ADD KARO
+    '/admin/orders': 'order',
 
   '/admin/categories': 'categories',
-  '/admin/attributes': 'attributes',
+  '/admin/attributes': 'attribute',
   '/admin/products': 'products',
   '/admin/store-info': 'store',
+  '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',
   '/admin/discounts': 'discounts',

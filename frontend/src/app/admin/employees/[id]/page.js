@@ -64,6 +64,9 @@ const ALLOWED_PERMISSIONS = {
   store: { label: "Store", default: false },
   banners: { label: "Banners", default: true }, // ✅ Added Banners Permission
   manageStock: { label: "Manage Stock", default: false }, // ✅ Manage Stock module
+  shipping: { label: "Shipping", default: false },
+  order: { label: "Order", default: true },
+  attribute: { label: "Attribute", default: true },
 };
 
 // ==========================================
@@ -584,13 +587,6 @@ function ScrollableTabs({
 
   return (
     <div className="flex items-center gap-2">
-      {/* Left arrow */}
-      <TabArrowButton
-        direction="left"
-        onClick={() => scrollByAmount(-1)}
-        disabled={!canScrollLeft}
-      />
-
       {/* Tab strip */}
       <div
         className="relative flex-1 min-w-0"
@@ -599,13 +595,7 @@ function ScrollableTabs({
         }}
       >
         <div
-          ref={scrollRef}
-          onScroll={updateArrows}
-          className="flex items-end gap-6 overflow-x-auto cursor-grab active:cursor-grabbing no-scrollbar"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          className="flex items-end gap-6"
         >
           {tabs.map((tab) => {
             const isActive =
@@ -645,13 +635,6 @@ function ScrollableTabs({
           })}
         </div>
       </div>
-
-      {/* Right arrow */}
-      <TabArrowButton
-        direction="right"
-        onClick={() => scrollByAmount(1)}
-        disabled={!canScrollRight}
-      />
     </div>
   );
 }
@@ -672,7 +655,7 @@ export default function EmployeeDetailPage() {
     useEmployeeSocketSync(employeeId);
 
   const [activeTab, setActiveTab] =
-    useState("all");
+    useState("permissions");
 
   const [showEditModal, setShowEditModal] =
     useState(false);
@@ -710,6 +693,9 @@ export default function EmployeeDetailPage() {
     store: false,
     banners: true,
     manageStock: false,
+    shipping: false,
+    order: true,
+    attribute: true,
   });
 
   const [showPassword, setShowPassword] =
@@ -1000,21 +986,34 @@ export default function EmployeeDetailPage() {
     }
 
     if (
-      formData.password &&
-      formData.password.length < 6
-    ) {
-      return toast.error(
-        "Password must be at least 6 characters"
-      );
-    }
-
-    if (
-      formData.password !==
+      formData.password ||
       formData.confirmPassword
     ) {
-      return toast.error(
-        "Passwords do not match"
-      );
+      if (!formData.password) {
+        return toast.error(
+          "Password is required"
+        );
+      }
+      if (!formData.confirmPassword) {
+        return toast.error(
+          "Confirm Password is required"
+        );
+      }
+      if (
+        formData.password.length < 6
+      ) {
+        return toast.error(
+          "Password must be at least 6 characters"
+        );
+      }
+      if (
+        formData.password !==
+        formData.confirmPassword
+      ) {
+        return toast.error(
+          "Passwords do not match"
+        );
+      }
     }
 
     const payload = {
@@ -1254,14 +1253,14 @@ export default function EmployeeDetailPage() {
   // ==========================================
   const tabs = [
     {
-      id: "all",
-      label: "Activity Log",
-      icon: Clock,
-    },
-    {
       id: "permissions",
       label: "Permissions",
       icon: ShieldCheck,
+    },
+    {
+      id: "all",
+      label: "Activity Log",
+      icon: Clock,
     },
   ];
 
@@ -1608,20 +1607,6 @@ export default function EmployeeDetailPage() {
                     "Department",
                   value:
                     department,
-                },
-
-                {
-                  label:
-                    "Date of Birth",
-                  value:
-                    dateOfBirth,
-                },
-
-                {
-                  label:
-                    "Address",
-                  value:
-                    address,
                 },
               ].map(
                 (item, i) => (
@@ -2260,6 +2245,22 @@ export default function EmployeeDetailPage() {
                                       0 && (
                                       <div className="mt-1.5 flex flex-wrap gap-1">
                                         {activity.details.changes
+                                          .filter(
+                                            (c) => {
+                                              const f = String(
+                                                c.field || ""
+                                              ).toLowerCase();
+                                              return (
+                                                !f.includes("password") &&
+                                                !f.includes("token") &&
+                                                !f.includes("secret") &&
+                                                !f.includes("key") &&
+                                                !f.includes("cookie") &&
+                                                !f.includes("hash") &&
+                                                !f.includes("credential")
+                                              );
+                                            }
+                                          )
                                           .slice(
                                             0,
                                             3
@@ -2318,24 +2319,27 @@ export default function EmployeeDetailPage() {
                                             )
                                           )}
 
-                                        {activity.details.changes.length >
-                                          3 && (
-                                          <span
-                                            className="px-1.5 py-0.5 rounded text-[9px]"
-                                            style={{
-                                              color:
-                                                "var(--text-muted)",
-                                            }}
-                                          >
-                                            +
-                                            {activity
-                                              .details
-                                              .changes
-                                              .length -
-                                              3}{" "}
-                                            more
-                                          </span>
-                                        )}
+                                        {(() => {
+                                          const safeChanges = activity.details.changes.filter(
+                                            (c) => {
+                                              const f = String(c.field || "").toLowerCase();
+                                              return (
+                                                !f.includes("password") &&
+                                                !f.includes("token") &&
+                                                !f.includes("secret") &&
+                                                !f.includes("key") &&
+                                                !f.includes("cookie") &&
+                                                !f.includes("hash") &&
+                                                !f.includes("credential")
+                                              );
+                                            }
+                                          );
+                                          return safeChanges.length > 3 ? (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ color: "var(--text-muted)" }}>
+                                              +{safeChanges.length - 3} more
+                                            </span>
+                                          ) : null;
+                                        })()}
                                       </div>
                                     )}
                                 </div>
@@ -2652,7 +2656,6 @@ export default function EmployeeDetailPage() {
               <div>
                 <h3 className="text-base font-semibold">
                   Edit Employee
-                  Details
                 </h3>
 
                 <p
@@ -2662,8 +2665,7 @@ export default function EmployeeDetailPage() {
                       "var(--text-muted)",
                   }}
                 >
-                  Update team member
-                  information
+                  Update employee details
                 </p>
               </div>
 
@@ -2688,12 +2690,12 @@ export default function EmployeeDetailPage() {
               onSubmit={
                 handleSubmit
               }
-              className="p-5 space-y-4 overflow-y-auto flex-1"
+              className="p-5 space-y-3 overflow-y-auto flex-1"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
@@ -2718,7 +2720,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                     style={
                       inputStyle
                     }
@@ -2728,7 +2730,7 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
@@ -2753,7 +2755,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                     style={
                       inputStyle
                     }
@@ -2764,14 +2766,13 @@ export default function EmployeeDetailPage() {
 
               <div>
                 <label
-                  className="block text-xs font-medium mb-1.5"
+                  className="block text-xs font-medium mb-1"
                   style={{
                     color:
                       "var(--text-secondary)",
                   }}
                 >
-                  Phone
-                  (optional)
+                  Phone number
                 </label>
 
                 <input
@@ -2789,22 +2790,22 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                  className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                   style={inputStyle}
                   placeholder="+92 300 1234567"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
                     }}
                   >
-                    New Password
+                    Password
                   </label>
 
                   <div className="relative">
@@ -2828,11 +2829,11 @@ export default function EmployeeDetailPage() {
                       disabled={
                         isSubmitting
                       }
-                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                       style={
                         inputStyle
                       }
-                      placeholder="New password"
+                      placeholder="Min 6 chars"
                       minLength={6}
                     />
 
@@ -2843,16 +2844,16 @@ export default function EmployeeDetailPage() {
                           !showPassword
                         )
                       }
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
                       style={{
                         color:
                           "var(--text-muted)",
                       }}
                     >
                       {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
+                        <EyeOff className="w-3.5 h-3.5" />
                       ) : (
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>
@@ -2860,14 +2861,13 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
                     }}
                   >
-                    Confirm
-                    Password
+                    Confirm Password
                   </label>
 
                   <div className="relative">
@@ -2891,11 +2891,11 @@ export default function EmployeeDetailPage() {
                       disabled={
                         isSubmitting
                       }
-                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition focus:ring-1 focus:ring-purple-500/40"
+                      className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                       style={
                         inputStyle
                       }
-                      placeholder="Confirm new password"
+                      placeholder="Confirm"
                       minLength={6}
                     />
 
@@ -2906,26 +2906,26 @@ export default function EmployeeDetailPage() {
                           !showConfirmPassword
                         )
                       }
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
                       style={{
                         color:
                           "var(--text-muted)",
                       }}
                     >
                       {showConfirmPassword ? (
-                        <EyeOff className="w-4 h-4" />
+                        <EyeOff className="w-3.5 h-3.5" />
                       ) : (
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                       )}
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
@@ -2949,7 +2949,7 @@ export default function EmployeeDetailPage() {
                     disabled={
                       isSubmitting
                     }
-                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 cursor-pointer"
+                    className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                     style={
                       inputStyle
                     }
@@ -2966,7 +2966,7 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label
-                    className="block text-xs font-medium mb-1.5"
+                    className="block text-xs font-medium mb-1"
                     style={{
                       color:
                         "var(--text-secondary)",
@@ -2994,7 +2994,7 @@ export default function EmployeeDetailPage() {
               </div>
 
               <div
-                className="flex flex-col sm:flex-row gap-3 pt-4 mt-2"
+                className="flex gap-2 pt-3"
                 style={{
                   borderTop:
                     "1px solid var(--border-color)",
@@ -3008,7 +3008,7 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="min-h-[44px] flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                  className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                   style={{
                     backgroundColor:
                       "var(--bg-tertiary)",
@@ -3026,11 +3026,12 @@ export default function EmployeeDetailPage() {
                   disabled={
                     isSubmitting
                   }
-                  className="min-h-[44px] flex-1 h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
+                  className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90"
                   style={{
                     backgroundColor:
-                      "#7c3aed",
-                    color: "#fff",
+                      "var(--accent)",
+                    color:
+                      "var(--accent-text)",
                   }}
                 >
                   {isSubmitting ? (

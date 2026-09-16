@@ -252,6 +252,7 @@ useEffect(() => {
     window.removeEventListener("resize", close);
   };
 }, [actionMenu]);
+
   const resetForm = () => {
     setFormData({
       name: "", code: "", description: "", target_type: "all",
@@ -272,7 +273,7 @@ useEffect(() => {
   const saveMutation = useMutation({
     mutationFn: ({ id, data }) => (id ? dealApi.update(id, data) : dealApi.create(data)),
     onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       toast.success(variables.id ? "Deal updated successfully" : "Deal created successfully");
       setShowModal(false);
@@ -565,15 +566,27 @@ useEffect(() => {
           <StatCard title="Expired" value={stats.expired} valueClass="text-amber-500" cardStyle={cardStyle} />
         </div>
 
-        {/* SEARCH & FILTERS */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search deal name..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none" style={inputStyle} />
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
-          <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+        {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          
+          {/* Wider Search Bar (Left Side) */}
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <input 
+              type="text" 
+              placeholder="Search deal name..." 
+              value={search} 
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} 
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              style={inputStyle} 
+            />
+          </div>
+
+          {/* Filters (Right Side) */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+            <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+          </div>
         </div>
 
         {/* TABLE / GRID DISPLAY */}
@@ -686,7 +699,7 @@ function StatCard({ title, value, valueClass = "", cardStyle }) {
 function Select({ value, onChange, options, inputStyle }) {
   return (
     <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" style={inputStyle}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-9 w-[170px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer" style={inputStyle}>
         {options.map(([val, label]) => (<option key={`${val}-${label}`} value={val}>{label}</option>))}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
@@ -834,7 +847,7 @@ const humanizeKey = (key) => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
+export function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
@@ -1242,7 +1255,7 @@ function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutat
 }
 
 /* ==================== SELECTION MODAL (REDESIGNED) ==================== */
-function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 

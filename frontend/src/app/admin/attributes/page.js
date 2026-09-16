@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
@@ -90,6 +91,26 @@ export default function AttributesPage() {
   // Status filter
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Edit from URL param (e.g. ?edit=attrId)
+  const searchParams = useSearchParams();
+  const editParam = searchParams?.get("edit") || null;
+  const [editParamHandled, setEditParamHandled] = useState(false);
+
+  useEffect(() => {
+    if (!editParam || editParamHandled) return;
+    const openFromUrl = async () => {
+      try {
+        const attr = await attributeApi.getById(editParam);
+        openEditModal(attr);
+      } catch (err) {
+        console.error("Failed to load attribute for edit:", err);
+        toast.error("Failed to load attribute for edit");
+      }
+      setEditParamHandled(true);
+    };
+    openFromUrl();
+  }, [editParam, editParamHandled]);
+
   // ===== SERVER-SIDE PAGINATED QUERY =====
   const { data: paginatedAttrsData, isLoading: attributesLoading, isFetching } = useQuery({
     queryKey: ["attributes", "paginated", attributePage, search],
@@ -140,6 +161,26 @@ export default function AttributesPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [attributePage]);
+
+  // ===== ALL ATTRIBUTES (for stats) =====
+  const { data: allAttrs = [] } = useQuery({
+    queryKey: ["attributes", "all"],
+    queryFn: () => attributeApi.getAll(),
+    retry: false,
+    staleTime: 0,
+  });
+
+  // ===== STATS (computed from real API data) =====
+  const stats = useMemo(() => {
+    const all = Array.isArray(allAttrs) ? allAttrs : [];
+    const total = all.length;
+    const active = all.filter((a) => a.is_active !== false).length;
+    const withOptions = all.filter((a) => Array.isArray(a.values) && a.values.length > 0).length;
+    const LEGACY_DATA_TYPE_MAP = { select: "multi_select", color: "multi_select", date: "text", datetime: "text", url: "text", measurement: "decimal" };
+    const SUPPORTED_TYPES = ["multi_select", "boolean"];
+    const dataTypeSet = new Set(all.map((a) => LEGACY_DATA_TYPE_MAP[a.data_type] || a.data_type).filter((t) => SUPPORTED_TYPES.includes(t)));
+    return { total, active, withOptions, dataTypes: dataTypeSet.size };
+  }, [allAttrs]);
 
   const goToAttributePage = (p) => {
     if (p >= 1 && p <= totalAttributePages && p !== attributePage) {
@@ -462,6 +503,38 @@ export default function AttributesPage() {
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>All attributes</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button onClick={() => setShowAttributeModal(true)} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <span>+ Add Attribute</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ===== Stat Cards ===== */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Active Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{stats.active}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>With Options</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{stats.withOptions}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Data Types</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{stats.dataTypes}</p></div>
+        </div>
+
+        {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          
+          {/* Wider Search Bar (Left Side) */}
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <input 
+              type="text" 
+              placeholder="Search attributes by name or code..." 
+              value={attributeSearch} 
+              onChange={e => setAttributeSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              style={inputStyle} 
+            />
+          </div>
+
+          {/* Filters (Right Side) */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative">
               <select
                 value={statusFilter}
@@ -475,17 +548,7 @@ export default function AttributesPage() {
               </select>
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
             </div>
-            <button onClick={() => setShowAttributeModal(true)} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <span>+ Add Attribute</span>
-            </button>
           </div>
-        </div>
-
-        {/* Attribute Search */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search attributes by name or code..." value={attributeSearch} onChange={e => setAttributeSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
         </div>
 
         {/* Attribute Table */}
