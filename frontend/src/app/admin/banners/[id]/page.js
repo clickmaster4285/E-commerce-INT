@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft, Image, Monitor, Tablet, Smartphone, Link2, Calendar,
@@ -204,8 +204,10 @@ export default function BannerDetailPage() {
   const router = useRouter();
   const backPath = pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/banners";
 
-  const bannerId = params?.id;
+   const bannerId = params?.id;
   const [tab, setTab] = useState("info");
+  const [showDelete, setShowDelete] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: banner, isLoading, isError, error } = useQuery({
     queryKey: ["banner", bannerId],
@@ -215,6 +217,16 @@ export default function BannerDetailPage() {
     },
     enabled: !!bannerId,
     retry: false,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => bannerAPI.delete(bannerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
+      queryClient.invalidateQueries({ queryKey: ["banners"] });
+      router.push(backPath);
+    },
+    onError: () => {},
   });
 
   const images = useMemo(() => ({
@@ -307,14 +319,15 @@ export default function BannerDetailPage() {
                       <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{fd(banner.createdAt)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => router.push(backPath)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                       <ArrowLeft className="w-4 h-4" /> Back
                     </button>
-                    <button onClick={() => router.push(`${backPath}?edit=${bannerId}`)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
-                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Edit3 className="w-4 h-4" /> Edit Banner
+                    <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
+                      className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
+                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      <Trash2 className="w-4 h-4" /> Delete
                     </button>
                   </div>
                 </div>
@@ -552,7 +565,46 @@ export default function BannerDetailPage() {
               <DataRow icon={Zap} label="Auto Publish" value={banner.autoPublish ? "Enabled" : "Disabled"} highlight={banner.autoPublish} />
               <DataRow icon={Zap} label="Auto Disable" value={banner.autoDisable ? "Enabled" : "Disabled"} highlight={banner.autoDisable} />
             </div>
-          </InfoCard>
+                 </InfoCard>
+        </div>
+      )}
+
+      {/* DELETE MODAL */}
+      {showDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{banner.title}"?</h3>
+                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The banner will be permanently removed.</p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
+              <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}
+                className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+                Cancel
+              </button>
+              <button disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}
+                className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger)" }}>
+                {deleteMutation.isPending ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  <><Trash2 className="w-4 h-4" /> Delete Banner</>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

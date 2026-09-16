@@ -123,7 +123,7 @@ const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill
 const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
-// ==========================================
+const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);// ==========================================
 // HELPERS
 // ==========================================
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -366,13 +366,13 @@ const MiniDealCreator = ({ onClose, onSuccess }) => {
   );
 };
 /* ==================== DROPDOWN MENU ITEM ==================== */
-const MenuItem = ({ icon, label, onClick, danger }) => (
+const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
-    style={{ color: danger ? undefined : "var(--text-primary)" }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
+    style={{ color: danger || success ? undefined : "var(--text-primary)" }}
   >
     {icon} {label}
   </button>
@@ -492,7 +492,21 @@ const [viewMode, setViewMode] = useState(() => {
       setSelectedIds([]);
       toast.success("Banner(s) deleted successfully");
     },
-    onError: (error) => toast.error(error.response?.data?.message || "Delete failed"),
+     onError: (error) => toast.error(error.response?.data?.message || "Delete failed"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newStatus }) => {
+      markSelfAction("update");
+      const fd = new FormData();
+      fd.append("status", newStatus);
+      return adminBannerApi.update(id, fd);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
+      toast.success(variables.newStatus === "active" ? "Banner activated" : "Banner deactivated");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update status"),
   });
 
   // --- Derived Data ---
@@ -621,7 +635,12 @@ const [viewMode, setViewMode] = useState(() => {
   };
 
   const handleOpenAdd = () => { resetForm(); setShowModal(true); };
-  const handleDelete = (banner) => setDeleteTarget({ banners: [banner] });
+  const handleToggleStatus = (banner) => {
+    const id = banner?._id;
+    const isActive = banner?.status === "active" || banner?.status === "scheduled";
+    toggleStatusMutation.mutate({ id, newStatus: isActive ? "inactive" : "active" });
+  };
+    const handleDelete = (banner) => setDeleteTarget({ banners: [banner] });
   const handleBulkDelete = () => setDeleteTarget({ banners: banners.filter((b) => selectedIds.includes(b._id)) });
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -679,7 +698,7 @@ const [viewMode, setViewMode] = useState(() => {
     e.stopPropagation();
     if (open) { setActionMenu(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuHeight = 196; // 4 items height
+       const menuHeight = 250; // 5 items height
     const menuWidth = 176;
     const top = rect.bottom + 6 + menuHeight > window.innerHeight
       ? rect.top - 6 - menuHeight
@@ -726,7 +745,7 @@ const [viewMode, setViewMode] = useState(() => {
               label="Edit Banner"
               onClick={() => { setActionMenu(null); handleEdit(banner); }}
             />
-            <MenuItem
+                    <MenuItem
               icon={<CopyIcon className="w-4 h-4" />}
               label="Duplicate"
               onClick={() => { 
@@ -737,6 +756,14 @@ const [viewMode, setViewMode] = useState(() => {
                 }); 
               }}
             />
+            <MenuItem
+              icon={<PowerIcon className="w-4 h-4" />}
+              label={(banner.status === "active" || banner.status === "scheduled") ? "Deactivate" : "Activate"}
+              danger={(banner.status === "active" || banner.status === "scheduled")}
+              success={!((banner.status === "active" || banner.status === "scheduled"))}
+              onClick={() => { setActionMenu(null); handleToggleStatus(banner); }}
+            />
+            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <MenuItem
               icon={<TrashIcon className="w-4 h-4" />}
               label="Delete"

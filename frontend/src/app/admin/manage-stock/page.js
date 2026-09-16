@@ -204,18 +204,28 @@ export default function ManageStockPage() {
     },
   });
 
-  const summary = useMemo(() => {
-    let inStock = 0, lowStock = 0, outOfStock = 0;
+    const summary = useMemo(() => {
+    // Current page counts
+    let pageInStock = 0, pageLowStock = 0, pageOutOfStock = 0;
     stockItems.forEach((item) => {
       const s = getStockStatus(item);
-      if (s === "in") inStock++; else if (s === "low") lowStock++; else outOfStock++;
+      if (s === "in") pageInStock++; else if (s === "low") pageLowStock++; else pageOutOfStock++;
     });
+    
+    // Use server pagination total for accurate counts
+    const totalVariants = stockPagination?.total || stockItems.length;
+    const totalProducts = stockPagination?.totalProducts || new Set(stockItems.map((i) => String(i.product_id))).size;
+    
     return {
-      totalVariants: stockItems.length,
-      totalProducts: new Set(stockItems.map((i) => String(i.product_id))).size,
-      inStock, lowStock, outOfStock,
+      totalVariants,
+      totalProducts,
+      // These are current page counts (backend should return totals for accurate stats)
+      inStock: pageInStock,
+      lowStock: pageLowStock,
+      outOfStock: pageOutOfStock,
+      isPageSpecific: true, // Flag to show note
     };
-  }, [stockItems]);
+  }, [stockItems, stockPagination]);
 
   const searchedItems = useMemo(() => {
     const text = search.toLowerCase().trim();
@@ -356,18 +366,19 @@ export default function ManageStockPage() {
           </div>
         </div>
 
-        {/* ✅ UPDATED STAT CARDS - Mobile optimized */}
+               {/* ✅ UPDATED STAT CARDS - Mobile optimized */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {[
             { label: "Total Variants", value: summary.totalVariants, sub: `Across ${summary.totalProducts} products` },
-            { label: "In Stock", value: summary.inStock, color: "#34d399" },
-            { label: "Low Stock", value: summary.lowStock, color: "#f59e0b" },
-            { label: "Out of Stock", value: summary.outOfStock, color: "var(--danger)" },
+            { label: "In Stock", value: summary.inStock, color: "#34d399", isCurrentPage: summary.isPageSpecific },
+            { label: "Low Stock", value: summary.lowStock, color: "#f59e0b", isCurrentPage: summary.isPageSpecific },
+            { label: "Out of Stock", value: summary.outOfStock, color: "var(--danger)", isCurrentPage: summary.isPageSpecific },
           ].map((card, idx) => (
             <div key={idx} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
               <p className="text-[11px] sm:text-[12px] font-medium leading-tight mb-1" style={{ color: "var(--text-muted)" }}>{card.label}</p>
               <p className="text-[20px] sm:text-[20px] font-bold" style={{ color: card.color || "var(--text-primary)" }}>{card.value}</p>
               {card.sub && <p className="text-[10px] sm:text-[11px] mt-1 truncate" style={{ color: "var(--text-muted)" }}>{card.sub}</p>}
+              {card.isCurrentPage && <p className="text-[9px] mt-1 italic" style={{ color: "var(--text-muted)" }}>Current page only</p>}
             </div>
           ))}
         </div>

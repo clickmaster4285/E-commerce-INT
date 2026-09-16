@@ -35,6 +35,7 @@ const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
+const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
@@ -174,13 +175,13 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
   );
 };
 /* ==================== DROPDOWN MENU ITEM ==================== */
-const MenuItem = ({ icon, label, onClick, danger }) => (
+const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
-    style={{ color: danger ? undefined : "var(--text-primary)" }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
+    style={{ color: danger || success ? undefined : "var(--text-primary)" }}
   >
     {icon} {label}
   </button>
@@ -288,7 +289,17 @@ useEffect(() => {
       setDeleteTarget(null);
       toast.success("Deal deleted successfully");
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+      onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newActive }) => dealApi.update(id, { isActive: newActive }),
+    onMutate: (_, variables) => markSelfAction("update"),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      toast.success(variables.newActive ? "Deal activated" : "Deal deactivated");
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
   });
 
   const filteredDeals = useMemo(() => {
@@ -410,6 +421,13 @@ useEffect(() => {
     deleteMutation.mutate(deleteTarget.map((deal) => deal?._id || deal?.id));
   };
 
+  const handleToggleStatus = (deal) => {
+    const id = deal?._id || deal?.id;
+    const status = getDealStatus(deal);
+    const isActive = status === "active" || status === "scheduled";
+    toggleStatusMutation.mutate({ id, newActive: !isActive });
+  };
+
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
@@ -436,7 +454,7 @@ useEffect(() => {
     e.stopPropagation();
     if (open) { setActionMenu(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuHeight = 148;
+       const menuHeight = 200;
     const menuWidth = 176;
     const top = rect.bottom + 6 + menuHeight > window.innerHeight
       ? rect.top - 6 - menuHeight
@@ -478,11 +496,19 @@ useEffect(() => {
               label="View Details"
               onClick={() => { setActionMenu(null); handleViewDeal(id); }}
             />
-            <MenuItem
+                      <MenuItem
               icon={<EditIcon className="w-4 h-4" />}
               label="Edit Deal"
               onClick={() => { setActionMenu(null); openEdit(deal); }}
             />
+            <MenuItem
+              icon={<PowerIcon className="w-4 h-4" />}
+              label={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled") ? "Deactivate" : "Activate"}
+              danger={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
+              success={!(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
+              onClick={() => { setActionMenu(null); handleToggleStatus(deal); }}
+            />
+            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <MenuItem
               icon={<TrashIcon className="w-4 h-4" />}
               label="Delete"
