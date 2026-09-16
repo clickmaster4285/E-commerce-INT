@@ -1,4 +1,5 @@
 const Variant = require("../models/Variant");
+const Product = require("../models/Product");
 const StockHistory = require("../models/StockHistory");
 const { getIO } = require("../utils/socket");
 const {
@@ -32,73 +33,45 @@ const emitSocketEvent = (event, data) => {
 const getStockOverview = async (req, res) => {
   try {
     const limitRaw = parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const search = String(req.query.search || "").trim();
     const statusFilter = String(req.query.status || "all").trim();
 
-    const filter = { is_deleted: { $ne: true } };
+    // ✅ STEP A: Pehle active products ke IDs nikalo
+    const activeProducts = await Product.find(
+      { is_deleted: { $ne: true } },
+      "_id"
+    ).lean();
+    const activeProductIds = activeProducts.map((p) => p._id);
+
+    // ✅ STEP B: Base filter banayo
+    const baseFilter = {
+      is_deleted: { $ne: true },
+      product_id: { $in: activeProductIds },
+    };
+
+    // ✅ STEP C: Search filter add karo agar search hai
     if (search) {
-      filter.$or = [
-        { "product_id.name": { $regex: search, $options: "i" } },
+      baseFilter.$or = [
         { sku: { $regex: search, $options: "i" } },
+        { title: { $regex: search, $options: "i" } },
       ];
     }
 
-    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    // ---- LEGACY MODE (no limit) ----
     if (!limit) {
-      const variants = await Variant.find({
-        is_deleted: { $ne: true },
-      })
+      const variants = await Variant.find(baseFilter)
         .populate({
           path: "product_id",
-          select: "name is_deleted",
-          match: { is_deleted: { $ne: true } },
+          select: "name",
         })
         .select("sku title quantity min_qnt max_qnt product_id")
         .sort({ created_at: -1 })
         .lean();
 
-      const items = variants
-        .filter((v) => v.product_id)
-        .map((v) => ({
-          _id: v._id,
-          sku: v.sku || "",
-          title: v.title || "",
-          quantity: v.quantity ?? 0,
-          min_qnt: v.min_qnt ?? 0,
-          max_qnt: v.max_qnt ?? 0,
-          product_id: v.product_id?._id || null,
-          product_name: v.product_id?.name || "Unknown Product",
-        }));
-
-      return res.status(200).json({ success: true, data: items });
-    }
-
-    // ---- PAGINATED MODE ----
-    const totalVariants = await Variant.countDocuments({ is_deleted: { $ne: true } });
-    const totalItems = totalVariants; // no additional product filter since products are linked via populate
-    const pages = Math.max(1, Math.ceil(totalItems / limit));
-    const safePage = Math.min(page, pages || 1);
-    const skip = (safePage - 1) * limit;
-
-    const variants = await Variant.find({
-      is_deleted: { $ne: true },
-    })
-      .populate({
-        path: "product_id",
-        select: "name is_deleted",
-        match: { is_deleted: { $ne: true } },
-      })
-      .select("sku title quantity min_qnt max_qnt product_id")
-      .sort({ created_at: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    const items = variants
-      .filter((v) => v.product_id)
-      .map((v) => ({
+      // ✅ STEP D: Search by product name (populate ke baad)
+      let items = variants.map((v) => ({
         _id: v._id,
         sku: v.sku || "",
         title: v.title || "",
@@ -109,11 +82,58 @@ const getStockOverview = async (req, res) => {
         product_name: v.product_id?.name || "Unknown Product",
       }));
 
+      // Product name se filter karo agar search hai
+      if (search) {
+        const searchLower = search.toLowerCase();
+        items = items.filter((item) => 
+          item.product_name.toLowerCase().includes(searchLower) ||
+          item.sku.toLowerCase().includes(searchLower) ||
+          item.title.toLowerCase().includes(searchLower)
+        );
+      }
+
+      return res.status(200).json({ success: true, data: items });
+    }
+
+    // ---- PAGINATED MODE ----
+    const totalVariants = await Variant.countDocuments(baseFilter);
+    const totalItems = totalVariants;
+    const pages = Math.max(1, Math.ceil(totalItems / limit));
+    const safePage = Math.min(page, pages || 1);
+    const skip = (safePage - 1) * limit;
+
+    const variants = await Variant.find(baseFilter)
+      .populate({
+        path: "product_id",
+        select: "name",
+      })
+      .select("sku title quantity min_qnt max_qnt product_id")
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const items = variants.map((v) => ({
+      _id: v._id,
+      sku: v.sku || "",
+      title: v.title || "",
+      quantity: v.quantity ?? 0,
+      min_qnt: v.min_qnt ?? 0,
+      max_qnt: v.max_qnt ?? 0,
+      product_id: v.product_id?._id || null,
+      product_name: v.product_id?.name || "Unknown Product",
+    }));
+
+      // ✅ Total unique products across ALL variants (saare pages, current page nahi)
+    const distinctProductIds = await Variant.distinct("product_id", baseFilter);
+    const totalProducts = distinctProductIds.length;
+
     return res.status(200).json({
       success: true,
       data: items,
-      pagination: {
+          pagination: {
         total: totalItems,
+        totalProducts: totalProducts,
         page: safePage,
         limit,
         pages,
