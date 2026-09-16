@@ -145,6 +145,11 @@ exports.updateBanner = async (req, res) => {
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
 
     const data = { ...req.body };
+
+    // Never allow overwriting createdby during update
+    delete data.createdby;
+    delete data._id;
+    delete data.__v;
     ["primaryButton", "secondaryButton", "displayRules"].forEach((k) => {
       if (typeof data[k] === "string") data[k] = JSON.parse(data[k]);
     });

@@ -33,13 +33,16 @@ const userSchema = new mongoose.Schema(
       users: { type: Boolean, default: false },
       orders: { type: Boolean, default: true },
       settings: { type: Boolean, default: true },
-      profile: { type: Boolean, default: true },       // ✅ Added
-      employees: { type: Boolean, default: true },     // ✅ Added
-      discounts: { type: Boolean, default: true },     // ✅ Added
-      deals: { type: Boolean, default: true },         // ✅ Added
-      store: { type: Boolean, default: false },        // ✅ Added
-      banners: { type: Boolean, default: true },       // ✅ Added
-      manageStock: { type: Boolean, default: false },  // ✅ Manage Stock module
+      profile: { type: Boolean, default: true },
+      employees: { type: Boolean, default: true },
+      discounts: { type: Boolean, default: true },
+      deals: { type: Boolean, default: true },
+      store: { type: Boolean, default: false },
+      banners: { type: Boolean, default: true },
+      manageStock: { type: Boolean, default: false },
+      shipping: { type: Boolean, default: false },
+      order: { type: Boolean, default: true },
+      attribute: { type: Boolean, default: true },
     },
     
     preferences: {

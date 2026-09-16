@@ -44,15 +44,10 @@ const fixPermissions = (oldPerms = {}) => ({
   discounts: oldPerms?.discounts ?? true,
   deals: oldPerms?.deals ?? true,
   banners: oldPerms?.banners ?? true,
-
-  /*
-   * IMPORTANT
-   * manageStock pehle yahan missing tha, is wajah se ye key
-   * har fixPermissions() call par strip ho jati thi — permission
-   * DB tak pahunchti hi nahi thi aur sidebar me kabhi show nahi
-   * hoti thi.
-   */
   manageStock: oldPerms?.manageStock ?? false,
+  shipping: oldPerms?.shipping ?? false,
+  order: oldPerms?.order ?? true,
+  attribute: oldPerms?.attribute ?? true,
 });
 
 const needsPermissionMigration = (perms) => {
@@ -84,6 +79,9 @@ const needsPermissionMigration = (perms) => {
     "deals",
     "banners",
     "manageStock",
+    "shipping",
+    "order",
+    "attribute",
   ];
 
   return requiredKeys.some(
@@ -656,6 +654,23 @@ exports.updateEmployee = async (req, res) => {
       updates.password &&
       String(updates.password).trim()
     ) {
+      const user =
+        await User.findById(targetUserId);
+      if (user) {
+        const samePassword =
+          await bcrypt.compare(
+            String(updates.password),
+            user.password
+          );
+        if (samePassword) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "New password must be different from your current password.",
+          });
+        }
+      }
+
       userUpdates.password =
         await bcrypt.hash(
           String(updates.password),
@@ -700,15 +715,10 @@ exports.updateEmployee = async (req, res) => {
         "discounts",
         "deals",
         "banners",
-
-        /*
-         * IMPORTANT
-         * manageStock pehle is list me nahi tha — isliye sirf
-         * Manage Stock toggle karne par permissionsChanged false
-         * rehta tha aur koi socket event emit nahi hota tha.
-         * Employee ka browser real-time update kabhi nahi pata tha.
-         */
         "manageStock",
+        "shipping",
+        "order",
+        "attribute",
       ];
 
       for (const key of permissionKeys) {

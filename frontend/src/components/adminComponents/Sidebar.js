@@ -74,7 +74,7 @@ const allMenuItems = [
     name: "Attributes", 
     icon: SlidersHorizontal, 
     path: "/admin/attributes", 
-    permissionKey: "attributes" 
+    permissionKey: "attribute" 
   },
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
@@ -82,8 +82,8 @@ const allMenuItems = [
   { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
   { name: "Banners", icon: ImageIcon, path: "/admin/banners", permissionKey: "banners" },
   { name: "Manage Stock", icon: Package, path: "/admin/manage-stock", permissionKey: "manageStock" },
-  { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "orders" },
-  { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "store" },
+  { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "order" },
+  { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
 ];

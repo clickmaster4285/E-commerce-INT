@@ -386,15 +386,28 @@ export default function ManageStockPage() {
        
         {tab === "stock" && (
           <>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-              <input type="text" placeholder="Search by product name, SKU or variant..." value={search} onChange={(e) => handleSearchChange(e.target.value)} className="w-full h-10 sm:h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
-            </div>
+            {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              
+              {/* Wider Search Bar (Left Side) */}
+              <div className="relative w-full md:w-[400px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+                <input 
+                  type="text" 
+                  placeholder="Search by product name, SKU or variant..." 
+                  value={search} 
+                  onChange={(e) => handleSearchChange(e.target.value)} 
+                  className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+                  style={inputStyle} 
+                />
+              </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {["all", "in", "low", "out"].map((f) => (
-                <FilterPill key={f} value={f} label={f === "all" ? "All" : STATUS_META[f].label} count={filterCounts[f]} active={statusFilter === f} onSelect={handleStatusFilterChange} />
-              ))}
+              {/* Filters (Right Side) */}
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                {["all", "in", "low", "out"].map((f) => (
+                  <FilterPill key={f} value={f} label={f === "all" ? "All" : STATUS_META[f].label} count={filterCounts[f]} active={statusFilter === f} onSelect={handleStatusFilterChange} />
+                ))}
+              </div>
             </div>
 
             {loading ? (

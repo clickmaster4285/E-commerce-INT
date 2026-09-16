@@ -24,11 +24,11 @@ router.get("/:id", authMiddleware, getOrderById);
 router.put("/:id/edit", authMiddleware, editOrder);
 router.delete("/:id", authMiddleware, deleteOrder);
 
-// ✅ Admin Routes (Requires 'orders' permission)
-router.get("/admin/all", authMiddleware, checkPermission("orders"), getAllOrders);
-router.get("/admin/:id", authMiddleware, checkPermission("orders"), getOrderByIdAdmin); // ✅ NEW
+// ✅ Admin Routes (Requires 'order' permission)
+router.get("/admin/all", authMiddleware, checkPermission("order"), getAllOrders);
+router.get("/admin/:id", authMiddleware, checkPermission("order"), getOrderByIdAdmin); // ✅ NEW
 
-router.patch("/admin/:id/status", authMiddleware, checkPermission("orders"), updateOrderStatus);
-router.patch("/admin/:id/payment", authMiddleware, checkPermission("orders"), updatePaymentStatus);
+router.patch("/admin/:id/status", authMiddleware, checkPermission("order"), updateOrderStatus);
+router.patch("/admin/:id/payment", authMiddleware, checkPermission("order"), updatePaymentStatus);
 
 module.exports = router;
