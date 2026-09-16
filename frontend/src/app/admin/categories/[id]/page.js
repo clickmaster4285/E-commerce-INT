@@ -206,6 +206,13 @@ export default function CategoryDetailPage() {
   // ✅ NEW: Edit Modal States (same as main page)
   const [showEditModal, setShowEditModal] = useState(false);
 
+  // ✅ Attribute edit within category detail
+  const [attrEditOpen, setAttrEditOpen] = useState(false);
+  const [attrEditLoading, setAttrEditLoading] = useState(false);
+  const [attrEditForm, setAttrEditForm] = useState({ name: "", data_type: "multi_select", is_active: true, values: [], value: false });
+  const [attrEditTarget, setAttrEditTarget] = useState(null);
+  const [editOptionInput, setEditOptionInput] = useState("");
+
   useAttributeSocketSync();
 
   // Queries
@@ -257,12 +264,43 @@ export default function CategoryDetailPage() {
     },
   });
 
+  const handleSaveAttrEdit = async () => {
+    if (!attrEditTarget) return;
+    setAttrEditLoading(true);
+    try {
+      const attrId = getAttributeId(attrEditTarget);
+      const valuesPayload = attrEditForm.data_type === "multi_select"
+        ? (attrEditForm.values || []).map((opt) => {
+            const label = String(opt || "").trim();
+            return { label, value: label.toLowerCase() };
+          })
+        : attrEditForm.data_type === "boolean"
+          ? [{ label: attrEditForm.value ? "Yes" : "No", value: attrEditForm.value ? "true" : "false", sort_order: 0, is_active: true }]
+          : [];
+      const payload = {
+        name: attrEditForm.name.trim(),
+        data_type: attrEditForm.data_type,
+        is_active: attrEditForm.is_active,
+        values: valuesPayload,
+      };
+      await attributeApi.update(attrId, payload);
+      await queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
+      toast.success("Attribute updated successfully");
+      setAttrEditOpen(false);
+      setAttrEditTarget(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute");
+    } finally {
+      setAttrEditLoading(false);
+    }
+  };
+
   const handleToggleAttributeActive = async (attr) => {
     if (!attr) return;
     const attrId = getAttributeId(attr);
     const currentActive = attr.is_active !== false;
     try {
-      await categoryApi.updateAttributes(attrId, { is_active: !currentActive });
+      await attributeApi.update(attrId, { is_active: !currentActive });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] }),
         queryClient.invalidateQueries({ queryKey: ["category", categoryId] }),
@@ -272,6 +310,18 @@ export default function CategoryDetailPage() {
       toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute status");
     }
     setAttrToToggle(null);
+  };
+
+  const addEditOption = () => {
+    const val = editOptionInput.trim();
+    if (!val) return;
+    if ((attrEditForm.values || []).some((v) => v.toLowerCase() === val.toLowerCase())) return;
+    setAttrEditForm({ ...attrEditForm, values: [...(attrEditForm.values || []), val] });
+    setEditOptionInput("");
+  };
+
+  const removeEditOption = (idx) => {
+    setAttrEditForm({ ...attrEditForm, values: (attrEditForm.values || []).filter((_, i) => i !== idx) });
   };
 
   // Loading state
@@ -613,7 +663,33 @@ export default function CategoryDetailPage() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 type="button"
-                                onClick={() => router.push(`/admin/attributes/${getAttributeId(attr)}/edit`)}
+                                onClick={() => {
+                                  const attrId = getAttributeId(attr);
+                                  const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
+                                  if (fullAttr) {
+                                    const dataType = fullAttr.data_type || "multi_select";
+                                    let booleanValue = false;
+                                    if (dataType === "boolean") {
+                                      const vals = fullAttr.values || [];
+                                      const trueEntry = vals.find((v) => (v.value || v).toString() === "true" || (v.label || v).toString().toLowerCase() === "yes");
+                                      if (trueEntry) booleanValue = true;
+                                    }
+                                    const values = (fullAttr.values || []).map((v) => {
+                                      const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
+                                      return String(label);
+                                    }).filter(Boolean);
+                                    setAttrEditTarget(attr);
+                                    setAttrEditForm({
+                                      name: fullAttr.name || "",
+                                      data_type: dataType,
+                                      is_active: fullAttr.is_active !== false,
+                                      values: values,
+                                      value: booleanValue,
+                                    });
+                                    setEditOptionInput("");
+                                    setAttrEditOpen(true);
+                                  }
+                                }}
                                 className="h-7 px-3 text-[10px] font-semibold flex items-center justify-center gap-1 rounded-md transition-colors"
                                 style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
                                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
@@ -651,6 +727,142 @@ export default function CategoryDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Full Attribute Edit Modal */}
+      {attrEditOpen && attrEditTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-[420px] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+                  <Ico d={D.box} className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Edit Attribute</h3>
+                  <p className="text-[11px] text-[var(--text-muted)]">Update attribute details and values.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => { setAttrEditOpen(false); setAttrEditTarget(null); }}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
+                <span>×</span>
+              </button>
+            </div>
+
+            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
+                <input type="text" value={attrEditForm.name}
+                  onChange={(e) => setAttrEditForm({ ...attrEditForm, name: e.target.value })} autoFocus
+                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  placeholder="e.g. Color, Size, RAM" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { id: "multi_select", label: "Multi Options" },
+                    { id: "boolean", label: "Yes / No" },
+                  ].map((type) => {
+                    const isActive = attrEditForm.data_type === type.id;
+                    return (
+                      <button key={type.id} type="button"
+                        onClick={() => setAttrEditForm({ ...attrEditForm, data_type: type.id })}
+                        className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
+                          ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
+                        <span>{type.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {attrEditForm.data_type === "multi_select" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+                  <div className="space-y-1.5">
+                    {(attrEditForm.values || []).map((opt, idx) => (
+                      <div key={`edit-opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
+                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
+                          {idx + 1}
+                        </span>
+                        <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
+                        <button type="button" onClick={() => removeEditOption(idx)}
+                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
+                          aria-label="Remove option">
+                          <span>×</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Add an option..." value={editOptionInput}
+                      onChange={(e) => setEditOptionInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEditOption(); } }}
+                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" />
+                    <button type="button" onClick={addEditOption}
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
+                      <span>+ Add</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {attrEditForm.data_type === "boolean" && (
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
+                      const isActive = attrEditForm.value === opt.id;
+                      return (
+                        <button key={String(opt.id)} type="button"
+                          onClick={() => setAttrEditForm({ ...attrEditForm, value: opt.id })}
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
+                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
+                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                  {[
+                    { id: true, label: "Active", color: "#34d399" },
+                    { id: false, label: "Inactive", color: "#f87171" },
+                  ].map((opt) => {
+                    const isSel = attrEditForm.is_active === opt.id;
+                    return (
+                      <button key={String(opt.id)} type="button"
+                        onClick={() => setAttrEditForm({ ...attrEditForm, is_active: opt.id })}
+                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
+                        <span className="w-2 h-2 rounded-full transition-colors" style={isSel ? { backgroundColor: opt.color } : { backgroundColor: "transparent" }} />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+              <button type="button" onClick={() => { setAttrEditOpen(false); setAttrEditTarget(null); }}
+                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSaveAttrEdit} disabled={attrEditLoading}
+                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
+                {attrEditLoading ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

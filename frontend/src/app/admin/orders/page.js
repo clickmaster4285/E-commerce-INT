@@ -124,7 +124,7 @@ function FilterSelect({ value, onChange, options, width = 160 }) {
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter orders"
-        className="appearance-none h-10 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
+        className="appearance-none h-9 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
         style={{ width: `${width}px`, backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         {options.map(([val, label]) => (
           <option key={`${val}-${label}`} value={val}>{label}</option>
@@ -359,31 +359,42 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        {/* Search - Full width on mobile */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search order #, customer name or phone..."
-            value={searchInput} onChange={(e) => handleSearchInput(e.target.value)} aria-label="Search orders"
-            className="w-full h-11 sm:h-10 pl-10 sm:pl-9 pr-10 sm:pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
-            style={inputStyle} />
-          {searchInput && (
-            <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
-              style={{ color: "var(--text-muted)" }}>
-              <CloseIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-            </button>
-          )}
-        </div>
+        {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          
+          {/* Wider Search Bar (Left Side) */}
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+              <SearchIcon />
+            </span>
+            <input 
+              type="text" 
+              placeholder="Search order #, customer name or phone..." 
+              value={searchInput} 
+              onChange={(e) => handleSearchInput(e.target.value)} 
+              aria-label="Search orders"
+              className="w-full h-9 pl-9 pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
+              style={inputStyle} 
+            />
+            {searchInput && (
+              <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
+                style={{ color: "var(--text-muted)" }}>
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-        {/* Filters - Better mobile wrapping */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }}
-            options={[["all", "All Status"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["processing", "Processing"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]]} />
-          <FilterSelect width={130} value={paymentFilter} onChange={setPaymentFilter}
-            options={[["all", "All Payments"], ["paid", "Paid"], ["pending", "Unpaid"], ["failed", "Failed"]]} />
-          <FilterSelect width={140} value={shippingFilter} onChange={setShippingFilter}
-            options={[["all", "All Shipping"], ["standard", "Standard"], ["express", "Express"]]} />
-          <FilterSelect width={130} value={dateRange} onChange={setDateRange}
-            options={[["all", "All Time"], ["today", "Today"], ["yesterday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"]]} />
+          {/* Filters (Right Side) */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }}
+              options={[["all", "All Status"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["processing", "Processing"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]]} />
+            <FilterSelect width={130} value={paymentFilter} onChange={setPaymentFilter}
+              options={[["all", "All Payments"], ["paid", "Paid"], ["pending", "Unpaid"], ["failed", "Failed"]]} />
+            <FilterSelect width={140} value={shippingFilter} onChange={setShippingFilter}
+              options={[["all", "All Shipping"], ["standard", "Standard"], ["express", "Express"]]} />
+            <FilterSelect width={130} value={dateRange} onChange={setDateRange}
+              options={[["all", "All Time"], ["today", "Today"], ["yesterday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"]]} />
+          </div>
         </div>
 
         {/* Active Filters */}

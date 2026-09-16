@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2, AlertTriangle, X,
-  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown,
+  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -150,19 +150,34 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   );
 }
 
+/* ==================== DROPDOWN MENU ITEM ==================== */
+const MenuItem = ({ icon, label, onClick, danger }) => (
+  <button
+    role="menuitem"
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+    style={{ color: danger ? undefined : "var(--text-primary)" }}
+  >
+    {icon} {label}
+  </button>
+);
+
 // ==========================================
 // MAIN EMPLOYEE PAGE COMPONENT
 // ==========================================
 export default function EmployeesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-useEmployeeSocketSync();
+  useEmployeeSocketSync();
+  
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
+  const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
 
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -208,39 +223,30 @@ useEmployeeSocketSync();
   }, [employees]);
 
   const createMutation = useMutation({
-  mutationFn: employeeSocketApi.create,
-  onSuccess: async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ["employees"],
-    });
-
-    toast.success("Employee created successfully");
-    closeModal();
-  },
+    mutationFn: employeeSocketApi.create,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee created successfully");
+      closeModal();
+    },
     onError: (err) => toast.error(err.message || "Creation failed"),
   });
 
-const updateMutation = useMutation({
-  mutationFn: employeeSocketApi.update,
-  onSuccess: async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ["employees"],
-    });
-
-    toast.success("Employee updated successfully");
-    closeModal();
-  },
+  const updateMutation = useMutation({
+    mutationFn: employeeSocketApi.update,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee updated successfully");
+      closeModal();
+    },
     onError: (err) => toast.error(err.message || "Update failed"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: employeeSocketApi.delete,
-onSuccess: async () => {
-  await queryClient.invalidateQueries({
-    queryKey: ["employees"],
-  });
-
-  toast.success("Employee deleted");
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee deleted");
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
       setSelectedIds([]);
@@ -250,45 +256,31 @@ onSuccess: async () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
-   onSuccess: async () => {
-  await queryClient.invalidateQueries({
-    queryKey: ["employees"],
-  });
-
-  toast.success(`${selectedIds.length} employees deleted`);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success(`${selectedIds.length} employees deleted`);
       setSelectedIds([]);
       setShowBulkDeleteModal(false);
     },
     onError: (err) => toast.error(err.message || "Bulk delete failed"),
   });
 
-  // ✅ BULLETPROOF TOGGLE STATUS MUTATION
-const toggleStatusMutation = useMutation({
-  mutationFn: employeeSocketApi.toggleStatus,
+  const toggleStatusMutation = useMutation({
+    mutationFn: employeeSocketApi.toggleStatus,
+    onSuccess: async (updatedEmployee) => {
+      queryClient.setQueryData(["employees"], (oldData) => {
+        if (!Array.isArray(oldData)) return oldData;
+        return oldData.map((emp) => emp._id === updatedEmployee._id ? updatedEmployee : emp);
+      });
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Status updated successfully");
+    },
+    onError: (err) => {
+      console.error("❌ Toggle Status Error:", err);
+      toast.error(err.message || "Status update failed");
+    },
+  });
 
-  onSuccess: async (updatedEmployee) => {
-    queryClient.setQueryData(["employees"], (oldData) => {
-      if (!Array.isArray(oldData)) return oldData;
-
-      return oldData.map((emp) =>
-        emp._id === updatedEmployee._id
-          ? updatedEmployee
-          : emp
-      );
-    });
-
-    await queryClient.invalidateQueries({
-      queryKey: ["employees"],
-    });
-
-    toast.success("Status updated successfully");
-  },
-
-  onError: (err) => {
-    console.error("❌ Toggle Status Error:", err);
-    toast.error(err.message || "Status update failed");
-  },
-});
   const closeModal = () => {
     setShowModal(false);
     setEditingEmployee(null);
@@ -321,6 +313,7 @@ const toggleStatusMutation = useMutation({
     setShowModal(true);
   };
 
+  // ✅ FIXED: Explicitly hide password fields when opening Edit Modal
   const openEditModal = (emp) => {
     setEditingEmployee(emp);
     setFormData({
@@ -332,6 +325,7 @@ const toggleStatusMutation = useMutation({
       password: "",
       confirmPassword: "",
     });
+    // Force password visibility states to false
     setShowPassword(false);
     setShowConfirmPassword(false);
     setShowModal(true);
@@ -349,6 +343,13 @@ const toggleStatusMutation = useMutation({
       if (formData.password !== formData.confirmPassword) {
         return toast.error("Passwords do not match");
       }
+    } else if (formData.password || formData.confirmPassword) {
+      if (!formData.password) return toast.error("Password is required");
+      if (!formData.confirmPassword) return toast.error("Confirm Password is required");
+      if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+      if (formData.password !== formData.confirmPassword) {
+        return toast.error("Passwords do not match");
+      }
     }
 
     const payload = {
@@ -358,10 +359,11 @@ const toggleStatusMutation = useMutation({
       department: formData.department.trim(),
       status: formData.status,
       role: "staff",
-      password: formData.password,
     };
-    
-    if (!payload.password) delete payload.password;
+
+    if (formData.password) {
+      payload.password = formData.password;
+    }
 
     if (editingEmployee) {
       updateMutation.mutate({ id: editingEmployee._id, data: payload });
@@ -406,6 +408,17 @@ const toggleStatusMutation = useMutation({
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
+
   const allSelected =
     paginatedEmployees.length > 0 &&
     paginatedEmployees.every((emp) => selectedIds.includes(emp._id));
@@ -437,6 +450,77 @@ const toggleStatusMutation = useMutation({
     borderRadius: "8px",
   };
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  /* ===== PROFESSIONAL ACTION BUTTONS WITH 3-DOT MENU ===== */
+  const ActionButtons = ({ employee }) => {
+    const id = employee._id;
+    const open = actionMenu?.id === id;
+
+    const toggleMenu = (e) => {
+      e.stopPropagation();
+      if (open) { setActionMenu(null); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuHeight = 160; 
+      const menuWidth = 176;
+      const top = rect.bottom + 6 + menuHeight > window.innerHeight
+        ? rect.top - 6 - menuHeight
+        : rect.bottom + 6;
+      const left = Math.max(8, rect.right - menuWidth);
+      setActionMenu({ id, top, left });
+    };
+
+    return (
+      <div className="flex items-center justify-end">
+        <button
+          onClick={toggleMenu}
+          aria-label={`Actions for ${employee.userId?.name || employee.name}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          style={{ color: "var(--text-secondary)" }}
+          title="Actions"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+              style={{
+                top: actionMenu.top,
+                left: actionMenu.left,
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              {/* ✅ SIMPLIFIED MENU: Only View, Edit, Delete */}
+              <MenuItem
+                icon={<Eye className="w-4 h-4" />}
+                label="View Details"
+                onClick={() => { setActionMenu(null); router.push(`/admin/employees/${id}`); }}
+              />
+              <MenuItem
+                icon={<Pencil className="w-4 h-4" />}
+                label="Edit Employee"
+                onClick={() => { setActionMenu(null); openEditModal(employee); }}
+              />
+              <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+              <MenuItem
+                icon={<Trash2 className="w-4 h-4" />}
+                label="Delete"
+                danger
+                onClick={() => { setActionMenu(null); setEmployeeToDelete(employee); setShowDeleteModal(true); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -475,53 +559,80 @@ const toggleStatusMutation = useMutation({
   }
 
   return (
-    <div className="w-full min-h-screen space-y-6" style={{ color: "var(--text-primary)" }}>
+    <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
       
+      {/* HEADER - MATCHING SCREENSHOT LAYOUT */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-bold tracking-tight">Employee Management</h1>
-          <p className="text-[14px] mt-1" style={{ color: "var(--text-muted)" }}>
+          <h1 className="text-[24px] font-bold tracking-tight">Employee Management</h1>
+          <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
             Manage your team members and their departments
           </p>
         </div>
         <button
           onClick={openAddModal}
-              className="h-10 px-5 min-w-[44px] min-h-[44px] rounded-lg text-[14px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
+          className="h-9 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
         >
           <Plus className="w-4 h-4" /> Add Employee
         </button>
       </div>
 
-      {/* ✅ SMART STATS */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="rounded-xl px-3 py-2" style={cardStyle}>
-          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-            Total
-          </p>
-          <p className="text-[20px] font-bold mt-0.5">{staffEmployees.length}</p>
+      {/* ✅ COMPACT STAT CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {[
+          { label: "Total", value: staffEmployees.length, color: "var(--text-primary)" },
+          { label: "Active", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "#34d399" },
+          { label: "Inactive", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "#f87171" },
+        ].map((stat, idx) => (
+          <div key={idx} className="rounded-lg px-4 py-3" style={cardStyle}>
+            <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              {stat.label}
+            </p>
+            <p className="text-[20px] font-bold mt-0.5" style={{ color: stat.color }}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        
+        {/* Wider Search Bar (Left Side) */}
+        <div className="relative w-full md:w-[400px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+            <Search className="w-4 h-4" />
+          </span>
+          <input 
+            type="text" 
+            placeholder="Search by name or email..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+            style={inputStyle} 
+          />
         </div>
-        <div className="rounded-xl px-3 py-2" style={cardStyle}>
-          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-            Active
-          </p>
-          <p className="text-[20px] font-bold mt-0.5" style={{ color: "#34d399" }}>
-            {staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length}
-          </p>
-        </div>
-        <div className="rounded-xl px-3 py-2" style={cardStyle}>
-          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-            Inactive
-          </p>
-          <p className="text-[20px] font-bold mt-0.5" style={{ color: "#f87171" }}>
-            {staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length}
-          </p>
+
+        {/* Filters (Right Side) */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="appearance-none h-9 w-full sm:w-[160px] px-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
+            style={inputStyle}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
       </div>
 
       {selectedIds.length > 0 && (
         <div
-          className="flex items-center justify-between rounded-xl px-4 h-11"
+          className="flex items-center justify-between rounded-lg px-4 h-10"
           style={{
             backgroundColor: "rgba(16,185,129,0.08)",
             border: "1px solid rgba(16,185,129,0.3)",
@@ -541,7 +652,7 @@ const toggleStatusMutation = useMutation({
             <button
               onClick={handleBulkDelete}
               disabled={bulkDeleteMutation.isPending}
-              className="h-10 min-w-[44px] min-h-[44px] px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+              className="h-9 min-w-[44px] min-h-[44px] px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: "var(--danger)" }}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -551,36 +662,7 @@ const toggleStatusMutation = useMutation({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-            style={inputStyle}
-          />
-        </div>
-        <select
-          value={filterStatus}
-          onChange={(e) => {
-            setFilterStatus(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="appearance-none h-10 md:h-9 w-full sm:w-[150px] px-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer"
-          style={inputStyle}
-        >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
-
-      <div className="rounded-xl overflow-hidden" style={cardStyle}>
+      <div className="rounded-lg overflow-hidden" style={cardStyle}>
         <div className="overflow-x-auto">
           <table className="w-full text-[13px] min-w-[600px]">
             <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
@@ -704,42 +786,8 @@ const toggleStatusMutation = useMutation({
                           {empStatus === "active" ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* REMOVED: Active/Inactive Toggle Button */}
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); 
-                              router.push(`/admin/employees/${emp._id}`);
-                            }}
-                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-                            style={{ color: "#34d399" }}
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => openEditModal(emp)}
-                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-                            style={{ color: "var(--text-secondary)" }}
-                            title="Edit"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEmployeeToDelete(emp);
-                              setShowDeleteModal(true);
-                            }}
-                            disabled={deleteMutation.isPending}
-                            className="min-w-[44px] min-h-[44px] p-2 rounded-md transition text-red-500 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                      <td className="px-4 py-2.5 whitespace-nowrap w-1">
+                        <ActionButtons employee={emp} />
                       </td>
                     </tr>
                   );
@@ -751,7 +799,7 @@ const toggleStatusMutation = useMutation({
       </div>
 
       {pagination.total > ITEMS_PER_PAGE && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl p-4" style={cardStyle}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
             {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)} of {pagination.total || employees.length}{" "}
@@ -761,7 +809,7 @@ const toggleStatusMutation = useMutation({
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="h-10 w-10 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              className="h-8 w-8 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -772,7 +820,7 @@ const toggleStatusMutation = useMutation({
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="h-10 w-10 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              className="h-8 w-8 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
             >
               <ChevronRight className="w-4 h-4" />
@@ -814,28 +862,26 @@ const toggleStatusMutation = useMutation({
                 <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
               </div>
 
-              {!editingEmployee && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password *</label>
-                    <div className="relative">
-                      <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="Min 6 chars" minLength={6} />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password *</label>
-                    <div className="relative">
-                      <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="Confirm" minLength={6} />
-                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
-                        {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password {editingEmployee ? "" : "*"}</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Leave blank to keep current" : "Min 6 chars"} minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password {editingEmployee ? "" : "*"}</label>
+                  <div className="relative">
+                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Confirm new password" : "Confirm"} minLength={6} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>

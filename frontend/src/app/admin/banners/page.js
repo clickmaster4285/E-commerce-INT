@@ -7,6 +7,10 @@ import axios from "axios";
 import { toast } from "sonner";
 import useBannerSocketSync from "../../../hooks/useBannerSocket";
 import { dealApi } from "../../../apis/admin/dealApi";
+import { DealFormModal, SelectionModal } from "../deals/page";
+import { productApi } from "../../../apis/admin/productApi";
+import { categoryApi } from "../../../apis/admin/categoryApi";
+import { brandApi } from "../../../apis/admin/brandApi";
 
 // ==========================================
 // API SETUP
@@ -280,91 +284,6 @@ const Checkbox = ({ checked, onChange, label }) => (
   </label>
 );
 
-// ==========================================
-// MINI DEAL CREATOR COMPONENT
-// ==========================================
-const MiniDealCreator = ({ onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    name: "",
-    discountValue: "",
-    type: "percentage",
-    startDate: "",
-    endDate: "",
-  });
-
-  const queryClient = useQueryClient();
-  const createDealMutation = useMutation({
-    mutationFn: (data) => dealApi.create(data),
-    onSuccess: (newDeal) => {
-      queryClient.invalidateQueries({ queryKey: ["adminDeals"] });
-      queryClient.invalidateQueries({ queryKey: ["banner-deal-options"] });
-      toast.success("New deal created successfully!");
-      onSuccess(newDeal);
-    },
-    onError: (err) => toast.error(err.response?.data?.message || "Failed to create deal"),
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.name || !formData.discountValue) return toast.error("Name and Value are required");
-    
-    const payload = {
-      name: formData.name,
-      discountValue: Number(formData.discountValue),
-      type: formData.type,
-      isActive: true,
-      applyTo: "all",
-      startDate: formData.startDate ? new Date(formData.startDate).toISOString() : new Date().toISOString(),
-      endDate: formData.endDate ? new Date(formData.endDate).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-
-    createDealMutation.mutate(payload);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
-        <div className="px-5 py-4 border-b flex justify-between items-center" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-          <h3 className="text-base font-semibold">Quick Create Deal</h3>
-          <button onClick={onClose} disabled={createDealMutation.isPending}><CloseIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <FormField label="Deal Name" required>
-            <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Flash Sale 50%" />
-          </FormField>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Type" required>
-              <Select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                <option value="percentage">Percentage (%)</option>
-                <option value="fixed_amount">Fixed Amount</option>
-              </Select>
-            </FormField>
-            <FormField label="Value" required>
-              <Input type="number" value={formData.discountValue} onChange={e => setFormData({...formData, discountValue: e.target.value})} placeholder="50" />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-             <FormField label="Start Date">
-               <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-             </FormField>
-             <FormField label="End Date">
-               <Input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
-             </FormField>
-          </div>
-
-          <div className="pt-2 flex gap-3">
-            <button type="button" onClick={onClose} disabled={createDealMutation.isPending} className="flex-1 h-10 rounded-lg text-sm font-medium border" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
-            <button type="submit" disabled={createDealMutation.isPending} className="flex-1 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center justify-center gap-2">
-              {createDealMutation.isPending ? <><Spinner className="w-4 h-4"/> Creating...</> : "Create & Select"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
 /* ==================== DROPDOWN MENU ITEM ==================== */
 const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
@@ -406,7 +325,6 @@ const [viewMode, setViewMode] = useState(() => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [currentPage, setCurrentPage] = useState(1);
-  const [showDealCreator, setShowDealCreator] = useState(false);
   
   const itemsPerPage = 20;
 
@@ -549,6 +467,153 @@ const [viewMode, setViewMode] = useState(() => {
   };
 }, [actionMenu]);
 
+  // --- Deal Form State (for inline deal creation) ---
+  const [dealFormType, setDealFormType] = useState(null);
+  const [dealFormData, setDealFormData] = useState({
+    name: "", code: "", description: "", target_type: "all",
+    selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
+    value_type: "percentage", value: "", min_order_value: "",
+    buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+    min_quantity: "",
+    start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
+    status: "active", is_featured: false,
+  });
+  const [dealSelector, setDealSelector] = useState({ open: false, type: null });
+
+  const resetDealForm = () => {
+    setDealFormData({
+      name: "", code: "", description: "", target_type: "all",
+      selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
+      value_type: "percentage", value: "", min_order_value: "",
+      buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      min_quantity: "",
+      start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
+      status: "active", is_featured: false,
+    });
+    setDealFormType(null);
+    setDealSelector({ open: false, type: null });
+  };
+
+  const getId = (item) => item?._id || item?.id || String(item);
+  const getName = (item, type) => {
+    if (!item) return "";
+    if (type === "product") return item.title || item.name || "Untitled Product";
+    if (type === "category") return item.title || item.name || "Untitled Category";
+    return item.title || item.name || "Untitled Brand";
+  };
+  const getProductPrice = (product) => {
+    if (product?.pricing?.sellingPrice) return Number(product.pricing.sellingPrice) || 0;
+    if (product?.pricing?.price) return Number(product.pricing.price) || 0;
+    if (product?.price) return Number(product.price) || 0;
+    if (product?.sellingPrice) return Number(product.sellingPrice) || 0;
+    return 0;
+  };
+  const getProductImage = (product) => {
+    if (product?.images?.[0]) return typeof product.images[0] === 'string' ? product.images[0] : product.images[0]?.url || product.images[0]?.src;
+    if (product?.image) return typeof product.image === 'string' ? product.image : product.image?.url;
+    return null;
+  };
+  const getInitials = (name) => {
+    if (!name) return "?";
+    return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  };
+  const formatCurrency = (amount) => {
+    const n = Number(amount) || 0;
+    return `$${n.toFixed(2)}`;
+  };
+
+  const getSelectedItems = (type) => {
+    const key = type === "product" ? "selected_product_ids" : type === "category" ? "selected_category_ids" : "selected_brand_ids";
+    return dealFormData[key] || [];
+  };
+
+  const dateToISO = (value) => {
+    if (!value) return undefined;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  };
+
+  const dealSaveMutation = useMutation({
+    mutationFn: ({ id, data }) => (id ? dealApi.update(id, data) : dealApi.create(data)),
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: ["banner-deal-options"] });
+      toast.success("Deal created successfully");
+      const newDealId = result?._id || result?.id || result?.data?._id || result?.data?.id;
+      if (newDealId && !variables.id) {
+        setForm(prev => ({ ...prev, linkedDealId: newDealId }));
+      }
+      resetDealForm();
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save deal"),
+  });
+
+  const dealInputStyle = { backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" };
+  const dealCardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
+  const handleDealSubmit = (e) => {
+    e.preventDefault();
+    if (!String(dealFormData.name || "").trim()) return toast.error("Deal name is required");
+
+    const dealValue = dealFormData.value === "" ? NaN : Number(dealFormData.value);
+    if (["percentage", "fixed_amount"].includes(dealFormData.value_type)) {
+      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
+      if (dealFormData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
+    }
+
+    if (dealFormData.value_type === "buy_x_get_y") {
+      if (!dealFormData.buy_quantity || Number(dealFormData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
+      if (!dealFormData.get_quantity || Number(dealFormData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+    }
+
+    if (dealFormData.target_type === "product" && dealFormData.selected_product_ids.length === 0) return toast.error("Select at least one product");
+    if (dealFormData.target_type === "category" && dealFormData.selected_category_ids.length === 0) return toast.error("Select at least one category");
+    if (dealFormData.target_type === "brand" && dealFormData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
+
+    const startDate = dealFormData.start_at ? dateToISO(dealFormData.start_at) : new Date().toISOString();
+    const endDate = dealFormData.end_at ? dateToISO(dealFormData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+
+    const cleanProductIds = dealFormData.selected_product_ids.map(id => String(id?._id || id));
+    const cleanCategoryIds = dealFormData.selected_category_ids.map(id => String(id?._id || id));
+    const cleanBrandIds = dealFormData.selected_brand_ids.map(id => String(id?._id || id));
+
+    const payload = {
+      name: String(dealFormData.name).trim(),
+      description: String(dealFormData.description || "").trim() || undefined,
+      applyTo: dealFormData.target_type,
+      productIds: dealFormData.target_type === "product" ? cleanProductIds : [],
+      categoryIds: dealFormData.target_type === "category" ? cleanCategoryIds : [],
+      brandIds: dealFormData.target_type === "brand" ? cleanBrandIds : [],
+      type: dealFormData.value_type,
+      discountValue: ["percentage", "fixed_amount"].includes(dealFormData.value_type) ? dealValue : 0,
+      minOrderValue: dealFormData.min_order_value ? Number(dealFormData.min_order_value) : 0,
+      buyQuantity: dealFormData.buy_quantity ? Number(dealFormData.buy_quantity) : 1,
+      getQuantity: dealFormData.get_quantity ? Number(dealFormData.get_quantity) : 1,
+      getDiscountValue: dealFormData.get_discount_value ? Number(dealFormData.get_discount_value) : 100,
+      bundlePrice: dealFormData.bundle_price ? Number(dealFormData.bundle_price) : 0,
+      minQuantity: dealFormData.min_quantity ? Number(dealFormData.min_quantity) : 1,
+      startDate, endDate,
+      usageLimit: dealFormData.usage_limit !== "" ? Number(dealFormData.usage_limit) : null,
+      perUserLimit: dealFormData.per_user_limit !== "" ? Number(dealFormData.per_user_limit) : null,
+      isActive: dealFormData.status === "active",
+      isFeatured: Boolean(dealFormData.is_featured),
+    };
+
+    Object.keys(payload).forEach((key) => { if (payload[key] === undefined || payload[key] === null) delete payload[key]; });
+    dealSaveMutation.mutate({ id: null, data: payload });
+  };
+
+  // --- End Deal Form State ---
+
+  // --- Data Queries ---
+  const { data: productsResponse = [] } = useQuery({ queryKey: ["admin-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
+  const { data: categoriesResponse = [] } = useQuery({ queryKey: ["admin-categories-list"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
+  const { data: brandsResponse = [] } = useQuery({ queryKey: ["admin-brands-list"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
+
   const stats = useMemo(() => ({
     total: banners.length,
     active: banners.filter(b => b.status === "active").length,
@@ -581,6 +646,11 @@ const [viewMode, setViewMode] = useState(() => {
     const fd = new FormData();
 
     Object.entries(form).forEach(([key, value]) => {
+      // Skip fields that should never be sent from the frontend
+      if (['_id', '__v', 'createdAt', 'updatedAt', 'createdby', 'updatedby'].includes(key)) {
+        return;
+      }
+
       // 1. Skip existing image strings. Backend will retain them if not replaced by a new File.
       if (['desktopImage', 'tabletImage', 'mobileImage'].includes(key) && typeof value === 'string') {
         return;
@@ -626,7 +696,12 @@ const [viewMode, setViewMode] = useState(() => {
         text: banner.primaryButton?.text || "",
         linkType: banner.primaryButton?.linkType || "custom_url",
         link: banner.primaryButton?.link || "",
-        dealId: banner.primaryButton?.dealId || ""
+        dealId: (() => {
+          const d = banner.primaryButton?.dealId;
+          if (!d) return "";
+          if (typeof d === "object" && d._id) return String(d._id);
+          return String(d);
+        })()
       },
       displayRules: banner.displayRules || { devices: ["desktop", "tablet", "mobile"] },
       linkedDealId: banner.linkedDealId || "",
@@ -659,11 +734,6 @@ const [viewMode, setViewMode] = useState(() => {
     if (file instanceof File) return URL.createObjectURL(file);
     const cleanPath = file.startsWith('/') ? file : `/${file}`;
     return `${API_BASE}${cleanPath}`;
-  };
-
-  const handleNewDealCreated = (newDeal) => {
-    setForm(prev => ({ ...prev, linkedDealId: newDeal._id || newDeal.id }));
-    setShowDealCreator(false);
   };
 
   // --- Reusable Styles ---
@@ -824,30 +894,41 @@ const [viewMode, setViewMode] = useState(() => {
           ))}
         </div>
 
-        {/* ===== Search ===== */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
-            <SearchIcon />
-          </span>
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
-        </div>
+        {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          
+          {/* Wider Search Bar (Left Side) */}
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+              <SearchIcon />
+            </span>
+            <input 
+              type="text" 
+              placeholder="Search banners..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              style={inputStyle} 
+            />
+          </div>
 
-        {/* ===== Filters ===== */}
-        <div className="flex flex-wrap items-center gap-3">
-          <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="draft">Draft</option>
-            <option value="expired">Expired</option>
-          </SelectFilter>
-          <SelectFilter value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-            <option value="all">All Types</option>
-            <option value="homepage_hero">Homepage Hero</option>
-            <option value="promotional">Promotional</option>
-            <option value="product">Product</option>
-            <option value="collection">Collection</option>
-          </SelectFilter>
+          {/* Filters (Right Side) */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="draft">Draft</option>
+              <option value="expired">Expired</option>
+            </SelectFilter>
+            <SelectFilter value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+              <option value="all">All Types</option>
+              <option value="homepage_hero">Homepage Hero</option>
+              <option value="promotional">Promotional</option>
+              <option value="product">Product</option>
+              <option value="collection">Collection</option>
+            </SelectFilter>
+          </div>
         </div>
 
         {/* ===== Bulk Selection Bar ===== */}
@@ -1120,24 +1201,17 @@ const [viewMode, setViewMode] = useState(() => {
                   <div className="space-y-4">
                     <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
                       <div className="flex gap-2">
-                        <Select value={form.linkedDealId || ""} onChange={(e) => {
-                          if(e.target.value === "CREATE_NEW") {
-                            setShowDealCreator(true);
-                          } else {
-                            updateForm("linkedDealId", e.target.value);
-                          }
-                        }}>
+                        <Select value={form.linkedDealId || ""} onChange={(e) => updateForm("linkedDealId", e.target.value)}>
                           <option value="">No Deal Linked</option>
                           {deals.map(deal => (
                             <option key={deal._id || deal.id} value={deal._id || deal.id}>
                               {deal.name} ({deal.type === 'percentage' ? `${deal.discountValue}%` : `$${deal.discountValue}`})
                             </option>
                           ))}
-                          <option value="CREATE_NEW" className="font-bold text-emerald-600">+ Create New Deal...</option>
                         </Select>
                       </div>
                     </FormField>
-                    {form.linkedDealId && form.linkedDealId !== "CREATE_NEW" && (
+                    {form.linkedDealId && (
                       <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
                         <TagIcon className="w-4 h-4 text-emerald-500" />
                         <span>Deal is linked. Button will redirect to deal page if configured.</span>
@@ -1245,15 +1319,44 @@ const [viewMode, setViewMode] = useState(() => {
           </div>
         )}
 
-        {/* ===== MINI DEAL CREATOR MODAL ===== */}
-        {showDealCreator && (
-           <MiniDealCreator 
-              onClose={() => setShowDealCreator(false)} 
-              onSuccess={handleNewDealCreated} 
-           />
+        {/* ===== INLINE DEAL FORM MODAL ===== */}
+        {dealFormType && (
+          <DealFormModal
+            formType={dealFormType}
+            formData={dealFormData}
+            setFormData={setDealFormData}
+            editingDeal={null}
+            saveMutation={dealSaveMutation}
+            setShowModal={() => resetDealForm()}
+            resetForm={resetDealForm}
+            setSelector={setDealSelector}
+            getSelectedItems={getSelectedItems}
+            handleSubmit={handleDealSubmit}
+            inputStyle={dealInputStyle}
+            products={products}
+            categories={categories}
+            brands={brands}
+          />
+        )}
+
+        {/* ===== INLINE SELECTION MODAL ===== */}
+        {dealSelector.open && (
+          <SelectionModal
+            type={dealSelector.type}
+            items={dealSelector.type === "product" ? products : dealSelector.type === "category" ? categories : brands}
+            selectedIds={dealSelector.type === "product" ? dealFormData.selected_product_ids : dealSelector.type === "category" ? dealFormData.selected_category_ids : dealFormData.selected_brand_ids}
+            onClose={() => setDealSelector({ open: false, type: null })}
+            onApply={(ids) => {
+              const key = dealSelector.type === "product" ? "selected_product_ids" : dealSelector.type === "category" ? "selected_category_ids" : "selected_brand_ids";
+              setDealFormData(prev => ({ ...prev, [key]: ids }));
+              setDealSelector({ open: false, type: null });
+            }}
+            inputStyle={dealInputStyle}
+            cardStyle={dealCardStyle}
+          />
         )}
 
       </div>
     </div>
   );
-} 
+}

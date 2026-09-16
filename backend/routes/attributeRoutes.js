@@ -12,12 +12,12 @@ const {
   deleteAttribute,
 } = require("../controllers/attributeController");
 
-router.get("/", authMiddleware, checkPermission("products"), getAttributes);
-router.post("/", authMiddleware, checkPermission("products"), createAttribute);
-router.get("/:id/categories", authMiddleware, checkPermission("products"), getAttributeCategories);
-router.put("/:id/categories", authMiddleware, checkPermission("products"), updateAttributeCategories);
-router.get("/:id", authMiddleware, checkPermission("products"), getAttributeById);
-router.put("/:id", authMiddleware, checkPermission("products"), updateAttribute);
-router.delete("/:id", authMiddleware, checkPermission("products"), deleteAttribute);
+router.get("/", authMiddleware, checkPermission("attribute"), getAttributes);
+router.post("/", authMiddleware, checkPermission("attribute"), createAttribute);
+router.get("/:id/categories", authMiddleware, checkPermission("attribute"), getAttributeCategories);
+router.put("/:id/categories", authMiddleware, checkPermission("attribute"), updateAttributeCategories);
+router.get("/:id", authMiddleware, checkPermission("attribute"), getAttributeById);
+router.put("/:id", authMiddleware, checkPermission("attribute"), updateAttribute);
+router.delete("/:id", authMiddleware, checkPermission("attribute"), deleteAttribute);
 
 module.exports = router;

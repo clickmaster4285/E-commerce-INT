@@ -495,7 +495,7 @@ const [viewMode, setViewMode] = useState(() => {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-10 md:h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[140px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
         {children}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
@@ -656,21 +656,35 @@ const [viewMode, setViewMode] = useState(() => {
           ))}
         </div>
 
-        {/* ===== Search & Filters ===== */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </SelectFilter>
-          <SelectFilter value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
-            <option value="all">All Countries</option>
-            {countries.map((c) => (<option key={c} value={c}>{c}</option>))}
-          </SelectFilter>
+        {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          
+          {/* Wider Search Bar (Left Side) */}
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <input 
+              type="text" 
+              placeholder="Search brands..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              style={inputStyle} 
+            />
+          </div>
+
+          {/* Filters (Right Side) */}
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </SelectFilter>
+            
+            <SelectFilter value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
+              <option value="all">All Countries</option>
+              {countries.map((c) => (<option key={c} value={c}>{c}</option>))}
+            </SelectFilter>
+          </div>
         </div>
 
         {/* ===== Bulk selection bar ===== */}

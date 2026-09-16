@@ -806,17 +806,28 @@ const [viewMode, setViewMode] = useState(() => {
         ))}
       </div>
 
-      {/* SEARCH */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
-        <input type="text" placeholder="Search by product name or SKU..." value={search} onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} className="h-10 w-full rounded-lg pl-9 pr-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle} />
-      </div>
+      {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        
+        {/* Wider Search Bar (Left Side) */}
+        <div className="relative w-full md:w-[400px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+          <input 
+            type="text" 
+            placeholder="Search by product name or SKU..." 
+            value={search} 
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} 
+            className="h-9 w-full pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+            style={inputStyle} 
+          />
+        </div>
 
-      {/* FILTERS */}
-      <div className="flex flex-wrap items-center gap-3">
-        <SelectFilter value={filterCategory} onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }} options={categories.map((c) => ({ value: String(c._id), label: c.name }))} placeholder="All Categories" />
-        <SelectFilter value={filterBrand} onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }} options={brands.map((b) => ({ value: String(b._id), label: b.name }))} placeholder="All Brands" />
-        <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
+        {/* Filters (Right Side) */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <SelectFilter value={filterCategory} onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }} options={categories.map((c) => ({ value: String(c._id), label: c.name }))} placeholder="All Categories" />
+          <SelectFilter value={filterBrand} onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }} options={brands.map((b) => ({ value: String(b._id), label: b.name }))} placeholder="All Brands" />
+          <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
+        </div>
       </div>
 
       {/* LIST VIEW */}
