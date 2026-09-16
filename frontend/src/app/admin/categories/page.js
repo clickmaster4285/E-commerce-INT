@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
@@ -162,16 +162,31 @@ const [viewMode, setViewMode] = useState(() => {
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Category delete failed"),
   });
 
-  const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, newStatus }) => categoryApi.update(id, { status: newStatus }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+  // ... (upar ka code same rahega, sirf toggleStatusMutation ko dhoond kar replace karo)
+   const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, newStatus }) => {
+      const payload = { 
+        is_active: newStatus === "active"
+      };
+      
+      const response = await categoryApi.update(id, payload);
+      return response;
+    },
+    onSuccess: async (data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+        queryClient.invalidateQueries({ queryKey: ["categories"] }),
+      ]);
+      
       toast.success(variables.newStatus === "active" ? "Category enabled" : "Category disabled");
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update status"),
+    onError: (error) => {
+      console.error("Toggle error:", error);
+      toast.error(error.response?.data?.message || "Failed to update status");
+    },
   });
 
+// ... (baaki code same rahega)
   // ================= FORM MUTATIONS =================
   const createMutation = useMutation({
     mutationFn: (data) => categoryApi.create(data),
@@ -325,7 +340,7 @@ const [viewMode, setViewMode] = useState(() => {
       name: category.name || "",
       description: category.description || "",
       parent_category_id: getId(category.parent_category_id),
-      status: category.status || "active",
+      status: category.is_active !== false ? "active" : "inactive",
       attributes: loadedAttrs,
     });
     setEditingCategory(category);
@@ -336,7 +351,11 @@ const [viewMode, setViewMode] = useState(() => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
-    const payload = { ...formData, parent_category_id: formData.parent_category_id || null };
+    const payload = { 
+      ...formData, 
+      parent_category_id: formData.parent_category_id || null,
+      is_active: formData.status === "active"
+    };
     if (showEditModal && editingCategory) {
       updateMutation.mutate({ id: editingCategory._id, data: payload });
     } else {
@@ -560,6 +579,18 @@ const [viewMode, setViewMode] = useState(() => {
     }
   }, [showCreateModal, showEditModal, showAttrSelectModal, showCreateAttrModal, showParentDropdown]);
 
+  // Auto-open edit modal when navigated from detail page with ?edit=<id>
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || categoriesLoading || categories.length === 0) return;
+    const target = categories.find((c) => String(c._id) === String(editId));
+    if (target) {
+      handleOpenEdit(target);
+      router.replace("/admin/categories", { scroll: false });
+    }
+  }, [searchParams, categories, categoriesLoading]);
+
   const allCategories = categories.length;
   const rootCategoriesCount = categories.filter((c) => !c.parent_category_id).length;
   const childCategoriesCount = allCategories - rootCategoriesCount;
@@ -630,7 +661,7 @@ const [viewMode, setViewMode] = useState(() => {
     const menuRef = useRef(null);
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0, flipUp: false });
 
-    const isActive = category.status !== "inactive";
+    const isActive = category.is_active !== false;
 
     const openMenu = () => {
       const rect = btnRef.current.getBoundingClientRect();
@@ -1148,7 +1179,7 @@ const [viewMode, setViewMode] = useState(() => {
                   {paginatedCategories.map((category, index) => {
                     const isSelected = selectedIds.includes(category._id);
                     const parentName = getCategoryName(category.parent_category_id, categories);
-                    const isActive = category.status !== "inactive";
+                    const isActive = category.is_active !== false;
                     return (
                       <tr key={category._id} className="transition cursor-pointer" style={{ borderBottom: index < paginatedCategories.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
                         onClick={() => handleViewDetail(category)}
@@ -1186,7 +1217,7 @@ const [viewMode, setViewMode] = useState(() => {
             {paginatedCategories.map((category) => {
               const isMobileSelected = selectedIds.includes(category._id);
               const parentName = getCategoryName(category.parent_category_id, categories);
-              const isMobileActive = category.status !== "inactive";
+              const isMobileActive = category.is_active !== false;
               return (
                 <div key={category._id} onClick={() => handleViewDetail(category)} className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
                   style={{ ...cardStyle, backgroundColor: isMobileSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}>

@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
@@ -15,6 +16,7 @@ import {
   Eye,
   Grid3x3,
   List,
+  MoreVertical,
   Package,
   Pencil,
   Plus,
@@ -1258,13 +1260,109 @@ function IconButton({ children, onClick, title, color = "var(--text-muted)", bac
   return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
 }
 function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting, isToggling }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const isActive = product?.status === "active";
+
+  const openMenu = () => {
+    const rect = btnRef.current.getBoundingClientRect();
+    const menuW = 170;
+    const menuH = 200;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const flipUp = spaceBelow < menuH;
+    const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
+    setMenuPos({ top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4, left });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+    };
+    const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const handleClose = () => setOpen(false);
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
+  }, [open]);
+
+  const menuItemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150";
+
   return (
-    <div className="flex items-center justify-end gap-1 sm:gap-2">
-      <button type="button" onClick={e => { e.stopPropagation(); onToggle(product); }} disabled={isToggling} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-white/5 disabled:opacity-50" style={{ color: isActive ? "#f87171" : "#34d399" }} title={isActive ? "Deactivate" : "Activate"}><Power className="h-4 w-4" /></button>
-      <button type="button" onClick={e => { e.stopPropagation(); onView(product); }} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-emerald-500/10" style={{ color: "#34d399" }} title="View Details"><Eye className="h-4 w-4" /></button>
-      <button type="button" onClick={e => { e.stopPropagation(); onEdit(product); }} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 transition hover:bg-white/5" style={{ color: "var(--text-secondary)" }} title="Edit"><Pencil className="h-4 w-4" /></button>
-      <button type="button" onClick={e => { e.stopPropagation(); onDelete(product); }} disabled={isDeleting} className="flex min-h-[34px] min-w-[34px] flex-shrink-0 items-center justify-center rounded-md p-2 text-red-500 transition hover:bg-red-500/10 disabled:opacity-50" title="Delete"><Trash2 className="h-4 w-4" /></button>
+    <div className="flex items-center justify-end">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
+        className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-md p-2 transition hover:bg-white/5"
+        style={{ color: "var(--text-secondary)" }}
+        aria-label="More actions"
+        title="More actions"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] w-[170px] rounded-lg border shadow-lg py-1"
+          style={{ top: menuPos.top, left: menuPos.left, backgroundColor: "var(--bg-secondary)", borderColor: "var(--border-color)", boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}
+        >
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onView(product); }}
+            className={menuItemClass}
+            style={{ color: "var(--text-primary)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            <Eye className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(product); }}
+            className={menuItemClass}
+            style={{ color: "var(--text-primary)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            <Pencil className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+          </button>
+          <button
+            type="button"
+            disabled={isToggling}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onToggle(product); }}
+            className={menuItemClass + " disabled:opacity-50"}
+            style={{ color: isActive ? "#f87171" : "#34d399" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            <Power className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
+          </button>
+          <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(product); }}
+            className={menuItemClass + " disabled:opacity-50"}
+            style={{ color: "#f87171" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          >
+            <Trash2 className="w-4 h-4 shrink-0" /> Delete
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

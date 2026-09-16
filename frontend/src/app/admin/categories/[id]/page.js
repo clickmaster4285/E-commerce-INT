@@ -1,18 +1,13 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createPortal } from "react-dom";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
-import { useSocket } from "@/hooks/useSocket";
 import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
 import { toast } from "sonner";
-import { createPortal } from "react-dom";
 
 /* =========================================================
    ICONS
@@ -67,9 +62,9 @@ function getId(value) {
 }
 
 function formatDateTime(date) {
-  if (!date) return "—";
+  if (!date) return "\u2014";
   const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return "—";
+  if (Number.isNaN(parsed.getTime())) return "\u2014";
   return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -123,71 +118,10 @@ function getDataTypeBadgeStyle(type) {
   }
 }
 
-function useClickOutside(ref, handler, triggerRef) {
-  const handlerRef = useRef(handler);
-  useEffect(() => { handlerRef.current = handler; });
-  useEffect(() => {
-    const listener = (event) => {
-      if (!ref.current || ref.current.contains(event.target)) return;
-      if (triggerRef?.current?.contains(event.target)) return;
-      handlerRef.current(event);
-    };
-    document.addEventListener("mousedown", listener);
-    return () => document.removeEventListener("mousedown", listener);
-  }, [ref, triggerRef]);
-}
-
-function useDropdownPosition(triggerRef, isOpen) {
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 0, direction: 'down' });
-  const updatePosition = useCallback(() => {
-    if (!triggerRef.current || !isOpen) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const DROPDOWN_MAX_H = 320;
-    const GAP = 6;
-    const shouldFlip = spaceBelow < DROPDOWN_MAX_H && spaceAbove > spaceBelow;
-    const vw = window.innerWidth;
-    let width = Math.max(rect.width, 280);
-    if (width > vw - 32) width = vw - 32;
-    let left = rect.left;
-    if (left + width > vw - 16) left = vw - width - 16;
-    if (left < 16) left = 16;
-    let top;
-    let direction;
-    if (shouldFlip) {
-      top = rect.top - GAP - DROPDOWN_MAX_H;
-      if (top < 16) top = 16;
-      direction = 'up';
-    } else {
-      top = rect.bottom + GAP;
-      if (top + DROPDOWN_MAX_H > window.innerHeight - 16) {
-        top = window.innerHeight - DROPDOWN_MAX_H - 16;
-      }
-      direction = 'down';
-    }
-    setPosition({ top, left, width, direction });
-  }, [triggerRef, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
-      updatePosition();
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-      return () => {
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
-      };
-    }
-  }, [isOpen, updatePosition]);
-  return position;
-}
-
 /* =========================================================
    UI COMPONENTS
 ========================================================= */
 
-// Reuse exact card style from List/Create pages
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
 function StatusBadge({ active = true }) {
@@ -213,21 +147,9 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
       disabled={disabled}
       className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       style={{
-        backgroundColor: primary
-          ? "var(--accent)"
-          : danger
-          ? "transparent"
-          : "transparent",
-        color: primary
-          ? "white"
-          : danger
-          ? "var(--danger)"
-          : "var(--text-secondary)",
-        border: primary
-          ? "none"
-          : danger
-          ? "1px solid rgba(239,68,68,0.25)"
-          : "1px solid var(--border-color)",
+        backgroundColor: primary ? "var(--accent)" : "transparent",
+        color: primary ? "white" : danger ? "var(--danger)" : "var(--text-secondary)",
+        border: primary ? "none" : danger ? "1px solid rgba(239,68,68,0.25)" : "1px solid var(--border-color)",
       }}
     >
       {icon}
@@ -239,12 +161,8 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
 function StatRow({ label, value }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b last:border-0" style={{ borderColor: "var(--border-color)" }}>
-      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </span>
-      <span className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
+      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{label}</span>
+      <span className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }
@@ -253,11 +171,7 @@ function AttributePill({ label }) {
   return (
     <span
       className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium"
-      style={{
-        backgroundColor: "rgba(139,92,246,0.10)",
-        color: "#8b5cf6",
-        border: "1px solid rgba(139,92,246,0.20)",
-      }}
+      style={{ backgroundColor: "rgba(139,92,246,0.10)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.20)" }}
     >
       {label}
     </span>
@@ -273,134 +187,6 @@ function Spin({ className = "w-4 h-4" }) {
   );
 }
 
-const MultiSelectIcons = {
-  Plus: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  ),
-  X: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  ChevronDown: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  ),
-  Check: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-    </svg>
-  ),
-  Search: ({ className }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  ),
-};
-
-function ProfessionalMultiSelect({ attribute, value, onChange, onAddNewOption }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [newOption, setNewOption] = useState("");
-  const triggerRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const pos = useDropdownPosition(triggerRef, isOpen);
-  useClickOutside(dropdownRef, () => setIsOpen(false), triggerRef);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e) => { if (e.key === "Escape") setIsOpen(false); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen]);
-
-  const options = sanitizeOptionLabels(attribute?.seed_options || attribute?.values || []);
-  const selected = sanitizeOptionLabels(Array.isArray(value) ? value : []).filter((v) => options.includes(v));
-  const filteredValues = options.filter((l) => l.toLowerCase().includes(search.toLowerCase()));
-
-  const toggleOption = (label) => {
-    const exists = selected.includes(label);
-    onChange(exists ? selected.filter((i) => i !== label) : [...selected, label]);
-  };
-
-  const handleAddNewOption = async () => {
-    const trimmed = newOption.trim();
-    if (!trimmed || !onAddNewOption) return;
-    try {
-      await onAddNewOption(trimmed);
-      if (!selected.includes(trimmed)) onChange([...selected, trimmed]);
-      setNewOption("");
-      setSearch("");
-    } catch (err) { console.error(err); }
-  };
-
-  const renderDropdown = () => (
-    <div
-      ref={dropdownRef}
-      className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl flex flex-col overflow-hidden"
-      style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: '320px' }}
-    >
-      <div className="p-2 border-b border-[var(--border-color)] shrink-0">
-        <div className="relative">
-          <MultiSelectIcons.Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-8 pl-8 pr-2.5 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" autoFocus />
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto py-0.5 min-h-0">
-        {filteredValues.length > 0 ? (
-          filteredValues.map((label, idx) => {
-            const isSelected = selected.includes(label);
-            return (
-              <button key={idx} type="button" onClick={() => toggleOption(label)} className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition-colors ${isSelected ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>
-                <span className="truncate">{label}</span>
-                <span className={`w-4 h-4 flex items-center justify-center shrink-0 ml-2 rounded border transition-colors ${isSelected ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)]"}`}>
-                  {isSelected && <MultiSelectIcons.Check className="w-2.5 h-2.5 text-white" />}
-                </span>
-              </button>
-            );
-          })
-        ) : (
-          <div className="px-3 py-6 text-center text-xs text-[var(--text-muted)]">No matching values</div>
-        )}
-      </div>
-      {onAddNewOption && (
-        <div className="px-2 py-1.5 border-t border-[var(--border-color)] shrink-0">
-          <div className="flex gap-1">
-            <input type="text" placeholder="Add new..." value={newOption} onChange={(e) => setNewOption(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAddNewOption()} className="flex-1 min-w-0 h-7 px-2 text-[11px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" />
-            <button onClick={handleAddNewOption} disabled={!newOption.trim()} className="h-7 px-2 text-[10px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-0.5 shrink-0">
-              <MultiSelectIcons.Plus className="w-3 h-3" /> Add
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="relative w-full">
-      <button type="button" ref={triggerRef} onClick={() => setIsOpen(!isOpen)} className={`w-full min-h-[36px] px-2.5 py-1.5 text-xs flex items-center justify-between outline-none transition-colors rounded border ${isOpen ? "border-[var(--accent)] ring-1 ring-[var(--accent-soft)] bg-[var(--bg-input)]" : "border-[var(--border-color)] hover:border-[var(--text-muted)] bg-[var(--bg-input)]"}`}>
-        <div className="flex flex-wrap items-center gap-1 text-left w-full min-w-0">
-          {selected.length === 0 ? (
-            <span className="text-[var(--text-muted)]">Select values...</span>
-          ) : (
-            <>
-              {selected.slice(0, 3).map((item) => (
-                <span key={item} className="inline-flex items-center gap-0.5 px-1.5 py-px text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/20">{item}</span>
-              ))}
-              {selected.length > 3 && <span className="text-[10px] font-medium text-[var(--text-muted)]">+{selected.length - 3}</span>}
-            </>
-          )}
-        </div>
-        <MultiSelectIcons.ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ml-1.5 text-[var(--text-muted)] ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-      {isOpen && typeof document !== 'undefined' && createPortal(renderDropdown(), document.body)}
-    </div>
-  );
-}
-
 /* =========================================================
    MAIN PAGE
 ========================================================= */
@@ -411,29 +197,14 @@ export default function CategoryDetailPage() {
   const queryClient = useQueryClient();
 
   const categoryId = getId(params?.id);
-  const { socket } = useSocket();
   const backPath = "/admin/categories";
 
   const [tab, setTab] = useState("overview");
-  const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    category_code: "",
-    category_type: "",
-    description: "",
-    parent_category_id: "",
-    sort_order: 0,
-    is_active: true,
-    attributes: [],
-  });
-
-  const [openAttributeKey, setOpenAttributeKey] = useState(null);
-  const [expandedReadOnlyAttr, setExpandedReadOnlyAttr] = useState(null);
-  const [showAttributeModal, setShowAttributeModal] = useState(false);
   const [attrToToggle, setAttrToToggle] = useState(null);
-  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
-  const loadedSeedTypeRef = useRef("");
+  
+  // ✅ NEW: Edit Modal States (same as main page)
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useAttributeSocketSync();
 
@@ -443,12 +214,7 @@ export default function CategoryDetailPage() {
     queryFn: categoryApi.getAll,
   });
 
-  const { data: adminCategories = [] } = useQuery({
-    queryKey: ["admin-categories"],
-    queryFn: categoryApi.getAllAdmin,
-  });
-
-  const { data: category, isLoading: loading, isError } = useQuery({
+  const { data: category, isLoading: loading } = useQuery({
     queryKey: ["category", categoryId],
     queryFn: () => categoryApi.getById(categoryId),
     enabled: !!categoryId,
@@ -459,12 +225,6 @@ export default function CategoryDetailPage() {
     queryKey: ["category-attributes", categoryId],
     queryFn: () => categoryApi.getAttributes(categoryId),
     enabled: !!categoryId,
-  });
-
-  const { data: seededAttributes = [] } = useQuery({
-    queryKey: ["seeded-attributes", form.category_type?.toLowerCase()],
-    queryFn: () => attributeApi.getAll({ category: form.category_type?.toLowerCase() }),
-    enabled: !!form.category_type && showEdit,
   });
 
   // Derived data
@@ -484,50 +244,6 @@ export default function CategoryDetailPage() {
   }, [category, allCategories]);
 
   // Mutations
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => categoryApi.update(id, data),
-    onSuccess: async (_saved, variables) => {
-      try {
-        const properAttrs = form.attributes
-          .filter((a) => a && (a.attribute_id || a.seed_code))
-          .map((a) => {
-            const raw = a.attribute_id || a._id;
-            let aid;
-            if (!raw) aid = undefined;
-            else if (typeof raw === "string") aid = raw;
-            else if (typeof raw === "object" && raw._id) aid = String(raw._id);
-            else aid = String(raw);
-            return {
-              attribute_id: aid || undefined,
-              is_visible: a.is_visible !== false,
-              is_searchable: Boolean(a.is_searchable),
-              is_variant_option: a.is_variant_option !== false,
-              sort_order: typeof a.sort_order === "number" ? a.sort_order : 0,
-              value: Array.isArray(a.value) ? a.value : (a.value != null ? String(a.value) : ""),
-            };
-          })
-          .filter((a) => !!a.attribute_id);
-        if (properAttrs.length > 0) {
-          await categoryApi.updateAttributes(String(variables.id || categoryId), properAttrs);
-        }
-      } catch (err) {
-        console.error("Attribute sync failed:", err);
-        toast.warning("Category updated, but some attributes failed to save.");
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["category", categoryId] }),
-        queryClient.invalidateQueries({ queryKey: ["categories"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
-        queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] }),
-      ]);
-      setShowEdit(false);
-      toast.success("Category updated successfully");
-    },
-    onError: (err) => {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to update category");
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: () => categoryApi.delete(categoryId),
     onSuccess: () => {
@@ -541,248 +257,12 @@ export default function CategoryDetailPage() {
     },
   });
 
-  // Enrich attributes with seed data when edit modal is open
-  useEffect(() => {
-    if (!showEdit) return;
-    const categoryType = form.category_type?.toLowerCase();
-    const isSeededCategory = ["mobile", "pc", "clothing"].includes(categoryType);
-
-    if (!isSeededCategory) {
-      if (loadedSeedTypeRef.current) {
-        loadedSeedTypeRef.current = "";
-      }
-      return;
-    }
-
-    if (seededAttributes.length === 0) return;
-
-    const firstSeededCategory = seededAttributes[0]?.category?.toLowerCase();
-    if (firstSeededCategory && firstSeededCategory !== categoryType) return;
-
-    setForm((p) => {
-      const needsEnrichment = p.attributes.some((a) => a.attribute_id && !a.seed_name) ||
-        p.attributes.some((a) => {
-          const attrId = getAttributeId(a);
-          const seedAttr = seededAttributes.find((sa) => String(sa._id) === String(attrId));
-          return seedAttr && a.seed_name !== seedAttr.name;
-        });
-      if (!needsEnrichment) return p;
-
-      const enrichedAttrs = p.attributes.map((existingAttr) => {
-        const attrId = getAttributeId(existingAttr);
-        const seedAttr = seededAttributes.find((sa) => String(sa._id) === String(attrId));
-
-        if (seedAttr) {
-          const mappedSeedType = seedAttr.data_type === "select" || seedAttr.data_type === "color" ? "multi_select" : seedAttr.data_type;
-          const seedOptions = (seedAttr.values || []).map(v => v.label || v.value || v);
-          return {
-            ...existingAttr,
-            seed_code: seedAttr.code,
-            seed_name: seedAttr.name,
-            seed_type: mappedSeedType,
-            seed_options: seedOptions,
-          };
-        }
-
-        const populatedAttr = existingAttr.attribute_id;
-        if (populatedAttr && typeof populatedAttr === "object" && populatedAttr.name) {
-          const mappedSeedType = populatedAttr.data_type === "select" || populatedAttr.data_type === "color" ? "multi_select" : populatedAttr.data_type;
-          const seedOptions = (populatedAttr.values || []).map(v => v.label || v.value || v);
-          return {
-            ...existingAttr,
-            seed_code: populatedAttr.code,
-            seed_name: populatedAttr.name,
-            seed_type: mappedSeedType,
-            seed_options: seedOptions,
-          };
-        }
-
-        return existingAttr;
-      });
-      return { ...p, attributes: enrichedAttrs };
-    });
-  }, [showEdit, form.category_type, seededAttributes, form.attributes]);
-
-  // Handlers
-  function openEdit() {
-    if (!category) return;
-    const catType = category.category_type || "";
-    const loadedAttrs = (category.attributes || []).map((a, i) => ({
-      ...a,
-      ui_key: a.ui_key || `edit-${getAttributeId(a) || a.seed_code || `idx-${i}`}-${i}`,
-    }));
-
-    setForm({
-      category_code: category.category_code || "",
-      category_type: catType,
-      name: category.name || "",
-      description: category.description || "",
-      parent_category_id: getId(category.parent_category_id) || "",
-      sort_order: category.sort_order ?? 0,
-      is_active: category.is_active !== false,
-      attributes: loadedAttrs,
-    });
-
-    loadedSeedTypeRef.current = catType;
-    setShowEdit(true);
-  }
-
-  function submitEdit(e) {
-    e.preventDefault();
-    if (!form.name?.trim()) { toast.error("Category name is required"); return; }
-    if (!form.category_type) { toast.error("Category type is required"); return; }
-
-    updateMutation.mutate({
-      id: categoryId,
-      data: {
-        category_code: form.category_code,
-        category_type: form.category_type,
-        name: form.name.trim(),
-        description: form.description.trim(),
-        parent_category_id: getId(form.parent_category_id) || null,
-        sort_order: Number(form.sort_order) || 0,
-        is_active: form.is_active,
-      },
-    });
-  }
-
-  const updateAttributeConfig = (key, field, val) => {
-    setForm((p) => ({
-      ...p,
-      attributes: p.attributes.map((item) => {
-        const keyStr = String(key || "");
-        const itemKey = String(item.ui_key || "");
-        const itemAttrId = getAttributeId(item);
-        if (itemKey === keyStr || itemAttrId === keyStr || String(item.seed_code || "") === keyStr) {
-          return { ...item, [field]: val };
-        }
-        return item;
-      }),
-    }));
-  };
-
-  const handleAddAttributeFromModal = async () => {
-    if (!newAttributeData.name.trim()) { toast.error("Attribute name is required"); return; }
-    const code = newAttributeData.code.trim() || newAttributeData.name.trim().toLowerCase().replace(/\s+/g, "_");
-    const tempKey = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const newAttrConfig = {
-      ui_key: tempKey,
-      attribute_id: null,
-      seed_code: code,
-      seed_name: newAttributeData.name,
-      seed_type: newAttributeData.data_type,
-      seed_options: newAttributeData.values || [],
-      is_visible: true,
-      is_searchable: true,
-      sort_order: form.attributes.length,
-      value: newAttributeData.data_type === "multi_select" ? newAttributeData.values || [] : (newAttributeData.value || ""),
-      _creating: true,
-    };
-    setForm((p) => ({ ...p, attributes: [...p.attributes, newAttrConfig] }));
-    setShowAttributeModal(false);
-    setNewAttributeData({ name: "", code: "", data_type: "multi_select", values: [], value: "" });
-    toast.success("Attribute added");
-    try {
-      const valuesPayload = (newAttrConfig.seed_options || []).map((opt) => {
-        const label = typeof opt === "string" ? opt : (opt?.label || opt?.value || String(opt));
-        return { label, value: String(label).toLowerCase() };
-      });
-      const created = await attributeApi.create({
-        code: newAttrConfig.seed_code,
-        name: newAttrConfig.seed_name,
-        data_type: newAttrConfig.seed_type,
-        values: valuesPayload,
-      });
-      const createdId = created?._id || created?.id || created?.data?._id || created?.data?.id;
-      if (createdId) {
-        setForm((p) => ({
-          ...p,
-          attributes: p.attributes.map((a) => (
-            a.ui_key === tempKey ? { ...a, attribute_id: String(createdId), _creating: false } : a
-          )),
-        }));
-      } else {
-        setForm((p) => ({
-          ...p,
-          attributes: p.attributes.map((a) => (a.ui_key === tempKey ? { ...a, _creating: false } : a)),
-        }));
-      }
-    } catch (err) {
-      console.error("Failed to persist attribute", err);
-      setForm((p) => ({
-        ...p,
-        attributes: p.attributes.map((a) => (a.ui_key === tempKey ? { ...a, _creating: false, _createError: true } : a)),
-      }));
-    }
-  };
-
-  const handleAddAttributeValue = async (inputKey, config) => {
-    const raw = String(config?._draftValue || "").trim();
-    if (!raw || !config) return;
-
-    const currentSelected = Array.isArray(config.value) ? config.value : [];
-    const currentSeedOptions = Array.isArray(config.seed_options) ? config.seed_options : [];
-
-    if (currentSelected.some((v) => String(v).toLowerCase() === raw.toLowerCase())) {
-      toast.error("Option already assigned");
-      return;
-    }
-    if (currentSeedOptions.some((o) => String(o).toLowerCase() === raw.toLowerCase())) {
-      toast.error("Option already exists");
-      return;
-    }
-
-    try {
-      let nextSelected = [...currentSelected, raw];
-      let nextSeedOptions = currentSeedOptions;
-      let nextAttributeId = config.attribute_id ? getAttributeId(config) : null;
-
-      if (nextAttributeId) {
-        const fullAttr = seededAttributes.find((a) => String(a._id) === String(nextAttributeId));
-        const existingValues = Array.isArray(fullAttr?.values) ? fullAttr.values : [];
-        const normalized = existingValues.map((v) => ({
-          label: v.label || v.value || "",
-          value: v.value || v.label || "",
-          sort_order: typeof v.sort_order === "number" ? v.sort_order : 0,
-          is_active: v.is_active !== false,
-        }));
-        if (normalized.some((v) => String(v.value).toLowerCase() === raw.toLowerCase())) {
-          toast.error("Option already exists");
-          return;
-        }
-        const newValue = { label: raw, value: raw.toLowerCase(), sort_order: normalized.length, is_active: true };
-        const response = await attributeApi.update(nextAttributeId, { values: [...normalized, newValue] });
-        const responseValues = Array.isArray(response?.values) ? response.values : [...normalized, newValue];
-        nextSeedOptions = responseValues.map((v) => v.label || v.value || "").filter(Boolean);
-      } else {
-        const created = await attributeApi.create({
-          code: `${config.seed_code || inputKey}-value-${Date.now()}`,
-          name: raw,
-          data_type: config.seed_type || "multi_select",
-          values: [{ label: raw, value: raw.toLowerCase(), sort_order: 0, is_active: true }],
-        });
-        nextAttributeId = String(created?._id || created?.id || created?.data?._id || created?.data?.id || "");
-        nextSeedOptions = [raw];
-      }
-
-      updateAttributeConfig(inputKey, "value", nextSelected);
-      updateAttributeConfig(inputKey, "seed_options", nextSeedOptions);
-      if (nextAttributeId && nextAttributeId !== getAttributeId(config)) {
-        updateAttributeConfig(inputKey, "attribute_id", nextAttributeId);
-      }
-
-      toast.success("Option added successfully");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to save option");
-    }
-  };
-
   const handleToggleAttributeActive = async (attr) => {
     if (!attr) return;
     const attrId = getAttributeId(attr);
     const currentActive = attr.is_active !== false;
     try {
-      await attributeApi.update(attrId, { is_active: !currentActive });
+      await categoryApi.updateAttributes(attrId, { is_active: !currentActive });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] }),
         queryClient.invalidateQueries({ queryKey: ["category", categoryId] }),
@@ -824,7 +304,7 @@ export default function CategoryDetailPage() {
   return (
     <div className="w-full space-y-5 pb-10" style={{ color: "var(--text-primary)" }}>
 
-      {/* HEADER - MATCHES LIST PAGE STYLE */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="flex items-start gap-4">
           <button
@@ -837,7 +317,7 @@ export default function CategoryDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-[24px] leading-7 font-bold tracking-tight">{category.name}</h1>
-              <StatusBadge active={true} />
+              <StatusBadge active={category.is_active !== false} />
             </div>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
               {category.description || "No description provided"}
@@ -846,9 +326,9 @@ export default function CategoryDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button onClick={openEdit} icon={<Ico d={D.edit} className="w-4 h-4" />}>
-            Edit
-          </Button>
+          <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-4 h-4" />}>
+  Edit
+</Button>
           <Button
             danger
             onClick={() => setShowDelete(true)}
@@ -859,7 +339,7 @@ export default function CategoryDetailPage() {
         </div>
       </div>
 
-      {/* TABS - PROFESSIONAL STYLE */}
+      {/* TABS */}
       <div className="flex items-center gap-6 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
           { id: "overview", label: "Overview" },
@@ -873,9 +353,7 @@ export default function CategoryDetailPage() {
               type="button"
               onClick={() => setTab(item.id)}
               className="relative py-3 text-[13px] font-medium transition-colors outline-none"
-              style={{
-                color: active ? "var(--accent)" : "var(--text-muted)",
-              }}
+              style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
             >
               {item.label}
               {item.count !== undefined && (
@@ -897,8 +375,6 @@ export default function CategoryDetailPage() {
       {/* OVERVIEW TAB */}
       {tab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          
-          {/* LEFT - Category Type Information */}
           <div className="lg:col-span-2">
             <div className="rounded-xl overflow-hidden" style={cardStyle}>
               <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
@@ -910,7 +386,6 @@ export default function CategoryDetailPage() {
                   <p className="text-[10px] text-[var(--text-muted)]">Basic information and metadata</p>
                 </div>
               </div>
-              
               <div className="p-5">
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -920,19 +395,15 @@ export default function CategoryDetailPage() {
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Category Code</p>
-                      <p className="text-[14px] font-mono text-[var(--text-secondary)]">{category.category_code || category.slug || "—"}</p>
+                      <p className="text-[14px] font-mono text-[var(--text-secondary)]">{category.category_code || category.slug || "\u2014"}</p>
                     </div>
                   </div>
-
                   {category.description && (
                     <div>
                       <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Description</p>
-                      <p className="text-[14px] leading-relaxed text-[var(--text-primary)]">
-                        {category.description}
-                      </p>
+                      <p className="text-[14px] leading-relaxed text-[var(--text-primary)]">{category.description}</p>
                     </div>
                   )}
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-[var(--border-color)]">
                     <div>
                       <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Created At</p>
@@ -948,7 +419,6 @@ export default function CategoryDetailPage() {
             </div>
           </div>
 
-          {/* RIGHT - Summary & Variants */}
           <div className="space-y-5">
             <div className="rounded-xl overflow-hidden" style={cardStyle}>
               <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
@@ -957,11 +427,10 @@ export default function CategoryDetailPage() {
               <div className="p-5 space-y-1">
                 <StatRow label="Total Attributes" value={categoryAttributes.length} />
                 <StatRow label="Parent Category" value={parentCategoryName} />
-                <StatRow label="Status" value={<StatusBadge active={true} />} />
+                <StatRow label="Status" value={<StatusBadge active={category.is_active !== false} />} />
               </div>
             </div>
 
-            {/* Variant Attributes */}
             {variantAttributes.length > 0 && (
               <div className="rounded-xl overflow-hidden" style={cardStyle}>
                 <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
@@ -978,7 +447,6 @@ export default function CategoryDetailPage() {
             )}
           </div>
 
-          {/* Attributes Preview - Full Width */}
           <div className="lg:col-span-3">
             <div className="rounded-xl overflow-hidden" style={cardStyle}>
               <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
@@ -987,35 +455,19 @@ export default function CategoryDetailPage() {
               <div className="p-5">
                 {categoryAttributes.length === 0 ? (
                   <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)]/30">
-                    <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-                      No attributes assigned yet.
-                    </p>
+                    <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No attributes assigned yet.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {categoryAttributes.slice(0, 5).map((attr) => (
-                      <div
-                        key={attr._id}
-                        className="p-3 rounded-lg border bg-[var(--bg-input)]"
-                        style={{ borderColor: "var(--border-color)" }}
-                      >
+                      <div key={attr._id} className="p-3 rounded-lg border bg-[var(--bg-input)]" style={{ borderColor: "var(--border-color)" }}>
                         <p className="text-[13px] font-medium mb-1 truncate text-[var(--text-primary)]">{attr.name}</p>
-                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                          {getDataTypeLabel(attr.data_type)}
-                        </p>
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{getDataTypeLabel(attr.data_type)}</p>
                       </div>
                     ))}
                     {categoryAttributes.length > 5 && (
-                      <div
-                        className="p-3 rounded-lg border flex items-center justify-center bg-[var(--bg-input)]"
-                        style={{
-                          borderColor: "var(--border-color)",
-                          borderStyle: "dashed",
-                        }}
-                      >
-                        <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
-                          +{categoryAttributes.length - 5} more
-                        </p>
+                      <div className="p-3 rounded-lg border flex items-center justify-center bg-[var(--bg-input)]" style={{ borderColor: "var(--border-color)", borderStyle: "dashed" }}>
+                        <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>+{categoryAttributes.length - 5} more</p>
                       </div>
                     )}
                   </div>
@@ -1029,7 +481,6 @@ export default function CategoryDetailPage() {
       {/* ATTRIBUTES TAB */}
       {tab === "attributes" && (
         <div className="space-y-4">
-          {/* Attributes Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
@@ -1054,16 +505,13 @@ export default function CategoryDetailPage() {
             </div>
           </div>
 
-          {/* Attribute List */}
           {categoryAttributes.length === 0 ? (
             <div className="rounded-xl py-12 flex flex-col items-center justify-center gap-3" style={cardStyle}>
               <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                 <Ico d={D.box} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
               </div>
               <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>No attributes assigned</p>
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                This category does not have any attributes assigned yet.
-              </p>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>This category does not have any attributes assigned yet.</p>
             </div>
           ) : (
             <div className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -1102,28 +550,18 @@ export default function CategoryDetailPage() {
                         <tr
                           key={attr._id}
                           className="transition-colors hover:bg-[var(--bg-tertiary)]/30"
-                          style={{
-                            borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none",
-                            opacity: isActive ? 1 : 0.5,
-                          }}
+                          style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none", opacity: isActive ? 1 : 0.5 }}
                         >
-                          {/* Attribute Name */}
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
-                              <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                                style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa" }}
-                              >
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
                                 <Ico d={D.box} className="w-4 h-4" />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{attr.name}</p>
                                   {isVariant && (
-                                    <span
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0"
-                                      style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }}
-                                    >
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }}>
                                       <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                       </svg>
@@ -1131,10 +569,7 @@ export default function CategoryDetailPage() {
                                     </span>
                                   )}
                                   {!isActive && (
-                                    <span
-                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0"
-                                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
-                                    >
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}>
                                       Disabled
                                     </span>
                                   )}
@@ -1143,61 +578,37 @@ export default function CategoryDetailPage() {
                               </div>
                             </div>
                           </td>
-
-                          {/* Data Type */}
                           <td className="px-5 py-3.5">
-                            <span
-                              className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-                              style={getDataTypeBadgeStyle(attr.data_type)}
-                            >
+                            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
                               {getDataTypeLabel(attr.data_type)}
                             </span>
                           </td>
-
-                          {/* Assigned Options */}
                           <td className="px-5 py-3.5">
                             {isMultiSelect ? (
                               optionCount > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {visibleOptions.map((label, i) => (
-                                    <span
-                                      key={i}
-                                      className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded truncate max-w-[80px]"
-                                      style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}
-                                    >
+                                    <span key={i} className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded truncate max-w-[80px]" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
                                       {label}
                                     </span>
                                   ))}
-                                  {hiddenCount > 0 && (
-                                    <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>
-                                      +{hiddenCount} more
-                                    </span>
-                                  )}
+                                  {hiddenCount > 0 && <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>+{hiddenCount} more</span>}
                                 </div>
                               ) : (
                                 <span className="text-[11px] italic" style={{ color: "var(--text-muted)" }}>No options</span>
                               )
                             ) : isBoolean ? (
                               boolValue ? (
-                                <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                  style={{
-                                    backgroundColor: boolValue === "Yes" ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)",
-                                    color: boolValue === "Yes" ? "#34d399" : "#9ca3af",
-                                    border: `1px solid ${boolValue === "Yes" ? "rgba(16,185,129,0.2)" : "rgba(107,114,128,0.2)"}`,
-                                  }}
-                                >
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)", color: boolValue === "Yes" ? "#34d399" : "#9ca3af", border: `1px solid ${boolValue === "Yes" ? "rgba(16,185,129,0.2)" : "rgba(107,114,128,0.2)"}` }}>
                                   {boolValue}
                                 </span>
                               ) : (
                                 <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>Not set</span>
                               )
                             ) : (
-                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>—</span>
+                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>\u2014</span>
                             )}
                           </td>
-
-                          {/* Action */}
                           <td className="px-5 py-3.5">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -1220,19 +631,9 @@ export default function CategoryDetailPage() {
                                   }
                                 }}
                                 className="h-7 px-3 text-[10px] font-semibold flex items-center justify-center gap-1 rounded-md transition-colors"
-                                style={{
-                                  color: isActive ? "#f87171" : "#34d399",
-                                  backgroundColor: "var(--bg-card)",
-                                  border: `1px solid ${isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"}`,
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.5)" : "rgba(16,185,129,0.5)";
-                                  e.currentTarget.style.backgroundColor = isActive ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)";
-                                  e.currentTarget.style.backgroundColor = "var(--bg-card)";
-                                }}
+                                style={{ color: isActive ? "#f87171" : "#34d399", backgroundColor: "var(--bg-card)", border: `1px solid ${isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"}` }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.5)" : "rgba(16,185,129,0.5)"; e.currentTarget.style.backgroundColor = isActive ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"; e.currentTarget.style.backgroundColor = "var(--bg-card)"; }}
                               >
                                 {isActive ? (
                                   <><Ico d={"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"} className="w-3 h-3" /> Disable</>
@@ -1261,555 +662,28 @@ export default function CategoryDetailPage() {
           </div>
           <div className="p-6">
             <div className="space-y-6 relative before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--border-color)]">
-              
-              {/* Created Event */}
               <div className="relative pl-8">
                 <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500 shadow-sm" />
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                   <div>
                     <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Created</p>
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      Initial category setup and configuration.
-                    </p>
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Initial category setup and configuration.</p>
                   </div>
-                  <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>
-                    {formatDateTime(category.created_at)}
-                  </span>
+                  <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at)}</span>
                 </div>
               </div>
-
-              {/* Updated Event */}
               {category.updated_at && category.updated_at !== category.created_at && (
                 <div className="relative pl-8">
                   <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-blue-500 shadow-sm" />
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                     <div>
                       <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Updated</p>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                        Category details or attributes were modified.
-                      </p>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Category details or attributes were modified.</p>
                     </div>
-                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>
-                      {formatDateTime(category.updated_at)}
-                    </span>
+                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at)}</span>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT MODAL */}
-      {showEdit && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className="w-full max-w-4xl max-h-[90vh] rounded-xl overflow-hidden shadow-2xl flex flex-col"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <div>
-                <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Edit Category</h2>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  Update category information and attributes
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEdit(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-tertiary)] transition-colors"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <Ico d={D.close} className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={submitEdit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-6">
-              {/* Category Information */}
-              <div className="space-y-4">
-                <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Category Information</h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                      Category Code
-                    </label>
-                    <input
-                      value={form.category_code}
-                      readOnly
-                      className="w-full h-10 px-3 rounded-lg text-[13px] font-mono outline-none bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-secondary)] cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                      Name *
-                    </label>
-                    <input
-                      value={form.name}
-                      required
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg text-[13px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                      Category Type *
-                    </label>
-                    <div className="w-full h-10 px-3 rounded-lg text-[13px] bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] flex items-center gap-2 cursor-not-allowed">
-                      <span className="truncate">{form.category_type || "—"}</span>
-                      <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)] bg-[var(--bg-card)] px-1.5 py-0.5 rounded border border-[var(--border-color)] shrink-0">Locked</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                      Parent Category
-                    </label>
-                    <select
-                      value={form.parent_category_id}
-                      onChange={(e) => setForm({ ...form, parent_category_id: e.target.value })}
-                      className="w-full h-10 px-3 rounded-lg text-[13px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors cursor-pointer appearance-none"
-                    >
-                      <option value="">Root Category</option>
-                      {adminCategories.filter((c) => String(c._id) !== String(categoryId)).map((c) => (
-                        <option key={c._id} value={c._id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                    Description
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg text-[13px] outline-none resize-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
-                    Status
-                  </label>
-                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                    {[
-                      { id: true, label: "Active" },
-                      { id: false, label: "Inactive" },
-                    ].map((opt) => {
-                      const isActive = form.is_active === opt.id;
-                      return (
-                        <button
-                          key={String(opt.id)}
-                          type="button"
-                          onClick={() => setForm({ ...form, is_active: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${
-                            isActive
-                              ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm"
-                              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Attributes Section */}
-              <div className="space-y-4" style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1.5rem" }}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Assigned Attributes</h3>
-                  {form.category_type && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAttributeModal(true)}
-                      className="h-8 px-3 text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                      <Ico d={D.box} className="w-3.5 h-3.5" /> Add Attribute
-                    </button>
-                  )}
-                </div>
-
-                {!form.category_type ? (
-                  <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)]/30">
-                    <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No category type selected</p>
-                  </div>
-                ) : form.attributes.length > 0 ? (
-                  <div className="space-y-3">
-                    {form.attributes.map((config, index) => {
-                      const seedName = config.seed_name || `Attribute ${index + 1}`;
-                      const inputKey = config.ui_key || `attr-${getAttributeId(config) || config.seed_code || index}`;
-                      const isOpen = openAttributeKey === inputKey;
-                      const selectedValues = Array.isArray(config.value) ? config.value : [];
-                      const TypeIcon = config.seed_type === "boolean" ? D.check : D.box;
-                      const typeBadgeLabel = config.seed_type === "multi_select" ? "Multi Select" : "Yes / No";
-
-                      return (
-                        <div
-                          key={inputKey}
-                          className={`rounded-xl border overflow-visible transition-all duration-200 ${isOpen ? "border-[var(--accent)]/50 bg-[var(--bg-primary)] shadow-md ring-1 ring-[var(--accent)]/10" : "border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--text-muted)]"}`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setOpenAttributeKey((prev) => (prev === inputKey ? null : inputKey))}
-                            className="w-full px-4 py-3 flex items-center justify-between text-left group"
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="text-[13px] font-bold text-[var(--text-primary)] truncate">{seedName}</h4>
-                                  <span className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-[var(--bg-tertiary)] text-[var(--text-muted)] rounded border border-[var(--border-color)]">
-                                    {typeBadgeLabel}
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap gap-1 min-h-[18px]">
-                                  {config.seed_type === "multi_select" ? (
-                                    selectedValues.length > 0 ? (
-                                      selectedValues.slice(0, 4).map((val, i) => (
-                                        <span key={i} className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/15">
-                                          {val}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-[11px] italic text-[var(--text-muted)]">No options assigned</span>
-                                    )
-                                  ) : (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded border border-[var(--accent)]/15">
-                                      {config.value === true ? "Yes" : config.value === false ? "No" : "Not set"}
-                                    </span>
-                                  )}
-                              </div>
-                              </div>
-                            </div>
-                            <Ico d={D.back} className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-90 text-[var(--accent)]" : "text-[var(--text-muted)]"}`} />
-                          </button>
-
-                          {isOpen && (
-                            <div className="px-4 pb-4 pt-3 border-t border-[var(--border-color)]/50 bg-[var(--bg-primary)]/50 rounded-b-xl">
-                              {config.seed_type === "multi_select" ? (
-                                <div className="space-y-2.5">
-                                  <div className="flex items-center justify-between">
-                                    <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Assigned Options</label>
-                                    <span className="text-[10px] font-medium text-[var(--text-muted)]">{selectedValues.length} assigned</span>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    {selectedValues.length > 0 ? (
-                                      selectedValues.map((val, i) => (
-                                        <div
-                                          key={`${inputKey}-opt-${i}`}
-                                          className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg"
-                                        >
-                                          <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                                            {i + 1}
-                                          </span>
-                                          <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{val}</span>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const next = selectedValues.filter((_, idx) => idx !== i);
-                                              updateAttributeConfig(inputKey, "value", next);
-                                            }}
-                                            className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                                          >
-                                            <Ico d={D.close} className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-3 text-center text-[11px] italic text-[var(--text-muted)] border border-dashed border-[var(--border-color)] rounded-lg">
-                                        No options assigned yet
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex gap-2 pt-1">
-                                    <input
-                                      type="text"
-                                      id={`opt-input-${inputKey}`}
-                                      placeholder={`Add option (e.g. 8 GB)`}
-                                      className="flex-1 min-w-0 h-[32px] px-3 text-xs outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                                      onKeyDown={async (e) => {
-                                        if (e.key !== "Enter") return;
-                                        e.preventDefault();
-                                        const input = e.currentTarget;
-                                        const raw = input.value.trim();
-                                        if (!raw) return;
-                                        input.value = "";
-                                        await handleAddAttributeValue(inputKey, { ...config, _draftValue: raw });
-                                      }}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const input = document.getElementById(`opt-input-${inputKey}`);
-                                        if (!input) return;
-                                        const raw = input.value.trim();
-                                        if (!raw) return;
-                                        await handleAddAttributeValue(inputKey, { ...config, _draftValue: raw });
-                                        input.value = "";
-                                      }}
-                                      className="h-[32px] px-3 text-[10px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
-                                    >
-                                      <Ico d={D.box} className="w-3 h-3" /> Add
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : config.seed_type === "boolean" ? (
-                                <div className="space-y-2">
-                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Current State</label>
-                                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
-                                      const isActive = config.value === opt.id;
-                                      return (
-                                        <button
-                                          key={String(opt.id)}
-                                          type="button"
-                                          onClick={() => updateAttributeConfig(inputKey, "value", opt.id)}
-                                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-                                        >
-                                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                                          {opt.label}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <p className="text-[10px] text-[var(--text-muted)]">Toggle to switch between Yes and No.</p>
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)]/30">
-                    <p className="text-[13px] mb-3" style={{ color: "var(--text-muted)" }}>No attributes assigned</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowAttributeModal(true)}
-                      className="h-8 px-4 text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors"
-                    >
-                      + Add First Attribute
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex justify-end gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <Button onClick={() => setShowEdit(false)}>Cancel</Button>
-                <Button
-                  primary
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  icon={updateMutation.isPending ? <Spin className="w-4 h-4" /> : <Ico d={D.check} className="w-4 h-4" />}
-                >
-                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ADD ATTRIBUTE MODAL */}
-      {showAttributeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(600px, 85vh)" }}>
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3 shrink-0">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-                  <Ico d={D.edit} className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Add New Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">Configure properties for products in this category.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAttributeModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-              >
-                <Ico d={D.close} className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="px-5 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
-              {/* Attribute Name */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newAttributeData.name}
-                  onChange={(e) => setNewAttributeData({ ...newAttributeData, name: e.target.value })}
-                  autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                  placeholder="e.g. Color, Size, RAM"
-                />
-              </div>
-
-              {/* Data Type */}
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: "multi_select", label: "Multiple Options", desc: "Choose from a list of values" },
-                    { id: "boolean", label: "Yes / No", desc: "Set this attribute to Yes or No" },
-                  ].map((type) => {
-                    const isActive = newAttributeData.data_type === type.id;
-                    return (
-                      <button
-                        key={type.id}
-                        type="button"
-                        onClick={() => setNewAttributeData({
-                          ...newAttributeData,
-                          data_type: type.id,
-                          ...(type.id === "boolean" ? { values: [], value: "yes" } : { value: "" }),
-                        })}
-                        className={`h-auto py-3 px-3 text-left rounded-lg border transition-all ${isActive
-                          ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm ring-1 ring-[var(--accent)]/10"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                        }`}
-                      >
-                        <span className="block text-[11px] font-semibold leading-tight">{type.label}</span>
-                        <span className={`block text-[10px] mt-1 leading-tight ${isActive ? "text-[var(--accent)]/70" : "text-[var(--text-muted)]"}`}>{type.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Multiple Options Section */}
-              {newAttributeData.data_type === "multi_select" && (
-                <div className="space-y-2.5">
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>
-                  <div className="space-y-1.5">
-                    {(newAttributeData.values || []).map((opt, idx) => (
-                      <div key={`opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
-                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = (newAttributeData.values || []).filter((_, i) => i !== idx);
-                            setNewAttributeData({ ...newAttributeData, values: next });
-                          }}
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                        >
-                          <Ico d={D.close} className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      id="new-attr-option-input"
-                      placeholder="Add an option (e.g. 8 GB)"
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const val = e.currentTarget.value.trim();
-                          if (!val) return;
-                          const exists = (newAttributeData.values || []).some((v) => v.toLowerCase() === val.toLowerCase());
-                          if (exists) return;
-                          setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
-                          e.currentTarget.value = "";
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const input = document.getElementById("new-attr-option-input");
-                        if (!input) return;
-                        const val = input.value.trim();
-                        if (!val) return;
-                        const exists = (newAttributeData.values || []).some((v) => v.toLowerCase() === val.toLowerCase());
-                        if (exists) { input.value = ""; return; }
-                        setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
-                        input.value = "";
-                      }}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
-                    >
-                      <Ico d={D.box} className="w-3 h-3" /> Add
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Yes / No Section */}
-              {newAttributeData.data_type === "boolean" && (
-                <div className="space-y-2.5">
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { id: "yes", label: "Yes" },
-                      { id: "no", label: "No" },
-                    ].map((opt) => {
-                      const isActive = newAttributeData.value === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setNewAttributeData({ ...newAttributeData, value: opt.id })}
-                          className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive
-                            ? opt.id === "yes"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
-                              : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
-                            : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          <span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive
-                            ? opt.id === "yes"
-                              ? "bg-emerald-500 border-emerald-500"
-                              : "bg-[var(--text-muted)] border-[var(--text-muted)]"
-                            : "border-[var(--border-color)] bg-transparent"
-                          }`} />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default value for this attribute.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowAttributeModal(false)}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAddAttributeFromModal}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm"
-              >
-                Add Attribute
-              </button>
             </div>
           </div>
         </div>
@@ -1818,18 +692,9 @@ export default function CategoryDetailPage() {
       {/* DELETE MODAL */}
       {showDelete && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className="w-full max-w-sm rounded-xl p-6 shadow-2xl"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(239,68,68,0.10)", color: "var(--danger)" }}
-              >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.10)", color: "var(--danger)" }}>
                 <Ico d={D.trash} className="w-5 h-5" />
               </div>
               <div>
@@ -1839,7 +704,6 @@ export default function CategoryDetailPage() {
                 </p>
               </div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
               <Button onClick={() => setShowDelete(false)}>Cancel</Button>
               <Button
@@ -1854,24 +718,27 @@ export default function CategoryDetailPage() {
           </div>
         </div>
       )}
-
+           {/* EDIT CATEGORY MODAL - EXACT SAME AS MAIN PAGE */}
+      {showEditModal && (
+        <CategoryEditModal
+          categoryId={categoryId}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false);
+            queryClient.invalidateQueries({ queryKey: ["category", categoryId] });
+            queryClient.invalidateQueries({ queryKey: ["categories"] });
+            toast.success("Category updated successfully");
+          }}
+        />
+      )}
       {/* TOGGLE ATTRIBUTE STATUS MODAL */}
       {attrToToggle && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className="w-full max-w-sm rounded-xl p-6 shadow-2xl"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-3">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{
-                  backgroundColor: attrToToggle.is_active !== false ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)",
-                  color: attrToToggle.is_active !== false ? "var(--danger)" : "var(--success)",
-                }}
+                style={{ backgroundColor: attrToToggle.is_active !== false ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: attrToToggle.is_active !== false ? "var(--danger)" : "var(--success)" }}
               >
                 {attrToToggle.is_active !== false ? (
                   <Ico d={"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"} className="w-5 h-5" />
@@ -1892,7 +759,6 @@ export default function CategoryDetailPage() {
                 </p>
               </div>
             </div>
-
             <div className="flex justify-end gap-2 mt-6">
               <Button onClick={() => setAttrToToggle(null)}>Cancel</Button>
               <Button
@@ -1907,5 +773,230 @@ export default function CategoryDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+/* =========================================================
+   EDIT CATEGORY MODAL (Same as Main Page)
+========================================================= */
+/* =========================================================
+   EXACT SAME EDIT CATEGORY MODAL (Self-Contained Replica)
+========================================================= */
+const ModalPlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
+const ModalSearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
+const ModalChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
+const ModalLayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>);
+const ModalSpinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
+
+function CategoryEditModal({ categoryId, onClose, onSuccess }) {
+  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({ category_code: "", name: "", description: "", parent_category_id: "", status: "active", attributes: [] });
+  const [showAttrSelectModal, setShowAttrSelectModal] = useState(false);
+  const [attrSearch, setAttrSearch] = useState("");
+  const [tempSelectedAttrIds, setTempSelectedAttrIds] = useState([]);
+  const [showCreateAttrModal, setShowCreateAttrModal] = useState(false);
+  const [newAttrName, setNewAttrName] = useState("");
+  const [newAttrType, setNewAttrType] = useState("multi_select");
+  const [newAttrValues, setNewAttrValues] = useState([]);
+  const [newAttrValueInput, setNewAttrValueInput] = useState("");
+  const [newAttrDefaultValue, setNewAttrDefaultValue] = useState("yes");
+  const [creatingAttribute, setCreatingAttribute] = useState(false);
+  const [showParentDropdown, setShowParentDropdown] = useState(false);
+  const parentDropdownRef = useRef(null);
+  const [parentDropdownPos, setParentDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const { data: category, isLoading: categoryLoading } = useQuery({ queryKey: ["category", categoryId], queryFn: () => categoryApi.getById(categoryId), enabled: !!categoryId });
+  const { data: allCategories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
+  const { data: allAttributes = [] } = useQuery({ queryKey: ["all-attributes"], queryFn: () => attributeApi.getAll(), enabled: showAttrSelectModal || showCreateAttrModal });
+
+  useEffect(() => {
+    if (category) {
+      const loadedAttrs = (category.attributes || []).map((a, i) => {
+        let value = a.value;
+        const attrObj = a.attribute_id;
+        const dataType = (attrObj && typeof attrObj === "object") ? attrObj.data_type : null;
+        if (dataType === "boolean") value = (value === "true" || value === true);
+        let seed_name = "", seed_code = "", seed_type = "", seed_options = [];
+        if (attrObj && typeof attrObj === "object" && attrObj.name) {
+          seed_name = attrObj.name || ""; seed_code = attrObj.code || "";
+          seed_type = (attrObj.data_type === "select" || attrObj.data_type === "color") ? "multi_select" : (attrObj.data_type || "");
+          seed_options = (attrObj.values || []).map((v) => v.label || v.value || v);
+        } else if (a.seed_name) { seed_name = a.seed_name || ""; seed_code = a.seed_code || ""; seed_type = a.seed_type || ""; seed_options = a.seed_options || []; }
+        return { ...a, value, seed_name, seed_code, seed_type, seed_options, ui_key: a.ui_key || `edit-${getAttributeId(a) || seed_code || `idx-${i}`}-${i}` };
+      });
+      setFormData({
+        category_code: category.category_code || "", name: category.name || "", description: category.description || "",
+        parent_category_id: getId(category.parent_category_id), status: category.is_active !== false ? "active" : "inactive", attributes: loadedAttrs,
+      });
+    }
+  }, [category]);
+
+  const updateMutation = useMutation({
+    mutationFn: (data) => categoryApi.update(categoryId, data),
+    onSuccess: async () => {
+      const attrs = formData.attributes || [];
+      const properAttrs = attrs.filter((a) => a && (a.attribute_id || a.seed_code)).map((a) => {
+        const raw = a.attribute_id || a._id; let aid = !raw ? undefined : (typeof raw === "string" ? raw : (typeof raw === "object" && raw._id ? String(raw._id) : String(raw)));
+        return { attribute_id: aid || undefined, is_visible: a.is_visible !== false, is_searchable: Boolean(a.is_searchable), is_variant_option: a.is_variant_option !== false, sort_order: typeof a.sort_order === "number" ? a.sort_order : 0, value: Array.isArray(a.value) ? a.value : (a.value != null ? String(a.value) : "") };
+      }).filter((a) => !!a.attribute_id);
+      if (properAttrs.length > 0) { try { await categoryApi.updateAttributes(String(categoryId), properAttrs); } catch (err) { console.error("Attribute sync failed:", err); } }
+      onSuccess();
+    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || "Update failed"),
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
+    updateMutation.mutate({ ...formData, parent_category_id: formData.parent_category_id || null, is_active: formData.status === "active" });
+  };
+
+  const removeAttributeFromForm = (attrId) => setFormData((p) => ({ ...p, attributes: p.attributes.filter((a) => String(getAttributeId(a)) !== String(attrId)) }));
+  const openAttrSelectModal = () => { setTempSelectedAttrIds(formData.attributes.map((a) => getAttributeId(a)).filter(Boolean)); setAttrSearch(""); setShowAttrSelectModal(true); };
+  const toggleTempAttribute = (attrId) => setTempSelectedAttrIds((prev) => prev.includes(attrId) ? prev.filter((id) => id !== attrId) : [...prev, attrId]);
+  
+  const applyAttributeSelection = () => {
+    const newAttrs = [];
+    tempSelectedAttrIds.forEach((attrId, index) => {
+      const existing = formData.attributes.find((a) => String(getAttributeId(a)) === String(attrId));
+      if (existing) newAttrs.push({ ...existing, sort_order: index });
+      else {
+        const attr = allAttributes.find((a) => String(a._id) === String(attrId));
+        if (attr) {
+          const mappedSeedType = attr.data_type === "select" || attr.data_type === "color" ? "multi_select" : attr.data_type;
+          newAttrs.push({ ui_key: `sel-${attrId}-${Date.now()}`, attribute_id: attr._id, seed_code: attr.code, seed_name: attr.name, seed_type: mappedSeedType, seed_options: (attr.values || []).map(v => v.label || v.value || v), is_visible: true, is_searchable: true, sort_order: index, value: mappedSeedType === "multi_select" ? [] : "" });
+        }
+      }
+    });
+    setFormData((p) => ({ ...p, attributes: newAttrs })); setShowAttrSelectModal(false);
+  };
+
+  const handleCreateAttribute = async () => {
+    if (!newAttrName.trim() || creatingAttribute) return;
+    if (newAttrType === "multi_select" && newAttrValues.length === 0) { toast.error("At least one option is required"); return; }
+    setCreatingAttribute(true);
+    try {
+      const code = newAttrName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const payload = { name: newAttrName.trim(), code, data_type: newAttrType, description: "", values: newAttrType === "multi_select" ? newAttrValues.map((v) => ({ label: v, value: v })) : [{ label: newAttrDefaultValue === "yes" ? "Yes" : "No", value: newAttrDefaultValue }] };
+      const created = await attributeApi.create(payload); queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
+      if (created && created._id) {
+        const mappedType = created.data_type === "select" || created.data_type === "color" ? "multi_select" : created.data_type;
+        const newAttrEntry = { ui_key: `sel-${created._id}-${Date.now()}`, attribute_id: created._id, seed_code: created.code, seed_name: created.name, seed_type: mappedType, seed_options: (created.values || []).map(v => v.label || v.value || v), is_visible: true, is_searchable: true, sort_order: formData.attributes.length, value: mappedType === "multi_select" ? [] : (newAttrDefaultValue === "yes" ? true : false) };
+        setFormData((p) => ({ ...p, attributes: [...p.attributes, newAttrEntry] })); setTempSelectedAttrIds((prev) => [...prev, created._id]);
+      }
+      setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); setAttrSearch("");
+      toast.success(`Attribute "${created?.name}" created`);
+    } catch (err) { toast.error(err.response?.data?.message || "Failed to create attribute"); } finally { setCreatingAttribute(false); }
+  };
+
+  const filteredAllAttributes = useMemo(() => !attrSearch.trim() ? allAttributes : allAttributes.filter((a) => a.name?.toLowerCase().includes(attrSearch.toLowerCase()) || a.code?.toLowerCase().includes(attrSearch.toLowerCase())), [allAttributes, attrSearch]);
+  
+  const buildHierarchy = (cats, parentId = null, depth = 0) => {
+    const result = []; const normalizedParent = parentId === null ? "" : getId(parentId);
+    const children = cats.filter((c) => getId(c.parent_category_id) === normalizedParent && String(c._id) !== String(categoryId));
+    for (const cat of children) { result.push({ ...cat, depth }); result.push(...buildHierarchy(cats, cat._id, depth + 1)); } return result;
+  };
+  const hierarchicalCategories = buildHierarchy(allCategories);
+  const selectedParentName = formData.parent_category_id ? allCategories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "Root Category" : "Root Category";
+
+  if (categoryLoading || !category) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="w-full max-w-[580px] max-h-[85vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden">
+          <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0"><Ico d={D.folder} className="w-4 h-4" /></div>
+              <div><h2 className="text-[14px] font-bold text-[var(--text-primary)]">Edit Category</h2><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Define category details, attributes, and hierarchy.</p></div>
+            </div>
+            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-4 h-4" /></button>
+          </div>
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
+            <div className="p-5 space-y-4">
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Code</label><input type="text" value={formData.category_code} readOnly className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] opacity-60" /></div>
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label><input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+                </div>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Description</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
+                  <div className="relative">
+                    <button ref={parentDropdownRef} type="button" onClick={() => { if (!showParentDropdown && parentDropdownRef.current) { const rect = parentDropdownRef.current.getBoundingClientRect(); setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width }); } setShowParentDropdown(!showParentDropdown); }} className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors cursor-pointer flex items-center justify-between gap-2">
+                      <span className="truncate text-left">{selectedParentName}</span><ModalChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Product Attributes</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Attributes</label>
+                  <button type="button" onClick={openAttrSelectModal} className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 min-w-0"><ModalLayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />{formData.attributes.length === 0 ? <span className="text-[var(--text-muted)]">Select Attributes</span> : <span className="text-[var(--text-secondary)]">{formData.attributes.length} attribute{formData.attributes.length !== 1 ? "s" : ""} selected</span>}</span>
+                    <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">Browse</span>
+                  </button>
+                  {formData.attributes.length > 0 && (<div className="flex flex-wrap gap-[6px] pt-1.5">{formData.attributes.map((attr, i) => (<span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 pl-[10px] pr-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">{attr.seed_name || `Attribute ${i + 1}`}<button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))} className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ml-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Ico d={D.close} className="w-[10px] h-[10px]" /></button></span>))}</div>)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Status</p>
+                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
+                  {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
+                    const isActive = formData.status === opt.id;
+                    return (<button key={opt.id} type="button" onClick={() => setFormData({ ...formData, status: opt.id })} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />{opt.label}</button>);
+                  })}
+                </div>
+              </div>
+            </div>
+          </form>
+          <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
+            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">Cancel</button>
+            <button type="submit" onClick={handleSubmit} disabled={updateMutation.isPending} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50">{updateMutation.isPending ? <ModalSpinner className="w-3.5 h-3.5" /> : <Ico d={D.check} className="w-3.5 h-3.5" />}Update Category</button>
+          </div>
+        </div>
+      </div>
+
+      {showParentDropdown && createPortal(<>
+        <div className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
+        <div className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden" style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "240px" }}>
+          <div className="overflow-y-auto" style={{ maxHeight: "240px" }}>
+            <button type="button" onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}><span>Root Category</span>{!formData.parent_category_id && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)]" />}</button>
+            {hierarchicalCategories.map((cat) => (<button key={cat._id} type="button" onClick={() => { setFormData({ ...formData, parent_category_id: cat._id }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`} style={{ paddingLeft: `${12 + cat.depth * 16}px` }}><span className="truncate">{cat.name}</span>{String(formData.parent_category_id) === String(cat._id) && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}</button>))}
+          </div>
+        </div>
+      </>, document.body)}
+
+      {showAttrSelectModal && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
+            <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0"><div><h3 className="text-[13px] font-bold text-[var(--text-primary)]">Select Attributes</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Select attributes to use for products in this category.</p></div><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
+            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0"><div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><ModalSearchIcon className="w-3.5 h-3.5" /></span><input type="text" placeholder="Search attributes..." value={attrSearch} onChange={(e) => setAttrSearch(e.target.value)} className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" autoFocus /></div></div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attr.name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{attr.values.length} values</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">No matching attributes found</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">No attributes available yet</p></div>}
+            </div>
+            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }} className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">Create "{attrSearch.trim()}"</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }} className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">Create new attribute</span></button></div>) : null}</div>)}
+            <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">Cancel</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">Apply{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
+          </div>
+        </div>, document.body
+      )}
+
+      {showCreateAttrModal && createPortal(
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 85vh)" }}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0"><div className="flex items-start gap-3 min-w-0"><div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0"><ModalLayersIcon className="w-4 h-4" /></div><div className="min-w-0 pt-0.5"><h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Add New Attribute</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure properties for products in this category.</p></div></div><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
+            <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+              <div className="space-y-1.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label><input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder="e.g. Color, Size, RAM" /></div>
+              <div className="space-y-2"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label><div className="grid grid-cols-2 gap-3">{[{ id: "multi_select", label: "Multi Options" }, { id: "boolean", label: "Yes / No" }].map((type) => { const isActive = newAttrType === type.id; return (<button key={type.id} type="button" onClick={() => { setNewAttrType(type.id); setNewAttrValues([]); setNewAttrValueInput(""); if (type.id === "boolean") setNewAttrDefaultValue("yes"); }} className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${isActive ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span>{type.label}</span></button>); })}</div></div>
+              {newAttrType === "multi_select" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>{newAttrValues.length > 0 && (<div className="flex flex-wrap gap-1.5">{newAttrValues.map((val, idx) => (<span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"><span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>{val}<button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, i) => i !== idx))} className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"><Ico d={D.close} className="w-2.5 h-2.5" /></button></span>))}</div>)}<div className="flex gap-2"><input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error("Option already exists"); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); } }} className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder="Add an option" /><button type="button" onClick={() => { const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error("Option already exists"); setNewAttrValueInput(""); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); }} className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"><ModalPlusIcon className="w-3 h-3" /> Add</button></div></div>)}
+              {newAttrType === "boolean" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label><div className="grid grid-cols-2 gap-3">{[{ id: "yes", label: "Yes" }, { id: "no", label: "No" }].map((opt) => { const isActive = newAttrDefaultValue === opt.id; return (<button key={opt.id} type="button" onClick={() => setNewAttrDefaultValue(opt.id)} className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive ? opt.id === "yes" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10" : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]" : "border-[var(--border-color)] bg-transparent"}`} />{opt.label}</button>); })}</div></div>)}
+            </div>
+            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0"><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">Cancel</button><button type="button" onClick={handleCreateAttribute} disabled={!newAttrName.trim() || creatingAttribute} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{creatingAttribute ? <span className="flex items-center gap-1.5"><ModalSpinner className="w-3.5 h-3.5" /> Adding...</span> : "Add Attribute"}</button></div>
+          </div>
+        </div>, document.body
+      )}
+    </>
   );
 }

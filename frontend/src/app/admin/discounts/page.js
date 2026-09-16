@@ -19,6 +19,7 @@ const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill
 
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
+const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
@@ -292,13 +293,13 @@ const getProductAttributes = (product) => {
   return list;
 };
 /* ==================== DROPDOWN MENU ITEM ==================== */
-const MenuItem = ({ icon, label, onClick, danger }) => (
+const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
-    style={{ color: danger ? undefined : "var(--text-primary)" }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
+    style={{ color: danger || success ? undefined : "var(--text-primary)" }}
   >
     {icon} {label}
   </button>
@@ -411,7 +412,21 @@ useEffect(() => {
       setSelectedIds([]);
       toast.success("Discount deleted successfully");
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+      onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, newStatus }) =>
+      discountApi.update(id, {
+        status: newStatus,
+        isActive: newStatus === "active" || newStatus === "scheduled",
+      }),
+    onMutate: () => markSelfAction("update"),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      toast.success(variables.newStatus === "active" ? "Discount activated" : "Discount deactivated");
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
   });
 
   const filteredDiscounts = useMemo(() => {
@@ -524,9 +539,16 @@ useEffect(() => {
     saveMutation.mutate({ id: editingDiscount?._id || editingDiscount?.id || null, data: payload });
   };
 
-  const confirmDelete = () => {
+   const confirmDelete = () => {
     if (!deleteTarget) return;
     deleteMutation.mutate(deleteTarget.map((d) => d?._id || d?.id));
+  };
+
+  const handleToggleStatus = (discount) => {
+    const id = discount?._id || discount?.id;
+    const status = getDiscountStatus(discount);
+    const isActive = status === "active" || status === "scheduled";
+    toggleStatusMutation.mutate({ id, newStatus: isActive ? "disabled" : "active" });
   };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
@@ -565,7 +587,7 @@ const ActionButtons = ({ discount }) => {
     e.stopPropagation();
     if (open) { setActionMenu(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuHeight = 148;
+        const menuHeight = 200;
     const menuWidth = 176;
     const top = rect.bottom + 6 + menuHeight > window.innerHeight
       ? rect.top - 6 - menuHeight
@@ -607,11 +629,19 @@ const ActionButtons = ({ discount }) => {
               label="View Details"
               onClick={() => { setActionMenu(null); handleView(id); }}
             />
-            <MenuItem
+                      <MenuItem
               icon={<EditIcon className="w-4 h-4" />}
               label="Edit Discount"
               onClick={() => { setActionMenu(null); openEdit(discount); }}
             />
+            <MenuItem
+              icon={<PowerIcon className="w-4 h-4" />}
+              label={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled") ? "Deactivate" : "Activate"}
+              danger={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
+              success={!(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
+              onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
+            />
+            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <MenuItem
               icon={<TrashIcon className="w-4 h-4" />}
               label="Delete"

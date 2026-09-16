@@ -351,10 +351,7 @@ export default function DealDetailPage() {
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                       <ArrowLeft className="w-4 h-4" /> Back
                     </button>
-                    <button onClick={() => router.push(`${backPath}?edit=${dealId}`)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
-                      style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Edit3 className="w-4 h-4" /> Edit Deal
-                    </button>
+                  
                     <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
                       className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
                       style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
