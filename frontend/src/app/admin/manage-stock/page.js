@@ -439,7 +439,19 @@ export default function ManageStockPage() {
                           const status = getStockStatus(item);
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                              <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={item.product_name} /><span className="font-medium text-[13px] truncate max-w-[160px]">{item.product_name}</span></div></td>
+<td className="px-4 py-2.5">
+  <div className="flex items-center gap-2.5">
+    <Avatar name={item.product_name} />
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="font-medium text-[13px] truncate max-w-[160px]">{item.product_name}</span>
+      {item.product_is_deleted && (
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
+          Deleted
+        </span>
+      )}
+    </div>
+  </div>
+</td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "#f59e0b" : "var(--text-primary)" }}>{item.quantity} units</span></td>
@@ -473,8 +485,15 @@ export default function ManageStockPage() {
                           <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
                             <BoxIcon className="w-4 h-4" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium truncate leading-tight">{item.product_name}</p>
+                                               <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-[13px] font-medium truncate leading-tight">{item.product_name}</p>
+                              {item.product_is_deleted && (
+                                <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
+                                  Deleted
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{item.sku || "—"}</p>
                           </div>
                         </div>
@@ -542,11 +561,11 @@ export default function ManageStockPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedHistory.map((h, index) => {
+                     {paginatedHistoryItems.map((h, index) => {
                         const change = h.change_quantity ?? 0;
                         const isSet = h.adjustment_type === "set";
                         return (
-                          <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistory.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
+                          <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
                             <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={h.product_name} /><span className="font-medium text-[13px] truncate max-w-[150px]">{h.product_name}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.variant_title}</span></td>

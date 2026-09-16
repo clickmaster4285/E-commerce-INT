@@ -318,7 +318,7 @@ export default function BrandDetailPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={() => router.push(backPath)}><Ico d={D.back} className="h-3.5 w-3.5" /> Back</Button>
-              <Button primary onClick={openEdit}><Ico d={D.edit} className="h-3.5 w-3.5" /> Edit Brand</Button>
+              
               <Button danger disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}><Ico d={D.trash} className="w-3.5 h-3.5" /> Delete</Button>
             </div>
           </div>

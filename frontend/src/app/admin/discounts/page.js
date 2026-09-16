@@ -459,12 +459,12 @@ useEffect(() => {
     let type = "all";
     if (rawTarget === "specific_products" || rawTarget === "product") type = "product";
     else if (rawTarget === "specific_categories" || rawTarget === "category") type = "category";
-    else if (rawTarget === "brand") type = "brand";
+    else if (rawTarget === "specific_brands" || rawTarget === "brand") type = "brand";
 
     let selected_ids = [];
-    if (type === "product") selected_ids = (discount?.selected_product_ids || discount?.productIds || discount?.products?.map(getId) || []).map(getId);
-    else if (type === "category") selected_ids = (discount?.selected_category_ids || discount?.categoryIds || discount?.categories?.map(getId) || []).map(getId);
-    else if (type === "brand") selected_ids = (discount?.selected_brand_ids || discount?.brandIds || discount?.brands?.map(getId) || []).map(getId);
+    if (type === "product") selected_ids = (discount?.selectedProducts || discount?.selected_product_ids || discount?.productIds || []).map(getId);
+    else if (type === "category") selected_ids = (discount?.selectedCategories || discount?.selected_category_ids || discount?.categoryIds || []).map(getId);
+    else if (type === "brand") selected_ids = (discount?.selectedBrands || discount?.selected_brand_ids || discount?.brandIds || []).map(getId);
 
     setFormData({
       name: discount?.name || "", code: discount?.code || "", description: discount?.description || "",
@@ -753,9 +753,8 @@ const ActionButtons = ({ discount }) => {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-4 h-4" /></div>
-                            <div className="min-w-0">
+                                                      <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
-                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{discount?.code || "—"}</p>
                             </div>
                           </div>
                         </td>
@@ -778,9 +777,8 @@ const ActionButtons = ({ discount }) => {
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-5 h-5" /></div>
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
-                <div className="min-w-0">
+                               <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
-                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{discount?.code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                   <span className="text-[12px] font-bold" style={{ color: "#34d399" }}>{formatValue(discount)}</span>

@@ -297,13 +297,7 @@ export default function DiscountDetailPage() {
                       </h1>
                       <StatusBadge active={isActive} label={getDiscountStatus(discount).toUpperCase()} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      {discount.code && (
-                        <>
-                          <span className="flex items-center gap-1.5 font-mono"><Hash className="w-3.5 h-3.5" />{discount.code}</span>
-                          <span className="opacity-50">•</span>
-                        </>
-                      )}
+                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
                       <span className="flex items-center gap-1.5 font-bold" style={{ color: "#10b981" }}>
                         <Percent className="w-3.5 h-3.5" /> {formatDiscountValue(discount)}
                       </span>
@@ -391,10 +385,9 @@ export default function DiscountDetailPage() {
 
                    {/* ✅ Discount Info LEFT + Description RIGHT — equal height */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InfoCard icon={Tag} title="Discount Information">
+                        <InfoCard icon={Tag} title="Discount Information">
               <div className="space-y-1">
                 <DataRow icon={Hash} label="Discount Name" value={discount.name} />
-                <DataRow icon={Hash} label="Coupon Code" value={discount.code || "—"} mono />
                 <DataRow icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
                 <DataRow icon={DollarSign} label="Discount Value" value={formatDiscountValue(discount)} highlight />
                 <DataRow icon={Activity} label="Status" value={getDiscountStatus(discount).toUpperCase()} highlight={isActive} />
