@@ -1128,9 +1128,7 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
                       <FormField label="Discount Percentage (%)">
                         <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
                       </FormField>
-                      <FormField label="Max Discount Cap (Rs.)" hint="Optional - caps the maximum savings">
-                        <TextInput type="number" value={formData.max_discount} onChange={(v) => setFormData({ ...formData, max_discount: v })} placeholder="e.g., 1000" style={inputStyle} />
-                      </FormField>
+                      
                     </>
                   )}
 

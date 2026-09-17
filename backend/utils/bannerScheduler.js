@@ -3,26 +3,32 @@ const Banner = require('../models/Banner');
 
 // Har minute check karo
 cron.schedule('* * * * *', async () => {
-  const now = new Date();
+  try {
+    const now = new Date();
 
-  // Scheduled → Active (start date aa gayi)
-  await Banner.updateMany(
-    {
-      status: 'scheduled',
-      autoPublish: true,
-      startDate: { $lte: now }
-    },
-    { $set: { status: 'active' } }
-  );
+    // ✅ Scheduled/Draft → Active (start date aa gayi, end date nahi guzri)
+    await Banner.updateMany(
+      {
+        status: { $in: ['scheduled', 'draft'] },
+        startDate: { $ne: null, $lte: now },
+        $or: [
+          { endDate: null },
+          { endDate: { $exists: false } },
+          { endDate: { $gt: now } },
+        ],
+      },
+      { $set: { status: 'active' } }
+    );
 
-  // Active → Expired (end date guzar gayi)
-  await Banner.updateMany(
-    {
-      status: 'active',
-      autoDisable: true,
-      endDate: { $lt: now }
-    },
-    { $set: { status: 'expired' } }
-  );
+    // ✅ Active/Scheduled → Expired (end date guzar gayi)
+    await Banner.updateMany(
+      {
+        status: { $in: ['active', 'scheduled'] },
+        endDate: { $lt: now },
+      },
+      { $set: { status: 'expired' } }
+    );
+  } catch (err) {
+    console.error('Banner auto-schedule cron error:', err.message);
+  }
 });
-

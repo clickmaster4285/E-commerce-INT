@@ -102,19 +102,19 @@ exports.getAllEmployees = async (req, res) => {
     const statusFilter = String(req.query.status || "all").trim();
     const departmentFilter = String(req.query.department || "all").trim();
 
-    const filter = { is_deleted: false };
+    const filter = { is_deleted: false, role: { $ne: "admin" } };
     const conditions = [];
     if (search) {
       conditions.push({
         $or: [
-          { "userId.name": { $regex: search, $options: "i" } },
-          { "userId.email": { $regex: search, $options: "i" } },
-          { "userId.phone": { $regex: search, $options: "i" } },
+          { name: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
         ],
       });
     }
     if (statusFilter && statusFilter !== "all") {
-      conditions.push({ "userId.status": statusFilter });
+      conditions.push({ status: statusFilter });
     }
     if (conditions.length > 1) {
       filter.$and = conditions;
@@ -127,14 +127,7 @@ exports.getAllEmployees = async (req, res) => {
 
     // ---- LEGACY MODE (no limit) -> exact old behavior ----
     if (!limit) {
-      const employees = await Employee.find({
-        is_deleted: false,
-      })
-        .populate({
-          path: "userId",
-          select:
-            "name email phone role status avatar permissions twoFactorEnabled created_at",
-        })
+      const employees = await Employee.find(filter)
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
         .sort({
@@ -142,33 +135,16 @@ exports.getAllEmployees = async (req, res) => {
         })
         .lean();
 
+      // No userId filter — all employees are valid now
       const validEmployees = employees.filter(
-        (employee) => employee.userId !== null
+        (employee) => employee !== null
       );
 
       for (const employee of validEmployees) {
-        if (!employee.userId) continue;
-
-        if (needsPermissionMigration(employee.userId.permissions)) {
-          const fixedPermissions = fixPermissions(
-            employee.userId.permissions || {}
-          );
-
-          await User.findByIdAndUpdate(
-            employee.userId._id,
-            {
-              $set: {
-                permissions: fixedPermissions,
-              },
-            }
-          );
-
-          employee.userId.permissions = fixedPermissions;
-        } else {
-          employee.userId.permissions = fixPermissions(
-            employee.userId.permissions
-          );
-        }
+        // Fix permissions directly on employee record
+        employee.permissions = fixPermissions(
+          employee.permissions || {}
+        );
       }
 
       return res.json({
@@ -184,10 +160,6 @@ exports.getAllEmployees = async (req, res) => {
     const skip = (safePage - 1) * limit;
 
     const employees = await Employee.find(filter)
-      .populate({
-        path: "userId",
-        select: "name email phone role status avatar permissions twoFactorEnabled created_at",
-      })
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .sort({ created_at: -1 })
@@ -195,26 +167,15 @@ exports.getAllEmployees = async (req, res) => {
       .limit(limit)
       .lean();
 
+    // All employees valid — no userId dependency
     const validEmployees = employees.filter(
-      (employee) => employee.userId !== null
+      (employee) => employee !== null
     );
 
     for (const employee of validEmployees) {
-      if (!employee.userId) continue;
-      if (needsPermissionMigration(employee.userId.permissions)) {
-        const fixedPermissions = fixPermissions(
-          employee.userId.permissions || {}
-        );
-        await User.findByIdAndUpdate(
-          employee.userId._id,
-          { $set: { permissions: fixedPermissions } }
-        );
-        employee.userId.permissions = fixedPermissions;
-      } else {
-        employee.userId.permissions = fixPermissions(
-          employee.userId.permissions
-        );
-      }
+      employee.permissions = fixPermissions(
+        employee.permissions || {}
+      );
     }
 
     return res.json({
@@ -251,18 +212,13 @@ exports.getEmployeeById = async (req, res) => {
     const employee = await Employee.findById(
       req.params.id
     )
-      .populate({
-        path: "userId",
-        select: "-password -activities",
-      })
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
 
     if (
       !employee ||
-      employee.is_deleted ||
-      !employee.userId
+      employee.is_deleted
     ) {
       return res.status(404).json({
         success: false,
@@ -270,30 +226,10 @@ exports.getEmployeeById = async (req, res) => {
       });
     }
 
-    if (
-      needsPermissionMigration(
-        employee.userId.permissions
-      )
-    ) {
-      const fixedPermissions = fixPermissions(
-        employee.userId.permissions || {}
-      );
-
-      await User.findByIdAndUpdate(
-        employee.userId._id,
-        {
-          $set: {
-            permissions: fixedPermissions,
-          },
-        }
-      );
-
-      employee.userId.permissions = fixedPermissions;
-    } else {
-      employee.userId.permissions = fixPermissions(
-        employee.userId.permissions
-      );
-    }
+    // Fix permissions directly
+    employee.permissions = fixPermissions(
+      employee.permissions || {}
+    );
 
     if (!Array.isArray(employee.activities)) {
       employee.activities = [];
@@ -331,13 +267,16 @@ exports.createEmployee = async (req, res) => {
       role = "staff",
       status = "active",
       permissions,
+      username,
+      avatar,
+      preferences,
+      twoFactorEnabled,
     } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message:
-          "Name, email and password are required",
+        message: "Name, email and password are required",
       });
     }
 
@@ -350,60 +289,38 @@ exports.createEmployee = async (req, res) => {
       sanitizedPhone = phoneResult.sanitized;
     }
 
-    const normalizedEmail = email
-      .toLowerCase()
-      .trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
-    const existing = await User.findOne({
+    // Check employee email uniqueness (not User)
+    const existingEmployee = await Employee.findOne({
       email: normalizedEmail,
     });
-
-    if (existing) {
+    if (existingEmployee) {
       return res.status(400).json({
         success: false,
         message: "Email already registered",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(
-      password,
-      10
-    );
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const performerId =
-      req.user?._id ||
-      req.user?.id ||
-      null;
-
-    const performerName =
-      req.user?.name ||
-      "Admin";
+    const performerId = req.user?._id || req.user?.id || null;
+    const performerName = req.user?.name || "Admin";
 
     const emailPrefix = normalizedEmail
       .split("@")[0]
       .replace(/[^a-zA-Z0-9]/g, "")
       .toLowerCase();
+    const autoUsername = username || `${emailPrefix}_${Date.now().toString(36)}`;
 
-    const autoUsername = `${emailPrefix}_${Date.now().toString(
-      36
-    )}`;
-
-    const usernameExists =
-      await User.findOne({
-        username: autoUsername,
-      });
-
+    const usernameExists = await Employee.findOne({ username: autoUsername });
     const finalUsername = usernameExists
-      ? `${autoUsername}_${Math.random()
-          .toString(36)
-          .substring(2, 6)}`
+      ? `${autoUsername}_${Math.random().toString(36).substring(2, 6)}`
       : autoUsername;
 
-    // ---------------------------------------------
-    // CREATE USER
-    // ---------------------------------------------
+    const count = await Employee.countDocuments({});
 
-    const newUser = await User.create({
+    const newEmployee = await Employee.create({
       name,
       email: normalizedEmail,
       username: finalUsername,
@@ -411,41 +328,14 @@ exports.createEmployee = async (req, res) => {
       phone: sanitizedPhone,
       role,
       status,
-      permissions: fixPermissions(
-        permissions || {}
-      ),
+      avatar: avatar || "",
+      permissions: fixPermissions(permissions || {}),
+      preferences: preferences || { darkMode: true, notifications: { email: true, push: true, weekly: true } },
+      twoFactorEnabled: twoFactorEnabled || false,
+      employeeCode: `EMP-${String(count + 1).padStart(5, "0")}`,
+      department: department || "",
       createdby: performerId,
     });
-
-    // ---------------------------------------------
-    // CREATE EMPLOYEE
-    // ---------------------------------------------
-
-    const count =
-      await Employee.countDocuments({});
-
-    const newEmployee =
-      await Employee.create({
-        userId: newUser._id,
-        employeeCode: `EMP-${String(
-          count + 1
-        ).padStart(5, "0")}`,
-        department: department || "",
-        createdby: performerId,
-      });
-
-    // ---------------------------------------------
-    // LINK EMPLOYEE TO USER
-    // ---------------------------------------------
-
-    newUser.employeeId =
-      newEmployee._id;
-
-    await newUser.save();
-
-    // ---------------------------------------------
-    // ACTIVITY
-    // ---------------------------------------------
 
     await pushActivity(
       newEmployee._id,
@@ -465,23 +355,15 @@ exports.createEmployee = async (req, res) => {
 
     const result = {
       ...newEmployee.toObject(),
-      userId: newUser.toObject(),
+      userId: newEmployee.toObject(),
     };
-
     delete result.userId.password;
 
-    // ---------------------------------------------
-    // SOCKET
-    // ---------------------------------------------
-
     if (req.io) {
-      req.io.emit(
-        "employeeCreated",
-        {
-          success: true,
-          data: result,
-        }
-      );
+      req.io.emit("employeeCreated", {
+        success: true,
+        data: result,
+      });
     }
 
     return res.json({
@@ -490,11 +372,7 @@ exports.createEmployee = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error(
-      "❌ createEmployee error:",
-      error.message
-    );
-
+    console.error("❌ createEmployee error:", error.message);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -517,14 +395,11 @@ exports.updateEmployee = async (req, res) => {
       ""
     ).toString();
 
-    const employee =
-      await Employee.findById(id).populate(
-        "userId"
-      );
+    const employee = await Employee.findById(id);
 
     if (
       !employee ||
-      !employee.userId
+      employee.is_deleted
     ) {
       return res.status(404).json({
         success: false,
@@ -532,15 +407,11 @@ exports.updateEmployee = async (req, res) => {
       });
     }
 
-    const targetUserId =
-      employee.userId._id.toString();
+    const targetEmployeeId = employee._id.toString();
 
-    // =================================================
-    // SELF PERMISSION PROTECTION
-    // =================================================
-
+    // Self permission protection
     if (
-      currentUserId === targetUserId &&
+      currentUserId === targetEmployeeId &&
       updates.permissions &&
       Object.keys(updates.permissions).length
     ) {
@@ -551,69 +422,38 @@ exports.updateEmployee = async (req, res) => {
       });
     }
 
-    const performerId =
-      req.user?._id ||
-      req.user?.id ||
-      null;
-
-    const performerName =
-      req.user?.name ||
-      "Admin";
-
+    const performerId = req.user?._id || req.user?.id || null;
+    const performerName = req.user?.name || "Admin";
     const changes = [];
-
-    // =================================================
-    // EMPLOYEE FIELDS
-    // =================================================
 
     const employeeFields = [
       "department",
       "address",
       "dateOfBirth",
     ];
-
     const employeeUpdates = {};
 
     for (const field of employeeFields) {
       if (
         updates[field] !== undefined &&
-        String(employee[field] ?? "") !==
-          String(updates[field] ?? "")
+        String(employee[field] ?? "") !== String(updates[field] ?? "")
       ) {
         changes.push({
           field,
-          oldValue:
-            employee[field] || "(empty)",
-          newValue:
-            updates[field] || "(empty)",
+          oldValue: employee[field] || "(empty)",
+          newValue: updates[field] || "(empty)",
         });
-
-        employeeUpdates[field] =
-          updates[field];
+        employeeUpdates[field] = updates[field];
       }
     }
 
-    // =================================================
-    // USER FIELDS
-    // =================================================
-
-    const userFields = [
-      "name",
-      "email",
-      "phone",
-      "status",
-      "role",
-    ];
-
-    const userUpdates = {};
+    const userFields = ["name", "email", "phone", "status", "role"];
+    const directUpdates = {};
 
     for (const field of userFields) {
       if (
         updates[field] !== undefined &&
-        String(
-          employee.userId[field] ?? ""
-        ) !==
-          String(updates[field] ?? "")
+        String(employee[field] ?? "") !== String(updates[field] ?? "")
       ) {
         if (field === "phone") {
           const phoneResult = validatePhone(updates[field]);
@@ -622,320 +462,114 @@ exports.updateEmployee = async (req, res) => {
           }
           changes.push({
             field,
-            oldValue:
-              employee.userId[field] ||
-              "(empty)",
-            newValue:
-              phoneResult.sanitized ||
-              "(empty)",
+            oldValue: employee[field] || "(empty)",
+            newValue: phoneResult.sanitized || "(empty)",
           });
-          userUpdates[field] = phoneResult.sanitized;
+          directUpdates[field] = phoneResult.sanitized;
         } else {
           changes.push({
             field,
-            oldValue:
-              employee.userId[field] ||
-              "(empty)",
-            newValue:
-              updates[field] ||
-              "(empty)",
+            oldValue: employee[field] || "(empty)",
+            newValue: updates[field] || "(empty)",
           });
-          userUpdates[field] =
-            updates[field];
+          directUpdates[field] = updates[field];
         }
       }
     }
 
-    // =================================================
-    // PASSWORD
-    // =================================================
-
-    if (
-      updates.password &&
-      String(updates.password).trim()
-    ) {
-      const user =
-        await User.findById(targetUserId);
-      if (user) {
-        const samePassword =
-          await bcrypt.compare(
-            String(updates.password),
-            user.password
-          );
+    // Password
+    if (updates.password && String(updates.password).trim()) {
+      const currentEmployee = await Employee.findById(id).select("password");
+      if (currentEmployee && currentEmployee.password) {
+        const samePassword = await bcrypt.compare(String(updates.password), currentEmployee.password);
         if (samePassword) {
           return res.status(400).json({
             success: false,
-            message:
-              "New password must be different from your current password.",
+            message: "New password must be different from your current password.",
           });
         }
       }
-
-      userUpdates.password =
-        await bcrypt.hash(
-          String(updates.password),
-          10
-        );
-
-      changes.push({
-        field: "password",
-        oldValue: "••••••",
-        newValue: "••••••",
-      });
+      directUpdates.password = await bcrypt.hash(String(updates.password), 10);
+      changes.push({ field: "password", oldValue: "••••••", newValue: "••••••" });
     }
 
-    // =================================================
-    // PERMISSIONS
-    // =================================================
-
+    // Permissions
     let permissionsChanged = false;
+    const currentPermissions = fixPermissions(employee.permissions || {});
 
-    const currentPermissions =
-      fixPermissions(
-        employee.userId.permissions || {}
-      );
-
-    if (
-      updates.permissions &&
-      typeof updates.permissions === "object"
-    ) {
-      const mergedPermissions =
-        fixPermissions({
-          ...currentPermissions,
-          ...updates.permissions,
-        });
-
+    if (updates.permissions && typeof updates.permissions === "object") {
+      const mergedPermissions = fixPermissions({ ...currentPermissions, ...updates.permissions });
       const permissionKeys = [
-        "employees",
-        "products",
-        "brands",
-        "categories",
-        "profile",
-        "store",
-        "discounts",
-        "deals",
-        "banners",
-        "manageStock",
-        "shipping",
-        "order",
-        "attribute",
+        "employees", "products", "brands", "categories", "profile",
+        "store", "discounts", "deals", "banners", "manageStock",
+        "shipping", "order", "attribute",
       ];
-
       for (const key of permissionKeys) {
-        if (
-          currentPermissions[key] !==
-          mergedPermissions[key]
-        ) {
+        if (currentPermissions[key] !== mergedPermissions[key]) {
           permissionsChanged = true;
-
           changes.push({
             field: `permission.${key}`,
-            oldValue:
-              currentPermissions[key]
-                ? "Enabled"
-                : "Disabled",
-            newValue:
-              mergedPermissions[key]
-                ? "Enabled"
-                : "Disabled",
+            oldValue: currentPermissions[key] ? "Enabled" : "Disabled",
+            newValue: mergedPermissions[key] ? "Enabled" : "Disabled",
           });
         }
       }
-
-      userUpdates.permissions =
-        mergedPermissions;
+      directUpdates.permissions = mergedPermissions;
     }
 
-    // =================================================
-    // UPDATED BY
-    // =================================================
-
-    if (
-      Object.keys(userUpdates).length > 0
-    ) {
-      userUpdates.updatedby =
-        performerId;
+    // Updated by
+    if (Object.keys(directUpdates).length > 0 || Object.keys(employeeUpdates).length > 0) {
+      const finalUpdates = { ...directUpdates, ...employeeUpdates, updatedby: performerId };
+      await Employee.findByIdAndUpdate(id, { $set: finalUpdates }, { new: true });
     }
 
-    if (
-      Object.keys(employeeUpdates).length > 0
-    ) {
-      employeeUpdates.updatedby =
-        performerId;
+    // Activity
+    const actionMsg = changes.length > 0
+      ? `${performerName} updated ${changes.map(c => c.field).join(", ")} for ${employee.name}`
+      : `${performerName} updated ${employee.name}'s profile`;
+
+    await pushActivity(employee._id, {
+      action: actionMsg,
+      category: "Employee Management",
+      performedBy: performerId,
+      performedByName: performerName,
+      details: { changes },
+    });
+
+    const updatedEmployee = await Employee.findById(id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    if (updatedEmployee) {
+      updatedEmployee.permissions = fixPermissions(updatedEmployee.permissions || {});
     }
 
-    // =================================================
-    // UPDATE USER
-    // =================================================
-
-    if (
-      Object.keys(userUpdates).length > 0
-    ) {
-      await User.findByIdAndUpdate(
-        employee.userId._id,
-        {
-          $set: userUpdates,
-        },
-        {
-          new: true,
-        }
-      );
-    }
-
-    // =================================================
-    // UPDATE EMPLOYEE
-    // =================================================
-
-    if (
-      Object.keys(employeeUpdates).length > 0
-    ) {
-      await Employee.findByIdAndUpdate(
-        id,
-        {
-          $set: employeeUpdates,
-        },
-        {
-          new: true,
-        }
-      );
-    }
-
-    // =================================================
-    // ACTIVITY
-    // =================================================
-
-    const actionMsg =
-      changes.length > 0
-        ? `${performerName} updated ${changes
-            .map((change) => change.field)
-            .join(
-              ", "
-            )} for ${employee.userId.name}`
-        : `${performerName} updated ${employee.userId.name}'s profile`;
-
-    await pushActivity(
-      employee._id,
-      {
-        action: actionMsg,
-        category:
-          "Employee Management",
-        performedBy:
-          performerId,
-        performedByName:
-          performerName,
-        details: {
-          changes,
-        },
-      }
-    );
-
-    // =================================================
-    // GET FRESH EMPLOYEE
-    // =================================================
-
-    const updatedEmployee =
-      await Employee.findById(id)
-        .populate({
-          path: "userId",
-          select:
-            "-password -activities",
-        })
-        .lean();
-
-    if (
-      updatedEmployee?.userId
-    ) {
-      updatedEmployee.userId.permissions =
-        fixPermissions(
-          updatedEmployee.userId.permissions
-        );
-    }
-
-    // =================================================
-    // SOCKET BROADCAST
-    // =================================================
-
+    // Socket
     if (req.io) {
-      // All employees/admin panels
-      req.io.emit(
-        "employeeUpdated",
-        {
-          success: true,
-          data: updatedEmployee,
-        }
-      );
-
-      // Target employee
-      req.io
-        .to(
-          `employee:${targetUserId}`
-        )
-        .emit(
-          "employeeUpdated",
-          {
-            success: true,
-            data: updatedEmployee,
-          }
-        );
-
-      // ---------------------------------------------
-      // IMPORTANT:
-      // Send fresh DB permissions to target user
-      // ---------------------------------------------
-
+      req.io.emit("employeeUpdated", { success: true, data: updatedEmployee });
+      req.io.to(`employee:${employee._id}`).emit("employeeUpdated", { success: true, data: updatedEmployee });
       if (permissionsChanged) {
         const permissionPayload = {
-          userId: targetUserId,
-          permissions:
-            updatedEmployee?.userId
-              ?.permissions || {},
-          role:
-            updatedEmployee?.userId
-              ?.role || "staff",
+          userId: employee._id,
+          permissions: updatedEmployee?.permissions || {},
+          role: updatedEmployee?.role || "staff",
         };
-
-
-        req.io
-          .to(
-            `employee:${targetUserId}`
-          )
-          .emit(
-            "permissionsUpdated",
-            permissionPayload
-          );
-
-        // Additional event for frontend auth/context
-        req.io
-          .to(
-            `employee:${targetUserId}`
-          )
-          .emit(
-            "authPermissionsUpdated",
-            permissionPayload
-          );
+        req.io.to(`employee:${employee._id}`).emit("permissionsUpdated", permissionPayload);
+        req.io.to(`employee:${employee._id}`).emit("authPermissionsUpdated", permissionPayload);
       }
     }
 
     return res.json({
       success: true,
-      message:
-        "Employee updated successfully",
+      message: "Employee updated successfully",
       data: updatedEmployee,
-      permissions:
-        updatedEmployee?.userId
-          ?.permissions || {},
+      permissions: updatedEmployee?.permissions || {},
       permissionsChanged,
     });
   } catch (error) {
-    console.error(
-      "❌ updateEmployee error:",
-      error.message
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.error("❌ updateEmployee error:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -1027,11 +661,11 @@ exports.toggleStatus = async (
     const employee =
       await Employee.findById(
         req.params.id
-      ).populate("userId");
+      );
 
     if (
       !employee ||
-      !employee.userId
+      employee.is_deleted
     ) {
       return res.status(404).json({
         success: false,
@@ -1040,9 +674,7 @@ exports.toggleStatus = async (
       });
     }
 
-    const oldStatus =
-      employee.userId.status;
-
+    const oldStatus = employee.status;
     const newStatus =
       oldStatus === "active"
         ? "inactive"
@@ -1057,16 +689,8 @@ exports.toggleStatus = async (
       req.user?.name ||
       "Admin";
 
-    await User.findByIdAndUpdate(
-      employee.userId._id,
-      {
-        $set: {
-          status: newStatus,
-          updatedby: performerId,
-        },
-      }
-    );
-
+    // Update directly on employee
+    employee.status = newStatus;
     employee.updatedby = performerId;
     await employee.save();
 
@@ -1077,7 +701,7 @@ exports.toggleStatus = async (
           newStatus === "active"
             ? "activated"
             : "deactivated"
-        } ${employee.userId.name}'s account`,
+        } ${employee.name}'s account`,
         category:
           "Employee Management",
         performedBy:
@@ -1096,11 +720,6 @@ exports.toggleStatus = async (
       await Employee.findById(
         req.params.id
       )
-        .populate({
-          path: "userId",
-          select:
-            "-password -activities",
-        })
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
         .lean();
@@ -1116,7 +735,7 @@ exports.toggleStatus = async (
 
       req.io
         .to(
-          `employee:${employee.userId._id}`
+          `employee:${employee._id}`
         )
         .emit(
           "employeeStatusToggled",

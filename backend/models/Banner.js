@@ -30,10 +30,9 @@ const bannerSchema = new mongoose.Schema(
     position: { type: Number, default: 0 },
 
     desktopImage: { type: String, required: true },
-    tabletImage: { type: String, default: "" },
-    mobileImage: { type: String, default: "" },
+   
     backgroundColor: { type: String, default: "#ffffff" },
-    overlayOpacity: { type: Number, default: 0 },
+
     altText: { type: String, default: "" },
 
     eyebrow: { type: String, default: "" },
@@ -45,10 +44,8 @@ const bannerSchema = new mongoose.Schema(
 
     startDate: { type: Date },
     endDate: { type: Date },
-    autoPublish: { type: Boolean, default: false },
-    autoDisable: { type: Boolean, default: true },
-
-    displayRules: { type: displayRulesSchema, default: () => ({}) },
+   
+   
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store" },
 
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
