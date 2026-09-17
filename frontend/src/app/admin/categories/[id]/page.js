@@ -41,6 +41,8 @@ const D = {
   box: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
   clock: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
   folder: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z",
+  dots: "M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z", // Vertical dots
+  eye: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
 };
 
 /* =========================================================
@@ -127,13 +129,14 @@ const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--
 function StatusBadge({ active = true }) {
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider"
       style={{
-        backgroundColor: active ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+        backgroundColor: active ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
         color: active ? "#34d399" : "#ef4444",
-        border: `1px solid ${active ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`,
+        border: `1px solid ${active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)"}`,
       }}
     >
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-red-500"}`} />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -145,36 +148,16 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       style={{
         backgroundColor: primary ? "var(--accent)" : "transparent",
-        color: primary ? "white" : danger ? "var(--danger)" : "var(--text-secondary)",
-        border: primary ? "none" : danger ? "1px solid rgba(239,68,68,0.25)" : "1px solid var(--border-color)",
+        color: primary ? "white" : danger ? "#ef4444" : "var(--text-secondary)",
+        border: primary ? "none" : danger ? "1px solid rgba(239,68,68,0.2)" : "1px solid var(--border-color)",
       }}
     >
       {icon}
       {children}
     </button>
-  );
-}
-
-function StatRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between py-2.5 border-b last:border-0" style={{ borderColor: "var(--border-color)" }}>
-      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{label}</span>
-      <span className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>{value}</span>
-    </div>
-  );
-}
-
-function AttributePill({ label }) {
-  return (
-    <span
-      className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium"
-      style={{ backgroundColor: "rgba(139,92,246,0.10)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.20)" }}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -188,8 +171,461 @@ function Spin({ className = "w-4 h-4" }) {
 }
 
 /* =========================================================
-   MAIN PAGE
+   SIDE PANEL FOR VIEWING OPTIONS
 ========================================================= */
+
+function AttributeOptionsPanel({ attr, onClose }) {
+  if (!attr) return null;
+  
+  const optionLabels = sanitizeOptionLabels(attr.values);
+  const isBoolean = attr.data_type === "boolean";
+  const isActive = attr.is_active !== false;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[1px] transition-opacity" 
+        onClick={onClose}
+      />
+      
+      {/* Side Panel */}
+      <div className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-[360px] bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out">
+        
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate pr-4">{attr.name}</h3>
+            <p className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5">{attr.code}</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+          >
+            <Ico d={D.close} className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          
+          {/* Details */}
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Details</h4>
+            <div className="space-y-0 rounded-lg border border-[var(--border-color)] overflow-hidden">
+              <div className="flex justify-between items-center px-3 py-2.5 bg-[var(--bg-input)]">
+                <span className="text-[12px] text-[var(--text-muted)]">Type</span>
+                <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
+                  {getDataTypeLabel(attr.data_type)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <span className="text-[12px] text-[var(--text-muted)]">Status</span>
+                <StatusBadge active={isActive} />
+              </div>
+              {attr.category_config?.is_variant_option && (
+                <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
+                  <span className="text-[12px] text-[var(--text-muted)]">Variant</span>
+                  <span className="text-[11px] font-medium text-[var(--accent)]">Yes</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Options List */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {isBoolean ? "Boolean Values" : "Available Options"}
+              </h4>
+              <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
+                {optionLabels.length}
+              </span>
+            </div>
+            
+            <div className="space-y-1.5">
+              {optionLabels.length > 0 ? (
+                optionLabels.map((label, idx) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg group hover:border-[var(--accent)]/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-5 h-5 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                        {idx + 1}
+                      </span>
+                      <span className="text-[12px] font-medium text-[var(--text-primary)]">{label}</span>
+                    </div>
+                    {isBoolean && (
+                       <span className={`w-2 h-2 rounded-full ${label.toLowerCase() === 'yes' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
+                   <p className="text-[12px] text-[var(--text-muted)]">No options defined.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-5 border-t border-[var(--border-color)]">
+           <Button primary onClick={onClose} className="w-full justify-center">
+             Close Panel
+           </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* =========================================================
+   MAIN PAGE
+======================================================== */
+
+function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
+  const isEdit = mode === "edit";
+
+  const [form, setForm] = useState({
+    name: "",
+    data_type: "multi_select",
+    values: [],
+    value: isEdit ? false : "",
+    is_active: true,
+  });
+  const [newOptionInput, setNewOptionInput] = useState("");
+  const [editOptionInput, setEditOptionInput] = useState("");
+  const optionInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      if (isEdit && initialData) {
+        const dataType = initialData.data_type || "multi_select";
+        let booleanValue = false;
+        if (dataType === "boolean") {
+          const vals = initialData.values || [];
+          const trueEntry = vals.find(
+            (v) =>
+              (v?.value || v)?.toString() === "true" ||
+              (v?.label || v)?.toString()?.toLowerCase() === "yes"
+          );
+          if (trueEntry) booleanValue = true;
+        }
+        const values = (initialData.values || [])
+          .map((v) => {
+            const label = typeof v === "string" ? v : v?.label || v?.value || String(v);
+            return String(label);
+          })
+          .filter(Boolean);
+        setForm({
+          name: initialData.name || "",
+          data_type: dataType,
+          values,
+          value: booleanValue,
+          is_active: initialData.is_active !== false,
+        });
+        setEditOptionInput("");
+        setNewOptionInput("");
+      } else {
+        setForm({
+          name: "",
+          data_type: "multi_select",
+          values: [],
+          value: "",
+          is_active: true,
+        });
+        setNewOptionInput("");
+        setEditOptionInput("");
+      }
+    }
+  }, [open, isEdit, initialData]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    if (!form.name || !form.name.trim()) return;
+    const valuesPayload = form.data_type === "multi_select"
+      ? (form.values || []).map((opt) => {
+          const label = String(opt || "").trim();
+          return { label, value: label.toLowerCase() };
+        })
+      : form.data_type === "boolean"
+        ? [
+            {
+              label: form.value ? "Yes" : "No",
+              value: form.value ? "true" : "false",
+              sort_order: 0,
+              is_active: true,
+            },
+          ]
+        : [];
+    const payload = {
+      name: form.name.trim(),
+      data_type: form.data_type,
+      values: valuesPayload,
+      is_active: form.is_active !== false,
+    };
+    if (!isEdit && !payload.name) return;
+    if (isEdit) {
+      payload.value = form.value;
+    }
+    onSave && onSave(payload);
+  };
+
+  const addOption = () => {
+    const val = (isEdit ? editOptionInput : newOptionInput).trim();
+    if (!val) return;
+    const exists = (form.values || []).some(
+      (v) => v.toLowerCase() === val.toLowerCase()
+    );
+    if (exists) {
+      if (isEdit) setEditOptionInput("");
+      else setNewOptionInput("");
+      return;
+    }
+    setForm({ ...form, values: [...(form.values || []), val] });
+    if (isEdit) setEditOptionInput("");
+    else setNewOptionInput("");
+  };
+
+  const removeOption = (idx) => {
+    setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
+  };
+
+  const title = isEdit ? "Edit Attribute" : "Add New Attribute";
+  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products.";
+  const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+  const dataTypeLabels = isEdit
+    ? [
+        { id: "multi_select", label: "Multi Options" },
+        { id: "boolean", label: "Yes / No" },
+      ]
+    : [
+        { id: "multi_select", label: "Options" },
+        { id: "boolean", label: "Yes / No" },
+      ];
+
+  const SlidersIcon = ({ className = "w-4 h-4" }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div
+        className={`w-full ${isEdit ? "max-w-[420px]" : "max-w-md"} bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden`}
+      >
+        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+              <SlidersIcon className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">{title}</h3>
+              <p className="text-[11px] text-[var(--text-muted)]">{subtitle}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            <span>×</span>
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+              Attribute Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              autoFocus
+              className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+              placeholder="e.g. Color, Size, RAM"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+              {isEdit ? "Attribute Type" : "Data Type"}
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              {dataTypeLabels.map((type) => {
+                const isActive = form.data_type === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        data_type: type.id,
+                        values: type.id === "boolean" ? form.values : form.values,
+                      })
+                    }
+                    className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${
+                      isActive
+                        ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
+                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
+                    }`}
+                  >
+                    <span>{type.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {form.data_type === "multi_select" && (
+            <div className="space-y-2">
+              <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+              <div className="space-y-1.5">
+                {(form.values || []).map((opt, idx) => (
+                  <div
+                    key={`opt-${idx}`}
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg"
+                  >
+                    <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
+                      {idx + 1}
+                    </span>
+                    <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeOption(idx)}
+                      className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
+                      aria-label="Remove option"
+                    >
+                      <span>×</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  ref={optionInputRef}
+                  type="text"
+                  placeholder="Add an option (e.g. 8 GB)"
+                  value={isEdit ? editOptionInput : newOptionInput}
+                  onChange={(e) => (isEdit ? setEditOptionInput(e.target.value) : setNewOptionInput(e.target.value))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addOption();
+                    }
+                  }}
+                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                />
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
+                >
+                  <span>+ Add</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                Add one or more options. You can also add more after creating the attribute.
+              </p>
+            </div>
+          )}
+
+          {form.data_type === "boolean" && (
+            <div className="space-y-2">
+              <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                {isEdit ? "Default Value" : "Default State"}
+              </label>
+              <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                {[
+                  { id: true, label: "Yes" },
+                  { id: false, label: "No" },
+                ].map((opt) => {
+                  const isActive = form.value === opt.id;
+                  return (
+                    <button
+                      key={String(opt.id)}
+                      type="button"
+                      onClick={() => setForm({ ...form, value: opt.id })}
+                      className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${
+                        isActive
+                          ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full transition-colors ${
+                          isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"
+                        }`}
+                      />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                This will be the default Yes/No state for this attribute.
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
+            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
+            <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+              {[
+                { id: true, label: "Active", color: "#34d399" },
+                { id: false, label: "Inactive", color: "#f87171" },
+              ].map((opt) => {
+                const isSel = form.is_active === opt.id;
+                return (
+                  <button
+                    key={String(opt.id)}
+                    type="button"
+                    onClick={() => setForm({ ...form, is_active: opt.id })}
+                    className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${
+                      isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full transition-colors"
+                      style={{
+                        backgroundColor: isSel ? opt.color : "transparent",
+                      }}
+                    />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !form.name || !form.name.trim()}
+            className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+          >
+            {saveText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CategoryDetailPage() {
   const router = useRouter();
@@ -201,17 +637,23 @@ export default function CategoryDetailPage() {
 
   const [tab, setTab] = useState("overview");
   const [showDelete, setShowDelete] = useState(false);
-  const [attrToToggle, setAttrToToggle] = useState(null);
   
-  // ✅ NEW: Edit Modal States (same as main page)
+  // ✅ NEW: Edit Modal States
   const [showEditModal, setShowEditModal] = useState(false);
 
   // ✅ Attribute edit within category detail
   const [attrEditOpen, setAttrEditOpen] = useState(false);
   const [attrEditLoading, setAttrEditLoading] = useState(false);
-  const [attrEditForm, setAttrEditForm] = useState({ name: "", data_type: "multi_select", is_active: true, values: [], value: false });
   const [attrEditTarget, setAttrEditTarget] = useState(null);
-  const [editOptionInput, setEditOptionInput] = useState("");
+
+  // Create New Attribute state (matches Attribute Management form)
+  const [showCreateAttrModal, setShowCreateAttrModal] = useState(false);
+  const [createAttrLoading, setCreateAttrLoading] = useState(false);
+
+  // ✅ NEW: Action Menu & Side Panel States
+  const [activeMenuId, setActiveMenuId] = useState(null); // ID of attribute with open menu
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [viewPanelAttr, setViewPanelAttr] = useState(null); // Attribute object for side panel
 
   useAttributeSocketSync();
 
@@ -264,73 +706,54 @@ export default function CategoryDetailPage() {
     },
   });
 
-  const handleSaveAttrEdit = async () => {
-    if (!attrEditTarget) return;
-    setAttrEditLoading(true);
-    try {
-      const attrId = getAttributeId(attrEditTarget);
-      const valuesPayload = attrEditForm.data_type === "multi_select"
-        ? (attrEditForm.values || []).map((opt) => {
-            const label = String(opt || "").trim();
-            return { label, value: label.toLowerCase() };
-          })
-        : attrEditForm.data_type === "boolean"
-          ? [{ label: attrEditForm.value ? "Yes" : "No", value: attrEditForm.value ? "true" : "false", sort_order: 0, is_active: true }]
-          : [];
-      const payload = {
-        name: attrEditForm.name.trim(),
-        data_type: attrEditForm.data_type,
-        is_active: attrEditForm.is_active,
-        values: valuesPayload,
-      };
-      await attributeApi.update(attrId, payload);
-      await queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
-      toast.success("Attribute updated successfully");
-      setAttrEditOpen(false);
-      setAttrEditTarget(null);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute");
-    } finally {
-      setAttrEditLoading(false);
-    }
-  };
-
-  const handleToggleAttributeActive = async (attr) => {
-    if (!attr) return;
-    const attrId = getAttributeId(attr);
-    const currentActive = attr.is_active !== false;
-    try {
-      await attributeApi.update(attrId, { is_active: !currentActive });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] }),
-        queryClient.invalidateQueries({ queryKey: ["category", categoryId] }),
-      ]);
-      toast.success(currentActive ? "Attribute disabled" : "Attribute enabled");
-    } catch (err) {
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ attrId, currentActive }) => {
+      return await attributeApi.update(attrId, { is_active: !currentActive });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["category", categoryId] });
+      toast.success(variables.currentActive ? "Attribute disabled" : "Attribute enabled");
+      setActiveMenuId(null);
+    },
+    onError: (err) => {
       toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute status");
+    },
+  });
+
+  const createAttributeMutation = useMutation({
+    mutationFn: async (data) => {
+      return await attributeApi.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
+      queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
+      setShowCreateAttrModal(false);
+      toast.success("Attribute created successfully");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create attribute");
+    },
+  });
+
+  // Click outside handler for menus
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (activeMenuId && !event.target.closest('.action-menu-container') && !event.target.closest('.dropdown-menu-portal')) {
+        setActiveMenuId(null);
+      }
     }
-    setAttrToToggle(null);
-  };
-
-  const addEditOption = () => {
-    const val = editOptionInput.trim();
-    if (!val) return;
-    if ((attrEditForm.values || []).some((v) => v.toLowerCase() === val.toLowerCase())) return;
-    setAttrEditForm({ ...attrEditForm, values: [...(attrEditForm.values || []), val] });
-    setEditOptionInput("");
-  };
-
-  const removeEditOption = (idx) => {
-    setAttrEditForm({ ...attrEditForm, values: (attrEditForm.values || []).filter((_, i) => i !== idx) });
-  };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeMenuId]);
 
   // Loading state
   if (loading) {
     return (
-      <div className="w-full min-h-[500px] flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Spin className="w-5 h-5 text-[var(--accent)]" />
-          <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+      <div className="w-full min-h-[600px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Spin className="w-6 h-6 text-[var(--accent)]" />
+          <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
             Loading category details...
           </span>
         </div>
@@ -340,9 +763,13 @@ export default function CategoryDetailPage() {
 
   if (!category) {
     return (
-      <div className="w-full min-h-[500px] flex items-center justify-center">
-        <div className="p-8 text-center max-w-sm rounded-xl" style={cardStyle}>
-          <h2 className="text-lg font-semibold mb-2 text-[var(--text-primary)]">Category Not Found</h2>
+      <div className="w-full min-h-[600px] flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            <Ico d={D.folder} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
+          </div>
+          <h2 className="text-[16px] font-semibold mb-1.5 text-[var(--text-primary)]">Category Not Found</h2>
+          <p className="text-[12px] mb-5" style={{ color: "var(--text-muted)" }}>The category you're looking for doesn't exist or has been removed.</p>
           <Button primary onClick={() => router.push(backPath)}>
             Back to Categories
           </Button>
@@ -352,37 +779,48 @@ export default function CategoryDetailPage() {
   }
 
   return (
-    <div className="w-full space-y-5 pb-10" style={{ color: "var(--text-primary)" }}>
+    // UPDATED: Wider container (98%), less bottom padding (pb-6), small top padding (pt-2)
+    <div className="w-[98%] max-w-[1600px] mx-auto space-y-5 pb-6 pt-2 relative" style={{ color: "var(--text-primary)" }}>
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3">
           <button
             type="button"
             onClick={() => router.push(backPath)}
-            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-1"
+            className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-0.5"
           >
-            <Ico d={D.back} className="w-5 h-5" />
+            <Ico d={D.back} className="w-4 h-4" />
           </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-[24px] leading-7 font-bold tracking-tight">{category.name}</h1>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-[22px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">{category.name}</h1>
               <StatusBadge active={category.is_active !== false} />
             </div>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              {category.description || "No description provided"}
-            </p>
+            {category.description && (
+              <p className="text-[13px] mt-1.5 max-w-xl leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                {category.description}
+              </p>
+            )}
+            <div className="flex items-center gap-4 mt-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                <Ico d={D.box} className="w-3.5 h-3.5" /> {categoryAttributes.length} attribute{categoryAttributes.length !== 1 ? "s" : ""}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                <Ico d={D.clock} className="w-3.5 h-3.5" /> {formatDateTime(category.created_at)}
+              </span>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-4 h-4" />}>
-  Edit
-</Button>
+          <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-3.5 h-3.5" />}>
+            Edit
+          </Button>
           <Button
             danger
             onClick={() => setShowDelete(true)}
-            icon={<Ico d={D.trash} className="w-4 h-4" />}
+            icon={<Ico d={D.trash} className="w-3.5 h-3.5" />}
           >
             Delete
           </Button>
@@ -390,11 +828,11 @@ export default function CategoryDetailPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex items-center gap-6 border-b" style={{ borderColor: "var(--border-color)" }}>
+      <div className="flex items-center gap-1 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
-          { id: "overview", label: "Overview" },
-          { id: "attributes", label: "Attributes", count: categoryAttributes.length },
-          { id: "history", label: "History" },
+          { id: "overview", label: "Overview", icon: D.eye },
+          { id: "attributes", label: "Attributes", count: categoryAttributes.length, icon: D.box },
+          { id: "history", label: "History", icon: D.clock },
         ].map((item) => {
           const active = tab === item.id;
           return (
@@ -402,18 +840,25 @@ export default function CategoryDetailPage() {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className="relative py-3 text-[13px] font-medium transition-colors outline-none"
+              className="relative inline-flex items-center gap-1.5 px-4 py-3 text-[12px] font-medium transition-colors outline-none"
               style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
             >
+              <Ico d={item.icon} className="w-3.5 h-3.5" />
               {item.label}
               {item.count !== undefined && (
-                <span className="ml-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                  ({item.count})
+                <span
+                  className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold tabular-nums"
+                  style={{
+                    backgroundColor: active ? "rgba(16,185,129,0.12)" : "var(--bg-tertiary)",
+                    color: active ? "var(--accent)" : "var(--text-muted)",
+                  }}
+                >
+                  {item.count}
                 </span>
               )}
               {active && (
                 <span
-                  className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
+                  className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full"
                   style={{ backgroundColor: "var(--accent)" }}
                 />
               )}
@@ -424,107 +869,213 @@ export default function CategoryDetailPage() {
 
       {/* OVERVIEW TAB */}
       {tab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2">
-            <div className="rounded-xl overflow-hidden" style={cardStyle}>
-              <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
-                <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
-                  <Ico d={D.folder} className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Category Details</h3>
-                  <p className="text-[10px] text-[var(--text-muted)]">Basic information and metadata</p>
-                </div>
+        // UPDATED: Grid uses minmax for left column and fixed width for right column to balance proportions
+        // Added items-stretch to ensure both cards match height
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_400px] gap-6 items-stretch">
+          
+          {/* LEFT COLUMN: Assigned Attributes Table */}
+          {/* Added h-full to stretch to match right column */}
+          <div className="rounded-xl overflow-hidden flex flex-col h-full" style={cardStyle}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Assigned Attributes</h3>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">These attributes are available for products in this category.</p>
               </div>
-              <div className="p-5">
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Name</p>
-                      <p className="text-[14px] font-medium text-[var(--text-primary)]">{category.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Category Code</p>
-                      <p className="text-[14px] font-mono text-[var(--text-secondary)]">{category.category_code || category.slug || "\u2014"}</p>
-                    </div>
-                  </div>
-                  {category.description && (
-                    <div>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Description</p>
-                      <p className="text-[14px] leading-relaxed text-[var(--text-primary)]">{category.description}</p>
-                    </div>
+              <Button primary icon={<Ico d={D.box} className="w-3.5 h-3.5" />} onClick={() => setTab("attributes")}>
+                Manage Attributes
+              </Button>
+            </div>
+            
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left">
+                <thead>
+                  <tr style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-10">#</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options / Values</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
+                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryAttributes.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-10 text-center">
+                        <p className="text-[13px] text-[var(--text-muted)]">No attributes assigned yet.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    categoryAttributes.slice(0, 5).map((attr, idx) => {
+                      const optionLabels = sanitizeOptionLabels(attr.values);
+                      const isMultiSelect = attr.data_type === "multi_select" || attr.data_type === "select";
+                      const isBoolean = attr.data_type === "boolean";
+                      const isActive = attr.is_active !== false;
+                      const attrId = getAttributeId(attr);
+                      const isMenuOpen = activeMenuId === attrId;
+
+                      const PREVIEW_LIMIT = 3;
+                      const visibleOptions = optionLabels.slice(0, PREVIEW_LIMIT);
+                      const hiddenCount = optionLabels.length - PREVIEW_LIMIT;
+
+                      return (
+                        <tr
+                          key={attr._id}
+                          className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group"
+                          style={{ borderBottom: "1px solid var(--border-color)", opacity: isActive ? 1 : 0.5 }}
+                        >
+                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
+                          <td className="px-5 py-3 text-[13px] font-medium text-[var(--text-primary)]">{attr.name}</td>
+                          <td className="px-5 py-3">
+                            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
+                              {getDataTypeLabel(attr.data_type)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3">
+                            {isMultiSelect ? (
+                              <div className="flex flex-wrap gap-1">
+                                {visibleOptions.map((label, i) => (
+                                  <span key={i} className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded truncate max-w-[80px]" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
+                                    {label}
+                                  </span>
+                                ))}
+                                {hiddenCount > 0 && <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>+{hiddenCount} more</span>}
+                              </div>
+                            ) : isBoolean ? (
+                              <span className="text-[11px] text-[var(--text-secondary)]">Yes, No</span>
+                            ) : (
+                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>\u2014</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                              style={{
+                                backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                                color: isActive ? "#34d399" : "#f87171",
+                                border: `1px solid ${isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"}`,
+                              }}
+                            >
+                              <span className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
+                              {isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          
+                          {/* ACTION COLUMN */}
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-end relative action-menu-container">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(isMenuOpen ? null : attrId);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                              >
+                                <Ico d={D.dots} className="w-4 h-4" />
+                              </button>
+
+                              {/* DROPDOWN MENU */}
+                              {isMenuOpen && (
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl z-50 overflow-visible pointer-events-auto">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        setViewPanelAttr(attr);
+                                        setActiveMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
+                                    >
+                                      <Ico d={D.eye} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                      View Options
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => {
+                                        const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
+                                        if (fullAttr) {
+                                          setAttrEditTarget(fullAttr);
+                                          setAttrEditOpen(true);
+                                        }
+                                        setActiveMenuId(null);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
+                                    >
+                                      <Ico d={D.edit} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                      Edit Attribute
+                                    </button>
+
+                                    <div className="h-px bg-[var(--border-color)] my-1" />
+
+                                    <button
+                                      onClick={() => handleToggleAttributeActive(attr)}
+                                      className="w-full px-4 py-2 text-left text-[12px] font-medium hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
+                                      style={{ color: isActive ? "#f87171" : "#34d399" }}
+                                    >
+                                      <Ico d={isActive ? "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-3.5 h-3.5" />
+                                      {isActive ? "Disable" : "Enable"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-[var(--border-color)]">
-                    <div>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Created At</p>
-                      <p className="text-[14px] text-[var(--text-secondary)]">{formatDateTime(category.created_at)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">Updated At</p>
-                      <p className="text-[14px] text-[var(--text-secondary)]">{formatDateTime(category.updated_at)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                </tbody>
+              </table>
             </div>
-          </div>
-
-          <div className="space-y-5">
-            <div className="rounded-xl overflow-hidden" style={cardStyle}>
-              <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Summary</h3>
-              </div>
-              <div className="p-5 space-y-1">
-                <StatRow label="Total Attributes" value={categoryAttributes.length} />
-                <StatRow label="Parent Category" value={parentCategoryName} />
-                <StatRow label="Status" value={<StatusBadge active={category.is_active !== false} />} />
-              </div>
-            </div>
-
-            {variantAttributes.length > 0 && (
-              <div className="rounded-xl overflow-hidden" style={cardStyle}>
-                <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Variant Attributes</h3>
-                </div>
-                <div className="p-5">
-                  <div className="flex flex-wrap gap-2">
-                    {variantAttributes.map((attr) => (
-                      <AttributePill key={attr._id} label={attr.name} />
-                    ))}
-                  </div>
-                </div>
+            {categoryAttributes.length > 5 && (
+              <div className="px-5 py-3 border-t border-[var(--border-color)] text-center shrink-0">
+                <button onClick={() => setTab("attributes")} className="text-[11px] font-medium text-[var(--accent)] hover:underline">
+                  View all {categoryAttributes.length} attributes
+                </button>
               </div>
             )}
           </div>
 
-          <div className="lg:col-span-3">
-            <div className="rounded-xl overflow-hidden" style={cardStyle}>
-              <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Attributes Preview</h3>
+          {/* RIGHT COLUMN: Category Information */}
+          {/* Added h-full to stretch to match left column */}
+          <div className="rounded-xl overflow-hidden flex flex-col h-full" style={cardStyle}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Category Information</h3>
+            </div>
+            <div className="p-5 space-y-4 flex-1">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Category Name</span>
+                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{category.name}</span>
+                </div>
+                
+                <div className="flex justify-between items-start">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Slug</span>
+                  <span className="text-[13px] font-mono font-medium text-[var(--text-secondary)] text-right break-all">{category.slug || category.category_code || "\u2014"}</span>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Created At</span>
+                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{formatDateTime(category.created_at)}</span>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Created By</span>
+                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">Admin</span>
+                </div>
               </div>
-              <div className="p-5">
-                {categoryAttributes.length === 0 ? (
-                  <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)]/30">
-                    <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>No attributes assigned yet.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    {categoryAttributes.slice(0, 5).map((attr) => (
-                      <div key={attr._id} className="p-3 rounded-lg border bg-[var(--bg-input)]" style={{ borderColor: "var(--border-color)" }}>
-                        <p className="text-[13px] font-medium mb-1 truncate text-[var(--text-primary)]">{attr.name}</p>
-                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{getDataTypeLabel(attr.data_type)}</p>
-                      </div>
-                    ))}
-                    {categoryAttributes.length > 5 && (
-                      <div className="p-3 rounded-lg border flex items-center justify-center bg-[var(--bg-input)]" style={{ borderColor: "var(--border-color)", borderStyle: "dashed" }}>
-                        <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>+{categoryAttributes.length - 5} more</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+
+              {category.description && (
+                <div className="pt-4 border-t border-[var(--border-color)]">
+                  <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Description</p>
+                  <p className="text-[12px] leading-relaxed text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-color)]">
+                    {category.description}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+
         </div>
       )}
 
@@ -537,14 +1088,14 @@ export default function CategoryDetailPage() {
                 {categoryAttributes.length} {categoryAttributes.length === 1 ? "Attribute" : "Attributes"}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Assigned attributes for {category.name} category
+                Assigned to {category.name}
               </p>
             </div>
             <div className="flex items-center gap-2">
               {variantAttributes.length > 0 && (
                 <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                  style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                  style={{ backgroundColor: "rgba(139,92,246,0.08)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.12)" }}
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -556,8 +1107,8 @@ export default function CategoryDetailPage() {
           </div>
 
           {categoryAttributes.length === 0 ? (
-            <div className="rounded-xl py-12 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+            <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Ico d={D.box} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
               </div>
               <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>No attributes assigned</p>
@@ -569,10 +1120,12 @@ export default function CategoryDetailPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-10">#</th>
                       <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute</th>
                       <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Assigned Options</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Action</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -583,6 +1136,8 @@ export default function CategoryDetailPage() {
                       const isBoolean = attr.data_type === "boolean";
                       const isVariant = attr.category_config?.is_variant_option;
                       const isActive = attr.is_active !== false;
+                      const attrId = getAttributeId(attr);
+                      const isMenuOpen = activeMenuId === attrId;
 
                       const PREVIEW_LIMIT = 3;
                       const visibleOptions = optionLabels.slice(0, PREVIEW_LIMIT);
@@ -599,27 +1154,26 @@ export default function CategoryDetailPage() {
                       return (
                         <tr
                           key={attr._id}
-                          className="transition-colors hover:bg-[var(--bg-tertiary)]/30"
+                          onClick={() => setViewPanelAttr(attr)}
+                          className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group cursor-pointer"
                           style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none", opacity: isActive ? 1 : 0.5 }}
                         >
-                          <td className="px-5 py-3.5">
+                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
+                          <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
-                                <Ico d={D.box} className="w-4 h-4" />
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.12)" }}>
+                                <Ico d={D.box} className="w-4 h-4" style={{ color: "#a78bfa" }} />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{attr.name}</p>
                                   {isVariant && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }}>
-                                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                      </svg>
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.08)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.12)" }}>
                                       Variant
                                     </span>
                                   )}
                                   {!isActive && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.12)" }}>
                                       Disabled
                                     </span>
                                   )}
@@ -628,12 +1182,12 @@ export default function CategoryDetailPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-5 py-3.5">
+                          <td className="px-5 py-3">
                             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
                               {getDataTypeLabel(attr.data_type)}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5">
+                          <td className="px-5 py-3">
                             {isMultiSelect ? (
                               optionCount > 0 ? (
                                 <div className="flex flex-wrap gap-1">
@@ -649,7 +1203,7 @@ export default function CategoryDetailPage() {
                               )
                             ) : isBoolean ? (
                               boolValue ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "rgba(16,185,129,0.1)" : "rgba(107,114,128,0.1)", color: boolValue === "Yes" ? "#34d399" : "#9ca3af", border: `1px solid ${boolValue === "Yes" ? "rgba(16,185,129,0.2)" : "rgba(107,114,128,0.2)"}` }}>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "rgba(16,185,129,0.08)" : "rgba(107,114,128,0.08)", color: boolValue === "Yes" ? "#34d399" : "#9ca3af", border: `1px solid ${boolValue === "Yes" ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)"}` }}>
                                   {boolValue}
                                 </span>
                               ) : (
@@ -659,64 +1213,109 @@ export default function CategoryDetailPage() {
                               <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>\u2014</span>
                             )}
                           </td>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center justify-end gap-2">
+                          <td className="px-5 py-3">
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                              style={{
+                                backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                                color: isActive ? "#34d399" : "#f87171",
+                                border: `1px solid ${isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"}`,
+                              }}
+                            >
+                              <span className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
+                              {isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          
+                          {/* ACTION COLUMN */}
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-end relative action-menu-container">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const attrId = getAttributeId(attr);
-                                  const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
-                                  if (fullAttr) {
-                                    const dataType = fullAttr.data_type || "multi_select";
-                                    let booleanValue = false;
-                                    if (dataType === "boolean") {
-                                      const vals = fullAttr.values || [];
-                                      const trueEntry = vals.find((v) => (v.value || v).toString() === "true" || (v.label || v).toString().toLowerCase() === "yes");
-                                      if (trueEntry) booleanValue = true;
-                                    }
-                                    const values = (fullAttr.values || []).map((v) => {
-                                      const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
-                                      return String(label);
-                                    }).filter(Boolean);
-                                    setAttrEditTarget(attr);
-                                    setAttrEditForm({
-                                      name: fullAttr.name || "",
-                                      data_type: dataType,
-                                      is_active: fullAttr.is_active !== false,
-                                      values: values,
-                                      value: booleanValue,
-                                    });
-                                    setEditOptionInput("");
-                                    setAttrEditOpen(true);
-                                  }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const btnEl = e.currentTarget;
+                                  const rect = btnEl.getBoundingClientRect();
+                                  const menuW = 192;
+                                  const adjustedLeft = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
+                                  setMenuPos({ top: rect.bottom + 4, left: adjustedLeft });
+                                  setActiveMenuId(isMenuOpen ? null : attrId);
                                 }}
-                                className="h-7 px-3 text-[10px] font-semibold flex items-center justify-center gap-1 rounded-md transition-colors"
-                                style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-color)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                               >
-                                <Ico d={D.edit} className="w-3 h-3" /> Edit
+                                <Ico d={D.dots} className="w-4 h-4" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isActive) {
-                                    setAttrToToggle(attr);
-                                  } else {
-                                    handleToggleAttributeActive(attr);
-                                  }
-                                }}
-                                className="h-7 px-3 text-[10px] font-semibold flex items-center justify-center gap-1 rounded-md transition-colors"
-                                style={{ color: isActive ? "#f87171" : "#34d399", backgroundColor: "var(--bg-card)", border: `1px solid ${isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"}` }}
-                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.5)" : "rgba(16,185,129,0.5)"; e.currentTarget.style.backgroundColor = isActive ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.06)"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = isActive ? "rgba(239,68,68,0.25)" : "rgba(16,185,129,0.25)"; e.currentTarget.style.backgroundColor = "var(--bg-card)"; }}
-                              >
-                                {isActive ? (
-                                  <><Ico d={"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"} className="w-3 h-3" /> Disable</>
-                                ) : (
-                                  <><Ico d={"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-3 h-3" /> Enable</>
-                                )}
-                              </button>
+
+                              {/* DROPDOWN MENU - Fixed portal to escape overflow clipping */}
+                              {isMenuOpen && (() => {
+                                const isTogglingThis = toggleStatusMutation.isPending && toggleStatusMutation.variables?.attrId === attrId;
+                                return createPortal(
+                                  <div
+                                  className="fixed z-[9999] w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal"
+                                  style={{
+                                    top: menuPos.top,
+                                    left: menuPos.left,
+                                    pointerEvents: "auto",
+                                  }}
+                                  >
+                                    <div className="py-1">
+                                      <button
+                                        onClick={() => {
+                                          setViewPanelAttr(attr);
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                      >
+                                        <Ico d={D.eye} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                        View Options
+                                      </button>
+
+                                      <button
+                                        onClick={() => {
+                                          const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
+                                          if (fullAttr) {
+                                            setAttrEditTarget(fullAttr);
+                                            setAttrEditOpen(true);
+                                          }
+                                          setActiveMenuId(null);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                      >
+                                        <Ico d={D.edit} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                        Edit Attribute
+                                      </button>
+
+                                      <div className="h-px bg-[var(--border-color)] my-1" />
+
+                                      <button
+                                        type="button"
+                                        disabled={isTogglingThis}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isTogglingThis) return;
+                                          setActiveMenuId(null);
+                                          toggleStatusMutation.mutate({ attrId, currentActive: isActive });
+                                        }}
+                                        className={`w-full px-4 py-2 text-left text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-[var(--bg-tertiary)]"}`}
+                                        style={{ color: isActive ? "#f87171" : "#34d399", pointerEvents: isTogglingThis ? "none" : "auto" }}
+                                      >
+                                        {isTogglingThis ? (
+                                          <>
+                                            <Spin className="w-3.5 h-3.5" />
+                                            <span className="opacity-70">{isActive ? "Disabling..." : "Enabling..."}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Ico d={isActive ? "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-3.5 h-3.5" />
+                                            <span className="opacity-100">{isActive ? "Disable" : "Enable"}</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>,
+                                  document.body
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>
@@ -730,156 +1329,77 @@ export default function CategoryDetailPage() {
         </div>
       )}
 
-      {/* Full Attribute Edit Modal */}
-      {attrEditOpen && attrEditTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-[420px] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-                  <Ico d={D.box} className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Edit Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">Update attribute details and values.</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => { setAttrEditOpen(false); setAttrEditTarget(null); }}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
-                <span>×</span>
-              </button>
-            </div>
-
-            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input type="text" value={attrEditForm.name}
-                  onChange={(e) => setAttrEditForm({ ...attrEditForm, name: e.target.value })} autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: "multi_select", label: "Multi Options" },
-                    { id: "boolean", label: "Yes / No" },
-                  ].map((type) => {
-                    const isActive = attrEditForm.data_type === type.id;
-                    return (
-                      <button key={type.id} type="button"
-                        onClick={() => setAttrEditForm({ ...attrEditForm, data_type: type.id })}
-                        className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
-                          ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
-                        <span>{type.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {attrEditForm.data_type === "multi_select" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
-                  <div className="space-y-1.5">
-                    {(attrEditForm.values || []).map((opt, idx) => (
-                      <div key={`edit-opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
-                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button type="button" onClick={() => removeEditOption(idx)}
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option">
-                          <span>×</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Add an option..." value={editOptionInput}
-                      onChange={(e) => setEditOptionInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEditOption(); } }}
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" />
-                    <button type="button" onClick={addEditOption}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
-                      <span>+ Add</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {attrEditForm.data_type === "boolean" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
-                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
-                      const isActive = attrEditForm.value === opt.id;
-                      return (
-                        <button key={String(opt.id)} type="button"
-                          onClick={() => setAttrEditForm({ ...attrEditForm, value: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
-                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                  {[
-                    { id: true, label: "Active", color: "#34d399" },
-                    { id: false, label: "Inactive", color: "#f87171" },
-                  ].map((opt) => {
-                    const isSel = attrEditForm.is_active === opt.id;
-                    return (
-                      <button key={String(opt.id)} type="button"
-                        onClick={() => setAttrEditForm({ ...attrEditForm, is_active: opt.id })}
-                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                        <span className="w-2 h-2 rounded-full transition-colors" style={isSel ? { backgroundColor: opt.color } : { backgroundColor: "transparent" }} />
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
-              </div>
-            </div>
-
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
-              <button type="button" onClick={() => { setAttrEditOpen(false); setAttrEditTarget(null); }}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSaveAttrEdit} disabled={attrEditLoading}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
-                {attrEditLoading ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Full Attribute Edit Modal - Reuses AttributeFormModal */}
+      <AttributeFormModal
+        open={attrEditOpen && !!attrEditTarget}
+        onClose={() => { setAttrEditOpen(false); setAttrEditTarget(null); }}
+        mode="edit"
+        initialData={attrEditTarget ? {
+          name: attrEditTarget.name || "",
+          data_type: attrEditTarget.data_type || "multi_select",
+          values: (attrEditTarget.values || []).map((v) => {
+            const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
+            return String(label);
+          }).filter(Boolean),
+          value: (() => {
+            if (attrEditTarget.data_type === "boolean") {
+              const vals = attrEditTarget.values || [];
+              const trueEntry = vals.find(
+                (v) => (v?.value || v)?.toString() === "true" || (v?.label || v)?.toString()?.toLowerCase() === "yes"
+              );
+              return !!trueEntry;
+            }
+            return false;
+          })(),
+          is_active: attrEditTarget.is_active !== false,
+        } : null}
+        isSaving={attrEditLoading}
+        onSave={async (payload) => {
+          if (!attrEditTarget) return;
+          setAttrEditLoading(true);
+          try {
+            const attrId = getAttributeId(attrEditTarget);
+            const valuesPayload = payload.data_type === "multi_select"
+              ? (payload.values || []).map((opt) => {
+                  const label = String(opt || "").trim();
+                  return { label, value: label.toLowerCase() };
+                })
+              : payload.data_type === "boolean"
+                ? [{ label: payload.value ? "Yes" : "No", value: payload.value ? "true" : "false", sort_order: 0, is_active: true }]
+                : [];
+            const savePayload = {
+              name: payload.name.trim(),
+              data_type: payload.data_type,
+              is_active: payload.is_active !== false,
+              values: valuesPayload,
+            };
+            await attributeApi.update(attrId, savePayload);
+            await queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
+            toast.success("Attribute updated successfully");
+            setAttrEditOpen(false);
+            setAttrEditTarget(null);
+          } catch (err) {
+            toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute");
+          } finally {
+            setAttrEditLoading(false);
+          }
+        }}
+      />
 
       {/* HISTORY TAB */}
       {tab === "history" && (
         <div className="rounded-xl overflow-hidden" style={cardStyle}>
-          <div className="px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Activity History</h3>
+          <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Activity History</h3>
           </div>
           <div className="p-6">
-            <div className="space-y-6 relative before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--border-color)]">
+            <div className="space-y-5 relative before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-px before:bg-[var(--border-color)]">
               <div className="relative pl-8">
                 <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500 shadow-sm" />
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                   <div>
                     <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Created</p>
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Initial category setup and configuration.</p>
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Initial category setup and configuration.</p>
                   </div>
                   <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at)}</span>
                 </div>
@@ -890,7 +1410,7 @@ export default function CategoryDetailPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                     <div>
                       <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Updated</p>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Category details or attributes were modified.</p>
+                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Category details or attributes were modified.</p>
                     </div>
                     <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at)}</span>
                   </div>
@@ -904,10 +1424,10 @@ export default function CategoryDetailPage() {
       {/* DELETE MODAL */}
       {showDelete && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="w-full max-w-[400px] rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.10)", color: "var(--danger)" }}>
-                <Ico d={D.trash} className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.12)" }}>
+                <Ico d={D.trash} className="w-5 h-5" style={{ color: "#ef4444" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">Delete Category?</h3>
@@ -922,7 +1442,7 @@ export default function CategoryDetailPage() {
                 danger
                 onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
-                icon={deleteMutation.isPending ? <Spin className="w-4 h-4" /> : null}
+                icon={deleteMutation.isPending ? <Spin className="w-3.5 h-3.5" /> : null}
               >
                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </Button>
@@ -930,7 +1450,8 @@ export default function CategoryDetailPage() {
           </div>
         </div>
       )}
-           {/* EDIT CATEGORY MODAL - EXACT SAME AS MAIN PAGE */}
+      
+      {/* EDIT CATEGORY MODAL */}
       {showEditModal && (
         <CategoryEditModal
           categoryId={categoryId}
@@ -943,50 +1464,19 @@ export default function CategoryDetailPage() {
           }}
         />
       )}
-      {/* TOGGLE ATTRIBUTE STATUS MODAL */}
-      {attrToToggle && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: attrToToggle.is_active !== false ? "rgba(239,68,68,0.10)" : "rgba(16,185,129,0.10)", color: attrToToggle.is_active !== false ? "var(--danger)" : "var(--success)" }}
-              >
-                {attrToToggle.is_active !== false ? (
-                  <Ico d={"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"} className="w-5 h-5" />
-                ) : (
-                  <Ico d={"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-5 h-5" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">
-                  {attrToToggle.is_active !== false ? "Disable Attribute?" : "Enable Attribute?"}
-                </h3>
-                <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                  {attrToToggle.is_active !== false ? (
-                    <>Are you sure you want to disable <span className="font-medium text-[var(--text-primary)]">{attrToToggle.name}</span>? It will be hidden from product forms until re-enabled.</>
-                  ) : (
-                    <>Are you sure you want to enable <span className="font-medium text-[var(--text-primary)]">{attrToToggle.name}</span>? It will become available for product forms.</>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button onClick={() => setAttrToToggle(null)}>Cancel</Button>
-              <Button
-                danger={attrToToggle.is_active !== false}
-                primary={attrToToggle.is_active === false}
-                onClick={() => handleToggleAttributeActive(attrToToggle)}
-              >
-                {attrToToggle.is_active !== false ? "Disable" : "Enable"}
-              </Button>
-            </div>
-          </div>
-        </div>
+
+      {/* ATTRIBUTE OPTIONS SIDE PANEL */}
+      {viewPanelAttr && (
+        <AttributeOptionsPanel 
+          attr={viewPanelAttr} 
+          onClose={() => setViewPanelAttr(null)} 
+        />
       )}
+
     </div>
   );
 }
+
 /* =========================================================
    EDIT CATEGORY MODAL (Same as Main Page)
 ========================================================= */

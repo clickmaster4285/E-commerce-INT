@@ -348,6 +348,7 @@ const getCategories = async (req, res) => {
     const categories = await Category.find({ is_deleted: false })
       .select("-__v")
       .populate("parent_category_id", "name category_code")
+      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .sort({ sort_order: 1, created_at: -1 })

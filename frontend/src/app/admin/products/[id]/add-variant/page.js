@@ -341,6 +341,7 @@ export default function AddVariantPage() {
   const [formData, setFormData] = useState(null);
   const [initialized, setInitialized] = useState(false);
   const [variantAttributes, setVariantAttributes] = useState({});
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // ----------------------------------------------------------------
   // Product Query
@@ -597,13 +598,13 @@ export default function AddVariantPage() {
       image.src = imageUrl;
     });
 
-  const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files || []);
+  const processImageFiles = async (files) => {
     if (!files.length) return;
-    const valid = files.filter((file) =>
+    const fileArray = Array.from(files);
+    const valid = fileArray.filter((file) =>
       ["image/jpeg", "image/png", "image/webp"].includes(file.type)
     );
-    if (valid.length !== files.length) {
+    if (valid.length !== fileArray.length) {
       toast.error("Only JPG, PNG and WebP allowed");
     }
     try {
@@ -623,7 +624,40 @@ export default function AddVariantPage() {
       console.error("Image Error:", error);
       toast.error("Image processing failed");
     }
-    e.target.value = "";
+  };
+
+  const handleImageUpload = async (e) => {
+    const files = e.target.files || [];
+    await processImageFiles(files);
+    if (e.target) e.target.value = "";
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processImageFiles(files);
+    }
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
   };
 
   const removeImage = (ii) => {
@@ -1016,40 +1050,64 @@ export default function AddVariantPage() {
                   Product Images
                 </h3>
 
-                <label
-                  className="block cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"
-                  style={{ borderColor: "var(--border-color)" }}
+                {/* Professional Drag & Drop Image Uploader */}
+                <div
+                  className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 ${isDragOver ? "border-[var(--accent)] bg-[var(--accent-soft)]/10 scale-[1.01]" : "border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"}`}
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
-                  <input
-                    hidden
-                    multiple
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleImageUpload}
-                  />
-                  <Upload className="mx-auto mb-2 w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                  <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                    Click to select images
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    JPG, PNG or WebP • Auto-optimized
-                  </p>
-                </label>
+                  <label className="block cursor-pointer">
+                    <input
+                      hidden
+                      multiple
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleImageUpload}
+                    />
+                    <div className="flex flex-col items-center gap-2.5">
+                      <div
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDragOver ? "bg-[var(--accent)]" : "bg-[var(--bg-tertiary)]"}`}
+                      >
+                        <Upload className={`w-6 h-6 ${isDragOver ? "text-white" : "text-[var(--text-muted)]"}`} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-semibold" style={{ color: isDragOver ? "var(--accent)" : "var(--text-secondary)" }}>
+                          {isDragOver ? "Drop images here" : "Drag & drop images here"}
+                        </p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          or click to browse
+                        </p>
+                      </div>
+                      <p className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
+                        JPG, PNG, WEBP • Any resolution accepted
+                      </p>
+                    </div>
+                  </label>
+                </div>
 
                 {variant.images.length > 0 && (
-                  <div className="flex flex-wrap gap-3 mt-3">
+                  <div className="flex flex-wrap gap-3 mt-4">
                     {variant.images.map((image, imageIndex) => (
-                      <div key={imageIndex} className="relative group">
+                      <div key={imageIndex} className="relative group rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: "var(--border-color)" }}>
                         <img
                           src={image.preview}
-                          alt=""
-                          className="h-16 w-16 rounded-lg object-cover border"
-                          style={{ borderColor: "var(--border-color)" }}
+                          alt={image.file?.name || "Variant image"}
+                          className="h-20 w-20 object-cover"
                         />
+                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/70 to-transparent">
+                          <p className="text-[9px] text-white truncate font-medium leading-tight">{image.file?.name || "image"}</p>
+                          <p className="text-[9px] text-white/80 truncate leading-tight">
+                            {image.file?.type?.replace("image/", "").toUpperCase() || "IMG"}
+                            {image.file?.size ? ` • ${(image.file.size / 1024).toFixed(1)} KB` : ""}
+                          </p>
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeImage(imageIndex)}
                           className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition shadow-md hover:bg-red-700"
+                          aria-label="Remove image"
                         >
                           <X className="w-3 h-3" />
                         </button>

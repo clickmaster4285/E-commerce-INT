@@ -223,12 +223,12 @@ export default function BrandsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCountry, setFilterCountry] = useState("all");
-const [viewMode, setViewMode] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return window.innerWidth < 768 ? "grid" : "list";
-  }
-  return "list";
-});
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? "grid" : "list";
+    }
+    return "list";
+  });
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -246,6 +246,10 @@ const [viewMode, setViewMode] = useState(() => {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [removeLogo, setRemoveLogo] = useState(false);
+  
+  // ✅ NEW STATE FOR DRAG AND DROP VISUALS
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
   const resetForm = () => {
     setFormData({ brand_code: "", name: "", description: "", country: "", is_active: true });
@@ -254,6 +258,7 @@ const [viewMode, setViewMode] = useState(() => {
     setRemoveLogo(false);
     setEditingBrand(null);
     setAutoBrandCode("");
+    setIsDragging(false);
   };
 
   // ✅ AUTO GENERATE BRAND CODE LOGIC
@@ -465,14 +470,40 @@ const [viewMode, setViewMode] = useState(() => {
     return pages;
   };
 
-  const handleLogoChange = (e) => {
-    const file = e.target.files?.[0];
+  // ✅ UPDATED LOGO HANDLERS FOR DRAG & DROP
+  const handleLogoChange = (file) => {
     if (file) {
       if (file.size > 10 * 1024 * 1024) return toast.error("Image size must be less than 10MB");
       setLogoFile(file);
       setRemoveLogo(false);
       setLogoPreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith('image/')) {
+        return toast.error("Please drop an image file (PNG, JPG, WEBP)");
+      }
+      handleLogoChange(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
   };
 
   const handleRemoveLogo = () => {
@@ -908,23 +939,57 @@ const [viewMode, setViewMode] = useState(() => {
                 />
               </div>
 
-              {/* ROW 3: Logo Upload */}
+              {/* ✅ ROW 3: DRAG AND DROP LOGO UPLOAD */}
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                    {logoPreview ? <img src={logoPreview} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-6 h-6" style={{ color: "var(--text-muted)" }} />}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="logo-upload" className="cursor-pointer h-8 px-3 rounded-md text-xs font-medium flex items-center gap-2 transition hover:opacity-80 w-fit" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                      <UploadIcon className="w-3.5 h-3.5" /> {logoPreview ? "Change Image" : "Upload Image"}
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
-                      {logoPreview && <button type="button" onClick={handleRemoveLogo} className="text-[11px] text-red-500 hover:underline">Remove</button>}
+                
+                {/* Hidden Input */}
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/png, image/jpeg, image/webp" 
+                  className="hidden" 
+                  onChange={(e) => handleLogoChange(e.target.files?.[0])} 
+                  disabled={isSubmitting} 
+                />
+
+                {/* Drop Zone Area */}
+                <div 
+                  onClick={() => !isSubmitting && fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`
+                    relative w-full h-32 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200
+                    ${isDragging ? "border-emerald-500 bg-emerald-500/10" : "border-gray-600 hover:border-emerald-500/50 hover:bg-white/5"}
+                  `}
+                  style={{ borderColor: isDragging ? undefined : "var(--border-color)" }}
+                >
+                  {logoPreview ? (
+                    <div className="relative w-full h-full flex items-center justify-center p-2">
+                       <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" />
+                       {/* Remove Button Overlay */}
+                       <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemoveLogo(); }}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
+                       >
+                         <CloseIcon className="w-3 h-3" />
+                       </button>
                     </div>
-                  </div>
-                  <input id="logo-upload" type="file" accept="image/png, image/jpeg, image/webp" className="hidden" onChange={handleLogoChange} disabled={isSubmitting} />
+                  ) : (
+                    <>
+                      <div className={`p-3 rounded-full ${isDragging ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-gray-400"}`}>
+                        <UploadIcon className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                          {isDragging ? "Drop image here" : "Click or Drag image here"}
+                        </p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

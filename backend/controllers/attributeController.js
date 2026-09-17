@@ -106,15 +106,11 @@ const getAttributes = async (req, res) => {
       ];
     }
 
-    // ✅ Safely filter by category if provided
-    if (category) {
-      filter.category = { $regex: new RegExp(`^${category}$`, 'i') };
-    }
-
     // ---- LEGACY MODE (no limit) → exact old behavior ----
     if (!limit) {
-      const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).lean();
-      return res.status(200).json({ success: true, data: attributes });
+      const attributes = await Attribute.find(filter).sort({ created_at: -1 }).lean();
+      const enriched = await enrichAttributesWithCategories(attributes);
+      return res.status(200).json({ success: true, data: enriched });
     }
 
     // ---- PAGINATED MODE ----
@@ -123,10 +119,11 @@ const getAttributes = async (req, res) => {
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const attributes = await Attribute.find(filter).sort({ sort_order: 1, name: 1 }).skip(skip).limit(limit).lean();
+    const attributes = await Attribute.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit).lean();
+    const enriched = await enrichAttributesWithCategories(attributes);
     return res.status(200).json({
       success: true,
-      data: attributes,
+      data: enriched,
       pagination: {
         total,
         page: safePage,
@@ -140,6 +137,44 @@ const getAttributes = async (req, res) => {
     console.error("Error in getAttributes:", error);
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+/**
+ * Reverse-lookup: find which categories reference each attribute
+ * and attach the first category name to the `category` field.
+ */
+const enrichAttributesWithCategories = async (attributes) => {
+  if (!attributes.length) return attributes;
+
+  const attrIds = attributes.map((a) => a._id);
+
+  // Find all non-deleted categories that reference any of these attributes
+  const categories = await Category.find({
+    is_deleted: false,
+    "attributes.attribute_id": { $in: attrIds },
+  })
+    .select("name attributes.attribute_id")
+    .lean();
+
+  // Build a map: attributeId → category name
+  const attrCategoryMap = {};
+  for (const cat of categories) {
+    for (const ca of cat.attributes || []) {
+      const aid = String(ca.attribute_id);
+      if (attrIds.some((id) => String(id) === aid)) {
+        // Use the first category found for each attribute
+        if (!attrCategoryMap[aid]) {
+          attrCategoryMap[aid] = cat.name;
+        }
+      }
+    }
+  }
+
+  // Attach category name to each attribute
+  return attributes.map((attr) => ({
+    ...attr,
+    category: attrCategoryMap[String(attr._id)] || attr.category || null,
+  }));
 };
 
 const createAttribute = async (req, res) => {

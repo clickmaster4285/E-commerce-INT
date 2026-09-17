@@ -16,6 +16,9 @@ export const adminProductApi = {
   // ✅ Ab /products use karo (admin/all exist nahi karta)
   getAll: () => axiosInstance.get("/products").then(list),
 
+  getByBrand: (brandId) =>
+    axiosInstance.get("/products", { params: { brand_id: brandId } }).then(list),
+
   getById: (id) =>
     axiosInstance.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 
