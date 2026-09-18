@@ -49,8 +49,8 @@ const categorySchema = new mongoose.Schema(
     category_type: { type: String, trim: true, default: "" },
 
        attributes: { type: [categoryAttributeSchema], default: [] },
-    image_url: { type: String, trim: true, default: "" },
-    sort_order: { type: Number, default: 0 },
+   
+ 
     is_active: { type: Boolean, default: true },
 
     is_deleted: { type: Boolean, default: false },

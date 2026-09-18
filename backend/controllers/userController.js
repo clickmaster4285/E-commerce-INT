@@ -1,15 +1,18 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Wishlist = require("../models/Wishlist");
+const CheckoutDraft = require("../models/CheckoutDraft");
+const Employee = require("../models/Employee");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 
-const generateTokens = (userId, role) => {
-  const accessToken = jwt.sign({ userId, role }, process.env.JWT_SECRET, {
+const generateTokens = (userId, role, type = 'user') => {
+  const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
     expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 60}m`,
   });
-  const refreshToken = jwt.sign({ userId, role }, process.env.JWT_SECRET, {
+  const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
     expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d`,
   });
   return { accessToken, refreshToken };
@@ -124,7 +127,7 @@ const loginUser = async (req, res) => {
       },
       user._id,
     );
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    const { accessToken, refreshToken } = generateTokens(user._id, user.role, 'user');
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie(
       "refreshToken",
@@ -160,26 +163,30 @@ const loginAdmin = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Please provide email and password" });
-    const user = await User.findOne({ email });
-    if (!user)
+    const employee = await Employee.findOne({ email }).select("-activities");
+    if (!employee)
       return res
         .status(401)
         .json({ success: false, message: "Invalid credentials" });
-    if (!["admin", "staff", "manager"].includes(user.role))
+    if (!employee.password)
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    if (!["admin", "staff", "manager"].includes(employee.role))
       return res
         .status(403)
         .json({
           success: false,
           message: "Admin access denied. Please use customer login page.",
         });
-    if (user.status === "inactive" || user.is_deleted)
+    if (employee.status === "inactive" || employee.is_deleted)
       return res
         .status(403)
         .json({
           success: false,
           message: "Your account is inactive. Please contact administrator.",
         });
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await bcrypt.compare(password, employee.password);
     if (!isValid)
       return res
         .status(401)
@@ -188,15 +195,15 @@ const loginAdmin = async (req, res) => {
     await pushGlobalActivity(
       io,
       {
-        action: `${user.name} (${user.role}) logged in to admin panel`,
+        action: `${employee.name} (${employee.role}) logged in to admin panel`,
         category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { ip: req.ip, role: user.role },
+        performedBy: employee._id,
+        performedByName: employee.name,
+        details: { ip: req.ip, role: employee.role },
       },
-      user._id,
+      employee._id,
     );
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, 'employee');
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.cookie(
       "refreshToken",
@@ -207,13 +214,13 @@ const loginAdmin = async (req, res) => {
       success: true,
       message: "Admin login successful",
       user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
+        id: employee._id,
+        name: employee.name,
+        username: employee.username,
+        phone: employee.phone,
+        email: employee.email,
+        role: employee.role,
+        avatar: employee.avatar || null,
       },
     });
   } catch (error) {
@@ -230,12 +237,14 @@ const refreshAccessToken = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Refresh token required" });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
+    const userType = decoded.type || 'user';
+    const Model = userType === 'employee' ? Employee : User;
+    const user = await Model.findById(decoded.userId);
     if (!user)
       return res
         .status(401)
         .json({ success: false, message: "User not found" });
-    const { accessToken } = generateTokens(decoded.userId, user.role);
+    const { accessToken } = generateTokens(decoded.userId, user.role, userType);
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
@@ -270,14 +279,22 @@ const logoutUser = async (req, res) => {
 
 const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select("-password")
-      .populate("storeId");
-    if (!user)
+    const userType = req.userType || 'user';
+    let entity = null;
+    if (userType === 'employee') {
+      entity = await Employee.findById(req.user._id)
+        .select("-password -activities")
+        .populate("storeId");
+    } else {
+      entity = await User.findById(req.user._id)
+        .select("-password -activities")
+        .populate("storeId");
+    }
+    if (!entity)
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    res.json({ success: true, user });
+    res.json({ success: true, user: entity });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -285,34 +302,41 @@ const getProfile = async (req, res) => {
 
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select("-password")
-      .populate("storeId");
-    if (!user)
+    const userType = req.userType || 'user';
+    let entity = null;
+    if (userType === 'employee') {
+      entity = await Employee.findById(req.user._id)
+        .select("-password -activities")
+        .populate("storeId");
+    } else {
+      entity = await User.findById(req.user._id)
+        .select("-password -activities")
+        .populate("storeId");
+    }
+    if (!entity)
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
     res.json({
       success: true,
       user: {
-        _id: user._id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        phone: user.phone || "",
-        role: user.role,
-        status: user.is_deleted ? "Inactive" : "Active",
-        avatar: user.avatar || null,
-        twoFactorEnabled: user.twoFactorEnabled || false,
-        permissions: user.permissions || {
-          products: true, brands: true, categories: true, 
+        _id: entity._id,
+        name: entity.name,
+        username: entity.username,
+        email: entity.email,
+        phone: entity.phone || "",
+        role: entity.role,
+        status: entity.is_deleted ? "Inactive" : "Active",
+        avatar: entity.avatar || null,
+        twoFactorEnabled: entity.twoFactorEnabled || false,
+        permissions: entity.permissions || {
+          products: true, brands: true, categories: true,
           employees: true, discounts: true, profile: true, store: false
         },
-        preferences: user.preferences || {
-          darkMode: true,
-          notifications: { email: true, push: true, weekly: true },
+        preferences: entity.preferences || {
+          darkMode: true, notifications: { email: true, push: true, weekly: true },
         },
-        store: user.storeId || {},
+        store: entity.storeId || {},
       },
     });
   } catch (error) {
@@ -334,7 +358,9 @@ const updateProfile = async (req, res) => {
       preferences,
     } = req.body;
     const userId = req.user._id;
-    await User.findByIdAndUpdate(userId, {
+    const userType = req.userType || 'user';
+    const Model = userType === 'employee' ? Employee : User;
+    await Model.findByIdAndUpdate(userId, {
       name,
       email,
       phone,
@@ -414,8 +440,10 @@ const getProfileInfo = async (req, res) => {
     const userId = req.user?.id;
     if (!userId || userId === "guest")
       return res.status(401).json({ success: false, message: "Unauthorized" });
-    const user = await User.findById(userId)
-      .select("-password")
+    const userType = req.userType || 'user';
+    const Model = userType === 'employee' ? Employee : User;
+    const user = await Model.findById(userId)
+      .select("-password -activities")
       .populate("storeId");
     if (!user)
       return res
@@ -761,8 +789,8 @@ const updatePhone = async (req, res) => {
 // ==========================================
 const getWishlist = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate("wishlist");
-    res.json({ success: true, wishlist: user?.wishlist || [] });
+    const wishlistDoc = await Wishlist.findOne({ user_id: req.user._id }).populate("products");
+    res.json({ success: true, wishlist: wishlistDoc?.products || [] });
   } catch (error) {
     console.error("getWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -780,26 +808,26 @@ const toggleWishlist = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Product ID required" });
     }
-    const user = await User.findById(req.user._id);
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
 
-    const idx = user.wishlist.findIndex(
+    let wishlistDoc = await Wishlist.findOne({ user_id: req.user._id });
+    if (!wishlistDoc) {
+      wishlistDoc = await Wishlist.create({ user_id: req.user._id, products: [] });
+    }
+
+    const idx = wishlistDoc.products.findIndex(
       (id) => id.toString() === product_id.toString(),
     );
     let added;
     if (idx >= 0) {
-      user.wishlist.splice(idx, 1);
+      wishlistDoc.products.splice(idx, 1);
       added = false;
     } else {
-      user.wishlist.push(product_id);
+      wishlistDoc.products.push(product_id);
       added = true;
     }
-    await user.save();
+    await wishlistDoc.save();
 
-    res.json({ success: true, added, count: user.wishlist.length });
+    res.json({ success: true, added, count: wishlistDoc.products.length });
   } catch (error) {
     console.error("toggleWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -832,19 +860,15 @@ const createCheckoutDraft = async (req, res) => {
       updatedAt: new Date(),
     };
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $push: { checkout_drafts: newDraft } },
-      { new: true },
-    ).select("checkout_drafts");
+    let checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
+    if (!checkoutDoc) {
+      checkoutDoc = await CheckoutDraft.create({ user_id: req.user._id, drafts: [newDraft] });
+    } else {
+      checkoutDoc.drafts.push(newDraft);
+      await checkoutDoc.save();
+    }
 
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
-    const createdDraft =
-      user.checkout_drafts[user.checkout_drafts.length - 1];
+    const createdDraft = checkoutDoc.drafts[checkoutDoc.drafts.length - 1];
     res.status(201).json({ success: true, draft: createdDraft });
   } catch (error) {
     console.error("createCheckoutDraft error:", error);
@@ -857,12 +881,12 @@ const createCheckoutDraft = async (req, res) => {
 // ==========================================
 const getCheckoutDrafts = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("checkout_drafts");
-    if (!user)
+    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
+    if (!checkoutDoc)
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
-    const drafts = user.checkout_drafts || [];
+        .json({ success: false, message: "Checkout drafts not found" });
+    const drafts = checkoutDoc.drafts || [];
     res.json({ success: true, drafts });
   } catch (error) {
     console.error("getCheckoutDrafts error:", error);
@@ -876,13 +900,13 @@ const getCheckoutDrafts = async (req, res) => {
 const getCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(req.user._id).select("checkout_drafts");
-    if (!user)
+    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
+    if (!checkoutDoc)
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "Checkout drafts not found" });
 
-    const draft = user.checkout_drafts.find(
+    const draft = checkoutDoc.drafts.find(
       (d) => d._id.toString() === id,
     );
     if (!draft)
@@ -913,33 +937,34 @@ const updateCheckoutDraft = async (req, res) => {
       items,
     } = req.body;
 
-    const user = await User.findOneAndUpdate(
-      { _id: req.user._id, "checkout_drafts._id": id },
-      {
-        $set: {
-          "checkout_drafts.$.step": step ?? 1,
-          "checkout_drafts.$.selectedKeys": Array.isArray(selectedKeys)
-            ? selectedKeys
-            : [],
-          "checkout_drafts.$.selectedAddressId": selectedAddressId || null,
-          "checkout_drafts.$.shippingMethod": shippingMethod || "standard",
-          "checkout_drafts.$.paymentMethod": paymentMethod || "cod",
-          "checkout_drafts.$.saved": saved ?? false,
-          "checkout_drafts.$.items": Array.isArray(items) ? items : [],
-          "checkout_drafts.$.updatedAt": new Date(),
-        },
-      },
-      { new: true },
-    ).select("checkout_drafts");
-
-    if (!user)
+    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
+    if (!checkoutDoc)
       return res
         .status(404)
-        .json({ success: false, message: "User or Draft not found" });
+        .json({ success: false, message: "Checkout drafts not found" });
 
-    const draft = user.checkout_drafts.find(
+    const draftIndex = checkoutDoc.drafts.findIndex(
       (d) => d._id.toString() === id,
     );
+    if (draftIndex === -1)
+      return res
+        .status(404)
+        .json({ success: false, message: "Draft not found" });
+
+    checkoutDoc.drafts[draftIndex].step = step ?? checkoutDoc.drafts[draftIndex].step;
+    checkoutDoc.drafts[draftIndex].selectedKeys = Array.isArray(selectedKeys)
+      ? selectedKeys
+      : checkoutDoc.drafts[draftIndex].selectedKeys;
+    checkoutDoc.drafts[draftIndex].selectedAddressId = selectedAddressId !== undefined ? selectedAddressId : checkoutDoc.drafts[draftIndex].selectedAddressId;
+    checkoutDoc.drafts[draftIndex].shippingMethod = shippingMethod || checkoutDoc.drafts[draftIndex].shippingMethod;
+    checkoutDoc.drafts[draftIndex].paymentMethod = paymentMethod || checkoutDoc.drafts[draftIndex].paymentMethod;
+    checkoutDoc.drafts[draftIndex].saved = saved !== undefined ? saved : checkoutDoc.drafts[draftIndex].saved;
+    checkoutDoc.drafts[draftIndex].items = Array.isArray(items) ? items : checkoutDoc.drafts[draftIndex].items;
+    checkoutDoc.drafts[draftIndex].updatedAt = new Date();
+
+    await checkoutDoc.save();
+
+    const draft = checkoutDoc.drafts[draftIndex];
     res.json({ success: true, draft });
   } catch (error) {
     console.error("updateCheckoutDraft error:", error);
@@ -953,17 +978,16 @@ const updateCheckoutDraft = async (req, res) => {
 const deleteCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $pull: { checkout_drafts: { _id: id } } },
-      { new: true },
-    ).select("checkout_drafts");
-
-    if (!user)
+    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
+    if (!checkoutDoc)
       return res
         .status(404)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "Checkout drafts not found" });
+
+    checkoutDoc.drafts = checkoutDoc.drafts.filter(
+      (d) => d._id.toString() !== id,
+    );
+    await checkoutDoc.save();
 
     res.json({ success: true, message: "Draft deleted" });
   } catch (error) {

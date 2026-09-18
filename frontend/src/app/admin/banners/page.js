@@ -328,15 +328,13 @@ const [viewMode, setViewMode] = useState(() => {
   
   const itemsPerPage = 20;
 
-  const defaultForm = {
+    const defaultForm = {
     title: "", bannerType: "homepage_hero", position: 1,
-    desktopImage: null, tabletImage: null, mobileImage: null,
+    desktopImage: null,
     altText: "", backgroundColor: "#ffffff",
     eyebrow: "", heading: "", description: "",
     primaryButton: { text: "", linkType: "custom_url", link: "", dealId: "" },
-    startDate: "", endDate: "", autoPublish: false, autoDisable: true,
-    displayRules: { devices: ["desktop", "tablet", "mobile"] },
-    linkedDealId: ""
+    startDate: "", endDate: "",
   };
 
   const [form, setForm] = useState(defaultForm);
@@ -644,7 +642,13 @@ const [viewMode, setViewMode] = useState(() => {
     }
 
     const fd = new FormData();
-
+    // ✅ Dates ko proper ISO string mein convert karo
+    if (form.startDate) {
+      form.startDate = dateToISO(form.startDate);
+    }
+    if (form.endDate) {
+      form.endDate = dateToISO(form.endDate);
+    }
     Object.entries(form).forEach(([key, value]) => {
       // Skip fields that should never be sent from the frontend
       if (['_id', '__v', 'createdAt', 'updatedAt', 'createdby', 'updatedby'].includes(key)) {
@@ -671,23 +675,47 @@ const [viewMode, setViewMode] = useState(() => {
         return;
       }
 
-      // 4. Append valid values
+         // 4. Append valid values
       if (value instanceof File) {
         fd.append(key, value);
       } else if (typeof value === "object" && value !== null) {
         fd.append(key, JSON.stringify(value));
       } else if (value !== null && value !== undefined) {
-        fd.append(key, value);
+        // Dates ko ISO string mein bhejo
+        if (key === 'startDate' || key === 'endDate') {
+          if (value) fd.append(key, typeof value === 'string' && value.includes('T') ? new Date(value).toISOString() : value);
+        } else {
+          fd.append(key, value);
+        }
       }
     });
-
+    // ✅ Auto status: dates ke hisaab se status compute karo
+    const nowDate = new Date();
+    const startD = form.startDate ? new Date(form.startDate) : null;
+    const endD = form.endDate ? new Date(form.endDate) : null;
+    let autoStatus = "active";
+    if (endD && endD < nowDate) autoStatus = "expired";
+    else if (startD && startD > nowDate) autoStatus = "scheduled";
+    fd.append("status", autoStatus);
     bannerMutation.mutate({ data: fd, id: editingBanner?._id });
   };
 
-  const handleEdit = (banner) => {
+   const handleEdit = (banner) => {
     setEditingBanner(banner);
     setPositionDuplicate("");
-    const formatDateInput = (d) => (d ? new Date(d).toISOString().slice(0, 16) : "");
+    // ✅ UTC time ko local time mein convert karo (datetime-local input ke liye)
+    const formatDateInput = (d) => {
+      if (!d) return "";
+      const date = new Date(d);
+      if (Number.isNaN(date.getTime())) return "";
+      // Local time ko ISO string format mein convert karo (YYYY-MM-DDTHH:MM)
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
     setForm({
       ...banner,
       startDate: formatDateInput(banner.startDate),
@@ -703,9 +731,7 @@ const [viewMode, setViewMode] = useState(() => {
           return String(d);
         })()
       },
-      displayRules: banner.displayRules || { devices: ["desktop", "tablet", "mobile"] },
-      linkedDealId: banner.linkedDealId || "",
-    });
+     });
     setShowModal(true);
   };
 
@@ -721,7 +747,7 @@ const [viewMode, setViewMode] = useState(() => {
     if (!deleteTarget) return;
     deleteMutation.mutate(deleteTarget.banners.map((b) => b._id), { onSettled: () => setDeleteTarget(null) });
   };
-
+  
   const handleSort = (key) => {
     setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
   };
@@ -1109,8 +1135,8 @@ const [viewMode, setViewMode] = useState(() => {
                 </FormSection>
 
                 {/* 2. Responsive Images */}
-                <FormSection number="2" title="Responsive Images" description="Upload images for different screen sizes">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <FormSection number="2" title="Banner Image" description="Upload the banner image">
+                  <div className="grid grid-cols-1 gap-4">
                     <ImageUploadBox
                       label="Desktop Image"
                       required
@@ -1118,20 +1144,6 @@ const [viewMode, setViewMode] = useState(() => {
                       file={form.desktopImage}
                       setFile={(f) => updateForm("desktopImage", f)}
                       preview={getImagePreview(form.desktopImage)}
-                    />
-                    <ImageUploadBox
-                      label="Tablet Image"
-                      dimensions="1024x500px recommended"
-                      file={form.tabletImage}
-                      setFile={(f) => updateForm("tabletImage", f)}
-                      preview={getImagePreview(form.tabletImage)}
-                    />
-                    <ImageUploadBox
-                      label="Mobile Image"
-                      dimensions="640x400px recommended"
-                      file={form.mobileImage}
-                      setFile={(f) => updateForm("mobileImage", f)}
-                      preview={getImagePreview(form.mobileImage)}
                     />
                   </div>
                   <div className="mt-4">
@@ -1196,73 +1208,15 @@ const [viewMode, setViewMode] = useState(() => {
                   </div>
                 </FormSection>
 
-                {/* 4.5 Linked Deal Section */}
-                <FormSection number="4.5" title="Linked Deal" description="Attach a deal to this banner for tracking/analytics">
-                  <div className="space-y-4">
-                    <FormField label="Select Active Deal" helpText="Attach a deal to this banner">
-                      <div className="flex gap-2">
-                        <Select value={form.linkedDealId || ""} onChange={(e) => updateForm("linkedDealId", e.target.value)}>
-                          <option value="">No Deal Linked</option>
-                          {deals.map(deal => (
-                            <option key={deal._id || deal.id} value={deal._id || deal.id}>
-                              {deal.name} ({deal.type === 'percentage' ? `${deal.discountValue}%` : `$${deal.discountValue}`})
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    </FormField>
-                    {form.linkedDealId && (
-                      <div className="p-3 rounded-md text-xs flex items-center gap-2" style={{backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)"}}>
-                        <TagIcon className="w-4 h-4 text-emerald-500" />
-                        <span>Deal is linked. Button will redirect to deal page if configured.</span>
-                      </div>
-                    )}
-                  </div>
-                </FormSection>
-
-                {/* 5. Display Rules (Devices Only) */}
-                <FormSection number="5" title="Display Rules" description="Control which devices see this banner">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-primary)" }}>Show On Devices:</label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {["desktop", "tablet", "mobile"].map((device) => (
-                          <Checkbox
-                            key={device}
-                            checked={form.displayRules.devices.includes(device)}
-                            onChange={(e) => {
-                              const devices = e.target.checked ? [...form.displayRules.devices, device] : form.displayRules.devices.filter(d => d !== device);
-                              updateNested("displayRules", "devices", devices);
-                            }}
-                            label={device.charAt(0).toUpperCase() + device.slice(1)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </FormSection>
-
-                {/* 6. Schedule */}
-                <FormSection number="6" title="Schedule" description="Set when banner should be active">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                              {/* 5. Schedule */}
+                <FormSection number="5" title="Schedule" description="Set when banner should be active">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label="Start Date & Time" helpText="When banner becomes active">
                       <Input type="datetime-local" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
                     </FormField>
                     <FormField label="End Date & Time" helpText="When banner expires">
                       <Input type="datetime-local" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
                     </FormField>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-4 pt-3 border-t" style={{ borderColor: "var(--border-color)" }}>
-                    <Checkbox
-                      checked={form.autoPublish}
-                      onChange={(e) => updateForm("autoPublish", e.target.checked)}
-                      label="Auto-publish on start date"
-                    />
-                    <Checkbox
-                      checked={form.autoDisable}
-                      onChange={(e) => updateForm("autoDisable", e.target.checked)}
-                      label="Auto-disable after end date"
-                    />
                   </div>
                 </FormSection>
 

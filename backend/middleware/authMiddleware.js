@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Employee = require("../models/Employee");
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -19,27 +20,31 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userType = decoded.type || 'user';
 
-    const user = await User.findById(decoded.userId)
-      .select("-password")
-      .lean();
+    let entity = null;
+    if (userType === 'employee') {
+      entity = await Employee.findById(decoded.userId).select("-password -activities").lean();
+    } else {
+      entity = await User.findById(decoded.userId).select("-password -activities").lean();
+    }
 
-    if (!user || user.is_deleted) {
+    if (!entity || entity.is_deleted) {
       return res.status(401).json({ success: false, message: "User not found or deleted" });
     }
 
-    if (user.status === "inactive") {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Your account is inactive. Please contact admin." 
+    if (entity.status === "inactive") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is inactive. Please contact admin.",
       });
     }
 
-    // ✅ FIX: Map storeId to tenant_id so existing controllers work correctly
     req.user = {
-      ...user,
-      tenant_id: user.storeId || null,
+      ...entity,
+      tenant_id: entity.storeId || null,
     };
+    req.userType = userType;
 
     next();
   } catch (error) {
