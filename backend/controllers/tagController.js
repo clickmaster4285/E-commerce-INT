@@ -1,4 +1,20 @@
 const Tag = require("../models/Tag");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
+
+// Helper to resolve user/employee info
+const resolveCreator = async (userId) => {
+  if (!userId) return null;
+  try {
+    const user = await User.findById(userId).select("name email").lean();
+    if (user) return { name: user.name, email: user.email };
+    const employee = await Employee.findById(userId).select("name email").lean();
+    if (employee) return { name: employee.name, email: employee.email };
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 // Helper function to generate slug from name
 const generateSlug = (text) => {
@@ -15,11 +31,23 @@ const generateSlug = (text) => {
 const getAllTags = async (req, res) => {
   try {
     const tags = await Tag.find({ is_deleted: { $ne: true } })
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
       .sort({ createdAt: -1 })
       .lean();
-    return res.status(200).json(tags);
+
+    // Manually resolve createdby/updatedby from User and Employee
+    const resolvedTags = await Promise.all(
+      tags.map(async (tag) => {
+        const createdbyInfo = await resolveCreator(tag.createdby);
+        const updatedbyInfo = await resolveCreator(tag.updatedby);
+        return {
+          ...tag,
+          createdby: createdbyInfo,
+          updatedby: updatedbyInfo,
+        };
+      })
+    );
+
+    return res.status(200).json(resolvedTags);
   } catch (error) {
     console.error("❌ [getAllTags] Error:", error);
     return res.status(500).json({ message: "Failed to fetch tags" });
@@ -35,7 +63,8 @@ const createTag = async (req, res) => {
     }
 
     const cleanName = String(name).trim();
-    const slug = generateSlug(cleanName);
+    let slug = generateSlug(cleanName);
+    if (!slug) slug = "tag-" + Date.now();
 
     // Check duplicate by name OR slug
     const existing = await Tag.findOne({ 
@@ -52,12 +81,15 @@ const createTag = async (req, res) => {
 
     const newTag = await Tag.create({
       name: cleanName,
-      slug: slug, // ✅ Saving generated slug
+      slug: slug,
       createdby: req.user?._id || null,
       updatedby: req.user?._id || null,
       is_deleted: false,
     });
-    const populatedTag = await Tag.findById(newTag._id).populate("createdby", "name email").populate("updatedby", "name email").lean();
+    const tagDoc = await Tag.findById(newTag._id).lean();
+    const createdbyInfo = await resolveCreator(tagDoc.createdby);
+    const updatedbyInfo = await resolveCreator(tagDoc.updatedby);
+    const populatedTag = { ...tagDoc, createdby: createdbyInfo, updatedby: updatedbyInfo };
     return res.status(201).json(populatedTag);
   } catch (error) {
     console.error("❌ [createTag] Error:", error);
@@ -80,7 +112,8 @@ const updateTag = async (req, res) => {
     }
 
     const cleanName = String(name).trim();
-    const slug = generateSlug(cleanName);
+    let slug = generateSlug(cleanName);
+    if (!slug) slug = "tag-" + Date.now();
 
     // Check if another tag has same name/slug
     const duplicate = await Tag.findOne({ 
@@ -108,7 +141,10 @@ const updateTag = async (req, res) => {
       return res.status(404).json({ message: "Tag not found" });
     }
 
-    const populatedTag = await Tag.findById(updatedTag._id).populate("createdby", "name email").populate("updatedby", "name email").lean();
+    const tagDoc = await Tag.findById(updatedTag._id).lean();
+    const createdbyInfo = await resolveCreator(tagDoc.createdby);
+    const updatedbyInfo = await resolveCreator(tagDoc.updatedby);
+    const populatedTag = { ...tagDoc, createdby: createdbyInfo, updatedby: updatedbyInfo };
     return res.status(200).json(populatedTag);
   } catch (error) {
     console.error("❌ [updateTag] Error:", error);

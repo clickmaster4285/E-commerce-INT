@@ -480,7 +480,7 @@ export default function ProductDetailPage() {
   });
 
   const deleteVariantMutation = useMutation({
-    mutationFn: ({ id, data }) => productApi.update(id, data),
+    mutationFn: (variantId) => variantApi.delete(variantId),
     onSuccess: async () => {
       toast.success("Variant deleted successfully");
       await refetchProduct();
@@ -1391,8 +1391,8 @@ export default function ProductDetailPage() {
                              </td>
                              <td className="px-5 py-3.5 text-right relative z-10">
                                 <MoreMenu actions={[
-                                 { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag), disabled: tag._id === tag.name },
-                                 { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => setDeleteTagTarget(tag), disabled: deleteTagMutation.isPending || tag._id === tag.name },
+                                 { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag) },
+                                 { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => setDeleteTagTarget(tag), disabled: deleteTagMutation.isPending },
                               ]} />
                             </td>
                           </tr>
@@ -2091,10 +2091,7 @@ export default function ProductDetailPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setDeleteVariantTarget(null)} className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
               <button onClick={() => {
-                const updatedVariants = product.variants.filter(v => String(v._id) !== String(deleteVariantTarget._id));
-                const data = new FormData();
-                data.append("variants", JSON.stringify(updatedVariants));
-                deleteVariantMutation.mutate({ id: product._id, data });
+                deleteVariantMutation.mutate(deleteVariantTarget._id);
                 setDeleteVariantTarget(null);
               }} disabled={deleteVariantMutation.isPending} className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>{deleteVariantMutation.isPending ? "Deleting..." : "Delete"}</button>
             </div>
