@@ -74,7 +74,7 @@ const sanitizeOptionLabels = (raw) => {
 
 const getCategoryName = (categoryId, categories) => {
   const category = categories.find((item) => String(item._id) === String(categoryId));
-  return category?.name || "Root category";
+  return category?.name || "None";
 };
 
 /* ================= MAIN PAGE COMPONENT ================= */
@@ -162,7 +162,6 @@ const [viewMode, setViewMode] = useState(() => {
     onError: (error) => toast.error(error.response?.data?.message || error.message || "Category delete failed"),
   });
 
-  // ... (upar ka code same rahega, sirf toggleStatusMutation ko dhoond kar replace karo)
    const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, newStatus }) => {
       const payload = { 
@@ -186,7 +185,6 @@ const [viewMode, setViewMode] = useState(() => {
     },
   });
 
-// ... (baaki code same rahega)
   // ================= FORM MUTATIONS =================
   const createMutation = useMutation({
     mutationFn: (data) => categoryApi.create(data),
@@ -798,8 +796,8 @@ const [viewMode, setViewMode] = useState(() => {
     };
     const hierarchicalCategories = buildHierarchy(categories);
     const selectedParentName = formData.parent_category_id
-      ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "Root Category"
-      : "Root Category";
+      ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+      : "None";
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -855,7 +853,7 @@ const [viewMode, setViewMode] = useState(() => {
 
               {/* ── SECTION 2: CATEGORY HIERARCHY ── */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Parent Category</p>
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
                   <div className="relative">
@@ -941,7 +939,7 @@ const [viewMode, setViewMode] = useState(() => {
                   <button type="button"
                     onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
                     className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
-                    <span>Root Category</span>
+                    <span>None</span>
                     {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)]" />}
                   </button>
                   {categoriesLoading ? (
@@ -1005,6 +1003,31 @@ const [viewMode, setViewMode] = useState(() => {
               <CloseIcon className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Selected Attributes - Compact Chips */}
+          {tempSelectedAttrIds.length > 0 && (
+            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Selected Attributes</span>
+                <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
+                {tempSelectedAttrIds.map((attrId) => {
+                  const attr = allAttributes.find((a) => String(a._id) === String(attrId));
+                  if (!attr) return null;
+                  return (
+                    <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
+                      {attr.name}
+                      <button type="button" onClick={() => toggleTempAttribute(attrId)}
+                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                        <CloseIcon className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Search - Fixed */}
           <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
@@ -1122,7 +1145,7 @@ const [viewMode, setViewMode] = useState(() => {
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{allCategories}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Root Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Parent Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Child Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{childCategoriesCount}</p></div>
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>With Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{categoriesWithAttributes}</p></div>
         </div>
@@ -1207,7 +1230,7 @@ const [viewMode, setViewMode] = useState(() => {
                           </div>
                         </td>
                         <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{category.description || "—"}</p></td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "Root category" ? "—" : parentName}</td>
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentName}</td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive
@@ -1243,7 +1266,7 @@ const [viewMode, setViewMode] = useState(() => {
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "Root category" ? "Root" : parentName}</span>
+                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? "None" : parentName}</span>
                     <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.2)" } : { backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}>{isMobileActive ? "Active" : "Inactive"}</span>
                   </div>
                   <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -1268,7 +1291,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                   </div>
                   <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "Root category" ? "Root" : parentName}</span>
+                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? "None" : parentName}</span>
                     <ActionButtons category={category} />
                   </div>
                 </div>
@@ -1401,7 +1424,6 @@ const [viewMode, setViewMode] = useState(() => {
                     <div className="flex flex-wrap gap-1.5">
                       {newAttrValues.map((val, idx) => (
                         <span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15">
-                          <span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>
                           {val}
                           <button
                             type="button"

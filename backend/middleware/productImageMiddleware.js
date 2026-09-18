@@ -20,26 +20,7 @@ const validateProductImages = async (req, res, next) => {
 
       const metadata = await sharp(file.buffer).metadata();
 
-
-      // Minimum resolution check
-      const MIN_WIDTH = 1000;
-      const MIN_HEIGHT = 1000;
-
-
-      if (
-        !metadata.width ||
-        !metadata.height ||
-        metadata.width < MIN_WIDTH ||
-        metadata.height < MIN_HEIGHT
-      ) {
-
-        return res.status(400).json({
-          message:
-            `Image resolution must be at least ${MIN_WIDTH}x${MIN_HEIGHT}px`
-        });
-
-      }
-
+      // Resolution restriction removed - any valid image size accepted
 
       imageMetadata.push({
 

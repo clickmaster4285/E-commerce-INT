@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
@@ -47,6 +47,12 @@ const EyeIcon = ({ className = "w-4 h-4", style }) => (
 const ShieldCheckIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
 );
+const PlusIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+);
+const CloseIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+);
 
 // --- Helpers ---
 const getDataTypeLabel = (type) => {
@@ -55,6 +61,312 @@ const getDataTypeLabel = (type) => {
 };
 
 const ATTRS_PER_PAGE = 15;
+
+function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
+  const isEdit = mode === "edit";
+
+  const [form, setForm] = useState({
+    name: "",
+    data_type: "multi_select",
+    values: [],
+    value: isEdit ? false : "",
+    is_active: true,
+  });
+  const [newOptionInput, setNewOptionInput] = useState("");
+  const [editOptionInput, setEditOptionInput] = useState("");
+  const optionInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      if (isEdit && initialData) {
+        const dataType = initialData.data_type || "multi_select";
+        let booleanValue = false;
+        if (dataType === "boolean") {
+          const vals = initialData.values || [];
+          const trueEntry = vals.find(
+            (v) =>
+              (v?.value || v)?.toString() === "true" ||
+              (v?.label || v)?.toString()?.toLowerCase() === "yes"
+          );
+          if (trueEntry) booleanValue = true;
+        }
+        const values = (initialData.values || [])
+          .map((v) => {
+            const label = typeof v === "string" ? v : v?.label || v?.value || String(v);
+            return String(label);
+          })
+          .filter(Boolean);
+        setForm({
+          name: initialData.name || "",
+          data_type: dataType,
+          values,
+          value: booleanValue,
+          is_active: initialData.is_active !== false,
+        });
+        setEditOptionInput("");
+        setNewOptionInput("");
+      } else {
+        setForm({
+          name: "",
+          data_type: "multi_select",
+          values: [],
+          value: "",
+          is_active: true,
+        });
+        setNewOptionInput("");
+        setEditOptionInput("");
+      }
+    }
+  }, [open, isEdit, initialData]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    if (!form.name || !form.name.trim()) return;
+    const valuesPayload = form.data_type === "multi_select"
+      ? (form.values || []).map((opt) => {
+          const label = String(opt || "").trim();
+          return { label, value: label.toLowerCase() };
+        })
+      : form.data_type === "boolean"
+        ? [
+            {
+              label: form.value ? "Yes" : "No",
+              value: form.value ? "true" : "false",
+              sort_order: 0,
+              is_active: true,
+            },
+          ]
+        : [];
+    const payload = {
+      name: form.name.trim(),
+      data_type: form.data_type,
+      values: valuesPayload,
+      is_active: form.is_active !== false,
+    };
+    if (!isEdit && !payload.name) return;
+    if (isEdit) {
+      payload.value = form.value;
+    }
+    onSave && onSave(payload);
+  };
+
+  const addOption = () => {
+    const val = (isEdit ? editOptionInput : newOptionInput).trim();
+    if (!val) return;
+    const exists = (form.values || []).some(
+      (v) => v.toLowerCase() === val.toLowerCase()
+    );
+    if (exists) {
+      if (isEdit) setEditOptionInput("");
+      else setNewOptionInput("");
+      return;
+    }
+    setForm({ ...form, values: [...(form.values || []), val] });
+    if (isEdit) setEditOptionInput("");
+    else setNewOptionInput("");
+  };
+
+  const removeOption = (idx) => {
+    setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
+  };
+
+  const title = isEdit ? "Edit Attribute" : "Add New Attribute";
+  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
+  const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+  const dataTypeLabels = [
+    { id: "multi_select", label: "Multi Options" },
+    { id: "boolean", label: "Yes / No" },
+  ];
+
+  const SlidersIcon = ({ className = "w-4 h-4" }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div
+        className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden"
+      >
+        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-9 h-9 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+              <SlidersIcon className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h3>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+          >
+            <span>×</span>
+          </button>
+        </div>
+
+        <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: "min(640px, 85vh)" }}>
+          <div className="space-y-3">
+            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Attribute Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                autoFocus
+                className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                placeholder="e.g. Color, Size, RAM"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              Attribute Type
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              {dataTypeLabels.map((type) => {
+                const isActive = form.data_type === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        data_type: type.id,
+                        values: type.id === "boolean" ? form.values : form.values,
+                      })
+                    }
+                    className={`h-auto py-3 px-3 text-[12px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-all duration-200 text-left ${
+                      isActive
+                        ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
+                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    <span>{type.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {form.data_type === "multi_select" && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Options</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(form.values || []).map((opt, idx) => (
+                  <span
+                    key={`opt-${idx}`}
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"
+                  >
+                    {opt}
+                    <button
+                      type="button"
+                      onClick={() => removeOption(idx)}
+                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
+                      aria-label="Remove option"
+                    >
+                      <CloseIcon className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  ref={optionInputRef}
+                  type="text"
+                  placeholder="Add an option (e.g. 8 GB)"
+                  value={isEdit ? editOptionInput : newOptionInput}
+                  onChange={(e) => (isEdit ? setEditOptionInput(e.target.value) : setNewOptionInput(e.target.value))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addOption();
+                    }
+                  }}
+                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
+                >
+                  <PlusIcon className="w-3 h-3" /> <span>Add</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                Add one or more options. You can also add more after creating the attribute.
+              </p>
+            </div>
+          )}
+
+          {form.data_type === "boolean" && (
+            <div className="space-y-2.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: true, label: "Yes" },
+                  { id: false, label: "No" },
+                ].map((opt) => {
+                  const isActive = form.value === opt.id;
+                  return (
+                    <button
+                      key={String(opt.id)}
+                      type="button"
+                      onClick={() => setForm({ ...form, value: opt.id })}
+                      className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive
+                        ? opt.id === true
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
+                          : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
+                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive
+                          ? opt.id === true ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]"
+                          : "border-[var(--border-color)] bg-transparent"
+                        }`}
+                      />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                This will be the default Yes/No state for this attribute.
+              </p>
+            </div>
+          )}
+
+        </div>
+
+        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !form.name || !form.name.trim()}
+            className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+          >
+            {saveText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AttributesPage() {
   useAttributeSocketSync();
@@ -77,13 +389,10 @@ export default function AttributesPage() {
 
   // Add Attribute Modal State
   const [showAttributeModal, setShowAttributeModal] = useState(false);
-  const [newAttributeData, setNewAttributeData] = useState({ name: "", code: "", data_type: "multi_select", values: [], value: "", is_active: true });
 
   // Edit Attribute Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAttribute, setEditingAttribute] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", data_type: "multi_select", values: [], value: false, is_active: true });
-  const [editOptionInput, setEditOptionInput] = useState("");
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -197,44 +506,14 @@ export default function AttributesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowAttributeModal(false);
-      setNewAttributeData({ name: "", code: "", data_type: "multi_select", values: [], value: "", is_active: true });
       toast.success("Attribute added successfully");
     },
     onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to add attribute"),
   });
 
-  const handleAddAttributeFromModal = () => {
-    if (!newAttributeData.name.trim()) { toast.error("Attribute name is required"); return; }
-    const code = newAttributeData.code.trim() || newAttributeData.name.trim().toLowerCase().replace(/\s+/g, "_");
-    const valuesPayload = (newAttributeData.values || []).map((opt) => {
-      const label = typeof opt === "string" ? opt : (opt?.label || opt?.value || String(opt));
-      return { label, value: String(label).toLowerCase() };
-    });
-    addAttributeMutation.mutate({
-      code,
-      name: newAttributeData.name,
-      data_type: newAttributeData.data_type,
-      values: valuesPayload,
-      is_active: newAttributeData.is_active !== false,
-    });
-  };
-
   // ===== EDIT ATTRIBUTE =====
   const openEditModal = (attr) => {
     setEditingAttribute(attr);
-    const dataType = attr.data_type || "multi_select";
-    let booleanValue = false;
-    if (dataType === "boolean") {
-      const vals = attr.values || [];
-      const trueEntry = vals.find((v) => (v.value || v).toString() === "true" || (v.label || v).toString().toLowerCase() === "yes");
-      if (trueEntry) booleanValue = true;
-    }
-    const values = (attr.values || []).map((v) => {
-      const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
-      return String(label);
-    }).filter(Boolean);
-    setEditForm({ name: attr.name || "", data_type: dataType, values, value: booleanValue, is_active: attr.is_active !== false });
-    setEditOptionInput("");
     setShowEditModal(true);
   };
 
@@ -246,42 +525,10 @@ export default function AttributesPage() {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowEditModal(false);
       setEditingAttribute(null);
-      setEditForm({ name: "", data_type: "multi_select", values: [], value: false, is_active: true });
-      setEditOptionInput("");
       toast.success("Attribute updated successfully");
     },
     onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute"),
   });
-
-  const handleSaveEdit = () => {
-    if (!editForm.name.trim()) { toast.error("Attribute name is required"); return; }
-    const valuesPayload = editForm.data_type === "multi_select"
-      ? (editForm.values || []).map((opt) => {
-          const label = String(opt || "").trim();
-          return { label, value: label.toLowerCase() };
-        })
-      : editForm.data_type === "boolean"
-        ? [{ label: editForm.value ? "Yes" : "No", value: editForm.value ? "true" : "false", sort_order: 0, is_active: true }]
-        : [];
-    editAttributeMutation.mutate({
-      name: editForm.name.trim(),
-      data_type: editForm.data_type,
-      values: valuesPayload,
-      is_active: editForm.is_active !== false,
-    });
-  };
-
-  const addEditOption = () => {
-    const val = editOptionInput.trim();
-    if (!val) return;
-    if ((editForm.values || []).some((v) => v.toLowerCase() === val.toLowerCase())) return;
-    setEditForm({ ...editForm, values: [...(editForm.values || []), val] });
-    setEditOptionInput("");
-  };
-
-  const removeEditOption = (idx) => {
-    setEditForm({ ...editForm, values: (editForm.values || []).filter((_, i) => i !== idx) });
-  };
 
   // ===== TOGGLE ATTRIBUTE STATUS =====
   const handleToggleAttributeActive = async (attr) => {
@@ -636,301 +883,75 @@ export default function AttributesPage() {
       </div>
 
       {/* ===== Add Attribute Modal ===== */}
-      {showAttributeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-                  <SlidersIcon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Add New Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">Configure properties for products.</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setShowAttributeModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
-                <span>×</span>
-              </button>
-            </div>
-
-            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input type="text" value={newAttributeData.name}
-                  onChange={(e) => setNewAttributeData({ ...newAttributeData, name: e.target.value })} autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: "multi_select", label: "Options" },
-                    { id: "boolean", label: "Yes / No" },
-                  ].map((type) => {
-                    const isActive = newAttributeData.data_type === type.id;
-                    return (
-                      <button key={type.id} type="button"
-                        onClick={() => setNewAttributeData({ ...newAttributeData, data_type: type.id })}
-                        className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
-                          ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
-                        <span>{type.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {newAttributeData.data_type === "multi_select" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
-                  <div className="space-y-1.5">
-                    {(newAttributeData.values || []).map((opt, idx) => (
-                      <div key={`opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
-                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button type="button"
-                          onClick={() => {
-                            const next = (newAttributeData.values || []).filter((_, i) => i !== idx);
-                            setNewAttributeData({ ...newAttributeData, values: next });
-                          }}
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option">
-                          <span>×</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" id="new-attr-option-input" placeholder="Add an option (e.g. 8 GB)"
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const val = e.currentTarget.value.trim();
-                          if (!val) return;
-                          const exists = (newAttributeData.values || []).some((v) => v.toLowerCase() === val.toLowerCase());
-                          if (exists) return;
-                          setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
-                          e.currentTarget.value = "";
-                        }
-                      }} />
-                    <button type="button"
-                      onClick={() => {
-                        const input = document.getElementById("new-attr-option-input");
-                        if (!input) return;
-                        const val = input.value.trim();
-                        if (!val) return;
-                        const exists = (newAttributeData.values || []).some((v) => v.toLowerCase() === val.toLowerCase());
-                        if (exists) { input.value = ""; return; }
-                        setNewAttributeData({ ...newAttributeData, values: [...(newAttributeData.values || []), val] });
-                        input.value = "";
-                      }}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
-                      <span>+ Add</span>
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">Add one or more options. You can also add more after creating the attribute.</p>
-                </div>
-              )}
-
-              {newAttributeData.data_type === "boolean" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default State</label>
-                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
-                      const isActive = newAttributeData.value === opt.id;
-                      return (
-                        <button key={String(opt.id)} type="button"
-                          onClick={() => setNewAttributeData({ ...newAttributeData, value: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default Yes/No state for this attribute.</p>
-                </div>
-              )}
-
-              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
-                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                  {[
-                    { id: true, label: "Active", color: "#34d399" },
-                    { id: false, label: "Inactive", color: "#f87171" },
-                  ].map((opt) => {
-                    const isSel = newAttributeData.is_active === opt.id;
-                    return (
-                      <button key={String(opt.id)} type="button"
-                        onClick={() => setNewAttributeData({ ...newAttributeData, is_active: opt.id })}
-                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                        <span className={`w-2 h-2 rounded-full transition-colors ${isSel ? "bg-[" + opt.color + "]" : "bg-transparent"}`} style={isSel ? { backgroundColor: opt.color } : {}} />
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
-              </div>
-            </div>
-
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
-              <button type="button" onClick={() => setShowAttributeModal(false)}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
-                Cancel
-              </button>
-              <button type="button" onClick={handleAddAttributeFromModal} disabled={addAttributeMutation.isPending}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
-                {addAttributeMutation.isPending ? "Adding..." : "Add Attribute"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AttributeFormModal
+        open={showAttributeModal}
+        onClose={() => setShowAttributeModal(false)}
+        mode="create"
+        isSaving={addAttributeMutation.isPending}
+        onSave={async (payload) => {
+          const code = payload.name.trim().toLowerCase().replace(/\s+/g, "_");
+          addAttributeMutation.mutate({
+            ...payload,
+            code,
+            values: payload.values || [],
+          });
+        }}
+      />
 
       {/* ===== Edit Attribute Modal ===== */}
-      {showEditModal && editingAttribute && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-[420px] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-                  <SlidersIcon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Edit Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">Update attribute details and values.</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setShowEditModal(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
-                <span>×</span>
-              </button>
-            </div>
-
-            <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
-                <input type="text" value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: "multi_select", label: "Multi Options" },
-                    { id: "boolean", label: "Yes / No" },
-                  ].map((type) => {
-                    const isActive = editForm.data_type === type.id;
-                    return (
-                      <button key={type.id} type="button"
-                        onClick={() => setEditForm({ ...editForm, data_type: type.id, values: type.id === "boolean" ? editForm.values : editForm.values })}
-                        className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${isActive
-                          ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>
-                        <span>{type.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {editForm.data_type === "multi_select" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
-                  <div className="space-y-1.5">
-                    {(editForm.values || []).map((opt, idx) => (
-                      <div key={`edit-opt-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg">
-                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                          {idx + 1}
-                        </span>
-                        <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                        <button type="button" onClick={() => removeEditOption(idx)}
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option">
-                          <span>×</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Add an option..." value={editOptionInput}
-                      onChange={(e) => setEditOptionInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEditOption(); } }}
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]" />
-                    <button type="button" onClick={addEditOption}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors">
-                      <span>+ Add</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {editForm.data_type === "boolean" && (
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
-                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                    {[{ id: true, label: "Yes" }, { id: false, label: "No" }].map((opt) => {
-                      const isActive = editForm.value === opt.id;
-                      return (
-                        <button key={String(opt.id)} type="button"
-                          onClick={() => setEditForm({ ...editForm, value: opt.id })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
-                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                  {[
-                    { id: true, label: "Active", color: "#34d399" },
-                    { id: false, label: "Inactive", color: "#f87171" },
-                  ].map((opt) => {
-                    const isSel = editForm.is_active === opt.id;
-                    return (
-                      <button key={String(opt.id)} type="button"
-                        onClick={() => setEditForm({ ...editForm, is_active: opt.id })}
-                        className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                        <span className="w-2 h-2 rounded-full transition-colors" style={isSel ? { backgroundColor: opt.color } : { backgroundColor: "transparent" }} />
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
-              </div>
-            </div>
-
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
-              <button type="button" onClick={() => setShowEditModal(false)}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSaveEdit} disabled={editAttributeMutation.isPending}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50">
-                {editAttributeMutation.isPending ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AttributeFormModal
+        open={showEditModal && !!editingAttribute}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingAttribute(null);
+        }}
+        mode="edit"
+        initialData={editingAttribute ? {
+          name: editingAttribute.name || "",
+          data_type: editingAttribute.data_type || "multi_select",
+          values: (editingAttribute.values || []).map((v) => {
+            const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
+            return String(label);
+          }).filter(Boolean),
+          value: (() => {
+            if (editingAttribute.data_type === "boolean") {
+              const vals = editingAttribute.values || [];
+              const trueEntry = vals.find(
+                (v) =>
+                  (v?.value || v)?.toString() === "true" ||
+                  (v?.label || v)?.toString()?.toLowerCase() === "yes"
+              );
+              return !!trueEntry;
+            }
+            return false;
+          })(),
+          is_active: editingAttribute.is_active !== false,
+        } : null}
+        isSaving={editAttributeMutation.isPending}
+        onSave={async (payload) => {
+          const valuesPayload = payload.data_type === "multi_select"
+            ? (payload.values || []).map((opt) => {
+                const label = String(opt || "").trim();
+                return { label, value: label.toLowerCase() };
+              })
+            : payload.data_type === "boolean"
+              ? [
+                  {
+                    label: payload.value ? "Yes" : "No",
+                    value: payload.value ? "true" : "false",
+                    sort_order: 0,
+                    is_active: true,
+                  },
+                ]
+              : [];
+          editAttributeMutation.mutate({
+            name: payload.name.trim(),
+            data_type: payload.data_type,
+            values: valuesPayload,
+            is_active: payload.is_active !== false,
+          });
+        }}
+      />
 
       {/* ===== Delete Confirmation Modal ===== */}
       {deleteTarget && (

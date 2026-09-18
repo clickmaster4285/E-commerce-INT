@@ -51,6 +51,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
   try {
     const categories = await Category.find({ is_deleted: false })
       .select("name category_code description parent_category_id category_type is_active attributes sort_order created_at")
+      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
       .sort({ created_at: -1 })
       .lean();
 
