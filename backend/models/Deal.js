@@ -18,10 +18,7 @@ const dealSchema = new mongoose.Schema(
       default: "",
     },
 
-    image: {
-      type: String,
-      default: "",
-    },
+   
 
     // ==========================================
     // DEAL TYPE & TARGET
@@ -79,11 +76,7 @@ const dealSchema = new mongoose.Schema(
       min: 0,
     },
 
-    maxDiscountAmount: {
-      type: Number,
-      default: null,
-      min: 0,
-    },
+ 
 
     // ==========================================
     // BUY X GET Y LOGIC
@@ -156,11 +149,7 @@ const dealSchema = new mongoose.Schema(
       min: 1,
     },
 
-    maxQuantity: {
-      type: Number,
-      default: null,
-      min: 0,
-    },
+   
 
     // ==========================================
     // USAGE LIMITS
@@ -173,7 +162,7 @@ const dealSchema = new mongoose.Schema(
 
     usedCount: {
       type: Number,
-      default: 0,
+      default:0,
       min: 0,
     },
 
@@ -192,23 +181,13 @@ const dealSchema = new mongoose.Schema(
       default: "all",
     },
 
-    customerIds: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    }],
-
+   
     // ==========================================
     // COMBINATION RULES
     // ==========================================
-    allowWithCoupon: {
-      type: Boolean,
-      default: false,
-    },
+  
 
-    allowWithOtherDeals: {
-      type: Boolean,
-      default: false,
-    },
+  
 
     // ==========================================
     // ADMIN CONTROL
@@ -223,10 +202,7 @@ const dealSchema = new mongoose.Schema(
       default: false,
     },
 
-    priority: {
-      type: Number,
-      default: 0,
-    },
+ 
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

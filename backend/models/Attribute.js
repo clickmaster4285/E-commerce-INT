@@ -24,7 +24,7 @@ const attributeSchema = new mongoose.Schema(
       default: "text",
     },
     unit: { type: String, trim: true, default: "" },
-    description: { type: String, trim: true, default: "" },
+   
     values: { type: [attributeValueSchema], default: [] },
     variant_allowed: { type: Boolean, default: true },
     is_active: { type: Boolean, default: true },

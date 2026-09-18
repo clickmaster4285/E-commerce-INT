@@ -8,8 +8,11 @@ const path = require("path");
 const fs = require("fs");
 const cookieParser = require("cookie-parser");
 
+const net = require('net');
+
 const connectDB = require("./config/db");
 const User = require("./models/User");
+const Employee = require("./models/Employee");
 const Store = require("./models/Store");
 const { initSocket } = require("./utils/socket");
 
@@ -173,22 +176,30 @@ const seedDefaultData = async () => {
         console.log("✅ Default Store Created");
       }
 
-      // 2. Admin Seed
+      // 2. Admin Seed (Employees collection only)
       const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
       const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
       if (adminEmail && adminPassword) {
-        let admin = await User.findOne({ email: adminEmail });
+        let admin = await Employee.findOne({ email: adminEmail });
         if (!admin) {
           const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
-          await User.create({
-            name: process.env.DEFAULT_ADMIN_NAME,
-            username: process.env.DEFAULT_ADMIN_USERNAME,
+          await Employee.create({
+            name: process.env.DEFAULT_ADMIN_NAME || "Admin",
+            username: process.env.DEFAULT_ADMIN_USERNAME || "admin",
             email: adminEmail,
             password: hashedPassword,
             role: DEFAULT_ADMIN_ROLE,
-            storeId: defaultStore._id,
+            status: "active",
+            storeId: defaultStore?._id || null,
+            permissions: {
+              products: true, brands: true, categories: true,
+              users: true, orders: true, settings: true,
+              profile: true, employees: true, discounts: true,
+              deals: true, store: true, banners: true,
+              manageStock: true, shipping: true, order: true, attribute: true,
+            },
           });
-          console.log("✅ Default Admin User Created");
+          console.log("✅ Default Admin Employee Created (employees collection)");
         }
       }
     }
@@ -200,6 +211,21 @@ const seedDefaultData = async () => {
     console.error("❌ Seed Error:", error.message);
   }
 };
+
+function checkPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') resolve(false);
+      else resolve(true);
+    });
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port);
+  });
+}
 
 // ==========================================
 // SERVER STARTUP
@@ -215,6 +241,13 @@ const startServer = async () => {
     if (typeof bannerScheduler === 'function') bannerScheduler();
     else if (bannerScheduler?.start) bannerScheduler.start();
     
+    const portAvailable = await checkPortAvailable(PORT);
+    if (!portAvailable) {
+      console.error(`❌ Port ${PORT} is already in use (EADDRINUSE). Please close the other process or change PORT in .env.`);
+      console.error(`💡 Fix: kill $(lsof -t -i:${PORT}) or change PORT=${PORT+1}`);
+      process.exit(1);
+    }
+
     server.listen(PORT, HOST, () => {
       const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
       console.log("==========================================");
