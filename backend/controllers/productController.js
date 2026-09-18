@@ -100,17 +100,23 @@ const resolveTags = async (tagNames, userId) => {
 
   if (cleanNames.length === 0) return [];
 
+  // ✅ Look up by name regardless of soft-delete: re-creating a soft-deleted
+  // name hits the unique `name` index (E11000), so restore that doc instead.
   const existingTags = await Tag.find({ 
-    name: { $in: cleanNames }, 
-    is_deleted: { $ne: true } 
+    name: { $in: cleanNames }
   }).lean();
 
-  const existingMap = new Map(existingTags.map(t => [t.name, t._id]));
+  const existingMap = new Map(existingTags.map(t => [t.name, t]));
   const finalTagIds = [];
 
   for (const name of cleanNames) {
-    if (existingMap.has(name)) {
-      finalTagIds.push(existingMap.get(name));
+    const found = existingMap.get(name);
+    if (found) {
+      if (found.is_deleted) {
+        // Restore the soft-deleted tag so the unique index is not violated
+        await Tag.updateOne({ _id: found._id }, { $set: { is_deleted: false } });
+      }
+      finalTagIds.push(found._id);
     } else {
       const newTag = await Tag.create({ 
         name, 

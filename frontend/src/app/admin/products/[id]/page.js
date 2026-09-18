@@ -133,6 +133,9 @@ function EmptyState({ icon: Icon, title, description, action }) {
   );
 }
 
+// Tag entries can be plain strings or legacy { name } objects
+const tagNameOf = (t) => (typeof t === "object" && t !== null ? t.name : t);
+
 // ==================== COMPACT 3-DOT MENU ====================
 
 function MoreMenu({ actions }) {
@@ -459,6 +462,19 @@ export default function ProductDetailPage() {
     onError: (err) => toast.error(err.response?.data?.message || "Failed to delete tag"),
   });
 
+  // Shared mutation for add / rename / remove of tags assigned to THIS product
+  // (uses the existing product update API; backend resolveTags preserves relationships)
+  const updateProductTagsMutation = useMutation({
+    mutationFn: ({ id, data }) => productApi.update(id, data),
+    onSuccess: async (_res, vars) => {
+      toast.success(vars?.successMsg || "Tags updated successfully");
+      await refetchProduct();
+      queryClient.invalidateQueries({ queryKey: ["product", id] });
+      refetchTags();
+    },
+    onError: (error, vars) => { toast.error(error.response?.data?.message || vars?.errorMsg || "Failed to update tags"); },
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => productApi.update(id, data),
     onSuccess: async () => {
@@ -677,12 +693,48 @@ export default function ProductDetailPage() {
 
   const handleCreateGlobalTag = () => { if (!newGlobalTag.trim()) return; createTagMutation.mutate({ name: newGlobalTag.trim() }); };
   const handleCreateTagFromModal = () => {
-    if (!newTagModalValue.trim()) return;
-    createTagMutation.mutate({ name: newTagModalValue.trim() }, { onSuccess: () => { setShowCreateTagModal(false); setNewTagModalValue(""); } });
+    const tagName = newTagModalValue.trim();
+    if (!tagName || !product?._id) return;
+    // Create AND assign to this product in one step: backend resolveTags
+    // creates the tag if missing and re-points product.tag_ids
+    const data = new FormData();
+    data.append("tag_names", JSON.stringify([...(displayTagNames || []), tagName]));
+    updateProductTagsMutation.mutate(
+      { id: product._id, data, successMsg: "Tag added successfully", errorMsg: "Failed to add tag" },
+      { onSuccess: () => { setShowCreateTagModal(false); setNewTagModalValue(""); } }
+    );
   };
 
   const startEditGlobalTag = (tag) => { setEditingTagId(tag._id); setEditingTagName(tag.name); setShowEditTagModal(true); };
-  const saveEditGlobalTag = () => { if (!editingTagName.trim() || !editingTagId) return; updateTagMutation.mutate({ id: editingTagId, data: { name: editingTagName } }); };
+  const saveEditGlobalTag = () => {
+    const newName = editingTagName.trim();
+    if (!newName || !editingTagId) return;
+    const original = (allAssignedTags || []).find(t => String(t._id) === String(editingTagId));
+    const oldName = original?.name;
+    if (!oldName) return;
+    if (oldName === newName) { cancelEditTag(); return; }
+    const isRealTag = (globalTags || []).some(t => String(t._id) === String(editingTagId));
+    if (isRealTag) {
+      // Active global tag — rename the tag document (existing behaviour)
+      updateTagMutation.mutate({ id: editingTagId, data: { name: newName } });
+      return;
+    }
+    // Assigned tag without an active global tag doc — rename the assignment on
+    // this product / variants (backend resolveTags creates/finds the active tag)
+    const data = new FormData();
+    data.append("tag_names", JSON.stringify((displayTagNames || []).map(n => (n === oldName ? newName : n))));
+    const variantHasTag = (v) => (v.tags || []).map(tagNameOf).includes(oldName);
+    if ((variants || []).some(variantHasTag)) {
+      const updatedVariants = (variants || []).map(v => variantHasTag(v)
+        ? { ...v, tags: (v.tags || []).map(tagNameOf).map(t => (t === oldName ? newName : t)) }
+        : v);
+      data.append("variants", JSON.stringify(updatedVariants));
+    }
+    updateProductTagsMutation.mutate(
+      { id: product._id, data, successMsg: "Tag updated successfully", errorMsg: "Failed to update tag" },
+      { onSuccess: () => { setShowEditTagModal(false); setEditingTagId(null); setEditingTagName(""); } }
+    );
+  };
   const cancelEditTag = () => { setShowEditTagModal(false); setEditingTagId(null); setEditingTagName(""); };
   const deleteGlobalTag = (tagId) => deleteTagMutation.mutate(tagId);
 
@@ -849,7 +901,7 @@ export default function ProductDetailPage() {
   const wasUp = !!(product.created_at && product.updated_at && product.created_at !== product.updated_at);
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set([...displayTagNames]);
-  (variants || []).forEach(v => { (v.tags || []).forEach(tag => { if (tag) assignedTagNames.add(String(tag)); }); });
+  (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n)); }); });
   const globalTagNames = new Set((globalTags || []).map(t => String(t.name || t).trim()));
   const assignedTags = (globalTags || []).filter(tag => assignedTagNames.has(tag.name || tag));
   const missingTagNames = [];
@@ -868,8 +920,8 @@ export default function ProductDetailPage() {
     if (tagName) tagSourceInfo[String(tagName).trim()] = { source: "Product", variant: "—" };
   });
   (variants || []).forEach(v => {
-    (v.tags || []).forEach(tagName => {
-      const name = String(tagName).trim();
+    (v.tags || []).forEach(tagEntry => {
+      const name = String(tagNameOf(tagEntry) || "").trim();
       if (name) tagSourceInfo[name] = { source: "Variant", variant: v.sku || v.title || String(v._id) };
     });
   });
@@ -1959,10 +2011,10 @@ export default function ProductDetailPage() {
               <div className="flex gap-2 justify-end pt-2">
                 <button onClick={() => { setShowCreateTagModal(false); setNewTagModalValue(""); }} className="h-10 px-5 rounded-lg text-[12px] font-semibold"
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button onClick={handleCreateTagFromModal} disabled={createTagMutation.isPending || !newTagModalValue.trim()}
+                <button onClick={handleCreateTagFromModal} disabled={updateProductTagsMutation.isPending || !newTagModalValue.trim()}
                   className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  <Plus className="w-4 h-4" /> {createTagMutation.isPending ? "Creating..." : "Create Tag"}
+                  <Plus className="w-4 h-4" /> {updateProductTagsMutation.isPending ? "Adding..." : "Create Tag"}
                 </button>
               </div>
             </div>
@@ -1990,10 +2042,10 @@ export default function ProductDetailPage() {
               <div className="flex gap-2 justify-end pt-2">
                 <button onClick={cancelEditTag} className="h-10 px-5 rounded-lg text-[12px] font-semibold"
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button onClick={saveEditGlobalTag} disabled={updateTagMutation.isPending || !editingTagName.trim()}
+                <button onClick={saveEditGlobalTag} disabled={updateTagMutation.isPending || updateProductTagsMutation.isPending || !editingTagName.trim()}
                   className="h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2 disabled:opacity-50"
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  <Save className="w-4 h-4" /> {updateTagMutation.isPending ? "Saving..." : "Save Changes"}
+                  <Save className="w-4 h-4" /> {(updateTagMutation.isPending || updateProductTagsMutation.isPending) ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
@@ -2115,9 +2167,18 @@ export default function ProductDetailPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setDeleteTagTarget(null)} className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
               <button onClick={() => {
-                deleteTagMutation.mutate(deleteTagTarget._id || deleteTagTarget.id);
+                const tagName = deleteTagTarget.name;
+                // Remove the tag assignment from this product / variants
+                // (other products' relationships remain unaffected)
+                const data = new FormData();
+                data.append("tag_names", JSON.stringify((displayTagNames || []).filter(n => n !== tagName)));
+                if ((variants || []).some(v => (v.tags || []).map(tagNameOf).includes(tagName))) {
+                  const updatedVariants = (variants || []).map(v => ({ ...v, tags: (v.tags || []).map(tagNameOf).filter(t => t !== tagName) }));
+                  data.append("variants", JSON.stringify(updatedVariants));
+                }
+                updateProductTagsMutation.mutate({ id: product._id, data, successMsg: "Tag deleted successfully", errorMsg: "Failed to delete tag" });
                 setDeleteTagTarget(null);
-              }} disabled={deleteTagMutation.isPending} className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>{deleteTagMutation.isPending ? "Deleting..." : "Delete"}</button>
+              }} disabled={updateProductTagsMutation.isPending} className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>{updateProductTagsMutation.isPending ? "Deleting..." : "Delete"}</button>
             </div>
           </div>
         </div>
