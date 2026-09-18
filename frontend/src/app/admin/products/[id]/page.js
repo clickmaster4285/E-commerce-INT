@@ -188,13 +188,14 @@ function MoreMenu({ actions }) {
       {open && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[9999] min-w-[160px] rounded-lg border shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95"
+          className="fixed z-[9999] min-w-[160px] rounded-lg border shadow-xl overflow-visible py-1 animate-in fade-in zoom-in-95 opacity-100 pointer-events-auto"
           style={{
             top: menuPos.top + "px",
             left: Math.max(8, menuPos.left) + "px",
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-color)",
             boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+            pointerEvents: "auto",
           }}
         >
           {actions.map((action, idx) => (
@@ -203,7 +204,7 @@ function MoreMenu({ actions }) {
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick?.(); }}
               disabled={action.disabled}
-              className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+              className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 opacity-100 pointer-events-auto cursor-pointer"
               style={{ color: action.destructive ? "#ef4444" : "var(--text-primary)" }}
             >
               {action.icon && <span className="w-4 h-4 flex items-center justify-center shrink-0">{action.icon}</span>}
@@ -366,6 +367,8 @@ export default function ProductDetailPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [expandedVariant, setExpandedVariant] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteVariantTarget, setDeleteVariantTarget] = useState(null);
+  const [deleteTagTarget, setDeleteTagTarget] = useState(null);
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [newTagModalValue, setNewTagModalValue] = useState("");
   const [editingVariantForTags, setEditingVariantForTags] = useState(null);
@@ -857,6 +860,19 @@ export default function ProductDetailPage() {
   });
   const syntheticTags = missingTagNames.map(name => ({ name, _id: name }));
   const allAssignedTags = [...assignedTags, ...syntheticTags];
+
+  // Source / Variant mapping for tag display
+  const tagSourceInfo = {};
+  (product.tag_ids || []).forEach(tagId => {
+    const tagName = typeof tagId === 'object' ? tagId.name : tagId;
+    if (tagName) tagSourceInfo[String(tagName).trim()] = { source: "Product", variant: "—" };
+  });
+  (variants || []).forEach(v => {
+    (v.tags || []).forEach(tagName => {
+      const name = String(tagName).trim();
+      if (name) tagSourceInfo[name] = { source: "Variant", variant: v.sku || v.title || String(v._id) };
+    });
+  });
   const firstVariant = variants[0];
   const productImage = firstVariant?.images?.[0] ? getImageUrl(firstVariant.images[0].img_url) : null;
 
@@ -1305,12 +1321,7 @@ export default function ProductDetailPage() {
                                     icon: <Trash2 className="w-3.5 h-3.5" />, 
                                     destructive: true, 
                                     onClick: () => {
-                                      if (confirm(`Are you sure you want to delete variant "${variant.sku}"?`)) {
-                                        const updatedVariants = product.variants.filter(v => String(v._id) !== String(variant._id));
-                                        const data = new FormData();
-                                        data.append("variants", JSON.stringify(updatedVariants));
-                                        deleteVariantMutation.mutate({ id: product._id, data });
-                                      }
+                                      setDeleteVariantTarget(variant);
                                     } 
                                   },
                                 ]} />
@@ -1359,35 +1370,29 @@ export default function ProductDetailPage() {
                   <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <table className="w-full text-[12px]">
                       <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                        <tr>
-                          <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Tag Name</th>
-                          <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Created By</th>
-                          <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Created At</th>
-                          <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Updated By</th>
-                          <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Updated At</th>
-                          <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
-                        </tr>
+                         <tr>
+                           <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Tag Name</th>
+                           <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Source</th>
+                           <th className="text-left px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Created By</th>
+                           <th className="text-right px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
+                         </tr>
                       </thead>
                       <tbody>
                         {allAssignedTags.map((tag, index) => (
                           <tr key={tag._id || tag.name || index} style={{ borderBottom: index < allAssignedTags.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                            <td className="px-5 py-3.5">
-                              <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
-                            </td>
-                            <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
-                              {tag.createdby ? (typeof tag.createdby === 'object' ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "System"}
-                            </td>
-                            <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">{fd(tag.created_at || tag.createdAt)}</td>
-                            <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
-                              {tag.updatedby ? (typeof tag.updatedby === 'object' ? (tag.updatedby.name || tag.updatedby.email || "—") : tag.updatedby) : (tag.updated_at ? "—" : "")}
-                            </td>
-                            <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">
-                              {tag.updated_at ? fd(tag.updated_at || tag.updatedAt) : ""}
-                            </td>
-                            <td className="px-5 py-3.5 text-right">
-                               <MoreMenu actions={[
-                                { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag), disabled: tag._id === tag.name },
-                                { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => deleteGlobalTag(tag._id || tag.id), disabled: deleteTagMutation.isPending || tag._id === tag.name },
+                             <td className="px-5 py-3.5">
+                               <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
+                             </td>
+                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)] capitalize">
+                               {tagSourceInfo[tag.name || tag]?.source || "—"}
+                             </td>
+                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
+                               {tag.createdby ? (typeof tag.createdby === 'object' ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "—"}
+                             </td>
+                             <td className="px-5 py-3.5 text-right relative z-10">
+                                <MoreMenu actions={[
+                                 { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag), disabled: tag._id === tag.name },
+                                 { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => setDeleteTagTarget(tag), disabled: deleteTagMutation.isPending || tag._id === tag.name },
                               ]} />
                             </td>
                           </tr>
@@ -2065,6 +2070,57 @@ export default function ProductDetailPage() {
               <button disabled={deleteMutation.isPending} onClick={confirmDelete}
                 className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90"
                 style={{ backgroundColor: "var(--danger)" }}>{deleteMutation.isPending ? "Deleting..." : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VARIANT DELETE CONFIRMATION */}
+      {deleteVariantTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Variant?</h3>
+                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>Are you sure you want to delete variant &quot;{deleteVariantTarget.sku}&quot;? This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setDeleteVariantTarget(null)} className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={() => {
+                const updatedVariants = product.variants.filter(v => String(v._id) !== String(deleteVariantTarget._id));
+                const data = new FormData();
+                data.append("variants", JSON.stringify(updatedVariants));
+                deleteVariantMutation.mutate({ id: product._id, data });
+                setDeleteVariantTarget(null);
+              }} disabled={deleteVariantMutation.isPending} className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>{deleteVariantMutation.isPending ? "Deleting..." : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAG DELETE CONFIRMATION */}
+      {deleteTagTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Tag?</h3>
+                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>Are you sure you want to delete tag &quot;{deleteTagTarget.name}&quot;? This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setDeleteTagTarget(null)} className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={() => {
+                deleteTagMutation.mutate(deleteTagTarget._id || deleteTagTarget.id);
+                setDeleteTagTarget(null);
+              }} disabled={deleteTagMutation.isPending} className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}>{deleteTagMutation.isPending ? "Deleting..." : "Delete"}</button>
             </div>
           </div>
         </div>
