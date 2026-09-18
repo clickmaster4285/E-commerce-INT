@@ -9,7 +9,8 @@ import {
   Package, Layers3, Box, TrendingUp, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
   Sparkles, AlertTriangle, DollarSign, FolderOpen, Store, Hash, Tag as TagIcon,
-  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText
+  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText,
+  Ban, ChevronLeft, ZoomIn // Added ZoomIn and ChevronLeft for gallery
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
@@ -91,9 +92,7 @@ function InfoCard({ icon: Icon, title, children, action }) {
 }
 
 function DataRow({ label, value, mono, highlight, icon: Icon }) {
-  // Hide row completely if value is falsy/empty
   if (!value && value !== 0) return null;
-  
   return (
     <div className="flex items-center justify-between py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
       <div className="flex items-center gap-2.5">
@@ -138,11 +137,27 @@ function EmptyState({ icon: Icon, title, description, action }) {
 
 function MoreMenu({ actions }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuHeight = 160; // approximate min height
+      const windowHeight = window.innerHeight;
+      const spaceBelow = windowHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      let top = rect.bottom + 4;
+      if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+        top = rect.top - menuHeight - 4;
+      }
+      let left = rect.right - 160;
+      if (left < 8) left = 8;
+      if (left + 160 > window.innerWidth) left = window.innerWidth - 168;
+      setMenuPos({ top, left });
+    }
     const handleClick = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
     };
@@ -153,15 +168,15 @@ function MoreMenu({ actions }) {
   }, [open]);
 
   return (
-    <div className="relative">
+    <div className="relative z-10">
       <button
         ref={btnRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         aria-label="More actions"
         aria-haspopup="true"
         aria-expanded={open}
-        className="w-8 h-8 inline-flex items-center justify-center rounded-md transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] focus:outline-none"
+        className="w-8 h-8 inline-flex items-center justify-center rounded-md transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
         style={{ color: "var(--text-muted)", backgroundColor: "transparent" }}
       >
         <span className="flex flex-col items-center gap-[3px]">
@@ -175,6 +190,8 @@ function MoreMenu({ actions }) {
           ref={menuRef}
           className="fixed z-[9999] min-w-[160px] rounded-lg border shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95"
           style={{
+            top: menuPos.top + "px",
+            left: Math.max(8, menuPos.left) + "px",
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-color)",
             boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
@@ -200,6 +217,118 @@ function MoreMenu({ actions }) {
   );
 }
 
+// ==================== IMAGE GALLERY MODAL ====================
+function ImageGalleryModal({ images, initialIndex, onClose }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
+  
+  // Reset index when images change
+  useEffect(() => {
+    setCurrentIndex(initialIndex || 0);
+  }, [initialIndex, images]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") nextImage();
+      if (e.key === "ArrowLeft") prevImage();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, images.length]);
+
+  const nextImage = () => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const prevImage = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  if (!images || images.length === 0) return null;
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      {/* Close Button */}
+      <button 
+        onClick={onClose}
+        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-50"
+      >
+        <X className="w-6 h-6" />
+      </button>
+
+      {/* Main Image Container */}
+      <div 
+        className="relative w-full max-w-6xl h-[80vh] flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking image area
+      >
+        {/* Previous Button */}
+        {images.length > 1 && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); prevImage(); }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/50 hover:bg-black/80 text-white transition-all hover:scale-110 z-50"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Image Display */}
+        <div className="relative w-full h-full flex items-center justify-center p-8">
+           <img 
+            src={getImageUrl(images[currentIndex].img_url)} 
+            alt={`Product view ${currentIndex + 1}`}
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl select-none"
+            draggable={false}
+           />
+           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-black/60 text-white text-xs font-medium backdrop-blur-sm">
+             {currentIndex + 1} / {images.length}
+           </div>
+        </div>
+
+        {/* Next Button */}
+        {images.length > 1 && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); nextImage(); }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/50 hover:bg-black/80 text-white transition-all hover:scale-110 z-50"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
+      </div>
+
+      {/* Thumbnails Strip */}
+      {images.length > 1 && (
+        <div 
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 p-2 rounded-xl bg-black/40 backdrop-blur-md border border-white/10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {images.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              className={`relative w-16 h-16 rounded-lg overflow-hidden transition-all duration-200 ${
+                idx === currentIndex 
+                  ? "ring-2 ring-emerald-500 scale-110 opacity-100" 
+                  : "opacity-50 hover:opacity-80 grayscale hover:grayscale-0"
+              }`}
+            >
+              <img 
+                src={getImageUrl(img.img_url)} 
+                alt="" 
+                className="w-full h-full object-cover" 
+              />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 // ==================== MAIN COMPONENT ====================
 
 export default function ProductDetailPage() {
@@ -213,8 +342,11 @@ export default function ProductDetailPage() {
 
   const id = params?.id;
   const [liveEvents, setLiveEvents] = useState([]);
+  
+  // Gallery State
+  const [showImageGallery, setShowImageGallery] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // ATTRIBUTES TAB REMOVED FROM VALID TABS
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams?.get("tab");
     const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
@@ -342,6 +474,16 @@ export default function ProductDetailPage() {
       if (showModal) closeProductModal();
     },
     onError: (error) => { toast.error(error.response?.data?.message || "Product update failed"); },
+  });
+
+  const deleteVariantMutation = useMutation({
+    mutationFn: ({ id, data }) => productApi.update(id, data),
+    onSuccess: async () => {
+      toast.success("Variant deleted successfully");
+      await refetchProduct();
+      queryClient.invalidateQueries({ queryKey: ["product", id] });
+    },
+    onError: (error) => { toast.error(error.response?.data?.message || "Failed to delete variant"); },
   });
 
   const deleteMutation = useMutation({
@@ -703,11 +845,39 @@ export default function ProductDetailPage() {
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
   const wasUp = !!(product.created_at && product.updated_at && product.created_at !== product.updated_at);
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
+  const assignedTagNames = new Set([...displayTagNames]);
+  (variants || []).forEach(v => { (v.tags || []).forEach(tag => { if (tag) assignedTagNames.add(String(tag)); }); });
+  const globalTagNames = new Set((globalTags || []).map(t => String(t.name || t).trim()));
+  const assignedTags = (globalTags || []).filter(tag => assignedTagNames.has(tag.name || tag));
+  const missingTagNames = [];
+  assignedTagNames.forEach(name => {
+    if (!globalTagNames.has(String(name).trim())) {
+      missingTagNames.push(String(name).trim());
+    }
+  });
+  const syntheticTags = missingTagNames.map(name => ({ name, _id: name }));
+  const allAssignedTags = [...assignedTags, ...syntheticTags];
   const firstVariant = variants[0];
   const productImage = firstVariant?.images?.[0] ? getImageUrl(firstVariant.images[0].img_url) : null;
 
+  // Helper to open gallery
+  const openGallery = (index) => {
+    setCurrentImageIndex(index);
+    setShowImageGallery(true);
+  };
+
   return (
     <div className="w-full space-y-5 pb-10">
+      
+      {/* IMAGE GALLERY MODAL */}
+      {showImageGallery && firstVariant?.images && (
+        <ImageGalleryModal 
+          images={firstVariant.images} 
+          initialIndex={currentImageIndex} 
+          onClose={() => setShowImageGallery(false)} 
+        />
+      )}
+
       {/* BREADCRUMB */}
       <nav className="flex items-center gap-2 text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
         <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors">Products</button>
@@ -732,7 +902,6 @@ export default function ProductDetailPage() {
               <StatusBadge active={product.status === "active"} size="md" />
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              {/* REMOVED: Star rating, SKU, In Stock badge from header */}
               <span>{totalVariants} Variants</span>
               <span className="opacity-30">|</span>
               <span>{totalStock} Units</span>
@@ -759,32 +928,54 @@ export default function ProductDetailPage() {
       {/* PRODUCT HERO */}
       <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-          {/* Image Area */}
-          <div className="relative bg-[var(--bg-tertiary)] p-6 md:p-8 flex items-center justify-center min-h-[320px] md:min-h-[420px]">
+          {/* Image Area - NOW CLICKABLE */}
+          <div className="relative bg-[var(--bg-tertiary)] p-6 md:p-8 flex items-center justify-center min-h-[320px] md:min-h-[420px] group">
             {firstVariant?.images?.length > 0 ? (
               <div className="w-full max-w-md">
-                <img
-                  src={getImageUrl(firstVariant.images[0].img_url)}
-                  alt={product.name}
-                  className="w-full h-auto rounded-xl shadow-lg object-cover"
-                  style={{ maxHeight: 380 }}
-                />
+                {/* Main Clickable Image */}
+                <button 
+                  onClick={() => openGallery(0)}
+                  className="block w-full relative overflow-hidden rounded-xl shadow-lg group-hover:shadow-2xl transition-all duration-300"
+                >
+                  <img
+                    src={getImageUrl(firstVariant.images[0].img_url)}
+                    alt={product.name}
+                    className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
+                    style={{ maxHeight: 380 }}
+                  />
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full flex items-center gap-2">
+                      <ZoomIn className="w-4 h-4" />
+                      <span className="text-xs font-medium">View Full Size</span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Clickable Thumbnails */}
                 {firstVariant.images.length > 1 && (
-                  <div className="flex gap-2 mt-3 overflow-x-auto">
+                  <div className="flex gap-2 mt-3 overflow-x-auto pb-2 scrollbar-hide">
                     {firstVariant.images.map((img, i) => (
-                      <img
+                      <button
                         key={i}
-                        src={getImageUrl(img.img_url)}
-                        alt=""
-                        className="w-14 h-14 rounded-lg object-cover border-2 shrink-0 cursor-pointer hover:opacity-80 transition"
-                        style={{ borderColor: i === 0 ? "var(--accent)" : "var(--border-color)" }}
-                      />
+                        onClick={() => openGallery(i)}
+                        className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 transition-all duration-200 ${
+                          i === 0 
+                            ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20 scale-105" 
+                            : "border-[var(--border-color)] hover:border-[var(--text-muted)] opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={getImageUrl(img.img_url)}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
             ) : (
-              // Professional Empty State for Images
               <div className="w-full h-48 rounded-xl flex flex-col items-center justify-center bg-[var(--bg-secondary)] border border-dashed border-[var(--border-color)]">
                 <ImageIcon className="w-12 h-12 mb-2" style={{ color: "var(--text-muted)" }} />
                 <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>No product images available</p>
@@ -796,7 +987,6 @@ export default function ProductDetailPage() {
           <div className="p-6 md:p-8 flex flex-col gap-4">
             <div>
               <h2 className="text-xl md:text-2xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
-              {/* REMOVED: SKU and Rating from here too */}
             </div>
             
             <div className="flex items-baseline gap-3">
@@ -806,7 +996,6 @@ export default function ProductDetailPage() {
               {lowestPrice !== highestPrice ? (
                 <span className="text-base line-through" style={{ color: "var(--text-muted)" }}>{priceRange}</span>
               ) : null}
-              {/* REMOVED: In Stock Badge */}
             </div>
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
@@ -894,7 +1083,6 @@ export default function ProductDetailPage() {
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.name}</p>
                           </div>
-                          {/* Conditional SKU Display */}
                           {(product.product_code || product.sku) && (
                             <div>
                               <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Code</p>
@@ -1041,11 +1229,14 @@ export default function ProductDetailPage() {
                       <tbody>
                         {variants.map((variant, index) => {
                           const isLowStock = Number(variant.quantity) <= 5;
+                          const isActive = variant.status === "active" || !variant.status;
                           return (
                             <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                               <td className="px-4 py-4">
                                 {variant.images?.length > 0 ? (
-                                  <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-10 h-10 rounded-md object-cover border border-[var(--border-color)]" />
+                                  <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
+                                    <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
+                                  </button>
                                 ) : (
                                   <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
                                     <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
@@ -1071,18 +1262,57 @@ export default function ProductDetailPage() {
                               <td className="px-4 py-4">
                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                                   style={{
-                                    backgroundColor: variant.status === "active" || !variant.status ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                                    color: variant.status === "active" || !variant.status ? "#10b981" : "#ef4444",
-                                    border: `1px solid ${variant.status === "active" || !variant.status ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                                    backgroundColor: isActive ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                                    color: isActive ? "#10b981" : "#ef4444",
+                                    border: `1px solid ${isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
                                   }}>
-                                  <span className="w-1 h-1 rounded-full" style={{ backgroundColor: variant.status === "active" || !variant.status ? "#10b981" : "#ef4444" }} />
-                                  {variant.status === "active" || !variant.status ? "Active" : "Inactive"}
+                                  <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "#10b981" : "#ef4444" }} />
+                                  {isActive ? "Active" : "Inactive"}
                                 </span>
                               </td>
-                              <td className="px-4 py-4 text-right">
+                              <td className="px-4 py-4 text-right relative z-10">
                                 <MoreMenu actions={[
-                                  { label: "Edit Variant", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) },
-                                  { label: "Manage Tags", icon: <TagIcon className="w-3.5 h-3.5" />, onClick: () => { setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); setShowVariantTagsModal(true); setVariantTagInput(""); } },
+                                  { 
+                                    label: "Edit Variant", 
+                                    icon: <Edit3 className="w-3.5 h-3.5" />, 
+                                    onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) 
+                                  },
+                                  { 
+                                    label: "Add Tag", 
+                                    icon: <TagIcon className="w-3.5 h-3.5" />, 
+                                    onClick: () => { 
+                                      setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); 
+                                      setShowVariantTagsModal(true); 
+                                      setVariantTagInput(""); 
+                                    } 
+                                  },
+                                  { 
+                                    label: isActive ? "Disable" : "Enable", 
+                                    icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
+                                    onClick: () => {
+                                      const updatedVariants = product.variants.map(v => 
+                                        String(v._id) === String(variant._id) 
+                                          ? { ...v, status: isActive ? "inactive" : "active" } 
+                                          : v
+                                      );
+                                      const data = new FormData();
+                                      data.append("variants", JSON.stringify(updatedVariants));
+                                      updateMutation.mutate({ id: product._id, data });
+                                    }
+                                  },
+                                  { 
+                                    label: "Delete", 
+                                    icon: <Trash2 className="w-3.5 h-3.5" />, 
+                                    destructive: true, 
+                                    onClick: () => {
+                                      if (confirm(`Are you sure you want to delete variant "${variant.sku}"?`)) {
+                                        const updatedVariants = product.variants.filter(v => String(v._id) !== String(variant._id));
+                                        const data = new FormData();
+                                        data.append("variants", JSON.stringify(updatedVariants));
+                                        deleteVariantMutation.mutate({ id: product._id, data });
+                                      }
+                                    } 
+                                  },
                                 ]} />
                               </td>
                             </tr>
@@ -1101,7 +1331,7 @@ export default function ProductDetailPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Tags</h2>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{globalTags.length} {globalTags.length === 1 ? "tag" : "tags"} available</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{allAssignedTags.length} {allAssignedTags.length === 1 ? "tag" : "tags"} assigned</p>
                   </div>
                   <button
                     onClick={() => setShowCreateTagModal(true)}
@@ -1112,11 +1342,11 @@ export default function ProductDetailPage() {
                   </button>
                 </div>
 
-                {globalTags.length === 0 ? (
+                {allAssignedTags.length === 0 ? (
                   <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <TagIcon className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
-                    <p className="text-[13px] font-medium text-[var(--text-secondary)]">No tags yet</p>
-                    <p className="text-[12px] text-[var(--text-muted)]">Create tags to organize and categorize your products.</p>
+                    <p className="text-[13px] font-medium text-[var(--text-secondary)]">No assigned tags</p>
+                    <p className="text-[12px] text-[var(--text-muted)]">Tags assigned to this product or its variants will appear here.</p>
                     <button
                       onClick={() => setShowCreateTagModal(true)}
                       className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2"
@@ -1139,25 +1369,25 @@ export default function ProductDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {globalTags.map((tag, index) => (
-                          <tr key={tag._id} style={{ borderBottom: index < globalTags.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                        {allAssignedTags.map((tag, index) => (
+                          <tr key={tag._id || tag.name || index} style={{ borderBottom: index < allAssignedTags.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                             <td className="px-5 py-3.5">
                               <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
                             </td>
                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
-                              {tag.createdby ? (typeof tag.createdby === "object" ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "System"}
+                              {tag.createdby ? (typeof tag.createdby === 'object' ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "System"}
                             </td>
                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">{fd(tag.created_at || tag.createdAt)}</td>
                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
-                              {tag.updatedby ? (typeof tag.updatedby === "object" ? (tag.updatedby.name || tag.updatedby.email || "—") : tag.updatedby) : (tag.updated_at ? "—" : "")}
+                              {tag.updatedby ? (typeof tag.updatedby === 'object' ? (tag.updatedby.name || tag.updatedby.email || "—") : tag.updatedby) : (tag.updated_at ? "—" : "")}
                             </td>
                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-muted)] font-mono">
                               {tag.updated_at ? fd(tag.updated_at || tag.updatedAt) : ""}
                             </td>
                             <td className="px-5 py-3.5 text-right">
-                              <MoreMenu actions={[
-                                { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag) },
-                                { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => deleteGlobalTag(tag._id), disabled: deleteTagMutation.isPending },
+                               <MoreMenu actions={[
+                                { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag), disabled: tag._id === tag.name },
+                                { label: "Delete", icon: <Trash2 className="w-3.5 h-3.5" />, destructive: true, onClick: () => deleteGlobalTag(tag._id || tag.id), disabled: deleteTagMutation.isPending || tag._id === tag.name },
                               ]} />
                             </td>
                           </tr>

@@ -752,6 +752,10 @@ const updateProduct = async (req, res) => {
             variant.tags = Array.isArray(item.tags) ? item.tags : [];
           }
 
+          if (item.status !== undefined) {
+            variant.status = item.status === "inactive" ? "inactive" : "active";
+          }
+
           if (imagesByVariant[index]) {
             const oldImages = Array.isArray(variant.images) ? variant.images : [];
             variant.images = [...oldImages, ...imagesByVariant[index]];
@@ -785,6 +789,7 @@ const updateProduct = async (req, res) => {
             max_qnt: toNumber(item.max_qnt, 0),
             attributes: item.option_values || item.attributes || {},
             tags: Array.isArray(item.tags) ? item.tags : [],
+            status: item.status === "inactive" ? "inactive" : "active",
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
             updatedby: req.user?._id || null,

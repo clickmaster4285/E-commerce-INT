@@ -109,6 +109,10 @@ const updateVariant = async (req, res) => {
         : req.body.attributes;
     }
 
+    if (req.body.status !== undefined) {
+      variant.status = req.body.status === "inactive" ? "inactive" : "active";
+    }
+
     // ✅ Update tags agar request mein aaye hain
     if (req.body.tags !== undefined) {
       variant.tags = typeof req.body.tags === "string"

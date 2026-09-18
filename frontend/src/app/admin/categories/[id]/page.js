@@ -84,14 +84,36 @@ function getAttributeId(attribute) {
   return String(aid);
 }
 
+// ✅ FIX ISSUE 2: Robustly extract string labels from mixed option formats
 function sanitizeOptionLabels(raw) {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   const result = [];
   for (const item of raw) {
     if (!item) continue;
-    let label = typeof item === "string" ? item : item.label || item.value || item.name;
+
+    let label = "";
+    if (typeof item === "string") {
+      label = item;
+    } else if (typeof item === "object" && item !== null) {
+      const labelStr = typeof item.label === "string" ? item.label : (typeof item.value === "string" ? item.value : (typeof item.name === "string" ? item.name : ""));
+      const valueStr = typeof item.value === "string" ? item.value : (typeof item.label === "string" ? item.label : (typeof item.name === "string" ? item.name : ""));
+      label = labelStr || valueStr || "";
+      // If label is still an object (corrupted nested data), coerce to string and filter
+      if (typeof label !== "string") {
+        label = String(label || "");
+      }
+      // If after coercion it still looks like [object Object], try to recover from nested properties
+      if (label.trim() === "[object Object]" || label.trim() === "[object object]") {
+        const nestedLabel = item.label?.label || item.label?.value || item.value?.label || item.value?.value || item.name?.label || item.name?.value || "";
+        label = (typeof nestedLabel === "string" ? nestedLabel : String(nestedLabel || "")).trim();
+      }
+    } else {
+      label = String(item);
+    }
+
     if (typeof label !== "string") continue;
+
     const trimmed = label.trim();
     if (trimmed && !seen.has(trimmed)) {
       seen.add(trimmed);
@@ -296,9 +318,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
     value: isEdit ? false : "",
     is_active: true,
   });
-  const [newOptionInput, setNewOptionInput] = useState("");
-  const [editOptionInput, setEditOptionInput] = useState("");
-  const optionInputRef = useRef(null);
+  const [optionInput, setOptionInput] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -314,12 +334,23 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           );
           if (trueEntry) booleanValue = true;
         }
+        // ✅ FIX ISSUE 2: Ensure we extract strings correctly when loading into form
         const values = (initialData.values || [])
           .map((v) => {
-            const label = typeof v === "string" ? v : v?.label || v?.value || String(v);
-            return String(label);
+            if (typeof v === "string") return v.trim();
+            if (typeof v === "object" && v !== null) {
+              const labelStr = typeof v.label === "string" ? v.label : (typeof v.value === "string" ? v.value : (typeof v.name === "string" ? v.name : ""));
+              const valueStr = typeof v.value === "string" ? v.value : (typeof v.label === "string" ? v.label : (typeof v.name === "string" ? v.name : ""));
+              let label = (labelStr || valueStr || "").trim();
+              if (label === "[object Object]" || label === "[object object]") {
+                const nestedLabel = v.label?.label || v.label?.value || v.value?.label || v.value?.value || v.name?.label || v.name?.value || "";
+                label = (typeof nestedLabel === "string" ? nestedLabel : String(nestedLabel || "")).trim();
+              }
+              return label || "";
+            }
+            return String(v || "").trim();
           })
-          .filter(Boolean);
+          .filter((s) => s && s !== "[object Object]" && s !== "[object object]");
         setForm({
           name: initialData.name || "",
           data_type: dataType,
@@ -327,8 +358,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           value: booleanValue,
           is_active: initialData.is_active !== false,
         });
-        setEditOptionInput("");
-        setNewOptionInput("");
+        setOptionInput("");
       } else {
         setForm({
           name: "",
@@ -337,8 +367,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           value: "",
           is_active: true,
         });
-        setNewOptionInput("");
-        setEditOptionInput("");
+        setOptionInput("");
       }
     }
   }, [open, isEdit, initialData]);
@@ -376,19 +405,14 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
   };
 
   const addOption = () => {
-    const val = (isEdit ? editOptionInput : newOptionInput).trim();
+    const val = optionInput.trim();
     if (!val) return;
-    const exists = (form.values || []).some(
-      (v) => v.toLowerCase() === val.toLowerCase()
-    );
-    if (exists) {
-      if (isEdit) setEditOptionInput("");
-      else setNewOptionInput("");
+    if (form.data_type === "multi_select" && form.values.some((v) => v.toLowerCase() === val.toLowerCase())) {
+      setOptionInput("");
       return;
     }
     setForm({ ...form, values: [...(form.values || []), val] });
-    if (isEdit) setEditOptionInput("");
-    else setNewOptionInput("");
+    setOptionInput("");
   };
 
   const removeOption = (idx) => {
@@ -396,49 +420,34 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
   };
 
   const title = isEdit ? "Edit Attribute" : "Add New Attribute";
-  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products.";
+  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
   const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
-  const dataTypeLabels = isEdit
-    ? [
-        { id: "multi_select", label: "Multi Options" },
-        { id: "boolean", label: "Yes / No" },
-      ]
-    : [
-        { id: "multi_select", label: "Options" },
-        { id: "boolean", label: "Yes / No" },
-      ];
-
-  const SlidersIcon = ({ className = "w-4 h-4" }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div
-        className={`w-full ${isEdit ? "max-w-[420px]" : "max-w-md"} bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden`}
-      >
-        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+      <div className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 85vh)" }}>
+        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0">
           <div className="flex items-start gap-3 min-w-0">
             <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-              <SlidersIcon className="w-4 h-4" />
+              <ModalLayersIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0 pt-0.5">
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">{title}</h3>
-              <p className="text-[11px] text-[var(--text-muted)]">{subtitle}</p>
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h3>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
           >
-            <span>×</span>
+            <ModalCloseIcon className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
+        <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="space-y-1.5">
-            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               Attribute Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -446,17 +455,20 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               autoFocus
-              className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+              className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
               placeholder="e.g. Color, Size, RAM"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
-              {isEdit ? "Attribute Type" : "Data Type"}
+            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              Attribute Type
             </label>
-            <div className="grid grid-cols-2 gap-4">
-              {dataTypeLabels.map((type) => {
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: "multi_select", label: "Multi Options" },
+                { id: "boolean", label: "Yes / No" },
+              ].map((type) => {
                 const isActive = form.data_type === type.id;
                 return (
                   <button
@@ -469,10 +481,10 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                         values: type.id === "boolean" ? form.values : form.values,
                       })
                     }
-                    className={`h-14 text-[11px] font-semibold flex flex-col items-center justify-center gap-2 rounded-xl border transition-all duration-200 ${
+                    className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${
                       isActive
-                        ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
+                        ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
+                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     }`}
                   >
                     <span>{type.label}</span>
@@ -483,133 +495,92 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           </div>
 
           {form.data_type === "multi_select" && (
-            <div className="space-y-2">
-              <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Options</label>
-              <div className="space-y-1.5">
-                {(form.values || []).map((opt, idx) => (
-                  <div
-                    key={`opt-${idx}`}
-                    className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg"
-                  >
-                    <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
-                      {idx + 1}
+            <div className="space-y-2.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+              {(form.values || []).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {(form.values || []).map((val, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15">
+                      {val}
+                      <button
+                        type="button"
+                        onClick={() => removeOption(idx)}
+                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
+                      >
+                        <ModalCloseIcon className="w-2.5 h-2.5" />
+                      </button>
                     </span>
-                    <span className="flex-1 min-w-0 text-xs text-[var(--text-primary)] truncate">{opt}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeOption(idx)}
-                      className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-red-500 hover:bg-[var(--bg-tertiary)] transition-colors"
-                      aria-label="Remove option"
-                    >
-                      <span>×</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
-                  ref={optionInputRef}
                   type="text"
-                  placeholder="Add an option (e.g. 8 GB)"
-                  value={isEdit ? editOptionInput : newOptionInput}
-                  onChange={(e) => (isEdit ? setEditOptionInput(e.target.value) : setNewOptionInput(e.target.value))}
+                  value={optionInput}
+                  onChange={(e) => setOptionInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       addOption();
                     }
                   }}
-                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                  placeholder="Add an option (e.g. 8 GB)"
                 />
                 <button
                   type="button"
                   onClick={addOption}
-                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
+                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                 >
-                  <span>+ Add</span>
+                  <ModalPlusIcon className="w-3 h-3" /> Add
                 </button>
               </div>
-              <p className="text-[10px] text-[var(--text-muted)]">
-                Add one or more options. You can also add more after creating the attribute.
-              </p>
             </div>
           )}
 
           {form.data_type === "boolean" && (
-            <div className="space-y-2">
-              <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
-                {isEdit ? "Default Value" : "Default State"}
+            <div className="space-y-2.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                Default Value
               </label>
-              <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+              <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: true, label: "Yes" },
-                  { id: false, label: "No" },
+                  { id: "yes", label: "Yes" },
+                  { id: "no", label: "No" },
                 ].map((opt) => {
-                  const isActive = form.value === opt.id;
+                  const isActive = (opt.id === "yes" && form.value === true) || (opt.id === "no" && form.value === false);
                   return (
                     <button
-                      key={String(opt.id)}
+                      key={opt.id}
                       type="button"
-                      onClick={() => setForm({ ...form, value: opt.id })}
-                      className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${
+                      onClick={() => setForm({ ...form, value: opt.id === "yes" })}
+                      className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${
                         isActive
-                          ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm"
-                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                          ? opt.id === "yes"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
+                            : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
+                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                       }`}
                     >
-                      <span
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          isActive ? (opt.id ? "bg-[var(--success)]" : "bg-[var(--text-muted)]") : "bg-transparent"
-                        }`}
-                      />
+                      <span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${
+                        isActive
+                          ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]"
+                          : "border-[var(--border-color)] bg-transparent"
+                      }`} />
                       {opt.label}
                     </button>
                   );
                 })}
               </div>
-              <p className="text-[10px] text-[var(--text-muted)]">
-                This will be the default Yes/No state for this attribute.
-              </p>
             </div>
           )}
-
-          <div className="space-y-1.5 pt-2 border-t" style={{ borderColor: "var(--border-color)" }}>
-            <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</label>
-            <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-              {[
-                { id: true, label: "Active", color: "#34d399" },
-                { id: false, label: "Inactive", color: "#f87171" },
-              ].map((opt) => {
-                const isSel = form.is_active === opt.id;
-                return (
-                  <button
-                    key={String(opt.id)}
-                    type="button"
-                    onClick={() => setForm({ ...form, is_active: opt.id })}
-                    className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${
-                      isSel ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full transition-colors"
-                      style={{
-                        backgroundColor: isSel ? opt.color : "transparent",
-                      }}
-                    />
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-[var(--text-muted)]">Inactive attributes are hidden from product forms.</p>
-          </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+            className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
           >
             Cancel
           </button>
@@ -617,7 +588,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             type="button"
             onClick={handleSave}
             disabled={isSaving || !form.name || !form.name.trim()}
-            className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+            className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saveText}
           </button>
@@ -991,9 +962,13 @@ export default function CategoryDetailPage() {
                                     </button>
                                     
                                     <button
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        // ✅ FIX ISSUE 1: Stop propagation to prevent row click
+                                        e.stopPropagation();
                                         const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
                                         if (fullAttr) {
+                                          // ✅ FIX ISSUE 1: Close view panel if open
+                                          setViewPanelAttr(null);
                                           setAttrEditTarget(fullAttr);
                                           setAttrEditOpen(true);
                                         }
@@ -1271,9 +1246,13 @@ export default function CategoryDetailPage() {
                                       </button>
 
                                       <button
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          // ✅ FIX ISSUE 1: Stop propagation to prevent row click
+                                          e.stopPropagation();
                                           const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
                                           if (fullAttr) {
+                                            // ✅ FIX ISSUE 1: Close view panel if open
+                                            setViewPanelAttr(null);
                                             setAttrEditTarget(fullAttr);
                                             setAttrEditOpen(true);
                                           }
@@ -1338,8 +1317,10 @@ export default function CategoryDetailPage() {
           name: attrEditTarget.name || "",
           data_type: attrEditTarget.data_type || "multi_select",
           values: (attrEditTarget.values || []).map((v) => {
-            const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
-            return String(label);
+            // ✅ FIX ISSUE 2: Ensure we extract strings correctly when loading into form
+            if (typeof v === "string") return v;
+            if (typeof v === "object") return String(v.label || v.value || v.name || "");
+            return String(v);
           }).filter(Boolean),
           value: (() => {
             if (attrEditTarget.data_type === "boolean") {
@@ -1361,6 +1342,17 @@ export default function CategoryDetailPage() {
             const attrId = getAttributeId(attrEditTarget);
             const valuesPayload = payload.data_type === "multi_select"
               ? (payload.values || []).map((opt) => {
+                  if (typeof opt === "string") {
+                    const label = String(opt || "").trim();
+                    return { label, value: label.toLowerCase() };
+                  }
+                  if (typeof opt === "object" && opt !== null) {
+                    const labelStr = typeof opt.label === "string" ? opt.label : (typeof opt.value === "string" ? opt.value : (typeof opt.name === "string" ? opt.name : ""));
+                    const valueStr = typeof opt.value === "string" ? opt.value : (typeof opt.label === "string" ? opt.label : (typeof opt.name === "string" ? opt.name : ""));
+                    const label = (labelStr || valueStr || "").trim();
+                    const value = (valueStr || labelStr || "").trim();
+                    return { label: label || value, value: value || label.toLowerCase(), sort_order: typeof opt.sort_order === "number" ? opt.sort_order : 0, is_active: opt.is_active !== false };
+                  }
                   const label = String(opt || "").trim();
                   return { label, value: label.toLowerCase() };
                 })
@@ -1487,6 +1479,7 @@ const ModalPlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className}
 const ModalSearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
 const ModalChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
 const ModalLayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>);
+const ModalCloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ModalSpinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
 
 function CategoryEditModal({ categoryId, onClose, onSuccess }) {

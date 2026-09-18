@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +52,9 @@ const PlusIcon = ({ className = "w-4 h-4" }) => (
 const CloseIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
 );
+const TagIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+);
 
 // --- Helpers ---
 const getDataTypeLabel = (type) => {
@@ -62,9 +64,140 @@ const getDataTypeLabel = (type) => {
 
 const ATTRS_PER_PAGE = 15;
 
+// ==================== RIGHT SIDE DETAIL PANEL ====================
+function AttributeOptionsPanel({ attr, onClose }) {
+  if (!attr) return null;
+
+  // Robustly extract option labels
+  const getOptions = () => {
+    if (!attr.values) return [];
+    return attr.values.map(v => {
+      if (typeof v === 'string') return v;
+      return v.label || v.value || v.name || String(v);
+    }).filter(Boolean);
+  };
+
+  const options = getOptions();
+  const isActive = attr.is_active !== false;
+  const isBoolean = attr.data_type === 'boolean';
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity duration-300" 
+        onClick={onClose}
+      />
+      
+      {/* Slide-in Panel */}
+      <div className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-md bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out">
+        
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shrink-0">
+              <SlidersIcon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-[var(--text-primary)] truncate">{attr.name}</h3>
+              <p className="text-xs font-mono text-[var(--text-muted)] mt-0.5">{attr.code}</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          
+          {/* Details Section */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Details</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)]">
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Type</span>
+                <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
+                  {getDataTypeLabel(attr.data_type)}
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)]">
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Status</span>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  {isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+            
+            {/* Variant Option Row */}
+            {attr.category_config?.is_variant_option && (
+               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] flex justify-between items-center">
+                 <span className="text-[10px] font-medium text-[var(--text-muted)]">Variant Option</span>
+                 <span className="text-xs font-semibold text-[var(--accent)]">Yes</span>
+               </div>
+            )}
+          </div>
+
+          {/* Available Options Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {isBoolean ? 'Boolean Values' : 'Available Options'}
+              </h4>
+              <span className="text-[10px] font-medium bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">
+                {options.length} items
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {options.length > 0 ? (
+                options.map((opt, idx) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] group hover:border-[var(--accent)]/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                        {idx + 1}
+                      </span>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">{opt}</span>
+                    </div>
+                    {isBoolean && (
+                       <span className={`w-2 h-2 rounded-full ${opt.toLowerCase() === 'yes' || opt.toLowerCase() === 'true' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
+                  <TagIcon className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-50" />
+                  <p className="text-sm text-[var(--text-muted)]">No options defined yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
+          <button 
+            onClick={onClose}
+            className="w-full h-10 rounded-lg text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
+          >
+            Close Panel
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ==================== ATTRIBUTE FORM MODAL ====================
 function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
   const isEdit = mode === "edit";
-
   const [form, setForm] = useState({
     name: "",
     data_type: "multi_select",
@@ -129,15 +262,15 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           return { label, value: label.toLowerCase() };
         })
       : form.data_type === "boolean"
-        ? [
-            {
-              label: form.value ? "Yes" : "No",
-              value: form.value ? "true" : "false",
-              sort_order: 0,
-              is_active: true,
-            },
-          ]
-        : [];
+      ? [
+          {
+            label: form.value ? "Yes" : "No",
+            value: form.value ? "true" : "false",
+            sort_order: 0,
+            is_active: true,
+          },
+        ]
+      : [];
     const payload = {
       name: form.name.trim(),
       data_type: form.data_type,
@@ -174,14 +307,11 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
   const title = isEdit ? "Edit Attribute" : "Add New Attribute";
   const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
   const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+
   const dataTypeLabels = [
     { id: "multi_select", label: "Multi Options" },
     { id: "boolean", label: "Yes / No" },
   ];
-
-  const SlidersIcon = ({ className = "w-4 h-4" }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -206,7 +336,6 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             <span>×</span>
           </button>
         </div>
-
         <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: "min(640px, 85vh)" }}>
           <div className="space-y-3">
             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
@@ -224,7 +353,6 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               />
             </div>
           </div>
-
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               Attribute Type
@@ -255,7 +383,6 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               })}
             </div>
           </div>
-
           {form.data_type === "multi_select" && (
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Options</p>
@@ -305,7 +432,6 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               </p>
             </div>
           )}
-
           {form.data_type === "boolean" && (
             <div className="space-y-2.5">
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
@@ -343,9 +469,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               </p>
             </div>
           )}
-
         </div>
-
         <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
           <button
             type="button"
@@ -377,7 +501,7 @@ export default function AttributesPage() {
   const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [attributePage, setAttributePage] = useState(1);
-
+  
   // Debounced search
   useEffect(() => {
     const t = setTimeout(() => {
@@ -389,16 +513,19 @@ export default function AttributesPage() {
 
   // Add Attribute Modal State
   const [showAttributeModal, setShowAttributeModal] = useState(false);
-
+  
   // Edit Attribute Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAttribute, setEditingAttribute] = useState(null);
-
+  
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null);
-
+  
   // Status filter
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // ✅ NEW: Detail Panel State
+  const [detailAttr, setDetailAttr] = useState(null);
 
   // Edit from URL param (e.g. ?edit=attrId)
   const searchParams = useSearchParams();
@@ -438,6 +565,7 @@ export default function AttributesPage() {
   const attributesRaw = Array.isArray(paginatedAttrsData)
     ? paginatedAttrsData
     : paginatedAttrsData?.items || paginatedAttrsData?.data || paginatedAttrsData?.attributes || [];
+  
   const pagination = Array.isArray(paginatedAttrsData)
     ? { total: attributesRaw.length, page: 1, limit: ATTRS_PER_PAGE, pages: 1 }
     : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: ATTRS_PER_PAGE, pages: 1 };
@@ -485,9 +613,11 @@ export default function AttributesPage() {
     const total = all.length;
     const active = all.filter((a) => a.is_active !== false).length;
     const withOptions = all.filter((a) => Array.isArray(a.values) && a.values.length > 0).length;
+    
     const LEGACY_DATA_TYPE_MAP = { select: "multi_select", color: "multi_select", date: "text", datetime: "text", url: "text", measurement: "decimal" };
     const SUPPORTED_TYPES = ["multi_select", "boolean"];
     const dataTypeSet = new Set(all.map((a) => LEGACY_DATA_TYPE_MAP[a.data_type] || a.data_type).filter((t) => SUPPORTED_TYPES.includes(t)));
+    
     return { total, active, withOptions, dataTypes: dataTypeSet.size };
   }, [allAttrs]);
 
@@ -605,11 +735,11 @@ export default function AttributesPage() {
             {pages.map((page, i) => (
               <React.Fragment key={i}>
                 {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> :
-                  <button onClick={() => go(page)}
-                    className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
-                    style={{ backgroundColor: current === page ? "var(--accent)" : "var(--bg-tertiary)", color: current === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${current === page ? "var(--accent)" : "var(--border-color)"}` }}>
-                    {page}
-                  </button>}
+                <button onClick={() => go(page)}
+                  className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
+                  style={{ backgroundColor: current === page ? "var(--accent)" : "var(--bg-tertiary)", color: current === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${current === page ? "var(--accent)" : "var(--border-color)"}` }}>
+                  {page}
+                </button>}
               </React.Fragment>
             ))}
           </span>
@@ -628,7 +758,6 @@ export default function AttributesPage() {
     const btnRef = React.useRef(null);
     const menuRef = React.useRef(null);
     const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-
     const isActive = attr.is_active !== false;
 
     const openMenu = () => {
@@ -689,13 +818,17 @@ export default function AttributesPage() {
           >
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); setOpen(false); openEditModal(attr); }}
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setOpen(false); 
+                setDetailAttr(attr); // ✅ Opens Right Panel
+              }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Options
             </button>
             <button
               type="button"
@@ -741,8 +874,16 @@ export default function AttributesPage() {
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-5">
+      
+      {/* ✅ RENDER DETAIL PANEL */}
+      {detailAttr && (
+        <AttributeOptionsPanel 
+          attr={detailAttr} 
+          onClose={() => setDetailAttr(null)} 
+        />
+      )}
 
+      <div className="w-full space-y-5">
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -766,20 +907,18 @@ export default function AttributesPage() {
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          
           {/* Wider Search Bar (Left Side) */}
           <div className="relative w-full md:w-[400px]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-            <input 
-              type="text" 
-              placeholder="Search attributes by name or code..." 
-              value={attributeSearch} 
+            <input
+              type="text"
+              placeholder="Search attributes by name or code..."
+              value={attributeSearch}
               onChange={e => setAttributeSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
-              style={inputStyle} 
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+              style={inputStyle}
             />
           </div>
-
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative">
@@ -848,8 +987,8 @@ export default function AttributesPage() {
                             style={attr.data_type === 'multi_select' || attr.data_type === 'select'
                               ? { backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }
                               : attr.data_type === 'text'
-                                ? { backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.2)" }
-                                : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+                              ? { backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.2)" }
+                              : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
                             {getDataTypeLabel(attr.data_type)}
                           </span>
                         </td>
@@ -879,7 +1018,6 @@ export default function AttributesPage() {
 
         <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
           label={totalAttributes > 0 ? `Showing ${attrStartIndex}–${attrEndIndex} of ${totalAttributes} attributes` : "No attributes"} />
-
       </div>
 
       {/* ===== Add Attribute Modal ===== */}
@@ -935,15 +1073,15 @@ export default function AttributesPage() {
                 return { label, value: label.toLowerCase() };
               })
             : payload.data_type === "boolean"
-              ? [
-                  {
-                    label: payload.value ? "Yes" : "No",
-                    value: payload.value ? "true" : "false",
-                    sort_order: 0,
-                    is_active: true,
-                  },
-                ]
-              : [];
+            ? [
+                {
+                  label: payload.value ? "Yes" : "No",
+                  value: payload.value ? "true" : "false",
+                  sort_order: 0,
+                  is_active: true,
+                },
+              ]
+            : [];
           editAttributeMutation.mutate({
             name: payload.name.trim(),
             data_type: payload.data_type,
