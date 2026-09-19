@@ -21,9 +21,7 @@ export function useStoreSocketSync() {
     const handleStoreUpdated = (data) => {
 
       if (!data) {
-        console.warn(
-          "⚠️ useStoreSocketSync → storeUpdated received empty data"
-        );
+        // ✅ Silent — console warning show na ho
         return;
       }
 
@@ -91,10 +89,7 @@ export function useStoreSocketSync() {
       // }
 
       if (!response?.success || !response?.data) {
-        console.warn(
-          "⚠️ useStoreSocketSync → Invalid storeInfo response:",
-          response
-        );
+        // ✅ Silent — console warning show na ho
         return;
       }
 

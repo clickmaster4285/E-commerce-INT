@@ -298,6 +298,7 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setFormData({
       name: "",
+      username: "",
       email: "",
       phone: "",
       department: "",
@@ -314,6 +315,7 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setFormData({
       name: "",
+      username: "",
       email: "",
       phone: "",
       department: "",
@@ -331,6 +333,7 @@ export default function EmployeesPage() {
     setEditingEmployee(emp);
     setFormData({
       name: emp.userId?.name || emp.name || "",
+      username: emp.username || "",
       email: emp.userId?.email || emp.email || "",
       phone: emp.userId?.phone || emp.phone || "",
       department: emp.department || "",
@@ -347,6 +350,10 @@ export default function EmployeesPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return toast.error("Name is required");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    const username = formData.username.trim().toLowerCase();
+    if (username.length < 3) return toast.error("Username must be at least 3 characters");
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return toast.error("Username can only contain letters, numbers, and underscores");
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!formData.department.trim()) return toast.error("Department is required");
 
@@ -367,6 +374,7 @@ export default function EmployeesPage() {
 
     const payload = {
       name: formData.name.trim(),
+      username,
       email: formData.email.trim(),
       phone: formData.phone || "",
       department: formData.department.trim(),
@@ -861,52 +869,19 @@ export default function EmployeesPage() {
                   <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Username *</label>
+                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john_doe" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
-                <div className="relative group">
-                  <input 
-                    type="tel" 
-                    value={formData.phone} 
-                    onChange={(e) => {
-                        const val = e.target.value;
-                        setFormData({ ...formData, phone: val });
-                        // Professional Tooltip Logic
-                        if (val.length > 15) {
-                            setPhoneError("Maximum 15 digits allowed");
-                        } else if (val.length > 0 && val.length < 10) {
-                             setPhoneError("Minimum 10 digits recommended");
-                        } else {
-                            setPhoneError("");
-                        }
-                    }} 
-                    disabled={isSubmitting} 
-                    className={`w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition-colors ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`} 
-                    style={inputStyle} 
-                    placeholder="+92 300 1234567" 
-                    minLength={10} 
-                    maxLength={15} 
-                  />
-                  
-                  {/* Professional Hover Message / Tooltip */}
-                  {phoneError && (
-                    <div className="absolute bottom-full left-0 mb-2 px-3 py-1.5 rounded-md text-xs font-medium shadow-lg border animate-in fade-in slide-in-from-bottom-1 duration-200 z-10 whitespace-nowrap" 
-                         style={{ 
-                             backgroundColor: "var(--bg-card)", 
-                             borderColor: "var(--border-color)", 
-                             color: "#f87171" 
-                         }}>
-                        <div className="flex items-center gap-1.5">
-                            <AlertTriangle className="w-3 h-3" /> {phoneError}
-                        </div>
-                        {/* Triangle pointer */}
-                        <div className="absolute top-full left-4 -mt-[1px] w-2 h-2 rotate-45 border-r border-b" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}></div>
-                    </div>
-                  )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
                 </div>
               </div>
 

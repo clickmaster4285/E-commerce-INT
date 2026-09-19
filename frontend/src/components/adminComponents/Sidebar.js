@@ -111,7 +111,7 @@ function getSidebarSocket() {
   });
 
   sidebarSocket.on("connect_error", (error) => {
-    console.error("❌ Sidebar socket error:", error?.message);
+    // ✅ Silent — error console par show na ho, reconnection waise hi chalega
   });
 
   sidebarSocket.on("disconnect", (reason) => {});

@@ -447,7 +447,31 @@ exports.updateEmployee = async (req, res) => {
       }
     }
 
-    const userFields = ["name", "email", "phone", "status", "role"];
+    // Username: blank = no change; validate format + uniqueness
+    if (updates.username !== undefined) {
+      const nextUsername = String(updates.username).trim().toLowerCase();
+      if (!nextUsername || !/^[a-zA-Z0-9_]+$/.test(nextUsername)) {
+        return res.status(400).json({
+          success: false,
+          message: "Username is required and can only contain letters, numbers, and underscores",
+        });
+      }
+      if (nextUsername !== String(employee.username || "").toLowerCase()) {
+        const usernameTaken = await Employee.findOne({
+          username: nextUsername,
+          _id: { $ne: employee._id },
+        });
+        if (usernameTaken) {
+          return res.status(400).json({
+            success: false,
+            message: "This username is already taken",
+          });
+        }
+      }
+      updates.username = nextUsername;
+    }
+
+    const userFields = ["name", "username", "email", "phone", "status", "role"];
     const directUpdates = {};
 
     for (const field of userFields) {
