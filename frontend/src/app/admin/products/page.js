@@ -185,6 +185,112 @@ function getAssignedOptionList(attr) {
   return out;
 }
 
+const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries = [] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const getFlagEmoji = (isoCode) => {
+    if (!isoCode || isoCode.length !== 2) return "";
+    return isoCode.toUpperCase().split("").map((char) => String.fromCodePoint(127397 + char.charCodeAt(0))).join("");
+  };
+
+  const filteredCountries = useMemo(() => {
+    if (!searchTerm.trim()) return allCountries;
+    const term = searchTerm.toLowerCase();
+    return allCountries.filter((c) => c.name.toLowerCase().includes(term) || c.isoCode.toLowerCase().includes(term));
+  }, [allCountries, searchTerm]);
+
+  const selectedCountry = useMemo(() => allCountries.find((c) => c.name === value) || null, [allCountries, value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
+    if (!isOpen) setSearchTerm("");
+  }, [isOpen]);
+
+  const handleSelect = (countryName) => {
+    onChange(countryName);
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange("");
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+        <div className="flex items-center gap-2 min-w-0">
+          {selectedCountry ? (
+            <>
+              <span className="text-base leading-none">{getFlagEmoji(selectedCountry.isoCode)}</span>
+              <span className="truncate text-[13px]">{selectedCountry.name}</span>
+            </>
+          ) : (
+            <span className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+              Select Country
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedCountry && (
+            <span onClick={handleClear} className="p-0.5 rounded hover:bg-white/10 transition" style={{ color: "var(--text-muted)" }}>
+              <X className="w-3 h-3" />
+            </span>
+          )}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}>
+          <div className="px-3 py-1.5 text-center" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{filteredCountries.length} of {allCountries.length} countries</p>
+          </div>
+          <div className="max-h-[200px] overflow-y-auto py-1" style={{ scrollbarWidth: "thin" }}>
+            {filteredCountries.length === 0 ? (
+              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No country found</p></div>
+            ) : (
+              filteredCountries.map((country) => {
+                const isSelected = country.name === value;
+                return (
+                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                    </div>
+                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="p-2" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search className="w-3.5 h-3.5" /></span>
+              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search country..." className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* =========================================================
 MAIN COMPONENT
 ======================================================== */
@@ -302,7 +408,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
-    const payload = { ...formData, parent_category_id: formData.parent_category_id || null };
+    const payload = { ...formData, parent_category_id: formData.parent_category_id || null, is_active: formData.status === "active" };
     createMutation.mutate(payload);
   };
 
@@ -341,8 +447,8 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   };
   const hierarchicalCategories = buildHierarchy(categories);
   const selectedParentName = formData.parent_category_id
-    ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "Root Category"
-    : "Root Category";
+    ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+    : "None";
 
   const filteredAllAttributes = useMemo(() => {
     if (!attrSearch.trim()) return allAttributes;
@@ -471,7 +577,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
             <button type="button"
               onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
               className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
-              <span>Root Category</span>
+              <span>None</span>
               {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)]" />}
             </button>
             {categoriesLoading ? (
@@ -511,6 +617,29 @@ function CategoryFormModal({ open, onClose, onCreated }) {
               <CloseIcon className="w-3.5 h-3.5" />
             </button>
           </div>
+          {tempSelectedAttrIds.length > 0 && (
+            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Selected Attributes</span>
+                <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
+                {tempSelectedAttrIds.map((attrId) => {
+                  const attr = allAttributes.find((a) => String(a._id) === String(attrId));
+                  if (!attr) return null;
+                  return (
+                    <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
+                      {attr.name}
+                      <button type="button" onClick={() => toggleTempAttribute(attrId)}
+                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                        <CloseIcon className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
@@ -783,7 +912,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
         </form>
 
         <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
-          <button type="button" onClick={() => { setShowCreateModal(false); setShowEditModal(false); setEditingCategory(null); resetForm(); }}
+          <button type="button" onClick={onClose}
             className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
             Cancel
           </button>
@@ -831,6 +960,8 @@ const [viewMode, setViewMode] = useState(() => {
   const [brandLogoFile, setBrandLogoFile] = useState(null);
   const [brandLogoPreview, setBrandLogoPreview] = useState("");
   const [loadingBrandCode, setLoadingBrandCode] = useState(false);
+  const [brandIsDragging, setBrandIsDragging] = useState(false);
+  const brandFileInputRef = useRef(null);
 
   // Attribute Modal States
   const [showNewAttributeModal, setShowNewAttributeModal] = useState(false);
@@ -1049,7 +1180,7 @@ const [viewMode, setViewMode] = useState(() => {
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
   const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
   
-  const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
+  const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); queryClient.invalidateQueries({ queryKey: ["adminBrands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
   
   const assignAttributeToCategoryMutation = useMutation({
     mutationFn: ({ categoryId, attributes }) => categoryApi.updateAttributes(categoryId, attributes),
@@ -1286,6 +1417,22 @@ const [viewMode, setViewMode] = useState(() => {
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Only PNG, JPG and WebP logos are allowed"); e.target.value = ""; return; }
     if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
     setBrandLogoFile(file); setBrandLogoPreview(URL.createObjectURL(file));
+  };
+  const handleBrandFileDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBrandIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith("image/")) { toast.error("Please drop an image file (PNG, JPG, WEBP)"); return; }
+      if (file.size > 10 * 1024 * 1024) { toast.error("Image size must be less than 10MB"); return; }
+      if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
+      setBrandLogoFile(file); setBrandLogoPreview(URL.createObjectURL(file));
+    }
+  };
+  const handleBrandRemoveLogo = () => {
+    if (brandLogoPreview?.startsWith("blob:")) URL.revokeObjectURL(brandLogoPreview);
+    setBrandLogoFile(null); setBrandLogoPreview("");
   };
   const handleBrandSubmit = (e) => {
     e.preventDefault();
@@ -1636,37 +1783,47 @@ const [viewMode, setViewMode] = useState(() => {
             </div>
             <form onSubmit={handleBrandSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Brand Code *">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
                   <div className="relative">
-                    <input type="text" value={brandFormData.brand_code} onChange={e => setBrandFormData(p => ({ ...p, brand_code: e.target.value }))} required disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingBrandCode ? "Generating..." : "BRD-001"} />
+                    <input type="text" value={brandFormData.brand_code} onChange={e => setBrandFormData(p => ({ ...p, brand_code: e.target.value }))} required disabled={createBrandMutation.isPending || loadingBrandCode} className="h-9 w-full rounded-md px-3 text-sm font-mono outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder={loadingBrandCode ? "Generating..." : "BRD-001"} />
                     {loadingBrandCode && <span className="absolute right-2.5 top-1/2 -translate-y-1/2"><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></span>}
                   </div>
-                </Field>
-                <Field label="Brand Name *"><input type="text" value={brandFormData.name} onChange={e => setBrandFormData(p => ({ ...p, name: e.target.value }))} required disabled={createBrandMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Nike" /></Field>
-              </div>
-              <Field label="Description"><textarea value={brandFormData.description} onChange={e => setBrandFormData(p => ({ ...p, description: e.target.value }))} rows={2} disabled={createBrandMutation.isPending} className="w-full resize-none rounded-md px-3 py-2 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Brand details..." /></Field>
-              <Field label="Brand Logo">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                    {brandLogoPreview ? <img src={brandLogoPreview} alt="Preview" className="h-full w-full object-cover" /> : <Upload className="h-6 w-6" style={{ color: "var(--text-muted)" }} />}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="brand-logo-upload" className="flex h-8 w-fit cursor-pointer items-center gap-2 rounded-md px-3 text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}><Upload className="h-3.5 w-3.5" />{brandLogoPreview ? "Change Image" : "Upload Image"}</label>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
-                  </div>
-                  <input id="brand-logo-upload" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBrandLogoChange} disabled={createBrandMutation.isPending} />
                 </div>
-              </Field>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Name *</label>
+                  <input type="text" value={brandFormData.name} onChange={e => setBrandFormData(p => ({ ...p, name: e.target.value }))} required disabled={createBrandMutation.isPending} className="h-9 w-full rounded-md px-3 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Nike" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
+                <textarea value={brandFormData.description} onChange={e => setBrandFormData(p => ({ ...p, description: e.target.value }))} rows={2} disabled={createBrandMutation.isPending} className="w-full resize-none rounded-md px-3 py-2 text-sm outline-none disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} placeholder="Brand details..." />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+                <input ref={brandFileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleBrandLogoChange} disabled={createBrandMutation.isPending} />
+                <div onClick={() => !createBrandMutation.isPending && brandFileInputRef.current?.click()} onDrop={handleBrandFileDrop} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setBrandIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setBrandIsDragging(false); }} className={`relative w-full h-32 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 ${brandIsDragging ? "border-emerald-500 bg-emerald-500/10" : "border-gray-600 hover:border-emerald-500/50 hover:bg-white/5"}`} style={{ borderColor: brandIsDragging ? undefined : "var(--border-color)" }}>
+                  {brandLogoPreview ? (
+                    <div className="relative w-full h-full flex items-center justify-center p-2">
+                      <img src={brandLogoPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" />
+                      <button type="button" onClick={(e) => { e.stopPropagation(); handleBrandRemoveLogo(); }} className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`p-3 rounded-full ${brandIsDragging ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-gray-400"}`}><Upload className="w-6 h-6" /></div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{brandIsDragging ? "Drop image here" : "Click or Drag image here"}</p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="grid grid-cols-2 items-end gap-3">
-                <Field label="Country">
-                  <div className="relative">
-                    <select value={brandFormData.country} onChange={e => setBrandFormData(p => ({ ...p, country: e.target.value }))} disabled={createBrandMutation.isPending} className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                      <option value="">Select Country</option>
-                      {allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
-                  </div>
-                </Field>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+                  <BrandCountryDropdown value={brandFormData.country} onChange={(val) => setBrandFormData(p => ({ ...p, country: val }))} disabled={createBrandMutation.isPending} allCountries={allCountries} />
+                </div>
                 <label className="flex h-9 cursor-pointer items-center gap-2">
                   <input type="checkbox" checked={brandFormData.is_active} onChange={e => setBrandFormData(p => ({ ...p, is_active: e.target.checked }))} disabled={createBrandMutation.isPending} className="h-4 w-4 rounded" style={{ accentColor: "var(--accent)" }} />
                   <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Active</span>

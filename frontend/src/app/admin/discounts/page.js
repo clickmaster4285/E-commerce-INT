@@ -195,14 +195,14 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled }) => (
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "" }) => (
   <input
     type={type}
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
     disabled={disabled}
-    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     style={style}
   />
 );
@@ -337,14 +337,14 @@ export default function DiscountsPage() {
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
     selected_ids: [],
-    value_type: "percentage", value: "", max_discount: "",
+    value_type: "percentage", value: "",
     min_order_amount: "", 
-    has_min_quantity: false, // New field for checkbox
+    has_min_quantity: false,
     min_quantity: "",
     usage_limit: "", usage_per_customer: "",
-    priority: "1", is_stackable: false,
     start_at: "", end_at: "", status: "active",
   });
+  const [formErrors, setFormErrors] = useState({});
 
   const { data: paginatedDiscountsData, isLoading } = useQuery({
     queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
@@ -383,17 +383,17 @@ export default function DiscountsPage() {
     setFormData({
       name: "", code: "", description: "",
       selected_ids: [],
-      value_type: "percentage", value: "", max_discount: "",
+      value_type: "percentage", value: "",
       min_order_amount: "", 
       has_min_quantity: false, 
       min_quantity: "",
       usage_limit: "", usage_per_customer: "",
-      priority: "1", is_stackable: false,
       start_at: "", end_at: "", status: "active",
     });
     setEditingDiscount(null);
     setSelector({ open: false, type: null });
     setActiveFormType(null);
+    setFormErrors({});
   };
 
   const handleView = (id) => router.push(`${pathname}/${id}`);
@@ -407,7 +407,14 @@ export default function DiscountsPage() {
       setShowModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save discount"),
+    onError: (error) => {
+      const msg = error?.response?.data?.message || error?.message || "Failed to save discount";
+      if (msg && msg.toLowerCase().includes("already exists")) {
+        setFormErrors({ code: "This discount code already exists. Please use a different code." });
+        return;
+      }
+      toast.error(msg);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -473,7 +480,6 @@ export default function DiscountsPage() {
     else if (type === "category") selected_ids = (discount?.selectedCategories || discount?.selected_category_ids || discount?.categoryIds || []).map(getId);
     else if (type === "brand") selected_ids = (discount?.selectedBrands || discount?.selected_brand_ids || discount?.brandIds || []).map(getId);
 
-    // Handle Min Quantity Logic on Edit
     const rawMinQty = discount?.min_quantity ?? discount?.minQuantity;
     const hasMinQty = rawMinQty !== null && rawMinQty !== undefined && rawMinQty !== "";
 
@@ -481,14 +487,12 @@ export default function DiscountsPage() {
       name: discount?.name || "", code: discount?.code || "", description: discount?.description || "",
       selected_ids,
       value_type: discount?.value_type || (discount?.type === "fixed" ? "fixed_amount" : "percentage"),
-      value: discount?.value ?? "", max_discount: discount?.max_discount ?? discount?.maxDiscountAmount ?? "",
+      value: discount?.value ?? "",
       min_order_amount: discount?.min_order_amount ?? discount?.minOrderValue ?? "",
       has_min_quantity: hasMinQty,
       min_quantity: hasMinQty ? rawMinQty : "",
       usage_limit: discount?.usage_limit ?? discount?.usageLimit ?? "",
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
-      priority: discount?.priority ?? "1",
-      is_stackable: Boolean(discount?.is_stackable ?? discount?.isStackable),
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
       status: discount?.status || (discount?.isActive ? "active" : "disabled"),
@@ -500,7 +504,13 @@ export default function DiscountsPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setFormErrors({});
     if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    const manualCode = String(formData.code || "").trim();
+    if (!manualCode) {
+      setFormErrors({ code: "Discount code is required." });
+      return;
+    }
     if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
     if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
 
@@ -526,26 +536,22 @@ export default function DiscountsPage() {
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
-    // Prepare Min Quantity Payload
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
       ? Number(formData.min_quantity) 
       : null;
 
     const payload = {
       name: String(formData.name).trim(),
-      code: formData.code.trim() ? formData.code.trim().toUpperCase() : undefined,
+      code: manualCode.toUpperCase(),
       description: String(formData.description || "").trim() || undefined,
       target_type, applyTo,
       value_type: formData.value_type,
       type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
       value: Number(formData.value),
-      max_discount: formData.max_discount !== "" ? Number(formData.max_discount) : undefined,
       min_order_amount: formData.min_order_amount !== "" ? Number(formData.min_order_amount) : undefined,
-      min_quantity: finalMinQuantity, // Send null if unchecked
+      min_quantity: finalMinQuantity,
       usage_limit: formData.usage_limit !== "" ? Number(formData.usage_limit) : undefined,
       usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
-      priority: formData.priority !== "" ? Number(formData.priority) : undefined,
-      is_stackable: Boolean(formData.is_stackable),
       start_at: startDate, end_at: endDate,
       status: formData.status,
       isActive: formData.status === "active" || formData.status === "scheduled",
@@ -676,7 +682,7 @@ export default function DiscountsPage() {
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5 p-4 md:p-0">
         
-        {/* ==================== HEADER SECTION (MATCHING IMAGE) ==================== */}
+        {/* ==================== HEADER SECTION ==================== */}
         <div className="flex flex-col gap-5">
           
           {/* Title & Actions Row */}
@@ -737,7 +743,7 @@ export default function DiscountsPage() {
             </div>
           </div>
 
-          {/* Stats Cards Row (Matching Image Layout) */}
+          {/* Stats Cards Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
             <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
@@ -745,7 +751,7 @@ export default function DiscountsPage() {
             <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
           </div>
 
-          {/* Search Bar & Filters Row (Matching Image Layout) */}
+          {/* Search Bar & Filters Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="relative w-full md:w-[400px]">
               <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
@@ -766,7 +772,6 @@ export default function DiscountsPage() {
           </div>
 
         </div>
-        {/* ==================== END HEADER SECTION ==================== */}
 
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
@@ -875,6 +880,8 @@ export default function DiscountsPage() {
           formType={activeFormType}
           formData={formData}
           setFormData={setFormData}
+          formErrors={formErrors}
+          setFormErrors={setFormErrors}
           editingDiscount={editingDiscount}
           saveMutation={saveMutation}
           setShowModal={setShowModal}
@@ -938,7 +945,7 @@ const TargetIconFor = (formType) => {
   return TagIcon;
 };
 
-function DiscountFormModal({ formType, formData, setFormData, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
@@ -1027,6 +1034,16 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
                       placeholder="e.g., Summer Sale 2026"
                       style={inputStyle}
                     />
+                  </FormField>
+                  <FormField label="Discount Code" required hint="Enter a unique code, e.g., SUMMER20">
+                    <TextInput
+                      value={formData.code}
+                      onChange={(v) => { setFormData({ ...formData, code: v }); setFormErrors(prev => ({ ...prev, code: undefined })); }}
+                      placeholder="e.g., SUMMER20"
+                      style={{ ...inputStyle, textTransform: "uppercase" }}
+                      className={formErrors.code ? "ring-2 ring-red-500/50" : ""}
+                    />
+                    {formErrors.code && <p className="text-[11px] mt-1 text-red-400 font-medium">{formErrors.code}</p>}
                   </FormField>
                   <FormField label="Description" fullWidth>
                     <TextArea
@@ -1182,12 +1199,9 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <>
-                      <FormField label="Discount Percentage (%)">
-                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
-                      </FormField>
-                      
-                    </>
+                    <FormField label="Discount Percentage (%)" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
@@ -1205,7 +1219,7 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
               </div>
             </section>
 
-            {/* CONDITIONS & LIMITS (UPDATED WITH CHECKBOX) */}
+            {/* CONDITIONS & LIMITS */}
             <section>
               <SectionHeader 
                 icon={LayersIcon} 

@@ -966,11 +966,10 @@ export default function AttributesPage() {
                     const isActive = attr.is_active !== false;
                     const opts = attr.values?.length || 0;
                     return (
-                      <tr key={attr._id} className="transition cursor-pointer"
+                      <tr key={attr._id} className="transition"
                         style={{                         borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-                        onClick={() => openEditModal(attr)}>
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
