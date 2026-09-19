@@ -1,6 +1,42 @@
 const Variant = require("../models/Variant");
+const Tag = require("../models/Tag");
 const { getNextSku } = require("../utils/skuHelper");
 const { deleteImageFile } = require("../utils/uploadHelpers");
+
+// ⭐ TAG RESOLVER (Find or Create): ensures each tag name has a Tag document
+// (with createdby tracked) so the Tags tab can show who created it.
+const resolveTags = async (tagNames, userId) => {
+  if (!Array.isArray(tagNames) || tagNames.length === 0) return [];
+
+  const cleanNames = [...new Set(
+    tagNames
+      .map(n => String(n).trim().toLowerCase())
+      .filter(Boolean)
+  )];
+
+  if (cleanNames.length === 0) return [];
+
+  // Look up regardless of soft-delete; restore soft-deleted docs instead of
+  // re-creating (avoids the unique `name` index E11000).
+  const existingTags = await Tag.find({ name: { $in: cleanNames } }).lean();
+  const existingMap = new Map(existingTags.map(t => [t.name, t]));
+  const finalTagIds = [];
+
+  for (const name of cleanNames) {
+    const found = existingMap.get(name);
+    if (found) {
+      if (found.is_deleted) {
+        await Tag.updateOne({ _id: found._id }, { $set: { is_deleted: false } });
+      }
+      finalTagIds.push(found._id);
+    } else {
+      const newTag = await Tag.create({ name, createdby: userId, updatedby: userId });
+      finalTagIds.push(newTag._id);
+    }
+  }
+
+  return finalTagIds;
+};
 
 // CREATE VARIANT
 const createVariant = async (req, res) => {
@@ -14,6 +50,12 @@ const createVariant = async (req, res) => {
     let tags = [];
     if (req.body.tags) {
       tags = typeof req.body.tags === "string" ? JSON.parse(req.body.tags) : req.body.tags;
+    }
+    if (!Array.isArray(tags)) tags = [];
+
+    // Ensure Tag docs exist so Created By is tracked for variant tags too
+    if (tags.length > 0) {
+      await resolveTags(tags, req.user?._id);
     }
 
     const variant = await Variant.create({
@@ -115,9 +157,15 @@ const updateVariant = async (req, res) => {
 
     // ✅ Update tags agar request mein aaye hain
     if (req.body.tags !== undefined) {
-      variant.tags = typeof req.body.tags === "string"
+      const parsedTags = typeof req.body.tags === "string"
         ? JSON.parse(req.body.tags)
         : req.body.tags;
+      const variantTagList = Array.isArray(parsedTags) ? parsedTags : [];
+      // Ensure Tag docs exist so Created By is tracked for variant tags too
+      if (variantTagList.length > 0) {
+        await resolveTags(variantTagList, req.user?._id);
+      }
+      variant.tags = variantTagList;
     }
 
     // Agar new images upload hui hain
