@@ -10,13 +10,12 @@ import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
 
-/* ==================== ICONS (same as Deals) ==================== */
+/* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
 const ListIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>);
 const GridIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" /></svg>);
 const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>);
-
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
@@ -39,7 +38,7 @@ const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
 
-/* ==================== HELPERS (same as Deals) ==================== */
+/* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
@@ -122,7 +121,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-/* ==================== CUSTOM MODAL SELECT (same as Deals) ==================== */
+/* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -166,7 +165,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
   );
 };
 
-/* ==================== SHARED FORM PIECES (same as Deals) ==================== */
+/* ==================== SHARED FORM PIECES ==================== */
 const SectionHeader = ({ icon: Icon, title, subtitle, right }) => (
   <div className="flex items-center justify-between gap-3 mb-3">
     <div className="flex items-center gap-2.5 min-w-0">
@@ -196,13 +195,14 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style }) => (
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "" }) => (
   <input
     type={type}
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+    disabled={disabled}
+    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     style={style}
   />
 );
@@ -219,7 +219,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 );
 
 function StatCard({ title, value, valueClass = "", cardStyle }) {
-  return (<div className="rounded-lg p-4" style={cardStyle}>
+  return (<div className="rounded-lg p-4 flex flex-col justify-center" style={cardStyle}>
     <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{title}</p>
     <p className={`text-[20px] font-bold mt-1 ${valueClass}`}>{value}</p>
   </div>);
@@ -236,7 +236,7 @@ function Select({ value, onChange, options, inputStyle }) {
   );
 }
 
-/* ==================== PRODUCT HELPERS (same as Deals) ==================== */
+/* ==================== PRODUCT HELPERS ==================== */
 const getInitials = (name) => {
   if (!name) return "??";
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
@@ -292,6 +292,7 @@ const getProductAttributes = (product) => {
   });
   return list;
 };
+
 /* ==================== DROPDOWN MENU ITEM ==================== */
 const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
@@ -304,6 +305,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     {icon} {label}
   </button>
 );
+
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
   const queryClient = useQueryClient();
@@ -314,12 +316,12 @@ export default function DiscountsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
-const [viewMode, setViewMode] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return window.innerWidth < 768 ? "grid" : "list";
-  }
-  return "list";
-});
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? "grid" : "list";
+    }
+    return "list";
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
@@ -335,12 +337,14 @@ const [viewMode, setViewMode] = useState(() => {
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
     selected_ids: [],
-    value_type: "percentage", value: "", max_discount: "",
-    min_order_amount: "", min_quantity: "",
+    value_type: "percentage", value: "",
+    min_order_amount: "", 
+    has_min_quantity: false,
+    min_quantity: "",
     usage_limit: "", usage_per_customer: "",
-    priority: "1", is_stackable: false,
     start_at: "", end_at: "", status: "active",
   });
+  const [formErrors, setFormErrors] = useState({});
 
   const { data: paginatedDiscountsData, isLoading } = useQuery({
     queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
@@ -364,29 +368,32 @@ const [viewMode, setViewMode] = useState(() => {
   }, []);
 
   useEffect(() => { setCurrentPage(1); }, [search, statusFilter, targetFilter]);
-useEffect(() => {
-  if (!actionMenu) return;
-  const close = () => setActionMenu(null);
-  window.addEventListener("scroll", close, true);
-  window.addEventListener("resize", close);
-  return () => {
-    window.removeEventListener("scroll", close, true);
-    window.removeEventListener("resize", close);
-  };
-}, [actionMenu]);
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
+
   const resetForm = () => {
     setFormData({
       name: "", code: "", description: "",
       selected_ids: [],
-      value_type: "percentage", value: "", max_discount: "",
-      min_order_amount: "", min_quantity: "",
+      value_type: "percentage", value: "",
+      min_order_amount: "", 
+      has_min_quantity: false, 
+      min_quantity: "",
       usage_limit: "", usage_per_customer: "",
-      priority: "1", is_stackable: false,
       start_at: "", end_at: "", status: "active",
     });
     setEditingDiscount(null);
     setSelector({ open: false, type: null });
     setActiveFormType(null);
+    setFormErrors({});
   };
 
   const handleView = (id) => router.push(`${pathname}/${id}`);
@@ -400,7 +407,14 @@ useEffect(() => {
       setShowModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save discount"),
+    onError: (error) => {
+      const msg = error?.response?.data?.message || error?.message || "Failed to save discount";
+      if (msg && msg.toLowerCase().includes("already exists")) {
+        setFormErrors({ code: "This discount code already exists. Please use a different code." });
+        return;
+      }
+      toast.error(msg);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -412,7 +426,7 @@ useEffect(() => {
       setSelectedIds([]);
       toast.success("Discount deleted successfully");
     },
-      onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
   });
 
   const toggleStatusMutation = useMutation({
@@ -443,7 +457,7 @@ useEffect(() => {
     });
   }, [discounts, search, statusFilter, targetFilter]);
 
-  const paginatedDiscounts = discounts; // server paginated; no client .slice()
+  const paginatedDiscounts = discounts; 
   const totalPages = pagination.pages || 1;
   const totalDiscounts = pagination.total || discounts.length;
 
@@ -466,17 +480,19 @@ useEffect(() => {
     else if (type === "category") selected_ids = (discount?.selectedCategories || discount?.selected_category_ids || discount?.categoryIds || []).map(getId);
     else if (type === "brand") selected_ids = (discount?.selectedBrands || discount?.selected_brand_ids || discount?.brandIds || []).map(getId);
 
+    const rawMinQty = discount?.min_quantity ?? discount?.minQuantity;
+    const hasMinQty = rawMinQty !== null && rawMinQty !== undefined && rawMinQty !== "";
+
     setFormData({
       name: discount?.name || "", code: discount?.code || "", description: discount?.description || "",
       selected_ids,
       value_type: discount?.value_type || (discount?.type === "fixed" ? "fixed_amount" : "percentage"),
-      value: discount?.value ?? "", max_discount: discount?.max_discount ?? discount?.maxDiscountAmount ?? "",
+      value: discount?.value ?? "",
       min_order_amount: discount?.min_order_amount ?? discount?.minOrderValue ?? "",
-      min_quantity: discount?.min_quantity ?? discount?.minQuantity ?? "",
+      has_min_quantity: hasMinQty,
+      min_quantity: hasMinQty ? rawMinQty : "",
       usage_limit: discount?.usage_limit ?? discount?.usageLimit ?? "",
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
-      priority: discount?.priority ?? "1",
-      is_stackable: Boolean(discount?.is_stackable ?? discount?.isStackable),
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
       status: discount?.status || (discount?.isActive ? "active" : "disabled"),
@@ -488,7 +504,13 @@ useEffect(() => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setFormErrors({});
     if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    const manualCode = String(formData.code || "").trim();
+    if (!manualCode) {
+      setFormErrors({ code: "Discount code is required." });
+      return;
+    }
     if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
     if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
 
@@ -514,21 +536,22 @@ useEffect(() => {
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
+    const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
+      ? Number(formData.min_quantity) 
+      : null;
+
     const payload = {
       name: String(formData.name).trim(),
-      code: formData.code.trim() ? formData.code.trim().toUpperCase() : undefined,
+      code: manualCode.toUpperCase(),
       description: String(formData.description || "").trim() || undefined,
       target_type, applyTo,
       value_type: formData.value_type,
       type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
       value: Number(formData.value),
-      max_discount: formData.max_discount !== "" ? Number(formData.max_discount) : undefined,
       min_order_amount: formData.min_order_amount !== "" ? Number(formData.min_order_amount) : undefined,
-      min_quantity: formData.min_quantity !== "" ? Number(formData.min_quantity) : undefined,
+      min_quantity: finalMinQuantity,
       usage_limit: formData.usage_limit !== "" ? Number(formData.usage_limit) : undefined,
       usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
-      priority: formData.priority !== "" ? Number(formData.priority) : undefined,
-      is_stackable: Boolean(formData.is_stackable),
       start_at: startDate, end_at: endDate,
       status: formData.status,
       isActive: formData.status === "active" || formData.status === "scheduled",
@@ -579,134 +602,175 @@ useEffect(() => {
     return pages;
   };
 
-const ActionButtons = ({ discount }) => {
-  const id = discount._id || discount.id;
-  const open = actionMenu?.id === id;
+  const ActionButtons = ({ discount }) => {
+    const id = discount._id || discount.id;
+    const open = actionMenu?.id === id;
 
-  const toggleMenu = (e) => {
-    e.stopPropagation();
-    if (open) { setActionMenu(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-        const menuHeight = 200;
-    const menuWidth = 176;
-    const top = rect.bottom + 6 + menuHeight > window.innerHeight
-      ? rect.top - 6 - menuHeight
-      : rect.bottom + 6;
-    const left = Math.max(8, rect.right - menuWidth);
-    setActionMenu({ id, top, left });
+    const toggleMenu = (e) => {
+      e.stopPropagation();
+      if (open) { setActionMenu(null); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuHeight = 200;
+      const menuWidth = 176;
+      const top = rect.bottom + 6 + menuHeight > window.innerHeight
+        ? rect.top - 6 - menuHeight
+        : rect.bottom + 6;
+      const left = Math.max(8, rect.right - menuWidth);
+      setActionMenu({ id, top, left });
+    };
+
+    return (
+      <div className="flex items-center justify-end">
+        <button
+          onClick={toggleMenu}
+          aria-label={`Actions for ${discount?.name || "discount"}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          style={{ color: "var(--text-secondary)" }}
+          title="Actions"
+        >
+          <DotsIcon className="w-4 h-4" />
+        </button>
+
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+              style={{
+                top: actionMenu.top,
+                left: actionMenu.left,
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <MenuItem
+                icon={<EyeIcon className="w-4 h-4" />}
+                label="View Details"
+                onClick={() => { setActionMenu(null); handleView(id); }}
+              />
+              <MenuItem
+                icon={<EditIcon className="w-4 h-4" />}
+                label="Edit Discount"
+                onClick={() => { setActionMenu(null); openEdit(discount); }}
+              />
+              <MenuItem
+                icon={<PowerIcon className="w-4 h-4" />}
+                label={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled") ? "Deactivate" : "Activate"}
+                danger={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
+                success={!(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
+                onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
+              />
+              <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+              <MenuItem
+                icon={<TrashIcon className="w-4 h-4" />}
+                label="Delete"
+                danger
+                onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
-
-  return (
-    <div className="flex items-center justify-end">
-      <button
-        onClick={toggleMenu}
-        aria-label={`Actions for ${discount?.name || "discount"}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-        style={{ color: "var(--text-secondary)" }}
-        title="Actions"
-      >
-        <DotsIcon className="w-4 h-4" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
-            style={{
-              top: actionMenu.top,
-              left: actionMenu.left,
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-            }}
-          >
-            <MenuItem
-              icon={<EyeIcon className="w-4 h-4" />}
-              label="View Details"
-              onClick={() => { setActionMenu(null); handleView(id); }}
-            />
-                      <MenuItem
-              icon={<EditIcon className="w-4 h-4" />}
-              label="Edit Discount"
-              onClick={() => { setActionMenu(null); openEdit(discount); }}
-            />
-            <MenuItem
-              icon={<PowerIcon className="w-4 h-4" />}
-              label={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled") ? "Deactivate" : "Activate"}
-              danger={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
-              success={!(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
-              onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
-            />
-            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
-            <MenuItem
-              icon={<TrashIcon className="w-4 h-4" />}
-              label="Delete"
-              danger
-              onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5 p-4 md:p-0">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+        
+        {/* ==================== HEADER SECTION ==================== */}
+        <div className="flex flex-col gap-5">
+          
+          {/* Title & Actions Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
             </div>
-            <div className="relative shrink-0" ref={typeMenuRef}>
-              <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                <PlusIcon /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {isTypeMenuOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
-                  {discountTypes.map((dt) => {
-                    const Icon = dt.icon;
-                    return (
-                      <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
-                        <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+            
+            <div className="flex items-center gap-2">
+              {/* View Toggle Buttons */}
+              <div className="flex items-center gap-1 mr-2">
+                <button 
+                  type="button" 
+                  onClick={() => setViewMode("list")} 
+                  className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
+                  style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
+                  title="List view"
+                >
+                  <ListIcon />
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setViewMode("grid")} 
+                  className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
+                  style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
+                  title="Grid view"
+                >
+                  <GridIcon />
+                </button>
+              </div>
+
+              {/* Add Button Dropdown */}
+              <div className="relative shrink-0" ref={typeMenuRef}>
+                <button 
+                  type="button" 
+                  onClick={() => setIsTypeMenuOpen((open) => !open)} 
+                  aria-expanded={isTypeMenuOpen} 
+                  className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition" 
+                  style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+                >
+                  <PlusIcon /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {isTypeMenuOpen && (
+                  <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                    {discountTypes.map((dt) => {
+                      const Icon = dt.icon;
+                      return (
+                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                          <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* STATS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
-          <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
-          <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
-          <StatCard title="Expired" value={stats.expired} valueClass="text-amber-500" cardStyle={cardStyle} />
-        </div>
+          {/* Stats Cards Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
+            <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
+            <StatCard title="Expired" value={stats.expired} valueClass="text-amber-500" cardStyle={cardStyle} />
+            <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
+          </div>
 
-        {/* SEARCH & FILTERS */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
-          <input type="text" placeholder="Search discount name or code..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none" style={inputStyle} />
-        </div>
+          {/* Search Bar & Filters Row */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="relative w-full md:w-[400px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+              <input 
+                type="text" 
+                placeholder="Search by discount name or code..." 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]" 
+                style={inputStyle} 
+              />
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+              <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", "All Targets"], ["all_products", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+            </div>
+          </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
-          <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", "All Targets"], ["all_products", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
         </div>
 
         {/* BULK BAR */}
@@ -753,7 +817,7 @@ const ActionButtons = ({ discount }) => {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-4 h-4" /></div>
-                                                      <div className="min-w-0">
+                            <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
                             </div>
                           </div>
@@ -777,7 +841,7 @@ const ActionButtons = ({ discount }) => {
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-5 h-5" /></div>
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
-                               <div className="min-w-0">
+                <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -816,6 +880,8 @@ const ActionButtons = ({ discount }) => {
           formType={activeFormType}
           formData={formData}
           setFormData={setFormData}
+          formErrors={formErrors}
+          setFormErrors={setFormErrors}
           editingDiscount={editingDiscount}
           saveMutation={saveMutation}
           setShowModal={setShowModal}
@@ -862,13 +928,13 @@ const ActionButtons = ({ discount }) => {
   );
 }
 
-/* ==================== FORM MODAL (same structure as DealFormModal) ==================== */
+/* ==================== FORM MODAL ==================== */
 const DISCOUNT_TYPE_LABELS = { all: "All Products Discount", product: "Product Discount", category: "Category Discount", brand: "Brand Discount" };
 const DISCOUNT_TYPE_SUBTITLES = {
   all: "This discount will apply to all products in your store automatically.",
   product: "Select specific products to apply this discount to.",
-  category: "Select entire categories to apply this discount to.",
-  brand: "Select specific brands to apply this discount to.",
+  category: "Apply this discount to entire categories.",
+  brand: "Apply this discount to specific brands.",
 };
 const DISCOUNT_TYPE_ICONS = { all: GlobeIcon, product: BoxIcon, category: FolderIcon, brand: AwardIcon };
 
@@ -879,7 +945,7 @@ const TargetIconFor = (formType) => {
   return TagIcon;
 };
 
-function DiscountFormModal({ formType, formData, setFormData, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
@@ -957,7 +1023,6 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
           <div className="p-5 sm:p-6 space-y-6">
 
             {/* BASIC INFORMATION */}
-                        {/* BASIC INFORMATION */}
             <section>
               <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your discount a clear identity" />
               <div className="rounded-lg p-4" style={cardStyle}>
@@ -969,6 +1034,16 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
                       placeholder="e.g., Summer Sale 2026"
                       style={inputStyle}
                     />
+                  </FormField>
+                  <FormField label="Discount Code" required hint="Enter a unique code, e.g., SUMMER20">
+                    <TextInput
+                      value={formData.code}
+                      onChange={(v) => { setFormData({ ...formData, code: v }); setFormErrors(prev => ({ ...prev, code: undefined })); }}
+                      placeholder="e.g., SUMMER20"
+                      style={{ ...inputStyle, textTransform: "uppercase" }}
+                      className={formErrors.code ? "ring-2 ring-red-500/50" : ""}
+                    />
+                    {formErrors.code && <p className="text-[11px] mt-1 text-red-400 font-medium">{formErrors.code}</p>}
                   </FormField>
                   <FormField label="Description" fullWidth>
                     <TextArea
@@ -983,7 +1058,7 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
               </div>
             </section>
 
-            {/* TARGET SELECTION — same as Deals */}
+            {/* TARGET SELECTION */}
             {sel && (
               <section>
                 <SectionHeader
@@ -1124,12 +1199,9 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <>
-                      <FormField label="Discount Percentage (%)">
-                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
-                      </FormField>
-                      
-                    </>
+                    <FormField label="Discount Percentage (%)" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
@@ -1148,24 +1220,101 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
             </section>
 
             {/* CONDITIONS & LIMITS */}
-                     {/* CONDITIONS & LIMITS */}
             <section>
-              <SectionHeader icon={LayersIcon} title="Conditions & Limits" subtitle="Control when and how often the discount can be used" />
-              <div className="rounded-lg p-4" style={cardStyle}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Min Order Amount (Rs.)">
-                    <TextInput type="number" value={formData.min_order_amount} onChange={(v) => setFormData({ ...formData, min_order_amount: v })} placeholder="e.g., 1000" style={inputStyle} />
+              <SectionHeader 
+                icon={LayersIcon} 
+                title="Conditions & Limits" 
+                subtitle="Control when and how often the discount can be used" 
+              />
+              <div className="rounded-lg p-5 space-y-5" style={cardStyle}>
+                
+                {/* Row 1: Min Order Amount & Min Quantity */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField label="Min Order Amount (Rs.)" hint="Leave empty for no minimum">
+                    <TextInput 
+                      type="number" 
+                      value={formData.min_order_amount} 
+                      onChange={(v) => setFormData({ ...formData, min_order_amount: v })} 
+                      placeholder="e.g., 1000" 
+                      style={inputStyle} 
+                    />
                   </FormField>
-                  <FormField label="Min Quantity">
-                    <TextInput type="number" value={formData.min_quantity} onChange={(v) => setFormData({ ...formData, min_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
+
+                  {/* Min Quantity with Checkbox Logic */}
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
+                      <span>Min Quantity</span>
+                      <span 
+                        className="flex items-center gap-2 cursor-pointer select-none group" 
+                        onClick={() => {
+                          const newState = !formData.has_min_quantity;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            has_min_quantity: newState,
+                            min_quantity: newState ? prev.min_quantity : "" 
+                          }));
+                        }}
+                      >
+                        <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">
+                          Enable Limit
+                        </span>
+                        <div 
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
+                          }`}
+                        >
+                          {formData.has_min_quantity && <CheckIcon className="w-3 h-3 text-white" />}
+                        </div>
+                      </span>
+                    </label>
+                    
+                    <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
+                      <TextInput 
+                        type="number" 
+                        value={formData.min_quantity} 
+                        onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
+                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
+                        disabled={!formData.has_min_quantity}
+                        style={{
+                          ...inputStyle,
+                          backgroundColor: !formData.has_min_quantity ? "var(--bg-secondary)" : "var(--bg-tertiary)",
+                          cursor: !formData.has_min_quantity ? "not-allowed" : "text"
+                        }} 
+                      />
+                    </div>
+                    {!formData.has_min_quantity && (
+                      <p className="text-[10px] mt-1.5 italic" style={{ color: "var(--text-muted)" }}>
+                        Discount applies regardless of quantity
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="h-px w-full" style={{ backgroundColor: "var(--border-color)" }}></div>
+
+                {/* Row 2: Usage Limits */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField label="Total Usage Limit" hint="Leave empty for unlimited uses">
+                    <TextInput 
+                      type="number" 
+                      value={formData.usage_limit} 
+                      onChange={(v) => setFormData({ ...formData, usage_limit: v })} 
+                      placeholder="Unlimited" 
+                      style={inputStyle} 
+                    />
                   </FormField>
-                  <FormField label="Total Usage Limit" hint="Leave empty for unlimited">
-                    <TextInput type="number" value={formData.usage_limit} onChange={(v) => setFormData({ ...formData, usage_limit: v })} placeholder="Unlimited" style={inputStyle} />
-                  </FormField>
-                  <FormField label="Per Customer Limit" hint="Leave empty for unlimited">
-                    <TextInput type="number" value={formData.usage_per_customer} onChange={(v) => setFormData({ ...formData, usage_per_customer: v })} placeholder="Unlimited" style={inputStyle} />
+                  <FormField label="Per Customer Limit" hint="Leave empty for unlimited per user">
+                    <TextInput 
+                      type="number" 
+                      value={formData.usage_per_customer} 
+                      onChange={(v) => setFormData({ ...formData, usage_per_customer: v })} 
+                      placeholder="Unlimited" 
+                      style={inputStyle} 
+                    />
                   </FormField>
                 </div>
+
               </div>
             </section>
 
@@ -1240,7 +1389,7 @@ function DiscountFormModal({ formType, formData, setFormData, editingDiscount, s
   );
 }
 
-/* ==================== SELECTION MODAL (same as Deals) ==================== */
+/* ==================== SELECTION MODAL ==================== */
 function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
@@ -1468,7 +1617,7 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
   );
 }
 
-/* ==================== SELECTED PRODUCT ROW (same as Deals) ==================== */
+/* ==================== SELECTED PRODUCT ROW ==================== */
 function SelectedProductRow({ product, price, image, onView, onRemove }) {
   const name = getName(product, "product");
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
@@ -1545,7 +1694,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
   );
 }
 
-/* ==================== PRODUCT DETAILS MODAL (same as Deals) ==================== */
+/* ==================== PRODUCT DETAILS MODAL ==================== */
 function ProductDetailsModal({ product, onClose }) {
   const name = getName(product, "product");
   const price = getProductPrice(product);
@@ -1573,7 +1722,7 @@ function ProductDetailsModal({ product, onClose }) {
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
               style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
             >
-              <BoxIcon className="h-5 h-5" />
+              <BoxIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
               <h3 className="text-[15px] font-bold truncate">Product Details</h3>
@@ -1637,7 +1786,7 @@ function ProductDetailsModal({ product, onClose }) {
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
                 style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
               >
-                <TagIcon className="h-3.5 h-3.5" />
+                <TagIcon className="h-3.5 w-3.5" />
               </span>
               <h4 className="text-[12px] font-bold uppercase tracking-wide">Attributes</h4>
               <span className="ml-auto text-[10px]" style={{ color: "var(--text-muted)" }}>

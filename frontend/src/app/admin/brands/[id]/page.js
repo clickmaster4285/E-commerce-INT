@@ -1,10 +1,12 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
+import { Country } from "country-state-city";
+import { toast } from "sonner";
 
 /* =========================================================
    ICONS & HELPERS
@@ -37,6 +39,7 @@ const D = {
   user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   image: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
   minus: "M20 12H4",
+  upload: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
 };
 
 function ini(name) {
@@ -167,7 +170,6 @@ function CardHeader({ icon, title, action }) {
   );
 }
 
-// Updated InfoRow with tighter padding (py-2)
 function InfoRow({ label, value, green = false, mono = false, isLast = false }) {
   return (
     <div
@@ -201,6 +203,117 @@ function Spin({ className = "w-4 h-4" }) {
 }
 
 /* =========================================================
+   CUSTOM COUNTRY DROPDOWN (From Reference)
+========================================================= */
+const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const getFlagEmoji = (isoCode) => {
+    if (!isoCode || isoCode.length !== 2) return "";
+    return isoCode.toUpperCase().split("").map((char) => String.fromCodePoint(127397 + char.charCodeAt(0))).join("");
+  };
+
+  const filteredCountries = useMemo(() => {
+    if (!searchTerm.trim()) return allCountries;
+    const term = searchTerm.toLowerCase();
+    return allCountries.filter((c) => c.name.toLowerCase().includes(term) || c.isoCode.toLowerCase().includes(term));
+  }, [allCountries, searchTerm]);
+
+  const selectedCountry = useMemo(() => allCountries.find((c) => c.name === value) || null, [allCountries, value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
+    if (!isOpen) setSearchTerm("");
+  }, [isOpen]);
+
+  const handleSelect = (countryName) => {
+    onChange(countryName);
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange("");
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+        <div className="flex items-center gap-2 min-w-0">
+          {selectedCountry ? (
+            <>
+              <span className="text-base leading-none">{getFlagEmoji(selectedCountry.isoCode)}</span>
+              <span className="truncate text-[13px]">{selectedCountry.name}</span>
+            </>
+          ) : (
+            <span className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+              <Ico d={D.globe} className="w-3.5 h-3.5" />
+              <span className="text-[13px]">Select Country</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedCountry && (
+            <span onClick={handleClear} className="p-0.5 rounded hover:bg-white/10 transition" style={{ color: "var(--text-muted)" }}>
+              <Ico d={D.close} className="w-3 h-3" />
+            </span>
+          )}
+          <Ico d={D.chevron} className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}>
+          <div className="px-3 py-1.5 text-center" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{filteredCountries.length} of {allCountries.length} countries</p>
+          </div>
+          <div className="max-h-[200px] overflow-y-auto py-1" style={{ scrollbarWidth: "thin" }}>
+            {filteredCountries.length === 0 ? (
+              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No country found</p></div>
+            ) : (
+              filteredCountries.map((country) => {
+                const isSelected = country.name === value;
+                return (
+                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                    </div>
+                    {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="p-2" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Ico d={D.search} className="w-3.5 h-3.5" /></span>
+              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search country..." className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* =========================================================
    MAIN PAGE
 ========================================================= */
 export default function BrandDetailPage() {
@@ -218,6 +331,7 @@ export default function BrandDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
+  // Form State for Edit Modal
   const [form, setForm] = useState({
     brand_code: "",
     name: "",
@@ -225,8 +339,16 @@ export default function BrandDetailPage() {
     country: "",
     is_active: true,
   });
+  
+  // Logo State
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Country Data
+  const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
   const { data: brand, isLoading: loading } = useQuery({
     queryKey: ["brand", brandId],
@@ -247,8 +369,13 @@ export default function BrandDetailPage() {
       queryClient.invalidateQueries(["brands"]);
       setLogoFile(null);
       setLogoPreview("");
+      setRemoveLogo(false);
       setShowEdit(false);
+      toast.success("Brand updated successfully");
     },
+    onError: (err) => {
+      toast.error(err.message || "Failed to update brand");
+    }
   });
 
   const deleteMutation = useMutation({
@@ -256,9 +383,11 @@ export default function BrandDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(["brands"]);
       router.push(backPath);
+      toast.success("Brand deleted successfully");
     },
   });
 
+  /* --- Edit Modal Handlers --- */
   function openEdit() {
     if (!brand) return;
     setForm({
@@ -270,6 +399,7 @@ export default function BrandDetailPage() {
     });
     setLogoPreview(logoUrl(brand));
     setLogoFile(null);
+    setRemoveLogo(false);
     setShowEdit(true);
   }
 
@@ -281,27 +411,56 @@ export default function BrandDetailPage() {
     data.append("description", form.description || "");
     data.append("country", form.country || "");
     data.append("is_active", form.is_active.toString());
+    
+    if (removeLogo) data.append("remove_logo", "true");
     if (logoFile) data.append("logo", logoFile);
+    
     updateMutation.mutate({ id: brandId, data });
   }
 
-  function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Logo size must be less than 10MB.");
-      return;
+  // Logo Handlers
+  const handleLogoChange = (file) => {
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) return toast.error("Image size must be less than 10MB");
+      setLogoFile(file);
+      setRemoveLogo(false);
+      setLogoPreview(URL.createObjectURL(file));
     }
-    setLogoFile(file);
-    setLogoPreview(URL.createObjectURL(file));
-  }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (!file.type.startsWith('image/')) return toast.error("Please drop an image file");
+      handleLogoChange(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview("");
+    setRemoveLogo(true);
+  };
 
   const totalProducts = brandProducts.length;
   const logoSrc = brand ? logoUrl(brand) : "";
   const hasLogo = Boolean(brand?.logo?.img_url) && !logoFailed;
-  const hasUpdates = Boolean(
-    brand?.created_at && brand?.updated_at && brand.created_at !== brand.updated_at
-  );
+  const hasUpdates = Boolean(brand?.updatedby);
 
   if (loading) {
     return (
@@ -476,14 +635,14 @@ export default function BrandDetailPage() {
           {/* TOP ROW: INFO (Wide), LOGO (Narrow), DESC (Narrow) */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             
-            {/* 1. BRAND INFORMATION (Reduced Width - Spans 2 cols) */}
+            {/* 1. BRAND INFORMATION */}
             <div className="lg:col-span-2">
               <Card className="h-full">
                 <CardHeader
                   title="Brand Information"
                   icon={<Ico d={D.tag} className="h-4 w-4" />}
                 />
-                <div className="px-4 pb-4"> {/* Added pb-4 for bottom padding */}
+                <div className="px-4 pb-4">
                   <InfoRow label="Brand Code" value={brand.brand_code} mono />
                   <InfoRow
                     label="Status"
@@ -499,7 +658,7 @@ export default function BrandDetailPage() {
                         Created By
                       </span>
                       <span className="text-[12px] font-medium">
-                        {brand.createdby?.name || "System"}
+                        {brand.createdby?.name || "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -517,7 +676,7 @@ export default function BrandDetailPage() {
                         Last Updated By
                       </span>
                       <span className="text-[12px] font-medium">
-                        {brand.updatedby?.name || (hasUpdates ? "Unknown" : "—")}
+                        {brand.updatedby?.name || "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -533,7 +692,7 @@ export default function BrandDetailPage() {
               </Card>
             </div>
 
-            {/* 2. BRAND LOGO (Spans 1 col) */}
+            {/* 2. BRAND LOGO */}
             <div className="lg:col-span-1">
               <Card className="h-full">
                 <CardHeader
@@ -548,7 +707,7 @@ export default function BrandDetailPage() {
                         style={{
                           backgroundColor: "var(--bg-tertiary)",
                           border: "1px solid var(--border-color)",
-                          minHeight: "140px", // Fixed reasonable height
+                          minHeight: "140px",
                           maxHeight: "200px"
                         }}
                       >
@@ -597,7 +756,7 @@ export default function BrandDetailPage() {
               </Card>
             </div>
 
-            {/* 3. DESCRIPTION (Spans 1 col) - Height Auto Fixed */}
+            {/* 3. DESCRIPTION */}
             <div className="lg:col-span-1">
               <Card className="h-full">
                 <CardHeader
@@ -907,7 +1066,7 @@ export default function BrandDetailPage() {
                   <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                     Created by{" "}
                     <span className="font-semibold text-[var(--text-primary)]">
-                      {brand.createdby?.name || "System"}
+                      {brand.createdby?.name || "—"}
                     </span>
                     {brand.createdby?.email && (
                       <span className="block text-[10px] opacity-70">
@@ -942,7 +1101,7 @@ export default function BrandDetailPage() {
                     <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                       Updated by{" "}
                       <span className="font-semibold text-[var(--text-primary)]">
-                        {brand.updatedby?.name || "Unknown User"}
+                        {brand.updatedby?.name || "—"}
                       </span>
                       {brand.updatedby?.email && (
                         <span className="block text-[10px] opacity-70">
@@ -1000,7 +1159,7 @@ export default function BrandDetailPage() {
                   </div>
                   <div>
                     <p className="text-[12px] font-medium">
-                      {brand.createdby?.name || "Unknown"}
+                      {brand.createdby?.name || "—"}
                     </p>
                     <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                       {brand.createdby?.email || "—"}
@@ -1030,7 +1189,7 @@ export default function BrandDetailPage() {
                     </div>
                     <div>
                       <p className="text-[12px] font-medium">
-                        {brand.updatedby?.name || "Unknown"}
+                        {brand.updatedby?.name || "—"}
                       </p>
                       <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                         {brand.updatedby?.email || "—"}
@@ -1044,134 +1203,129 @@ export default function BrandDetailPage() {
         </div>
       )}
 
-      {/* ===== EDIT MODAL ===== */}
+      {/* ===== NEW EDIT MODAL ===== */}
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-xl"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-              boxShadow: "0 20px 60px rgba(0,0,0,.4)",
-            }}
-          >
-            <div
-              className="flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: "1px solid var(--border-color)" }}
-            >
-              <div>
-                <h2 className="text-[14px] font-semibold">Edit Brand</h2>
-                <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                  Update brand information
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEdit(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
-              >
-                <Ico d={D.close} className="h-4 w-4" />
-              </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              <h3 className="text-base font-semibold">Edit Brand</h3>
+              <button onClick={() => { setShowEdit(false); }} disabled={updateMutation.isPending} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><Ico d={D.close} /></button>
             </div>
-            <form onSubmit={submitEdit} className="space-y-4 p-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            
+            <form onSubmit={submitEdit} className="p-5 space-y-4 overflow-y-auto flex-1">
+              
+              {/* ROW 1: Brand Code + Brand Name */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label
-                    className="mb-1.5 block text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Brand Code
-                  </label>
-                  <input
-                    value={form.brand_code}
-                    disabled
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
+                  <input 
+                    type="text" 
+                    value={form.brand_code} 
                     readOnly
-                    className="h-9 w-full rounded-lg border px-3 text-[13px] outline-none opacity-60"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 font-mono cursor-not-allowed" 
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
                   />
                 </div>
                 <div>
-                  <label
-                    className="mb-1.5 block text-[11px]"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Brand Name *
-                  </label>
-                  <input
-                    value={form.name}
-                    required
-                    disabled={updateMutation.isPending}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="h-9 w-full rounded-lg border px-3 text-[13px] outline-none"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Name *</label>
+                  <input 
+                    type="text" 
+                    value={form.name} 
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} 
+                    required 
+                    disabled={updateMutation.isPending} 
+                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" 
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                    placeholder="e.g. Nike" 
                   />
                 </div>
               </div>
+
+              {/* ROW 2: Description */}
               <div>
-                <label
-                  className="mb-1.5 block text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Description
-                </label>
-                <textarea
-                  rows={4}
-                  value={form.description}
-                  disabled={updateMutation.isPending}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full resize-none rounded-lg border px-3 py-2.5 text-[13px] outline-none"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    borderColor: "var(--border-color)",
-                    color: "var(--text-primary)",
-                  }}
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
+                <textarea 
+                  value={form.description} 
+                  onChange={(e) => setForm({ ...form, description: e.target.value })} 
+                  rows="3" 
+                  disabled={updateMutation.isPending} 
+                  className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none" 
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
+                  placeholder="Brand details..." 
                 />
               </div>
 
+              {/* ROW 3: DRAG AND DROP LOGO UPLOAD */}
               <div>
-                <label
-                  className="mb-1.5 block text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  Logo
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFile}
-                  disabled={updateMutation.isPending}
-                  className="w-full text-[11px] file:mr-4 file:rounded-md file:border-0 file:bg-white/5 file:px-4 file:py-2 file:text-[11px] file:font-semibold file:text-[var(--text-primary)] hover:file:bg-white/10"
-                  style={{ color: "var(--text-muted)" }}
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+                
+                {/* Hidden Input */}
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/png, image/jpeg, image/webp" 
+                  className="hidden" 
+                  onChange={(e) => handleLogoChange(e.target.files?.[0])} 
+                  disabled={updateMutation.isPending} 
                 />
-              </div>
 
-              <div
-                className="flex flex-col-reverse gap-2 border-t pt-3 sm:flex-row sm:justify-end"
-                style={{ borderColor: "var(--border-color)" }}
-              >
-                <Button disabled={updateMutation.isPending} onClick={() => setShowEdit(false)}>
-                  Cancel
-                </Button>
-                <Button primary type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? (
-                    <>
-                      <Spin className="h-3.5 w-3.5" /> Saving...
-                    </>
+                {/* Drop Zone Area */}
+                <div 
+                  onClick={() => !updateMutation.isPending && fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`
+                    relative w-full h-32 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200
+                    ${isDragging ? "border-emerald-500 bg-emerald-500/10" : "border-gray-600 hover:border-emerald-500/50 hover:bg-white/5"}
+                  `}
+                  style={{ borderColor: isDragging ? undefined : "var(--border-color)" }}
+                >
+                  {logoPreview ? (
+                    <div className="relative w-full h-full flex items-center justify-center p-2">
+                       <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" />
+                       {/* Remove Button Overlay */}
+                       <button 
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleRemoveLogo(); }}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
+                       >
+                         <Ico d={D.close} className="w-3 h-3" />
+                       </button>
+                    </div>
                   ) : (
                     <>
-                      <Ico d={D.check} className="h-3.5 w-3.5" /> Save Changes
+                      <div className={`p-3 rounded-full ${isDragging ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-gray-400"}`}>
+                        <Ico d={D.upload} className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                          {isDragging ? "Drop image here" : "Click or Drag image here"}
+                        </p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                      </div>
                     </>
                   )}
-                </Button>
+                </div>
+              </div>
+
+              {/* ROW 4: Country + Active Status */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+                  <CountryDropdown value={form.country} onChange={(val) => setForm({ ...form, country: val })} disabled={updateMutation.isPending} allCountries={allCountries} />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer h-9 mb-1">
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} disabled={updateMutation.isPending} className="w-4 h-4 rounded disabled:opacity-50" style={{ accentColor: "var(--accent)" }} />
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Active</span>
+                </label>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <button type="button" onClick={() => { setShowEdit(false); }} disabled={updateMutation.isPending} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={updateMutation.isPending} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {updateMutation.isPending ? <><Spin className="w-3.5 h-3.5 inline mr-1.5" /> Saving...</> : "Update Brand"}
+                </button>
               </div>
             </form>
           </div>

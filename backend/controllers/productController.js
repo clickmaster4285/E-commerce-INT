@@ -100,17 +100,23 @@ const resolveTags = async (tagNames, userId) => {
 
   if (cleanNames.length === 0) return [];
 
+  // ✅ Look up by name regardless of soft-delete: re-creating a soft-deleted
+  // name hits the unique `name` index (E11000), so restore that doc instead.
   const existingTags = await Tag.find({ 
-    name: { $in: cleanNames }, 
-    is_deleted: { $ne: true } 
+    name: { $in: cleanNames }
   }).lean();
 
-  const existingMap = new Map(existingTags.map(t => [t.name, t._id]));
+  const existingMap = new Map(existingTags.map(t => [t.name, t]));
   const finalTagIds = [];
 
   for (const name of cleanNames) {
-    if (existingMap.has(name)) {
-      finalTagIds.push(existingMap.get(name));
+    const found = existingMap.get(name);
+    if (found) {
+      if (found.is_deleted) {
+        // Restore the soft-deleted tag so the unique index is not violated
+        await Tag.updateOne({ _id: found._id }, { $set: { is_deleted: false } });
+      }
+      finalTagIds.push(found._id);
     } else {
       const newTag = await Tag.create({ 
         name, 
@@ -362,8 +368,8 @@ const getProductById = async (req, res) => {
       _id: req.params.id,
       is_deleted: { $ne: true },
     })
-      .populate("category_id", "name")
-      .populate("brand_id", "name")
+      .populate("category_id", "name category_code description is_active")
+      .populate("brand_id", "name brand_code description country is_active logo")
       .populate("tag_ids", "name")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
@@ -451,7 +457,7 @@ const createProduct = async (req, res) => {
       tax: toNumber(req.body.tax, 0),
       status: req.body.status === "inactive" ? "inactive" : "active",
       createdby: req.user?._id || null,
-      updatedby: req.user?._id || null,
+      updatedby: null,
       is_deleted: false,
       deleted_at: null,
       deletedby: null,
@@ -752,6 +758,10 @@ const updateProduct = async (req, res) => {
             variant.tags = Array.isArray(item.tags) ? item.tags : [];
           }
 
+          if (item.status !== undefined) {
+            variant.status = item.status === "inactive" ? "inactive" : "active";
+          }
+
           if (imagesByVariant[index]) {
             const oldImages = Array.isArray(variant.images) ? variant.images : [];
             variant.images = [...oldImages, ...imagesByVariant[index]];
@@ -785,6 +795,7 @@ const updateProduct = async (req, res) => {
             max_qnt: toNumber(item.max_qnt, 0),
             attributes: item.option_values || item.attributes || {},
             tags: Array.isArray(item.tags) ? item.tags : [],
+            status: item.status === "inactive" ? "inactive" : "active",
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
             updatedby: req.user?._id || null,

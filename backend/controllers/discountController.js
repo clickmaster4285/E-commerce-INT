@@ -208,6 +208,17 @@ exports.createDiscount = async (req, res) => {
     }
 
     // ===================================================
+    // DUPLICATE CODE CHECK
+    // ===================================================
+    const normalizedCode = discountData.code;
+    if (normalizedCode) {
+      const existing = await Discount.findOne({ code: normalizedCode, is_deleted: false });
+      if (existing) {
+        return res.status(400).json({ message: "This discount code already exists. Please use a different code." });
+      }
+    }
+
+    // ===================================================
     // SAVE
     // ===================================================
     const newDiscount = await Discount.create(discountData);
@@ -231,7 +242,7 @@ exports.createDiscount = async (req, res) => {
     }
 
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Discount code already exists." });
+      return res.status(400).json({ message: "This discount code already exists. Please use a different code." });
     }
 
     return res.status(500).json({ message: error.message || "Server error" });
@@ -479,6 +490,16 @@ exports.updateDiscount = async (req, res) => {
     }
 
     // ===================================================
+    // DUPLICATE CODE CHECK (UPDATE)
+    // ===================================================
+    if (discount.isModified("code") && discount.code) {
+      const existing = await Discount.findOne({ code: discount.code, is_deleted: false, _id: { $ne: discount._id } });
+      if (existing) {
+        return res.status(400).json({ message: "This discount code already exists. Please use a different code." });
+      }
+    }
+
+    // ===================================================
     // SAVE
     // ===================================================
     const updatedDiscount = await discount.save();
@@ -502,7 +523,7 @@ exports.updateDiscount = async (req, res) => {
     }
 
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Discount code already exists." });
+      return res.status(400).json({ message: "This discount code already exists. Please use a different code." });
     }
 
     return res.status(500).json({ message: error.message || "Server error" });

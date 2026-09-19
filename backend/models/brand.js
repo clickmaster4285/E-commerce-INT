@@ -54,19 +54,19 @@
       // Tracking users
       createdby: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "Employee",
         default: null,
       },
 
       updatedby: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "Employee",
         default: null,
       },
 
       deletedby: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: "Employee",
         default: null,
       },
     },
