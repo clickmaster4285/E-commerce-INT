@@ -36,6 +36,7 @@ const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} f
 const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
+
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
@@ -174,6 +175,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     </div>
   );
 };
+
 /* ==================== DROPDOWN MENU ITEM ==================== */
 const MenuItem = ({ icon, label, onClick, danger, success }) => (
   <button
@@ -186,6 +188,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     {icon} {label}
   </button>
 );
+
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const queryClient = useQueryClient();
@@ -196,12 +199,12 @@ export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
 
-const [viewMode, setViewMode] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return window.innerWidth < 768 ? "grid" : "list";
-  }
-  return "list";
-});
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? "grid" : "list";
+    }
+    return "list";
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
@@ -221,6 +224,7 @@ const [viewMode, setViewMode] = useState(() => {
     get_quantity: "",
     get_discount_value: "",
     bundle_price: "",
+    has_min_quantity: false, // New field for checkbox
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
     status: "active", is_featured: false,
@@ -242,16 +246,17 @@ const [viewMode, setViewMode] = useState(() => {
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
-useEffect(() => {
-  if (!actionMenu) return;
-  const close = () => setActionMenu(null);
-  window.addEventListener("scroll", close, true);
-  window.addEventListener("resize", close);
-  return () => {
-    window.removeEventListener("scroll", close, true);
-    window.removeEventListener("resize", close);
-  };
-}, [actionMenu]);
+
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
 
   const resetForm = () => {
     setFormData({
@@ -259,6 +264,7 @@ useEffect(() => {
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
       buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      has_min_quantity: false,
       min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
       status: "active", is_featured: false,
@@ -290,7 +296,7 @@ useEffect(() => {
       setDeleteTarget(null);
       toast.success("Deal deleted successfully");
     },
-      onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
   });
 
   const toggleStatusMutation = useMutation({
@@ -329,6 +335,10 @@ useEffect(() => {
       ? deal.freeShippingMethods
       : ["standard", "express"];
 
+    // Handle Min Quantity Logic on Edit
+    const rawMinQty = deal?.minQuantity ?? deal?.min_quantity;
+    const hasMinQty = rawMinQty !== null && rawMinQty !== undefined && rawMinQty !== "";
+
     setFormData({
       name: deal?.name || "", code: deal?.code || "", description: deal?.description || "",
       target_type: deal?.applyTo || "all",
@@ -343,7 +353,10 @@ useEffect(() => {
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
       bundle_price: deal?.bundlePrice ?? "",
-      min_quantity: deal?.minQuantity ?? "",
+      
+      has_min_quantity: hasMinQty,
+      min_quantity: hasMinQty ? rawMinQty : "",
+      
       start_at: toDateInput(deal?.startDate),
       end_at: toDateInput(deal?.endDate),
       usage_limit: deal?.usageLimit ?? "",
@@ -383,6 +396,11 @@ useEffect(() => {
     const cleanCategoryIds = formData.selected_category_ids.map(id => String(id?._id || id));
     const cleanBrandIds = formData.selected_brand_ids.map(id => String(id?._id || id));
 
+    // Prepare Min Quantity Payload
+    const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
+      ? Number(formData.min_quantity) 
+      : null;
+
     const payload = {
       name: String(formData.name).trim(),
       description: String(formData.description || "").trim() || undefined,
@@ -397,7 +415,7 @@ useEffect(() => {
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
-      minQuantity: formData.min_quantity ? Number(formData.min_quantity) : 1,
+      minQuantity: finalMinQuantity, // Send null if unchecked
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
       perUserLimit: formData.per_user_limit !== "" ? Number(formData.per_user_limit) : null,
@@ -447,81 +465,81 @@ useEffect(() => {
     setShowModal(true);
   };
 
- const ActionButtons = ({ deal }) => {
-  const id = deal._id || deal.id;
-  const open = actionMenu?.id === id;
+  const ActionButtons = ({ deal }) => {
+    const id = deal._id || deal.id;
+    const open = actionMenu?.id === id;
 
-  const toggleMenu = (e) => {
-    e.stopPropagation();
-    if (open) { setActionMenu(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-       const menuHeight = 200;
-    const menuWidth = 176;
-    const top = rect.bottom + 6 + menuHeight > window.innerHeight
-      ? rect.top - 6 - menuHeight
-      : rect.bottom + 6;
-    const left = Math.max(8, rect.right - menuWidth);
-    setActionMenu({ id, top, left });
+    const toggleMenu = (e) => {
+      e.stopPropagation();
+      if (open) { setActionMenu(null); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuHeight = 200;
+      const menuWidth = 176;
+      const top = rect.bottom + 6 + menuHeight > window.innerHeight
+        ? rect.top - 6 - menuHeight
+        : rect.bottom + 6;
+      const left = Math.max(8, rect.right - menuWidth);
+      setActionMenu({ id, top, left });
+    };
+
+    return (
+      <div className="flex items-center justify-end">
+        <button
+          onClick={toggleMenu}
+          aria-label={`Actions for ${deal?.name || "deal"}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          style={{ color: "var(--text-secondary)" }}
+          title="Actions"
+        >
+          <DotsIcon className="w-4 h-4" />
+        </button>
+
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+              style={{
+                top: actionMenu.top,
+                left: actionMenu.left,
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <MenuItem
+                icon={<EyeIcon className="w-4 h-4" />}
+                label="View Details"
+                onClick={() => { setActionMenu(null); handleViewDeal(id); }}
+              />
+              <MenuItem
+                icon={<EditIcon className="w-4 h-4" />}
+                label="Edit Deal"
+                onClick={() => { setActionMenu(null); openEdit(deal); }}
+              />
+              <MenuItem
+                icon={<PowerIcon className="w-4 h-4" />}
+                label={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled") ? "Deactivate" : "Activate"}
+                danger={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
+                success={!(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
+                onClick={() => { setActionMenu(null); handleToggleStatus(deal); }}
+              />
+              <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+              <MenuItem
+                icon={<TrashIcon className="w-4 h-4" />}
+                label="Delete"
+                danger
+                onClick={() => { setActionMenu(null); setDeleteTarget([deal]); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
-
-  return (
-    <div className="flex items-center justify-end">
-      <button
-        onClick={toggleMenu}
-        aria-label={`Actions for ${deal?.name || "deal"}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-        style={{ color: "var(--text-secondary)" }}
-        title="Actions"
-      >
-        <DotsIcon className="w-4 h-4" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
-            style={{
-              top: actionMenu.top,
-              left: actionMenu.left,
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-            }}
-          >
-            <MenuItem
-              icon={<EyeIcon className="w-4 h-4" />}
-              label="View Details"
-              onClick={() => { setActionMenu(null); handleViewDeal(id); }}
-            />
-                      <MenuItem
-              icon={<EditIcon className="w-4 h-4" />}
-              label="Edit Deal"
-              onClick={() => { setActionMenu(null); openEdit(deal); }}
-            />
-            <MenuItem
-              icon={<PowerIcon className="w-4 h-4" />}
-              label={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled") ? "Deactivate" : "Activate"}
-              danger={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
-              success={!(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
-              onClick={() => { setActionMenu(null); handleToggleStatus(deal); }}
-            />
-            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
-            <MenuItem
-              icon={<TrashIcon className="w-4 h-4" />}
-              label="Delete"
-              danger
-              onClick={() => { setActionMenu(null); setDeleteTarget([deal]); }}
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
@@ -576,7 +594,7 @@ useEffect(() => {
               type="text" 
               placeholder="Search deal name..." 
               value={search} 
-              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} 
+              onChange={(e) => setSearch(e.target.value)} 
               className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
               style={inputStyle} 
             />
@@ -744,13 +762,14 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style }) => (
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled }) => (
   <input
     type={type}
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+    disabled={disabled}
+    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
     style={style}
   />
 );
@@ -1150,10 +1169,58 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                     </FormField>
                   )}
 
-                  {/* Min Quantity Required — applies to all discount types */}
-                  <FormField label="Min Quantity Required" hint="Minimum cart quantity for the deal to apply" fullWidth>
-                    <TextInput type="number" value={formData.min_quantity} onChange={(v) => setFormData({ ...formData, min_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
-                  </FormField>
+                  {/* ========================================== */}
+                  {/* MIN QUANTITY WITH CHECKBOX LOGIC           */}
+                  {/* ========================================== */}
+                  <div className="md:col-span-2">
+                    <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
+                      <span>Min Quantity</span>
+                      <span 
+                        className="flex items-center gap-2 cursor-pointer select-none group" 
+                        onClick={() => {
+                          const newState = !formData.has_min_quantity;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            has_min_quantity: newState,
+                            min_quantity: newState ? prev.min_quantity : "" 
+                          }));
+                        }}
+                      >
+                        <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">
+                          Enable Limit
+                        </span>
+                        <div 
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
+                          }`}
+                        >
+                          {formData.has_min_quantity && <CheckIcon className="w-3 h-3 text-white" />}
+                        </div>
+                      </span>
+                    </label>
+                    
+                    <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
+                      <TextInput 
+                        type="number" 
+                        value={formData.min_quantity} 
+                        onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
+                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
+                        disabled={!formData.has_min_quantity}
+                        style={{
+                          ...inputStyle,
+                          backgroundColor: !formData.has_min_quantity ? "var(--bg-secondary)" : "var(--bg-tertiary)",
+                          cursor: !formData.has_min_quantity ? "not-allowed" : "text"
+                        }} 
+                      />
+                    </div>
+                    {!formData.has_min_quantity && (
+                      <p className="text-[10px] mt-1.5 italic" style={{ color: "var(--text-muted)" }}>
+                        Deal applies regardless of quantity
+                      </p>
+                    )}
+                  </div>
+                  {/* ========================================== */}
+
                 </div>
               </div>
             </section>
@@ -1183,7 +1250,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
             <section>
               <SectionHeader icon={SettingsIcon} title="Settings" subtitle="Status and visibility options" />
               <div className="rounded-lg p-4" style={cardStyle}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Status">
                     <CustomModalSelect
                       value={formData.status}

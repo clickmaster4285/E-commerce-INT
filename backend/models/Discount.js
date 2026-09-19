@@ -6,7 +6,14 @@ const discountSchema = new mongoose.Schema(
     // BASIC INFORMATION
     // =====================================================
 
-    
+    code: {
+      type: String,
+      required: [true, "Discount code is required"],
+      unique: true,
+      trim: true,
+      uppercase: true,
+      index: true,
+    },
 
     name: {
       type: String,
@@ -35,8 +42,6 @@ const discountSchema = new mongoose.Schema(
       required: [true, "Discount value is required"],
       min: [0, "Value cannot be negative"],
     },
-
-   
 
     // =====================================================
     // TARGET TYPE
@@ -115,7 +120,17 @@ const discountSchema = new mongoose.Schema(
     // PRICE RANGE
     // =====================================================
 
-    
+    priceMin: {
+      type: Number,
+      default: null,
+      min: [0, "Minimum price cannot be negative"],
+    },
+
+    priceMax: {
+      type: Number,
+      default: null,
+      min: [0, "Maximum price cannot be negative"],
+    },
 
     // =====================================================
     // CONDITIONS
@@ -163,12 +178,20 @@ const discountSchema = new mongoose.Schema(
       min: [1, "Per user limit must be at least 1"],
     },
 
-   
+    usageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     // =====================================================
     // RULES
     // =====================================================
 
-   
+    isStackable: {
+      type: Boolean,
+      default: false,
+    },
 
     // =====================================================
     // STATUS
@@ -176,12 +199,7 @@ const discountSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "draft",
-        "scheduled",
-        "active",
-        "disabled",
-      ],
+      enum: ["draft", "scheduled", "active", "disabled"],
       default: "draft",
       index: true,
     },
@@ -242,7 +260,4 @@ discountSchema.index({
   isActive: 1,
 });
 
-module.exports = mongoose.model(
-  "Discount",
-  discountSchema
-);
+module.exports = mongoose.model("Discount", discountSchema);

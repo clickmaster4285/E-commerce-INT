@@ -81,6 +81,11 @@ const variantSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    status: {
+      type: String,
+      default: "active",
+      enum: ["active", "inactive"],
+    },
     // ✅ NEW: Tags field added here
     tags: {
       type: [String],

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
@@ -127,7 +127,9 @@ const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill
 const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
-const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);// ==========================================
+const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
+
+// ==========================================
 // HELPERS
 // ==========================================
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -208,9 +210,24 @@ const Textarea = ({ ...props }) => (
   />
 );
 
+/* ==================== DRAG AND DROP IMAGE UPLOAD (FIXED) ==================== */
 const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions }) => {
-  const inputRef = React.useRef(null);
-  
+  const inputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Helper to get valid preview URL
+  const getPreviewUrl = () => {
+    if (!file) return null;
+    if (file instanceof File) return URL.createObjectURL(file);
+    if (typeof file === 'string') {
+      // If it's already a URL string (from DB), use it directly or prepend base
+      return file.startsWith('http') ? file : `${API_BASE}${file.startsWith('/') ? '' : '/'}${file}`;
+    }
+    return null;
+  };
+
+  const currentPreview = preview || getPreviewUrl();
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -218,7 +235,39 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
     }
   };
 
-  const handleRemove = () => {
+  // Drag & Drop Handlers
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentPreview) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (currentPreview) return; // Don't allow drop if image already exists
+
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      const droppedFile = droppedFiles[0];
+      if (droppedFile.type.startsWith('image/')) {
+        setFile(droppedFile);
+      } else {
+        toast.error("Please upload an image file");
+      }
+    }
+  };
+
+  const handleRemove = (e) => {
+    e.stopPropagation(); // Prevent triggering click on container
     setFile(null);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -229,35 +278,68 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
+      
+      {/* Drop Zone / Preview Container */}
       <div
-        onClick={() => !preview && inputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-lg p-4 transition-all duration-200 cursor-pointer ${
-          preview 
-            ? "border-emerald-300 bg-emerald-50/30" 
-            : "hover:border-emerald-400"
-        }`}
-        style={{ borderColor: preview ? "" : "var(--border-color)", backgroundColor: preview ? "" : "var(--bg-tertiary)" }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !currentPreview && inputRef.current?.click()}
+        className={`relative border-2 border-dashed rounded-lg p-4 transition-all duration-200 
+          ${currentPreview 
+            ? "border-emerald-500/50 bg-emerald-500/5 cursor-default" 
+            : isDragging 
+              ? "border-emerald-500 bg-emerald-500/10 scale-[1.01]" 
+              : "hover:border-emerald-400 hover:bg-black/5 cursor-pointer"
+          }`}
+        style={{ 
+          borderColor: currentPreview ? "" : isDragging ? "" : "var(--border-color)", 
+          backgroundColor: currentPreview ? "" : isDragging ? "" : "var(--bg-tertiary)" 
+        }}
       >
-        {preview ? (
-          <div className="space-y-2">
-            <img src={preview} alt={label} className="w-full h-24 object-cover rounded-md" />
+        {currentPreview ? (
+          <div className="relative w-full group">
+            <img src={currentPreview} alt={label} className="w-full h-32 object-cover rounded-md border border-white/10" />
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-              className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+              onClick={handleRemove}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-md border-2 border-[var(--bg-card)]"
+              title="Remove image"
             >
               <CloseIcon className="w-3 h-3" />
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-4 text-center">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-              <UploadIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div 
+              className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${
+                isDragging ? "bg-emerald-500/20 text-emerald-400" : "bg-transparent"
+              }`}
+              style={{ backgroundColor: isDragging ? "" : "var(--bg-secondary)" }}
+            >
+              <UploadIcon className={`w-6 h-6 ${isDragging ? "animate-bounce" : ""}`} style={{ color: isDragging ? "" : "var(--text-muted)" }} />
             </div>
-            <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>Click to upload</p>
-            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{dimensions}</p>
+            
+            {isDragging ? (
+              <p className="text-sm font-bold text-emerald-400">Drop image here</p>
+            ) : (
+              <>
+                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                  Click to upload or drag and drop
+                </p>
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
+                  SVG, PNG, JPG or GIF
+                </p>
+                {dimensions && (
+                  <p className="text-[10px] mt-0.5 font-mono opacity-70" style={{ color: "var(--text-secondary)" }}>
+                    Recommended: {dimensions}
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
+        
         <input
           ref={inputRef}
           type="file"
@@ -300,9 +382,6 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
 export default function BannersPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -312,12 +391,12 @@ export default function BannersPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
-const [viewMode, setViewMode] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return window.innerWidth < 768 ? "grid" : "list";
-  }
-  return "list";
-});
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? "grid" : "list";
+    }
+    return "list";
+  });
   const [sortConfig, setSortConfig] = useState({ key: "position", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -328,7 +407,7 @@ const [viewMode, setViewMode] = useState(() => {
   
   const itemsPerPage = 20;
 
-    const defaultForm = {
+  const defaultForm = {
     title: "", bannerType: "homepage_hero", position: 1,
     desktopImage: null,
     altText: "", backgroundColor: "#ffffff",
@@ -455,15 +534,15 @@ const [viewMode, setViewMode] = useState(() => {
 
   useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterType]);
   useEffect(() => {
-  if (!actionMenu) return;
-  const close = () => setActionMenu(null);
-  window.addEventListener("scroll", close, true);
-  window.addEventListener("resize", close);
-  return () => {
-    window.removeEventListener("scroll", close, true);
-    window.removeEventListener("resize", close);
-  };
-}, [actionMenu]);
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
 
   // --- Deal Form State (for inline deal creation) ---
   const [dealFormType, setDealFormType] = useState(null);
@@ -741,7 +820,7 @@ const [viewMode, setViewMode] = useState(() => {
     const isActive = banner?.status === "active" || banner?.status === "scheduled";
     toggleStatusMutation.mutate({ id, newStatus: isActive ? "inactive" : "active" });
   };
-    const handleDelete = (banner) => setDeleteTarget({ banners: [banner] });
+  const handleDelete = (banner) => setDeleteTarget({ banners: [banner] });
   const handleBulkDelete = () => setDeleteTarget({ banners: banners.filter((b) => selectedIds.includes(b._id)) });
   const confirmDelete = () => {
     if (!deleteTarget) return;
@@ -786,92 +865,92 @@ const [viewMode, setViewMode] = useState(() => {
     </div>
   );
 
- const ActionButtons = ({ banner }) => {
-  const id = banner._id;
-  const open = actionMenu?.id === id;
+  const ActionButtons = ({ banner }) => {
+    const id = banner._id;
+    const open = actionMenu?.id === id;
 
-  const toggleMenu = (e) => {
-    e.stopPropagation();
-    if (open) { setActionMenu(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-       const menuHeight = 250; // 5 items height
-    const menuWidth = 176;
-    const top = rect.bottom + 6 + menuHeight > window.innerHeight
-      ? rect.top - 6 - menuHeight
-      : rect.bottom + 6;
-    const left = Math.max(8, rect.right - menuWidth);
-    setActionMenu({ id, top, left });
-  };
+    const toggleMenu = (e) => {
+      e.stopPropagation();
+      if (open) { setActionMenu(null); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuHeight = 250; // 5 items height
+      const menuWidth = 176;
+      const top = rect.bottom + 6 + menuHeight > window.innerHeight
+        ? rect.top - 6 - menuHeight
+        : rect.bottom + 6;
+      const left = Math.max(8, rect.right - menuWidth);
+      setActionMenu({ id, top, left });
+    };
 
-  return (
-    <div className="flex items-center justify-end">
-      <button
-        onClick={toggleMenu}
-        aria-label={`Actions for ${banner?.title || "banner"}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
-        style={{ color: "var(--text-secondary)" }}
-        title="Actions"
-      >
-        <DotsIcon className="w-4 h-4" />
-      </button>
+    return (
+      <div className="flex items-center justify-end">
+        <button
+          onClick={toggleMenu}
+          aria-label={`Actions for ${banner?.title || "banner"}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          style={{ color: "var(--text-secondary)" }}
+          title="Actions"
+        >
+          <DotsIcon className="w-4 h-4" />
+        </button>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
-          <div
-            role="menu"
-            onClick={(e) => e.stopPropagation()}
-            className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
-            style={{
-              top: actionMenu.top,
-              left: actionMenu.left,
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-            }}
-          >
-            <MenuItem
-              icon={<EyeIcon className="w-4 h-4" />}
-              label="View Details"
-              onClick={() => { setActionMenu(null); router.push(`${pathname}/${id}`); }}
-            />
-            <MenuItem
-              icon={<EditIcon className="w-4 h-4" />}
-              label="Edit Banner"
-              onClick={() => { setActionMenu(null); handleEdit(banner); }}
-            />
-                    <MenuItem
-              icon={<CopyIcon className="w-4 h-4" />}
-              label="Duplicate"
-              onClick={() => { 
-                setActionMenu(null); 
-                adminBannerApi.duplicate(id).then(() => { 
-                  queryClient.invalidateQueries({ queryKey: ["adminBanners"] }); 
-                  toast.success("Duplicated"); 
-                }); 
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+              style={{
+                top: actionMenu.top,
+                left: actionMenu.left,
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
               }}
-            />
-            <MenuItem
-              icon={<PowerIcon className="w-4 h-4" />}
-              label={(banner.status === "active" || banner.status === "scheduled") ? "Deactivate" : "Activate"}
-              danger={(banner.status === "active" || banner.status === "scheduled")}
-              success={!((banner.status === "active" || banner.status === "scheduled"))}
-              onClick={() => { setActionMenu(null); handleToggleStatus(banner); }}
-            />
-            <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
-            <MenuItem
-              icon={<TrashIcon className="w-4 h-4" />}
-              label="Delete"
-              danger
-              onClick={() => { setActionMenu(null); handleDelete(banner); }}
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+            >
+              <MenuItem
+                icon={<EyeIcon className="w-4 h-4" />}
+                label="View Details"
+                onClick={() => { setActionMenu(null); router.push(`${pathname}/${id}`); }}
+              />
+              <MenuItem
+                icon={<EditIcon className="w-4 h-4" />}
+                label="Edit Banner"
+                onClick={() => { setActionMenu(null); handleEdit(banner); }}
+              />
+              <MenuItem
+                icon={<CopyIcon className="w-4 h-4" />}
+                label="Duplicate"
+                onClick={() => { 
+                  setActionMenu(null); 
+                  adminBannerApi.duplicate(id).then(() => { 
+                    queryClient.invalidateQueries({ queryKey: ["adminBanners"] }); 
+                    toast.success("Duplicated"); 
+                  }); 
+                }}
+              />
+              <MenuItem
+                icon={<PowerIcon className="w-4 h-4" />}
+                label={(banner.status === "active" || banner.status === "scheduled") ? "Deactivate" : "Activate"}
+                danger={(banner.status === "active" || banner.status === "scheduled")}
+                success={!((banner.status === "active" || banner.status === "scheduled"))}
+                onClick={() => { setActionMenu(null); handleToggleStatus(banner); }}
+              />
+              <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+              <MenuItem
+                icon={<TrashIcon className="w-4 h-4" />}
+                label="Delete"
+                danger
+                onClick={() => { setActionMenu(null); handleDelete(banner); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   const renderPageNumbers = () => {
     const pages = [];
@@ -1135,7 +1214,7 @@ const [viewMode, setViewMode] = useState(() => {
                 </FormSection>
 
                 {/* 2. Responsive Images */}
-                             <FormSection number="2" title="Banner Image" description="Upload the banner image">
+                <FormSection number="2" title="Banner Image" description="Upload the banner image">
                   <div className="grid grid-cols-1 gap-4">
                     <ImageUploadBox
                       label="Desktop Image"
@@ -1208,7 +1287,7 @@ const [viewMode, setViewMode] = useState(() => {
                   </div>
                 </FormSection>
 
-                              {/* 5. Schedule */}
+                {/* 5. Schedule */}
                 <FormSection number="5" title="Schedule" description="Set when banner should be active">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label="Start Date & Time" helpText="When banner becomes active">

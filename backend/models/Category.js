@@ -56,9 +56,9 @@ const categorySchema = new mongoose.Schema(
     is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
 
-    createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    deletedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+    updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+    deletedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );

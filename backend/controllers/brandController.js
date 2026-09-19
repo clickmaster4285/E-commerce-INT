@@ -77,7 +77,7 @@ const createBrand = async (req, res) => {
       ...req.body,
       brand_code,
       createdby: req.user?._id || null,
-      updatedby: req.user?._id || null,
+      updatedby: null,
     };
 
     if (req.brandImage) brandData.logo = req.brandImage;
