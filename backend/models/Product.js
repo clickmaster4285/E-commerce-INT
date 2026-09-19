@@ -59,19 +59,19 @@ const productSchema = new mongoose.Schema(
 
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
 
     updatedby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
 
     deletedby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
     is_deleted: {

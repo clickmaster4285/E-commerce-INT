@@ -1036,7 +1036,7 @@ export default function CategoryDetailPage() {
 
                 <div className="flex justify-between items-start">
                   <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Created By</span>
-                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">Admin</span>
+                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{category.createdby?.name || "—"}</span>
                 </div>
               </div>
 
@@ -1391,18 +1391,22 @@ export default function CategoryDetailPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                   <div>
                     <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Created</p>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Initial category setup and configuration.</p>
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      Created by <span className="font-semibold text-[var(--text-primary)]">{category.createdby?.name || "—"}</span>
+                    </p>
                   </div>
                   <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at)}</span>
                 </div>
               </div>
-              {category.updated_at && category.updated_at !== category.created_at && (
+              {category.updatedby && (
                 <div className="relative pl-8">
                   <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-blue-500 shadow-sm" />
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                     <div>
                       <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Updated</p>
-                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Category details or attributes were modified.</p>
+                      <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        Updated by <span className="font-semibold text-[var(--text-primary)]">{category.updatedby?.name || "—"}</span>
+                      </p>
                     </div>
                     <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at)}</span>
                   </div>

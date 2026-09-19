@@ -368,8 +368,8 @@ const getProductById = async (req, res) => {
       _id: req.params.id,
       is_deleted: { $ne: true },
     })
-      .populate("category_id", "name")
-      .populate("brand_id", "name")
+      .populate("category_id", "name category_code description is_active")
+      .populate("brand_id", "name brand_code description country is_active logo")
       .populate("tag_ids", "name")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
@@ -457,7 +457,7 @@ const createProduct = async (req, res) => {
       tax: toNumber(req.body.tax, 0),
       status: req.body.status === "inactive" ? "inactive" : "active",
       createdby: req.user?._id || null,
-      updatedby: req.user?._id || null,
+      updatedby: null,
       is_deleted: false,
       deleted_at: null,
       deletedby: null,

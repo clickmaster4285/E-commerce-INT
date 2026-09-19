@@ -312,7 +312,7 @@ const createCategory = async (req, res) => {
       is_active: Boolean(is_active),
       attributes: cleanedAttributes,
       createdby: req.user?._id || null,
-      updatedby: req.user?._id || null,
+      updatedby: null,
     });
 
     const performerName = req.user?.name || "Admin";

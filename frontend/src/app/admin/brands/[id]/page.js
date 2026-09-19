@@ -460,9 +460,7 @@ export default function BrandDetailPage() {
   const totalProducts = brandProducts.length;
   const logoSrc = brand ? logoUrl(brand) : "";
   const hasLogo = Boolean(brand?.logo?.img_url) && !logoFailed;
-  const hasUpdates = Boolean(
-    brand?.created_at && brand?.updated_at && brand.created_at !== brand.updated_at
-  );
+  const hasUpdates = Boolean(brand?.updatedby);
 
   if (loading) {
     return (
@@ -660,7 +658,7 @@ export default function BrandDetailPage() {
                         Created By
                       </span>
                       <span className="text-[12px] font-medium">
-                        {brand.createdby?.name || "System"}
+                        {brand.createdby?.name || "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -678,7 +676,7 @@ export default function BrandDetailPage() {
                         Last Updated By
                       </span>
                       <span className="text-[12px] font-medium">
-                        {brand.updatedby?.name || (hasUpdates ? "Unknown" : "—")}
+                        {brand.updatedby?.name || "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -1068,7 +1066,7 @@ export default function BrandDetailPage() {
                   <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                     Created by{" "}
                     <span className="font-semibold text-[var(--text-primary)]">
-                      {brand.createdby?.name || "System"}
+                      {brand.createdby?.name || "—"}
                     </span>
                     {brand.createdby?.email && (
                       <span className="block text-[10px] opacity-70">
@@ -1103,7 +1101,7 @@ export default function BrandDetailPage() {
                     <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                       Updated by{" "}
                       <span className="font-semibold text-[var(--text-primary)]">
-                        {brand.updatedby?.name || "Unknown User"}
+                        {brand.updatedby?.name || "—"}
                       </span>
                       {brand.updatedby?.email && (
                         <span className="block text-[10px] opacity-70">
@@ -1161,7 +1159,7 @@ export default function BrandDetailPage() {
                   </div>
                   <div>
                     <p className="text-[12px] font-medium">
-                      {brand.createdby?.name || "Unknown"}
+                      {brand.createdby?.name || "—"}
                     </p>
                     <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                       {brand.createdby?.email || "—"}
@@ -1191,7 +1189,7 @@ export default function BrandDetailPage() {
                     </div>
                     <div>
                       <p className="text-[12px] font-medium">
-                        {brand.updatedby?.name || "Unknown"}
+                        {brand.updatedby?.name || "—"}
                       </p>
                       <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                         {brand.updatedby?.email || "—"}

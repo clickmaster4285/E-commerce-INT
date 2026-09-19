@@ -898,7 +898,7 @@ export default function ProductDetailPage() {
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
-  const wasUp = !!(product.created_at && product.updated_at && product.created_at !== product.updated_at);
+  const wasUp = Boolean(product?.updatedby);
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set([...displayTagNames]);
   (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n)); }); });
@@ -1102,7 +1102,7 @@ export default function ProductDetailPage() {
               { id: "tags", label: "Tags", count: displayTagNames.length > 0 ? displayTagNames.length : null },
               { id: "category", label: "Category" },
               { id: "brand", label: "Brand" },
-              { id: "activity", label: "History", count: wasUp ? 2 : 1 },
+              { id: "activity", label: "History" },
             ].map((t) => {
               const active = activeTab === t.id;
               return (
@@ -1114,7 +1114,7 @@ export default function ProductDetailPage() {
                   style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
                 >
                   {t.label}
-                  {t.count !== null && (
+                  {t.count != null && t.count > 0 && (
                     <span className="ml-1.5 text-[11px] font-medium" style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}>
                       ({t.count})
                     </span>
@@ -1218,7 +1218,7 @@ export default function ProductDetailPage() {
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">System</p>
+                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
                             <p className="text-[11px] text-[var(--text-muted)]">Created At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at)}</span></p>
                           </div>
                         )}
@@ -1525,28 +1525,23 @@ export default function ProductDetailPage() {
                       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
                         <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
                       </div>
-                      <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
+                      {wasUp && (
+                        <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
+                      )}
                     </div>
                     <div className="flex-1 pb-6">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                           <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Product Created</h4>
-                          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Added to the system</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                            Created by <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{product.createdby?.name || "—"}</span>
+                          </p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(product.created_at)}</p>
                           <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(product.created_at)}</p>
                         </div>
                       </div>
-                      {product.createdby && (
-                        <div className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                          <Avatar user={product.createdby} size="sm" color="emerald" />
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.createdby.name || product.createdby.email}</p>
-                            <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{product.createdby.email}</p>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1556,28 +1551,20 @@ export default function ProductDetailPage() {
                         <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.12)" }}>
                           <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />
                         </div>
-                        <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
                       </div>
                       <div className="flex-1 pb-6">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Product Updated</h4>
-                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Details were modified</p>
+                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                              Updated by <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{product.updatedby?.name || "—"}</span>
+                            </p>
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(product.updated_at)}</p>
                             <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(product.updated_at)}</p>
                           </div>
                         </div>
-                        {product.updatedby && (
-                          <div className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                            <Avatar user={product.updatedby} size="sm" color="blue" />
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.updatedby.name || product.updatedby.email}</p>
-                              <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{product.updatedby.email}</p>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
