@@ -476,14 +476,7 @@ export default function OrdersPage() {
               <table className="w-full text-[13px] box-border" style={{ tableLayout: "fixed", width: "100%" }}>
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <th className="w-[44px] px-3 py-4 align-middle rounded-tl-lg">
-                      <div className="flex justify-center">
-                        <input type="checkbox" checked={allSelected}
-                          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                          onChange={toggleSelectAll} aria-label="Select all orders on this page"
-                          className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
-                      </div>
-                    </th>
+                
                     <th className="w-[36px] px-1 py-4" />
                     <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="14%" />
                     <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="24%" />
@@ -515,14 +508,7 @@ export default function OrdersPage() {
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}
                           onClick={() => openDetailPage(order)}
                         >
-                          <td className="px-3 py-4 align-middle box-border" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-center">
-                              <input type="checkbox" checked={isSelected}
-                                onChange={() => toggleSelect(order._id)}
-                                aria-label={`Select order ${order.order_number}`}
-                                className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
-                            </div>
-                          </td>
+                        
                           <td className="px-1 py-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setExpandedRows((prev) => isExpanded ? prev.filter((x) => x !== order._id) : [...prev, order._id])}
@@ -626,7 +612,7 @@ export default function OrdersPage() {
 
                         {isExpanded && (
                           <tr style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                            <td colSpan={10} className={`px-6 py-4 box-border ${index === filteredOrders.length - 1 ? "rounded-b-lg" : ""}`}>
+<td colSpan={9} className={`px-6 py-4 box-border ${index === filteredOrders.length - 1 ? "rounded-b-lg" : ""}`}>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
                                 {(order.items || []).map((item, idx) => (
                                   <div key={`${order._id}-item-${idx}`} className="flex items-center gap-2.5 p-2 rounded-md max-w-full box-border"
@@ -834,9 +820,7 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       {/* Header Section */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
-          <input type="checkbox" checked={isSelected} onChange={onToggleSelect}
-            aria-label={`Select order ${order.order_number}`}
-            className="w-5 h-5 rounded cursor-pointer shrink-0 mt-0.5" style={{ accentColor: "var(--accent)" }} />
+               
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-[15px] break-words">{order.order_number}</p>
             <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at)}</p>

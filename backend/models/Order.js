@@ -49,7 +49,6 @@ const orderSchema = new mongoose.Schema(
     address_id: { type: mongoose.Schema.Types.ObjectId, ref: "Address", default: null },
     shipping_method: {
       type: String,
-      enum: ["standard", "express"],
       default: "standard",
     },
     payment: {

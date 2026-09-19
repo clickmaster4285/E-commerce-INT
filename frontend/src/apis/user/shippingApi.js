@@ -13,4 +13,8 @@ export const shippingApi = {
   // Auth — cart items ke hisab se exact quote
   quote: (payload) =>
     axiosInstance.post("/shipping/quote", payload).then((res) => res.data?.data || res.data),
+
+  // ✅ Public — admin ke custom shipping methods (active only)
+  getMethods: () =>
+    axiosInstance.get("/shipping/methods").then((res) => res.data?.data || res.data || []),
 };

@@ -15,18 +15,7 @@ const nextConfig = {
     root: __dirname,
   },
 
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://192.168.88.73:5000/api/:path*',
-      },
-      {
-        source: '/uploads/:path*',
-        destination: 'http://192.168.88.73:5000/uploads/:path*',
-      },
-    ];
-  },
+
 };
 
 export default nextConfig;
