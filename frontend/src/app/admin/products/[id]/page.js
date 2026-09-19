@@ -443,6 +443,13 @@ export default function ProductDetailPage() {
 
   const { data: globalTags = [], refetch: refetchTags } = useQuery({ queryKey: ["globalTags"], queryFn: tagApi.getAll });
 
+  // Re-fetch tags once the product has loaded: the backend heals legacy
+  // variant tags into Tag documents during the product fetch, and those
+  // healed docs (with Created By) must appear in this page's tag lookups.
+  useEffect(() => {
+    if (product && refetchTags) refetchTags();
+  }, [product?._id]);
+
   // Mutations
   const createTagMutation = useMutation({
     mutationFn: tagApi.create,
@@ -481,6 +488,9 @@ export default function ProductDetailPage() {
       toast.success("Product updated successfully");
       await refetchProduct();
       queryClient.invalidateQueries({ queryKey: ["product", id] });
+      // Re-fetch global tags so newly created variant tag docs (with their
+      // Created By) appear in the Tags tab without a page refresh.
+      refetchTags();
       if (showVariantTagsModal && editingVariantForTags) {
         setTimeout(() => {
           const freshProduct = queryClient.getQueryData(["product", id]);
@@ -900,28 +910,41 @@ export default function ProductDetailPage() {
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
   const wasUp = Boolean(product?.updatedby);
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
-  const assignedTagNames = new Set([...displayTagNames]);
-  (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n)); }); });
-  const globalTagNames = new Set((globalTags || []).map(t => String(t.name || t).trim()));
-  const assignedTags = (globalTags || []).filter(tag => assignedTagNames.has(tag.name || tag));
+  const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
+  (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n).trim()); }); });
+  // Case-insensitive matching: Tag docs store lowercased names while variant
+  // tag strings keep the original case, so compare on lowercase everywhere.
+  const lowerAssignedNames = new Set([...assignedTagNames].map(n => n.toLowerCase()));
+  const globalTagNames = new Set((globalTags || []).map(t => String(t.name || t).trim().toLowerCase()));
+  const assignedTags = (globalTags || []).filter(tag => lowerAssignedNames.has(String(tag.name || tag).trim().toLowerCase()));
   const missingTagNames = [];
   assignedTagNames.forEach(name => {
-    if (!globalTagNames.has(String(name).trim())) {
-      missingTagNames.push(String(name).trim());
+    if (!globalTagNames.has(name.toLowerCase())) {
+      missingTagNames.push(name);
     }
   });
   const syntheticTags = missingTagNames.map(name => ({ name, _id: name }));
   const allAssignedTags = [...assignedTags, ...syntheticTags];
 
-  // Source / Variant mapping for tag display
+  // Build lookup from existing global tag records (with resolved createdby) by lowercase name and by id
+  const tagRecordLookup = {};
+  (globalTags || []).forEach((gt) => {
+    if (gt && (gt.name || gt._id)) {
+      tagRecordLookup[String(gt.name || gt).trim().toLowerCase()] = gt;
+      if (gt._id) tagRecordLookup[String(gt._id).trim().toLowerCase()] = gt;
+      if (gt.name) tagRecordLookup[String(gt.name || gt).trim()] = gt;
+    }
+  });
+
+  // Source / Variant mapping for tag display (keys lowercased for case-insensitive lookup)
   const tagSourceInfo = {};
   (product.tag_ids || []).forEach(tagId => {
     const tagName = typeof tagId === 'object' ? tagId.name : tagId;
-    if (tagName) tagSourceInfo[String(tagName).trim()] = { source: "Product", variant: "—" };
+    if (tagName) tagSourceInfo[String(tagName).trim().toLowerCase()] = { source: "Product", variant: "—" };
   });
   (variants || []).forEach(v => {
     (v.tags || []).forEach(tagEntry => {
-      const name = String(tagNameOf(tagEntry) || "").trim();
+      const name = String(tagNameOf(tagEntry) || "").trim().toLowerCase();
       if (name) tagSourceInfo[name] = { source: "Variant", variant: v.sku || v.title || String(v._id) };
     });
   });
@@ -1436,11 +1459,23 @@ export default function ProductDetailPage() {
                                <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
                              </td>
                              <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)] capitalize">
-                               {tagSourceInfo[tag.name || tag]?.source || "—"}
+                               {tagSourceInfo[String(tag.name || tag || "").trim().toLowerCase()]?.source || "—"}
                              </td>
-                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
-                               {tag.createdby ? (typeof tag.createdby === 'object' ? (tag.createdby.name || tag.createdby.email || "—") : tag.createdby) : "—"}
-                             </td>
+                              <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
+                                {(() => {
+                                  const lookupKey = String(tag.name || tag || "").trim().toLowerCase();
+                                  const lookupIdKey = tag._id ? String(tag._id).trim().toLowerCase() : null;
+                                  const resolvedTag = tagRecordLookup[lookupKey] || (lookupIdKey ? tagRecordLookup[lookupIdKey] : null) || tag;
+                                  const cb = resolvedTag?.createdby;
+                                  if (!cb) return "—";
+                                  if (typeof cb === 'object') {
+                                    const name = cb.name || cb.email || "";
+                                    return name ? String(name).trim() : "—";
+                                  }
+                                  const str = String(cb || "").trim();
+                                  return str && str !== "null" && str !== "undefined" ? str : "—";
+                                })()}
+                              </td>
                              <td className="px-5 py-3.5 text-right relative z-10">
                                 <MoreMenu actions={[
                                  { label: "Edit", icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => startEditGlobalTag(tag) },

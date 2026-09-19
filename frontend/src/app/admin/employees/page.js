@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2, AlertTriangle, X,
-  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical
+  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical, Info
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,20 +23,18 @@ const normalizeArrayResponse = (response) => {
 };
 
 // ==========================================
-// DEPARTMENT DROPDOWN COMPONENT
+// DEPARTMENT DROPDOWN COMPONENT (UPDATED)
 // ==========================================
 function DepartmentDropdown({ value, onChange, disabled }) {
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
-  const [filteredOptions, setFilteredOptions] = useState(PREDEFINED_DEPARTMENTS);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Sync external value changes
   useEffect(() => { if (value !== undefined) setInputValue(value || ""); }, [value]);
-  useEffect(() => {
-    if (!inputValue.trim()) setFilteredOptions(PREDEFINED_DEPARTMENTS);
-    else setFilteredOptions(PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(inputValue.toLowerCase())));
-  }, [inputValue]);
+
+  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
@@ -48,7 +46,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInputValue(val);
-    onChange(val);
+    onChange(val); // Update parent state immediately
     setIsOpen(true);
   };
 
@@ -60,10 +58,17 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && inputValue.trim()) setIsOpen(false);
+    if (e.key === "Enter" && inputValue.trim()) {
+        // If user hits enter, we accept current input (even if custom)
+        setIsOpen(false);
+    }
     if (e.key === "Escape") setIsOpen(false);
     if (e.key === "ArrowDown") { e.preventDefault(); setIsOpen(true); }
   };
+
+  // Check if current input matches any existing department
+  const exactMatch = PREDEFINED_DEPARTMENTS.some(d => d.toLowerCase() === inputValue.trim().toLowerCase());
+  const hasInput = inputValue.trim().length > 0;
 
   const inputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -88,6 +93,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           disabled={disabled}
           className="w-full h-8 pl-3 pr-7 rounded-md text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
           style={inputStyle}
+          autoComplete="off"
         />
         <button
           type="button"
@@ -102,7 +108,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
 
       {isOpen && !disabled && (
         <div
-          className="absolute z-10 w-full mb-1 rounded-md shadow-lg max-h-48 overflow-auto py-1"
+          className="absolute z-50 w-full mb-1 rounded-md shadow-lg overflow-hidden py-1"
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
@@ -110,39 +116,42 @@ function DepartmentDropdown({ value, onChange, disabled }) {
             bottom: "100%",
           }}
         >
-          {filteredOptions.length === 0 ? (
-            <div className="px-3 py-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
-              No matching departments
+          {/* LOGIC: Show "No matching" ONLY if user typed something AND it's not an exact match */}
+          {hasInput && !exactMatch && (
+            <div className="px-3 py-2 text-xs font-medium flex items-center gap-2 opacity-60 cursor-default select-none border-b border-dashed" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+              <Info className="w-3 h-3" /> No matching departments
             </div>
-          ) : (
-            filteredOptions.map((dept) => (
-              <button
-                key={dept}
-                type="button"
-                onClick={() => handleSelectOption(dept)}
-                className="w-full text-left px-3 py-1.5 text-[13px] transition"
-                style={{
-                  color: "var(--text-primary)",
-                  backgroundColor: inputValue === dept ? "rgba(16,185,129,0.1)" : "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (inputValue !== dept) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
-                }}
-                onMouseLeave={(e) => {
-                  if (inputValue !== dept) e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {dept}
-              </button>
-            ))
           )}
-          {inputValue.trim() && !PREDEFINED_DEPARTMENTS.includes(inputValue.trim()) && (
-            <div
-              className="px-3 py-1.5 text-[11px] border-t"
-              style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}
+
+          {/* Filtered List of Existing Departments */}
+          {PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(inputValue.toLowerCase())).map((dept) => (
+            <button
+              key={dept}
+              type="button"
+              onClick={() => handleSelectOption(dept)}
+              className="w-full text-left px-3 py-2 text-[13px] transition hover:bg-white/5"
+              style={{
+                color: "var(--text-primary)",
+                backgroundColor: inputValue === dept ? "rgba(16,185,129,0.1)" : "transparent",
+              }}
             >
-              Custom: "{inputValue.trim()}"
+              {dept}
+            </button>
+          ))}
+
+          {/* Custom Create Option */}
+          {hasInput && !exactMatch && (
+            <div
+              className="px-3 py-2 text-[12px] font-medium border-t mt-1 flex items-center gap-2"
+              style={{ borderColor: "var(--border-color)", color: "#34d399" }}
+            >
+              <Plus className="w-3 h-3" /> Creating new: "{inputValue.trim()}"
             </div>
+          )}
+          
+          {/* Empty State if no filter matches and no custom input */}
+          {!hasInput && PREDEFINED_DEPARTMENTS.length === 0 && (
+             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No departments available</div>
           )}
         </div>
       )}
@@ -177,7 +186,7 @@ export default function EmployeesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
-  const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
+  const [actionMenu, setActionMenu] = useState(null); 
 
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -186,6 +195,9 @@ export default function EmployeesPage() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Phone validation state for tooltip
+  const [phoneError, setPhoneError] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -295,6 +307,7 @@ export default function EmployeesPage() {
     });
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setPhoneError("");
   };
 
   const openAddModal = () => {
@@ -310,10 +323,10 @@ export default function EmployeesPage() {
     });
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setPhoneError("");
     setShowModal(true);
   };
 
-  // ✅ FIXED: Explicitly hide password fields when opening Edit Modal
   const openEditModal = (emp) => {
     setEditingEmployee(emp);
     setFormData({
@@ -325,9 +338,9 @@ export default function EmployeesPage() {
       password: "",
       confirmPassword: "",
     });
-    // Force password visibility states to false
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setPhoneError("");
     setShowModal(true);
   };
 
@@ -401,7 +414,7 @@ export default function EmployeesPage() {
     );
   };
 
-  const paginatedEmployees = employees; // server paginated; no client .slice()
+  const paginatedEmployees = employees; 
   const totalPages = pagination.pages || 1;
 
   useEffect(() => {
@@ -497,7 +510,6 @@ export default function EmployeesPage() {
                 borderColor: "var(--border-color)",
               }}
             >
-              {/* ✅ SIMPLIFIED MENU: Only View, Edit, Delete */}
               <MenuItem
                 icon={<Eye className="w-4 h-4" />}
                 label="View Details"
@@ -561,7 +573,7 @@ export default function EmployeesPage() {
   return (
     <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
       
-      {/* HEADER - MATCHING SCREENSHOT LAYOUT */}
+      {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-[24px] font-bold tracking-tight">Employee Management</h1>
@@ -578,7 +590,7 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* ✅ COMPACT STAT CARDS */}
+      {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
           { label: "Total", value: staffEmployees.length, color: "var(--text-primary)" },
@@ -594,10 +606,8 @@ export default function EmployeesPage() {
         ))}
       </div>
 
-      {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
+      {/* Toolbar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        
-        {/* Wider Search Bar (Left Side) */}
         <div className="relative w-full md:w-[400px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
             <Search className="w-4 h-4" />
@@ -612,7 +622,6 @@ export default function EmployeesPage() {
           />
         </div>
 
-        {/* Filters (Right Side) */}
         <div className="flex items-center gap-3 w-full md:w-auto">
           <select
             value={filterStatus}
@@ -859,7 +868,46 @@ export default function EmployeesPage() {
 
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
+                <div className="relative group">
+                  <input 
+                    type="tel" 
+                    value={formData.phone} 
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData({ ...formData, phone: val });
+                        // Professional Tooltip Logic
+                        if (val.length > 15) {
+                            setPhoneError("Maximum 15 digits allowed");
+                        } else if (val.length > 0 && val.length < 10) {
+                             setPhoneError("Minimum 10 digits recommended");
+                        } else {
+                            setPhoneError("");
+                        }
+                    }} 
+                    disabled={isSubmitting} 
+                    className={`w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50 transition-colors ${phoneError ? "border-red-500/50 focus:border-red-500" : ""}`} 
+                    style={inputStyle} 
+                    placeholder="+92 300 1234567" 
+                    minLength={10} 
+                    maxLength={15} 
+                  />
+                  
+                  {/* Professional Hover Message / Tooltip */}
+                  {phoneError && (
+                    <div className="absolute bottom-full left-0 mb-2 px-3 py-1.5 rounded-md text-xs font-medium shadow-lg border animate-in fade-in slide-in-from-bottom-1 duration-200 z-10 whitespace-nowrap" 
+                         style={{ 
+                             backgroundColor: "var(--bg-card)", 
+                             borderColor: "var(--border-color)", 
+                             color: "#f87171" 
+                         }}>
+                        <div className="flex items-center gap-1.5">
+                            <AlertTriangle className="w-3 h-3" /> {phoneError}
+                        </div>
+                        {/* Triangle pointer */}
+                        <div className="absolute top-full left-4 -mt-[1px] w-2 h-2 rotate-45 border-r border-b" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}></div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

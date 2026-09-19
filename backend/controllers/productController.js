@@ -87,7 +87,9 @@ const escapeRegex = (value) => {
 };
 
 // ======================================================
-// ⭐ SIMPLIFIED TAG RESOLVER (Find or Create)
+// ⭐ SHARED TAG RESOLVER (Find or Create)
+// Ensures every tag name exists as a Tag document (with
+// createdby tracked) so the Tags tab can show who created it.
 // ======================================================
 const resolveTags = async (tagNames, userId) => {
   if (!Array.isArray(tagNames) || tagNames.length === 0) return [];
@@ -102,7 +104,7 @@ const resolveTags = async (tagNames, userId) => {
 
   // ✅ Look up by name regardless of soft-delete: re-creating a soft-deleted
   // name hits the unique `name` index (E11000), so restore that doc instead.
-  const existingTags = await Tag.find({ 
+  const existingTags = await Tag.find({
     name: { $in: cleanNames }
   }).lean();
 
@@ -118,10 +120,10 @@ const resolveTags = async (tagNames, userId) => {
       }
       finalTagIds.push(found._id);
     } else {
-      const newTag = await Tag.create({ 
-        name, 
-        createdby: userId, 
-        updatedby: userId 
+      const newTag = await Tag.create({
+        name,
+        createdby: userId,
+        updatedby: userId
       });
       finalTagIds.push(newTag._id);
     }
@@ -386,6 +388,39 @@ const getProductById = async (req, res) => {
       .sort({ created_at: 1 })
       .lean();
 
+    // ⭐ LEGACY TAG HEALING: variant tags used to be saved as plain strings
+    // without a Tag document, so the Tags tab showed "—" for Created By.
+    // Create any missing Tag docs, attributing them to the user who last
+    // updated the variant (most plausible assigner).
+    try {
+      const tagCreatorByName = new Map();
+      variants.forEach(v => {
+        (Array.isArray(v.tags) ? v.tags : []).forEach(t => {
+          const name = String(t || "").trim().toLowerCase();
+          if (name && !tagCreatorByName.has(name)) {
+            tagCreatorByName.set(name, v.updatedby || v.createdby || null);
+          }
+        });
+      });
+
+      if (tagCreatorByName.size > 0) {
+        const nameRegexes = [...tagCreatorByName.keys()].map(n => new RegExp(`^${escapeRegex(n)}$`, "i"));
+        const existingTagDocs = await Tag.find({ name: { $in: nameRegexes } }).select("name").lean();
+        const existingLowerNames = new Set(existingTagDocs.map(t => String(t.name).trim().toLowerCase()));
+
+        for (const [lowerName, creator] of tagCreatorByName) {
+          if (existingLowerNames.has(lowerName)) continue;
+          try {
+            await Tag.create({ name: lowerName, createdby: creator, updatedby: creator });
+          } catch (createErr) {
+            // Unique index race (tag created concurrently) — safe to ignore
+          }
+        }
+      }
+    } catch (healErr) {
+      console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
+    }
+
     return res.status(200).json({
       ...product,
       variants,
@@ -507,6 +542,12 @@ const createProduct = async (req, res) => {
 
       usedSkus.add(skuKey);
 
+      const variantTags = Array.isArray(item.tags) ? item.tags : [];
+      if (variantTags.length > 0) {
+        // Ensure Tag docs exist so Created By is tracked for variant tags too
+        await resolveTags(variantTags, req.user?._id);
+      }
+
       const variant = await Variant.create({
         product_id: createdProduct._id,
         sku,
@@ -518,7 +559,7 @@ const createProduct = async (req, res) => {
         min_qnt: toNumber(item.min_qnt, 0),
         max_qnt: toNumber(item.max_qnt, 0),
         attributes: item.option_values || item.attributes || {},
-        tags: Array.isArray(item.tags) ? item.tags : [],
+        tags: variantTags,
         images: imagesByVariant[index] || [],
         createdby: req.user?._id || null,
         updatedby: req.user?._id || null,
@@ -755,7 +796,12 @@ const updateProduct = async (req, res) => {
           }
 
           if (item.tags !== undefined) {
-            variant.tags = Array.isArray(item.tags) ? item.tags : [];
+            const variantTagList = Array.isArray(item.tags) ? item.tags : [];
+            if (variantTagList.length > 0) {
+              // Ensure Tag docs exist so Created By is tracked for variant tags too
+              await resolveTags(variantTagList, req.user?._id);
+            }
+            variant.tags = variantTagList;
           }
 
           if (item.status !== undefined) {
@@ -783,6 +829,12 @@ const updateProduct = async (req, res) => {
             return res.status(400).json({ message: `SKU ${sku} already exists` });
           }
 
+          const newVariantTags = Array.isArray(item.tags) ? item.tags : [];
+          if (newVariantTags.length > 0) {
+            // Ensure Tag docs exist so Created By is tracked for variant tags too
+            await resolveTags(newVariantTags, req.user?._id);
+          }
+
           await Variant.create({
             product_id: product._id,
             sku,
@@ -794,7 +846,7 @@ const updateProduct = async (req, res) => {
             min_qnt: toNumber(item.min_qnt, 0),
             max_qnt: toNumber(item.max_qnt, 0),
             attributes: item.option_values || item.attributes || {},
-            tags: Array.isArray(item.tags) ? item.tags : [],
+            tags: newVariantTags,
             status: item.status === "inactive" ? "inactive" : "active",
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,

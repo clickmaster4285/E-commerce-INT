@@ -2,7 +2,7 @@ import axiosInstance from "../axiosInstance";
 
 export const adminBrandApi = {
   getAll: () => 
-    axiosInstance.get("/brands").then((res) => {
+    axiosInstance.get("/brands/admin/all").then((res) => {
       const data = res.data;
       if (data?.success && Array.isArray(data.data)) return data.data;
       if (Array.isArray(data)) return data;

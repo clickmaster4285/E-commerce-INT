@@ -53,6 +53,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
   const [addText, setAddText] = useState("");
   const [addError, setAddError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const dropdownRef = useRef(null);
 
   // Derive value objects from subAttribute (database source of truth) with local update support
@@ -146,7 +147,24 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
           <button
             type="button"
             onClick={() => {
-              setOpen((p) => !p);
+              setOpen((p) => {
+                const next = !p;
+                if (next) {
+                  // Smart positioning: open upward if not enough space below
+                  setTimeout(() => {
+                    const btn = dropdownRef.current?.querySelector("button");
+                    if (btn) {
+                      const rect = btn.getBoundingClientRect();
+                      const dropdownHeight = 310; // approximate max dropdown height
+                      const spaceBelow = window.innerHeight - rect.bottom;
+                      setDropUp(spaceBelow < dropdownHeight);
+                    } else {
+                      setDropUp(false);
+                    }
+                  }, 0);
+                }
+                return next;
+              });
               if (showAdd) setShowAdd(false);
             }}
             className="w-full h-10 px-3 rounded-lg text-sm flex items-center justify-between outline-none transition border"
@@ -165,10 +183,12 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
 
           {open && (
             <div
-              className="absolute z-50 mt-1 w-full rounded-lg shadow-xl overflow-hidden"
+              className={`absolute z-50 w-full rounded-lg shadow-xl overflow-hidden ${dropUp ? "bottom-full mb-1" : "mt-1 top-full"}`}
               style={{
                 backgroundColor: "var(--bg-card)",
                 border: "1px solid var(--border-color)",
+                left: 0,
+                right: 0,
               }}
             >
               <div
@@ -378,8 +398,7 @@ export default function AddVariantPage() {
       queryClient.invalidateQueries({ queryKey: ["product", id] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       toast.success(isEditMode ? "Variant updated!" : "Variant added!");
-      const tabParam = searchParams?.get("tab");
-      const redirectUrl = `/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`;
+      const redirectUrl = `/admin/products/${id}?tab=variants`;
       router.push(redirectUrl);
     },
     onError: (err) => {
