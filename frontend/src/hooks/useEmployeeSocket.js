@@ -22,10 +22,7 @@ export function getEmployeeSocket() {
     process.env.NEXT_PUBLIC_SOCKET_URL;
 
   if (!SOCKET_URL) {
-    console.error(
-      "❌ NEXT_PUBLIC_SOCKET_URL is not defined"
-    );
-
+    // ✅ Silent — console error show na ho
     return null;
   }
 
@@ -58,10 +55,7 @@ export function getEmployeeSocket() {
     employeeSocket.on(
       "connect_error",
       (error) => {
-        console.error(
-          "⚠️ Employee Socket Error:",
-          error.message
-        );
+        // ✅ Silent — error console par show na ho, reconnection waise hi chalega
       }
     );
   }
@@ -483,10 +477,7 @@ export function useEmployeeSocketSync(
 
 
         if (!data?._id) {
-          console.warn(
-            "⚠️ Invalid employee status data"
-          );
-
+          // ✅ Silent — console warning show na ho
           invalidateEmployees();
 
           return;
@@ -546,10 +537,7 @@ export function useEmployeeSocketSync(
 
 
         if (!data?._id) {
-          console.warn(
-            "⚠️ Invalid employee update data"
-          );
-
+          // ✅ Silent — console warning show na ho
           invalidateEmployees();
 
           return;

@@ -46,7 +46,7 @@ const categorySchema = new mongoose.Schema(
     },
 
     // ✅ FIX: Persist category_type (Mobile / PC / Clothing) sent from frontend
-    category_type: { type: String, trim: true, default: "" },
+  
 
        attributes: { type: [categoryAttributeSchema], default: [] },
    

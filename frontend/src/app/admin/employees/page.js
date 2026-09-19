@@ -286,6 +286,7 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setFormData({
       name: "",
+      username: "",
       email: "",
       phone: "",
       department: "",
@@ -301,6 +302,7 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setFormData({
       name: "",
+      username: "",
       email: "",
       phone: "",
       department: "",
@@ -318,6 +320,7 @@ export default function EmployeesPage() {
     setEditingEmployee(emp);
     setFormData({
       name: emp.userId?.name || emp.name || "",
+      username: emp.username || "",
       email: emp.userId?.email || emp.email || "",
       phone: emp.userId?.phone || emp.phone || "",
       department: emp.department || "",
@@ -334,6 +337,10 @@ export default function EmployeesPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return toast.error("Name is required");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    const username = formData.username.trim().toLowerCase();
+    if (username.length < 3) return toast.error("Username must be at least 3 characters");
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return toast.error("Username can only contain letters, numbers, and underscores");
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!formData.department.trim()) return toast.error("Department is required");
 
@@ -354,6 +361,7 @@ export default function EmployeesPage() {
 
     const payload = {
       name: formData.name.trim(),
+      username,
       email: formData.email.trim(),
       phone: formData.phone || "",
       department: formData.department.trim(),
@@ -852,14 +860,20 @@ export default function EmployeesPage() {
                   <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Username *</label>
+                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john_doe" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
-                <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
+                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

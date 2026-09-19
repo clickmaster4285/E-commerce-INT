@@ -46,7 +46,7 @@ function getSocket() {
 
   const SOCKET_URL = getSocketURL();
   if (!SOCKET_URL) {
-    console.warn("⚠️ Socket URL not configured — backend may not be reachable.");
+    // ✅ Silent — console error/warning show na ho
     return null;
   }
 
@@ -62,7 +62,7 @@ function getSocket() {
       timeout: 15000,
     });
   } catch (err) {
-    console.error("⚠️ Socket initialization failed:", err.message);
+    // ✅ Silent — socket init fail par bhi console error show na ho
     return null;
   }
 
@@ -72,16 +72,12 @@ function getSocket() {
   });
 
   globalSocket.on("disconnect", (reason) => {
-    console.log("❌ Socket disconnected:", reason);
+    // ✅ Silent — disconnect info console par show na ho
   });
 
   globalSocket.on("connect_error", (err) => {
-    // ✅ Sirf ek baar error log karo — spam se bacho
-    if (!hasLoggedError) {
-      console.error("⚠️ Socket Connection Error:", err?.message || err);
-      console.error("Backend URL:", SOCKET_URL);
-      hasLoggedError = true;
-    }
+    // ✅ Silent — error console par show na ho, reconnection waise hi chalega
+    hasLoggedError = true;
   });
 
   return globalSocket;
