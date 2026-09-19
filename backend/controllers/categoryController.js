@@ -388,15 +388,59 @@ const getCategoryById = async (req, res) => {
 
 const updateCategory = async (req, res) => {
   try {
-    const updateData = { ...req.body, updatedby: req.user?._id || null };
+    // Get existing category to compare actual changes
+    const existingCategory = await Category.findOne({
+      _id: req.params.id,
+      is_deleted: false,
+    });
+
+    if (!existingCategory) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    const updateData = { ...req.body };
 
     delete updateData._id;
     delete updateData.created_at;
     delete updateData.createdby;
+    delete updateData.updatedby;
+    delete updateData.updated_at;
+    delete updateData.__v;
 
     if (Object.prototype.hasOwnProperty.call(req.body, "is_active")) {
       updateData.is_active = Boolean(req.body.is_active);
     }
+
+    // Check if there are any actual changes before setting updatedby
+    const fieldsToCompare = Object.keys(updateData);
+    const hasActualChanges = fieldsToCompare.some((key) => {
+      const newVal = updateData[key];
+      const oldVal = existingCategory[key];
+      // Handle array comparison for attributes
+      if (Array.isArray(newVal) && Array.isArray(oldVal)) {
+        return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+      }
+      if (newVal !== undefined && newVal !== null && oldVal !== undefined && oldVal !== null) {
+        return String(newVal) !== String(oldVal);
+      }
+      // If new value is explicitly provided and different from old
+      if (key in req.body) {
+        return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+      }
+      return false;
+    });
+
+    if (!hasActualChanges) {
+      // No actual changes, don't set updatedby, just return existing
+      return res.status(200).json({
+        success: true,
+        message: "No changes to update",
+        data: existingCategory,
+      });
+    }
+
+    // Only set updatedby when there are actual changes
+    updateData.updatedby = req.user?._id || null;
 
     const updatedCategory = await Category.findByIdAndUpdate(
       req.params.id,
@@ -462,8 +506,15 @@ const assignCategoryAttributes = async (req, res) => {
     // ✅ FIX: Skip tenantId in validation
     const attributes = await validateAttributePayload(req.body.attributes || []);
 
+    // Only set updatedby if attributes actually changed
+    const newAttributesStr = JSON.stringify(attributes);
+    const oldAttributesStr = JSON.stringify(category.attributes || []);
+    const attributesChanged = newAttributesStr !== oldAttributesStr;
+
     category.attributes = attributes;
-    category.updatedby = req.user?._id || null;
+    if (attributesChanged) {
+      category.updatedby = req.user?._id || null;
+    }
     await category.save();
 
     const io = req.io || getIO();
