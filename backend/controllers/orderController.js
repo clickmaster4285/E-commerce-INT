@@ -144,7 +144,20 @@ const placeOrder = async (req, res) => {
       );
     }
 
-    const shipping_method = reqShippingMethod === "express" ? "express" : "standard";
+    // ✅ Custom shipping method support:
+    //    'standard'/'express' as-is; koi bhi aur code sirf tab accepted
+    //    jab wo active custom ShippingMethod ho — warna standard fallback.
+    let shipping_method = "standard";
+    if (reqShippingMethod === "express" || reqShippingMethod === "standard") {
+      shipping_method = reqShippingMethod;
+    } else if (reqShippingMethod) {
+      const ShippingMethod = require("../models/ShippingMethod");
+      const customMethod = await ShippingMethod.findOne({
+        code: String(reqShippingMethod),
+        is_active: true,
+      }).lean();
+      if (customMethod) shipping_method = String(reqShippingMethod);
+    }
 
     // ✅ Fetch the free_shipping deal docs so we can honour freeShippingMethods
     //    (missing/empty array => BOTH methods, backward compatible).

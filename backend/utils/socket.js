@@ -182,15 +182,37 @@ const initSocket = (server) => {
       })
     );
 
+    // ✅ Access token expire ho jaye toh refresh token se identity recover karo
+    // (REST interceptor bhi yehi karta hai — warna socket reconnect pe "guest" ban jata hai)
+    const tryRefreshAuth = () => {
+      const rt = cookies.refreshToken;
+      if (!rt) return false;
+      try {
+        const rDecoded = jwt.verify(rt, process.env.JWT_SECRET);
+        if (!rDecoded.userId && !rDecoded.id) return false;
+        socket.userId = rDecoded.userId || rDecoded.id;
+        socket.userType = rDecoded.type || "user";
+        socket.userRole = (rDecoded.role || "user").toLowerCase();
+        socket.storeId = rDecoded.storeId || null;
+        socket.userName = rDecoded.name || "User";
+        socket.userPermissions = rDecoded.permissions || {};
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
     const token = cookies.accessToken || cookies.auth_token || cookies.access_token;
 
-    // ✅ Token nahi → guest allow
+    // ✅ Token nahi → refresh se try, warna guest allow
     if (!token) {
-      socket.userId = null;
-      socket.userRole = "guest";
-      socket.storeId = null;
-      socket.userName = "Guest";
-      socket.userPermissions = {};
+      if (!tryRefreshAuth()) {
+        socket.userId = null;
+        socket.userRole = "guest";
+        socket.storeId = null;
+        socket.userName = "Guest";
+        socket.userPermissions = {};
+      }
       return next();
     }
 
@@ -200,18 +222,21 @@ const initSocket = (server) => {
         return next(new Error("Invalid token payload"));
       }
       socket.userId = decoded.userId || decoded.id;
+      socket.userType = decoded.type || 'user';
       socket.userRole = (decoded.role || "user").toLowerCase();
       socket.storeId = decoded.storeId || null;
       socket.userName = decoded.name || "User";
       socket.userPermissions = decoded.permissions || {};
       next();
     } catch (error) {
-      // Invalid token → guest ki tarah treat karo
-      socket.userId = null;
-      socket.userRole = "guest";
-      socket.storeId = null;
-      socket.userName = "Guest";
-      socket.userPermissions = {};
+      // ✅ Access token expired/invalid → refresh token se try, warna guest
+      if (!tryRefreshAuth()) {
+        socket.userId = null;
+        socket.userRole = "guest";
+        socket.storeId = null;
+        socket.userName = "Guest";
+        socket.userPermissions = {};
+      }
       next();
     }
   });
@@ -396,14 +421,14 @@ const initSocket = (server) => {
     socket.on("getProfile", async () => {
       if (!requireAuth(socket)) return socket.emit("profileData", { success: false, message: "Please login" });
       try {
-        const User = require("../models/User");
-        const user = await User.findById(socket.userId).select("-password").populate("storeId");
+        const Model = socket.userType === 'employee' ? require("../models/Employee") : require("../models/User");
+        const user = await Model.findById(socket.userId).select("-password").populate("storeId");
         if (!user) return socket.emit("profileData", { success: false, message: "User not found" });
 
         let permissions = user.permissions || {};
         if (needsPermissionMigration(permissions)) {
           permissions = fixPermissions(permissions);
-          await User.findByIdAndUpdate(socket.userId, { permissions });
+          await Model.findByIdAndUpdate(socket.userId, { permissions });
         }
         const store = user.storeId || {};
         const profileData = {
@@ -429,6 +454,7 @@ const initSocket = (server) => {
         const { updateProfileInfo } = require("../controllers/userController");
         const req = {
           user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
+          userType: socket.userType || 'user',
           body: payload, io
         };
         const res = {
@@ -445,6 +471,7 @@ const initSocket = (server) => {
         const { changePasswordSocket } = require("../controllers/userController");
         const req = {
           user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
+          userType: socket.userType || 'user',
           body: payload, io
         };
         const res = { status: () => ({ json: (d) => { if (callback) callback(d); } }), json: (d) => { if (callback) callback(d); } };

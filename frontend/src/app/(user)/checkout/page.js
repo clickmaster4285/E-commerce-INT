@@ -401,6 +401,14 @@ function CheckoutContent() {
   const { data: shipConfig } = useQuery({ queryKey: ["shippingConfig"], queryFn: shippingApi.getConfig, staleTime: 60 * 1000 });
   const cfg = shipConfig || DEFAULT_SHIP_CONFIG;
 
+  // ✅ Admin ke custom shipping methods (public, active only)
+  const { data: customShippingMethods = [] } = useQuery({
+    queryKey: ["shippingMethods"],
+    queryFn: shippingApi.getMethods,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+
   // ✅ Active shipping rules (brand/category/product/all — free or fixed).
   const { data: shippingRules = [] } = useQuery({
     queryKey: ["shippingRules"],
@@ -444,7 +452,9 @@ function CheckoutContent() {
   } else if (ruleFixedFee != null) {
     shipping = ruleFixedFee;
   } else {
-    shipping = shipQuote?.fee ?? (shippingMethod === "express" ? cfg.express.fee : cfg.standard.fee);
+    // ✅ Custom method fee fallback: selected method custom ho to uska fee
+    const customSelected = (customShippingMethods || []).find((m) => m.code === shippingMethod);
+    shipping = shipQuote?.fee ?? (customSelected ? Number(customSelected.fee ?? 0) : shippingMethod === "express" ? cfg.express.fee : cfg.standard.fee);
   }
   const shippingReason = isFreeForCurrentMethod
     ? "Free shipping via active deal"
@@ -662,6 +672,15 @@ function CheckoutContent() {
   const shippingMethods = [
     { id: "standard", title: "Standard Delivery", time: `${cfg.standard.min_days}–${cfg.standard.max_days} days`, icon: Truck, badge: "Popular" },
     { id: "express", title: "Express Delivery", time: `${cfg.express.min_days}–${cfg.express.max_days} days`, icon: Zap, badge: "Fast" },
+    // ✅ Admin ke custom shipping methods (Add New se bane hue)
+    ...(customShippingMethods || []).map((m) => ({
+      id: m.code,
+      title: m.name,
+      time: `${m.min_days}–${m.max_days} days`,
+      icon: Package,
+      custom: true,
+      fee: Number(m.fee ?? 0),
+    })),
   ];
 
   return (
@@ -876,7 +895,8 @@ function CheckoutContent() {
                     {shippingMethods.map((m) => {
                       const active = shippingMethod === m.id;
                       const IconComp = m.icon;
-                      const baseFee = m.id === "express" ? cfg.express.fee : cfg.standard.fee;
+                      // ✅ Custom method => uska apna fee; warna standard/express config fee
+                      const baseFee = m.custom ? m.fee : (m.id === "express" ? cfg.express.fee : cfg.standard.fee);
                       // ✅ FREE only if active free-shipping deal covers THIS method
                       const isFreeForThisMethod = freeShippingByActiveItems && freeShippingDealsForMethod(m.id);
                       // ✅ For the SELECTED method, also reflect the server-side quote
@@ -1193,6 +1213,15 @@ function CheckoutContent() {
       const shippingMethodsMob = [
         { id: "standard", title: "Standard Delivery", time: `${cfg.standard.min_days}–${cfg.standard.max_days} days`, icon: Truck },
         { id: "express", title: "Express Delivery", time: `${cfg.express.min_days}–${cfg.express.max_days} days`, icon: Zap },
+        // ✅ Admin ke custom shipping methods (Add New se bane hue)
+        ...(customShippingMethods || []).map((m) => ({
+          id: m.code,
+          title: m.name,
+          time: `${m.min_days}–${m.max_days} days`,
+          icon: Package,
+          custom: true,
+          fee: Number(m.fee ?? 0),
+        })),
       ];
 
       return (
@@ -1285,7 +1314,8 @@ function CheckoutContent() {
                 {shippingMethodsMob.map((m) => {
                   const active = shippingMethod === m.id;
                   const IconComp = m.icon;
-                  const baseFee = m.id === "express" ? cfg.express.fee : cfg.standard.fee;
+                  // ✅ Custom method => uska apna fee; warna standard/express config fee
+                  const baseFee = m.custom ? m.fee : (m.id === "express" ? cfg.express.fee : cfg.standard.fee);
                   const isFreeForThisMethod = freeShippingByActiveItems && freeShippingDealsForMethod(m.id);
                   const isFree = active ? (isFreeForCurrentMethod || shipping === 0) : isFreeForThisMethod;
                   return (

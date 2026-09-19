@@ -390,7 +390,8 @@ const updateProfile = async (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
+    const Model = req.userType === "employee" ? Employee : User;
+    const user = await Model.findById(req.user._id);
     if (!user)
       return res
         .status(404)
@@ -424,7 +425,8 @@ const changePassword = async (req, res) => {
 const toggle2FA = async (req, res) => {
   try {
     const { enabled } = req.body;
-    await User.findByIdAndUpdate(req.user._id, {
+    const Model = req.userType === "employee" ? Employee : User;
+    await Model.findByIdAndUpdate(req.user._id, {
       twoFactorEnabled: enabled,
       updatedby: req.user._id,
     });
@@ -437,7 +439,7 @@ const toggle2FA = async (req, res) => {
 
 const getProfileInfo = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?._id || req.user?.id;
     if (!userId || userId === "guest")
       return res.status(401).json({ success: false, message: "Unauthorized" });
     const userType = req.userType || 'user';
@@ -489,9 +491,11 @@ const getProfileInfo = async (req, res) => {
 
 const updateProfileInfo = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?._id || req.user?.id;
     if (!userId || userId === "guest")
       return res.status(401).json({ success: false, message: "Unauthorized" });
+    const userType = req.userType || 'user';
+    const Model = userType === 'employee' ? Employee : User;
     const {
       name, email, phone, website, address,
       store_name, tagline, primary_color, currency, country, city, state, zip_code, store_status
@@ -504,7 +508,7 @@ const updateProfileInfo = async (req, res) => {
     if (website !== undefined) userUpdateFields.website = website;
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
-    const updatedUser = await User.findByIdAndUpdate(userId, userUpdateFields, {
+    const updatedUser = await Model.findByIdAndUpdate(userId, userUpdateFields, {
       new: true,
       runValidators: true,
     })
@@ -561,7 +565,7 @@ const updateProfileInfo = async (req, res) => {
 
 const changePasswordSocket = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?._id || req.user?.id;
     if (!userId || userId === "guest")
       return res.status(401).json({ success: false, message: "Unauthorized" });
     const { currentPassword, newPassword } = req.body;
@@ -569,7 +573,8 @@ const changePasswordSocket = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "All password fields are required" });
-    const user = await User.findById(userId);
+    const Model = req.userType === "employee" ? Employee : User;
+    const user = await Model.findById(userId);
     if (!user)
       return res
         .status(404)
@@ -768,7 +773,8 @@ const updatePhone = async (req, res) => {
     const { phone } = req.body;
     if (!phone || !/^[0-9+\-\s]{7,20}$/.test(String(phone)))
       return res.status(400).json({ message: "Valid phone number required" });
-    const user = await User.findById(req.user._id);
+    const Model = req.userType === "employee" ? Employee : User;
+    const user = await Model.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
     user.phone = String(phone).trim();
     await user.save();
@@ -1001,7 +1007,8 @@ const updateProfileREST = async (req, res) => {
     const update = {};
     if (name) update.name = name;
     if (username) update.username = username;
-    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const Model = req.userType === "employee" ? Employee : User;
+    const user = await Model.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
     res.json({ success: true, user });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -1009,7 +1016,8 @@ const updateProfileREST = async (req, res) => {
 const changePasswordREST = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
+    const Model = req.userType === "employee" ? Employee : User;
+    const user = await Model.findById(req.user._id);
     const match = await bcrypt.compare(currentPassword, user.password);
     if (!match) return res.status(400).json({ success: false, message: "Current password is incorrect" });
     const salt = await bcrypt.genSalt(10);

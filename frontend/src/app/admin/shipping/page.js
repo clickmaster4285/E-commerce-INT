@@ -38,6 +38,21 @@ const Spinner = ({ className = "w-4 h-4" }) => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
   </svg>
 );
+const PlusIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
+const TrashIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+const BoxIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
 
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
@@ -220,6 +235,182 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
   );
 }
 
+/* ================= CUSTOM METHOD MODAL (Add / Edit) ================= */
+function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
+  const [form, setForm] = useState({ name: "", fee: 0, min_days: 2, max_days: 4, is_active: true });
+
+  useEffect(() => {
+    if (open) {
+      if (method) {
+        setForm({
+          name: method.name || "",
+          fee: Number(method.fee ?? 0),
+          min_days: Number(method.min_days ?? 2),
+          max_days: Number(method.max_days ?? 4),
+          is_active: method.is_active !== false,
+        });
+      } else {
+        setForm({ name: "", fee: 0, min_days: 2, max_days: 4, is_active: true });
+      }
+    }
+  }, [open, method]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-xl overflow-hidden" style={cardStyle}>
+        {/* Modal Header */}
+        <div
+          className="px-4 sm:px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-color)" }}
+        >
+          <div>
+            <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
+              {method ? "Edit Shipping Method" : "Add New Shipping Method"}
+            </h3>
+            <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+              {method ? "Update this custom delivery method" : "Create your own shipping method"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="p-1.5 rounded-md transition disabled:opacity-50 hover:opacity-70"
+            style={{ color: "var(--text-muted)", backgroundColor: "var(--bg-tertiary)" }}
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!form.name.trim()) return;
+            onSave(form);
+          }}
+          className="p-4 sm:p-6 space-y-4"
+        >
+          <div>
+            <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              Method Name
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              disabled={saving}
+              required
+              className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
+              style={inputStyle}
+              placeholder="e.g. Overnight, TCS Same Day, Cargo"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              Shipping Fee (Rs)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={form.fee}
+              onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })}
+              disabled={saving}
+              className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
+              style={inputStyle}
+              placeholder="e.g. 300"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                Min Days
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.min_days}
+                onChange={(e) => setForm({ ...form, min_days: Number(e.target.value) })}
+                disabled={saving}
+                className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                Max Days
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.max_days}
+                onChange={(e) => setForm({ ...form, max_days: Number(e.target.value) })}
+                disabled={saving}
+                className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Active toggle */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+              disabled={saving}
+              className="w-4 h-4"
+              style={{ accentColor: "var(--accent)" }}
+            />
+            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+              Active (visible to customers at checkout)
+            </span>
+          </label>
+
+          {/* Modal Footer */}
+          <div
+            className="flex flex-col sm:flex-row gap-3 pt-4"
+            style={{ borderTop: "1px solid var(--border-color)" }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="flex-1 h-11 sm:h-10 rounded-lg text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !form.name.trim()}
+              className="flex-1 h-11 sm:h-10 rounded-lg text-[13px] font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              {saving ? (
+                <>
+                  <Spinner className="w-4 h-4" /> Saving...
+                </>
+              ) : (
+                <>
+                  <CheckIcon className="w-4 h-4" /> {method ? "Save Changes" : "Add Method"}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ================= MAIN PAGE ================= */
 export default function ShippingManagementPage() {
   useShippingSocketSync();
@@ -227,10 +418,19 @@ export default function ShippingManagementPage() {
 
   const [editType, setEditType] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [methodModalOpen, setMethodModalOpen] = useState(false);
+  const [editingMethod, setEditingMethod] = useState(null);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["adminShippingConfig"],
     queryFn: shippingApi.getConfig,
+    retry: false,
+  });
+
+  // ✅ Custom shipping methods (admin "Add New" wale)
+  const { data: methods = [] } = useQuery({
+    queryKey: ["adminShippingMethods"],
+    queryFn: shippingApi.getMethods,
     retry: false,
   });
 
@@ -250,6 +450,54 @@ export default function ShippingManagementPage() {
   const handleEdit = (type) => {
     setEditType(type);
     setShowEditModal(true);
+  };
+
+  // ✅ Custom methods CRUD
+  const methodMutation = useMutation({
+    mutationFn: ({ id, data }) =>
+      id ? shippingApi.updateMethod(id, data) : shippingApi.createMethod(data),
+    onSuccess: (_res, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
+      toast.success(vars.id ? "Shipping method updated" : "Shipping method added");
+      setMethodModalOpen(false);
+      setEditingMethod(null);
+    },
+    onError: (e) =>
+      toast.error(e?.response?.data?.message || e?.message || "Save failed"),
+  });
+
+  const methodDeleteMutation = useMutation({
+    mutationFn: (id) => shippingApi.deleteMethod(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
+      toast.success("Shipping method deleted");
+    },
+    onError: (e) =>
+      toast.error(e?.response?.data?.message || e?.message || "Delete failed"),
+  });
+
+  const methodToggleMutation = useMutation({
+    mutationFn: (id) => shippingApi.toggleMethod(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
+      toast.success("Shipping method updated");
+    },
+    onError: (e) =>
+      toast.error(e?.response?.data?.message || e?.message || "Update failed"),
+  });
+
+  const openAddMethod = () => {
+    setEditingMethod(null);
+    setMethodModalOpen(true);
+  };
+
+  const openEditMethod = (m) => {
+    setEditingMethod(m);
+    setMethodModalOpen(true);
+  };
+
+  const handleSaveMethod = (formData) => {
+    methodMutation.mutate({ id: editingMethod?._id || null, data: formData });
   };
 
   const handleSave = (formData) => {
@@ -287,6 +535,14 @@ export default function ShippingManagementPage() {
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Shipping Management</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage delivery methods and rates</p>
           </div>
+          {/* ✅ Add New — custom shipping method */}
+          <button
+            onClick={openAddMethod}
+            className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-[13px] font-semibold transition hover:opacity-90 active:scale-[0.98]"
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+          >
+            <PlusIcon className="w-4 h-4" /> Add New
+          </button>
         </div>
 
         {/* ===== Stat Cards — Standard & Express ===== */}
@@ -432,6 +688,57 @@ export default function ShippingManagementPage() {
                     </div>
                   </td>
                 </tr>
+
+                {/* ✅ Custom Shipping Methods — Express ke neeche, usi table mein */}
+                {methods.map((m) => (
+                  <tr key={m._id} className="transition"
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10b981" }}>
+                          <BoxIcon className="w-4 h-4" />
+                        </div>
+                        <span className="font-medium text-[13px]" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
+                          {m.name}
+                          {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Inactive</span>}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {Number(m.fee ?? 0)}</td>
+                    <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{m.min_days}</td>
+                    <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{m.max_days}</td>
+                    <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{m.min_days}-{m.max_days} days</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap w-1">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => methodToggleMutation.mutate(m._id)}
+                          disabled={methodToggleMutation.isPending}
+                          title={m.is_active ? "Deactivate" : "Activate"}
+                          className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "#10b981" : "var(--text-muted)" }}
+                        >
+                          {m.is_active ? "ON" : "OFF"}
+                        </button>
+                        <button
+                          onClick={() => openEditMethod(m)}
+                          className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80"
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                        >
+                          <EditIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
+                          disabled={methodDeleteMutation.isPending}
+                          className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "#ef4444" }}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -488,6 +795,53 @@ export default function ShippingManagementPage() {
               </button>
             </div>
           </div>
+
+          {/* ✅ Custom Shipping Methods — Express ke neeche, usi list mein */}
+          {methods.map((m) => (
+            <div key={m._id} className="rounded-lg p-3 space-y-2.5 transition" style={cardStyle}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10b981" }}>
+                  <BoxIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium truncate leading-tight" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    {m.name}
+                    {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Inactive</span>}
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.min_days}-{m.max_days} days</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <span className="text-[11px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {Number(m.fee ?? 0)}</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => methodToggleMutation.mutate(m._id)}
+                    disabled={methodToggleMutation.isPending}
+                    title={m.is_active ? "Deactivate" : "Activate"}
+                    className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "#10b981" : "var(--text-muted)" }}
+                  >
+                    {m.is_active ? "ON" : "OFF"}
+                  </button>
+                  <button
+                    onClick={() => openEditMethod(m)}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                  >
+                    <EditIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
+                    disabled={methodDeleteMutation.isPending}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "#ef4444" }}
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -502,6 +856,18 @@ export default function ShippingManagementPage() {
         }}
         onSave={handleSave}
         saving={configMutation.isPending}
+      />
+
+      {/* ===== Custom Method Modal (Add / Edit) ===== */}
+      <ShippingMethodModal
+        open={methodModalOpen}
+        method={editingMethod}
+        onClose={() => {
+          setMethodModalOpen(false);
+          setEditingMethod(null);
+        }}
+        onSave={handleSaveMethod}
+        saving={methodMutation.isPending}
       />
     </div>
   );

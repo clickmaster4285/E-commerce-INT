@@ -1,5 +1,6 @@
 const ShippingConfig = require("../models/ShippingConfig");
 const ShippingRule = require("../models/ShippingRule");
+const ShippingMethod = require("../models/ShippingMethod");
 
 const emit = (event, data) => {
   try {
@@ -11,8 +12,21 @@ const emit = (event, data) => {
 // ✅ Core calculator — checkout + placeOrder dono use karenge
 const calculateShipping = async ({ items = [], method = "standard", subtotal = 0 }) => {
   const config = await ShippingConfig.getConfig();
-  let fee = method === "express" ? config.express.fee : config.standard.fee;
-  let reason = method === "express" ? "Express rate" : "Standard rate";
+
+  // ✅ Custom method support: agar method standard/express nahi, to ShippingMethod
+  //    collection se uski fee nikalo (inactive/missing => standard fee fallback).
+  let fee;
+  let isCustom = false;
+  if (method === "express") {
+    fee = config.express.fee;
+  } else if (method === "standard") {
+    fee = config.standard.fee;
+  } else {
+    const custom = await ShippingMethod.findOne({ code: method, is_active: true }).lean();
+    fee = custom ? custom.fee : config.standard.fee;
+    isCustom = !!custom;
+  }
+  let reason = method === "express" ? "Express rate" : method === "standard" ? "Standard rate" : (isCustom ? "Custom method rate" : "Standard rate");
   let free = false;
 
   // ✅ Threshold free shipping
@@ -215,6 +229,117 @@ const toggleShippingRule = async (req, res) => {
   }
 };
 
+// ==========================================
+// ✅ CUSTOM SHIPPING METHODS (admin "Add New")
+// ==========================================
+const getActiveShippingMethods = async (req, res) => {
+  try {
+    const methods = await ShippingMethod.find({ is_active: true })
+      .select("name code fee min_days max_days is_active")
+      .sort({ createdAt: 1 })
+      .lean();
+    res.json({ success: true, data: methods });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getShippingMethods = async (req, res) => {
+  try {
+    const methods = await ShippingMethod.find().sort({ createdAt: 1 }).lean();
+    res.json({ success: true, data: methods });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const createShippingMethod = async (req, res) => {
+  try {
+    const { name, fee = 0, min_days = 2, max_days = 4, is_active = true } = req.body || {};
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ success: false, message: "Method name is required" });
+    }
+    // ✅ name se slug code generate karo (unique clash => numbered suffix)
+    const baseCode = String(name).toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "method";
+    let code = baseCode;
+    let suffix = 2;
+    while (await ShippingMethod.findOne({ code }).lean()) {
+      code = `${baseCode}-${suffix++}`;
+    }
+    const method = await ShippingMethod.create({
+      name: String(name).trim(),
+      code,
+      fee: Math.max(0, Number(fee) || 0),
+      min_days: Math.max(0, Number(min_days) || 0),
+      max_days: Math.max(Number(min_days) || 0, Number(max_days) || 0),
+      is_active: !!is_active,
+    });
+    emit("shippingMethods:updated", method);
+    emit("shippingMethodCreated", method);
+    res.status(201).json({ success: true, data: method });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: "A method with this name already exists" });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const updateShippingMethod = async (req, res) => {
+  try {
+    const method = await ShippingMethod.findById(req.params.id);
+    if (!method) return res.status(404).json({ success: false, message: "Method not found" });
+
+    const b = req.body || {};
+    if (b.name !== undefined && String(b.name).trim()) {
+      method.name = String(b.name).trim();
+      // ✅ rename par code bhi sync karo (agar koi aur method us code par na ho)
+      const newCode = method.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+      const clash = await ShippingMethod.findOne({ code: newCode, _id: { $ne: method._id } }).lean();
+      if (!clash) method.code = newCode;
+    }
+    if (b.fee !== undefined) method.fee = Math.max(0, Number(b.fee) || 0);
+    if (b.min_days !== undefined) method.min_days = Math.max(0, Number(b.min_days) || 0);
+    if (b.max_days !== undefined) method.max_days = Math.max(Number(b.min_days) || method.min_days, Number(b.max_days) || 0);
+    if (b.is_active !== undefined) method.is_active = !!b.is_active;
+
+    await method.save();
+    emit("shippingMethods:updated", method);
+    emit("shippingMethodUpdated", method);
+    res.json({ success: true, data: method });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const deleteShippingMethod = async (req, res) => {
+  try {
+    await ShippingMethod.findByIdAndDelete(req.params.id);
+    emit("shippingMethods:updated", { id: req.params.id });
+    emit("shippingMethodDeleted", { id: req.params.id });
+    res.json({ success: true, message: "Method deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const toggleShippingMethod = async (req, res) => {
+  try {
+    const method = await ShippingMethod.findById(req.params.id);
+    if (!method) return res.status(404).json({ success: false, message: "Method not found" });
+    method.is_active = !method.is_active;
+    await method.save();
+    emit("shippingMethods:updated", method);
+    emit("shippingMethodToggled", method);
+    res.json({ success: true, data: method });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   calculateShipping,
   getShippingConfig,
@@ -226,4 +351,10 @@ module.exports = {
   updateShippingRule,
   deleteShippingRule,
   toggleShippingRule,
+  getActiveShippingMethods,
+  getShippingMethods,
+  createShippingMethod,
+  updateShippingMethod,
+  deleteShippingMethod,
+  toggleShippingMethod,
 };
