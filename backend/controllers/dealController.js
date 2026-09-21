@@ -181,7 +181,6 @@ const getDealById = async (req, res) => {
       .populate("productIds", "name sku images selling_price cost_price")
       .populate("categoryIds", "name code")
       .populate("brandIds", "name")
-      .populate("customerIds", "name email")
       .populate("bundleProducts.product", "name sku images selling_price")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");

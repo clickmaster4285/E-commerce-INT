@@ -40,6 +40,7 @@ const D = {
   image: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
   minus: "M20 12H4",
   upload: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
+  clock: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
 };
 
 function ini(name) {
@@ -458,6 +459,8 @@ export default function BrandDetailPage() {
   };
 
   const totalProducts = brandProducts.length;
+  const activeProducts = brandProducts.filter((p) => p.status === "active").length;
+  const inactiveProducts = totalProducts - activeProducts;
   const logoSrc = brand ? logoUrl(brand) : "";
   const hasLogo = Boolean(brand?.logo?.img_url) && !logoFailed;
   const hasUpdates = Boolean(brand?.updatedby);
@@ -489,102 +492,106 @@ export default function BrandDetailPage() {
   }
 
   return (
-    <div className="w-full space-y-5 pb-10" style={{ color: "var(--text-primary)" }}>
-      {/* ===== HEADER ===== */}
-      <div>
-        {/* Breadcrumb */}
-        <div className="mb-3 flex items-center gap-2 text-[11px]">
-          <button
-            onClick={() => router.push(backPath)}
-            className="transition hover:text-[var(--accent)]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Brands
-          </button>
-          <Ico d={D.chevron} className="h-2.5 w-2.5" style={{ color: "var(--text-muted)" }} />
-          <span style={{ color: "var(--text-primary)" }}>Brand Details</span>
-        </div>
-
-        {/* Header Card */}
-        <div
-          className="rounded-xl p-4"
-          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+    <div className="w-full space-y-4 pb-10" style={{ color: "var(--text-primary)" }}>
+      {/* ===== BREADCRUMB ===== */}
+      <nav className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+        <button
+          type="button"
+          onClick={() => router.push(backPath)}
+          className="transition-colors hover:text-[var(--text-primary)]"
         >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              {/* Logo */}
-              <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl"
-                style={{
-                  backgroundColor: "var(--bg-primary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                {hasLogo ? (
-                  <img
-                    src={logoSrc}
-                    alt={brand.name}
-                    onError={() => setLogoFailed(true)}
-                    className="h-full w-full object-contain p-2"
-                  />
-                ) : (
-                  <span className="text-lg font-bold" style={{ color: "var(--accent)" }}>
-                    {ini(brand.name)}
-                  </span>
-                )}
-              </div>
+          Brands
+        </button>
+        <Ico d={D.chevron} className="h-3 w-3" />
+        <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+          Brand Details
+        </span>
+      </nav>
 
-              {/* Title */}
-              <div className="min-w-0">
-                <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
-                  <h1 className="truncate text-xl font-bold tracking-tight">{brand.name}</h1>
-                  <StatusPill active={brand.is_active} />
-                </div>
-                <div
-                  className="flex flex-wrap items-center gap-2 text-[11px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  <span
-                    className="rounded border px-1.5 py-0.5 font-mono"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.04)",
-                      borderColor: "var(--border-color)",
-                    }}
-                  >
-                    {brand.brand_code || "—"}
-                  </span>
-                  {brand.country && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Ico d={D.globe} className="h-3 w-3" />
-                        {brand.country}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => router.push(backPath)}>
-                <Ico d={D.back} className="h-3.5 w-3.5" /> Back
-              </Button>
-              <Button primary onClick={openEdit}>
-                <Ico d={D.edit} className="h-3.5 w-3.5" /> Edit
-              </Button>
-              <Button
-                danger
-                disabled={deleteMutation.isPending}
-                onClick={() => setShowDelete(true)}
-              >
-                <Ico d={D.trash} className="h-3.5 w-3.5" /> Delete
-              </Button>
-            </div>
-          </div>
+      {/* ===== HEADER: Title + Actions ===== */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-[20px] leading-tight font-bold tracking-tight">Brand Details</h1>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button primary onClick={openEdit}>
+            <Ico d={D.edit} className="h-3.5 w-3.5" /> Edit
+          </Button>
+          <Button
+            danger
+            disabled={deleteMutation.isPending}
+            onClick={() => setShowDelete(true)}
+          >
+            <Ico d={D.trash} className="h-3.5 w-3.5" /> Delete
+          </Button>
         </div>
       </div>
+
+      {/* ===== BACK LINK ===== */}
+      <button
+        type="button"
+        onClick={() => router.push(backPath)}
+        className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:underline"
+        style={{ color: "var(--accent)" }}
+      >
+        <Ico d={D.back} className="h-3.5 w-3.5" /> Back to Brands
+      </button>
+
+      {/* ===== BRAND BANNER CARD ===== */}
+      <Card className="p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          {/* Logo */}
+          {hasLogo ? (
+            <div
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              <img
+                src={logoSrc}
+                alt={brand.name}
+                onError={() => setLogoFailed(true)}
+                className="max-h-full max-w-full object-contain p-1.5"
+              />
+            </div>
+          ) : (
+            <div
+              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                border: "1px dashed var(--border-color)",
+              }}
+            >
+              <Ico d={D.image} className="h-5 w-5 opacity-40" sw={1.4} />
+            </div>
+          )}
+
+          {/* Identity */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-[17px] leading-tight font-bold">{brand.name}</h2>
+              <StatusPill active={brand.is_active} />
+            </div>
+            <span
+              className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              {brand.brand_code || "—"}
+            </span>
+            {brand.description && (
+              <p
+                className="mt-2 max-w-2xl text-[12px] leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {brand.description}
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* ===== TABS ===== */}
       <div
@@ -630,75 +637,331 @@ export default function BrandDetailPage() {
 
       {/* ===== OVERVIEW TAB ===== */}
       {tab === "overview" && (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          {/* LEFT COLUMN */}
+          <div className="space-y-4 lg:col-span-2">
           
-          {/* TOP ROW: INFO (Wide), LOGO (Narrow), DESC (Narrow) */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          {/* Reference-style two-column overview layout */}
             
             {/* 1. BRAND INFORMATION */}
-            <div className="lg:col-span-2">
-              <Card className="h-full">
-                <CardHeader
-                  title="Brand Information"
-                  icon={<Ico d={D.tag} className="h-4 w-4" />}
+            <Card>
+              <CardHeader
+                title="Brand Information"
+                icon={<Ico d={D.tag} className="h-4 w-4" />}
+              />
+              <div className="px-4 pb-4">
+                <InfoRow label="Brand Code" value={brand.brand_code} mono />
+                <InfoRow label="Brand Name" value={brand.name} />
+                <InfoRow label="Country" value={brand.country || "—"} />
+                <InfoRow
+                  label="Status"
+                  value={brand.is_active ? "Active" : "Inactive"}
+                  green={brand.is_active}
+                  isLast
                 />
-                <div className="px-4 pb-4">
-                  <InfoRow label="Brand Code" value={brand.brand_code} mono />
-                  <InfoRow
-                    label="Status"
-                    value={brand.is_active ? "Active" : "Inactive"}
-                    green={brand.is_active}
-                  />
-                  <InfoRow label="Country" value={brand.country || "—"} />
-
-                  {/* Created Section */}
-                  <div className="py-2 border-b" style={{ borderColor: "var(--border-color)" }}>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        Created By
-                      </span>
-                      <span className="text-[12px] font-medium">
-                        {brand.createdby?.name || "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        Created At
-                      </span>
-                      <span className="text-[12px]">{formatDateTime(brand.created_at)}</span>
-                    </div>
-                  </div>
-
-                  {/* Updated Section */}
-                  <div className="pt-2">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        Last Updated By
-                      </span>
-                      <span className="text-[12px] font-medium">
-                        {brand.updatedby?.name || "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        Last Updated At
-                      </span>
-                      <span className="text-[12px]">
-                        {hasUpdates ? formatDateTime(brand.updated_at) : "Never"}
-                      </span>
-                    </div>
-                  </div>
+                <div
+                  className="mt-3 rounded-lg p-3"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                >
+                  <p
+                    className="mb-1 text-[10px] font-bold uppercase tracking-wide"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Description
+                  </p>
+                  {brand.description ? (
+                    <p
+                      className="whitespace-pre-wrap break-words text-[12px] leading-6"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {brand.description}
+                    </p>
+                  ) : (
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                      No description added
+                    </p>
+                  )}
                 </div>
-              </Card>
+              </div>
+            </Card>
+
+            {/* 2. ADDITIONAL DETAILS */}
+            <Card>
+              <CardHeader
+                title="Additional Details"
+                icon={<Ico d={D.clock} className="h-4 w-4" />}
+              />
+              <div className="px-4 pb-4">
+                <InfoRow label="Created At" value={formatDateTime(brand.created_at)} />
+                <InfoRow label="Created By" value={brand.createdby?.name} />
+                <InfoRow
+                  label="Updated At"
+                  value={hasUpdates ? formatDateTime(brand.updated_at) : "Never"}
+                />
+                <InfoRow
+                  label="Updated By"
+                  value={hasUpdates ? brand.updatedby?.name : "—"}
+                  isLast
+                />
+              </div>
+            </Card>
+
+            {/* 3. RECORD INFO BANNER */}
+            <div
+              className="flex items-start gap-3 rounded-xl px-4 py-3"
+              style={{
+                backgroundColor: "rgba(16,185,129,.08)",
+                border: "1px solid rgba(16,185,129,.25)",
+              }}
+            >
+              <span className="mt-0.5 shrink-0" style={{ color: "var(--accent)" }}>
+                <Ico d={D.eye} className="h-4 w-4" />
+              </span>
+              <p className="text-[11px] leading-5" style={{ color: "var(--text-secondary)" }}>
+                Brand record created by{" "}
+                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {brand.createdby?.name || "—"}
+                </span>{" "}
+                on {formatDateTime(brand.created_at)}
+                {hasUpdates ? (
+                  <>
+                    {" • "}Last updated by{" "}
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {brand.updatedby?.name || "—"}
+                    </span>{" "}
+                    on {formatDateTime(brand.updated_at)}
+                  </>
+                ) : (
+                  " • No updates recorded yet"
+                )}
+                {" • "}
+                {totalProducts} product{totalProducts === 1 ? "" : "s"} linked
+              </p>
             </div>
 
-            {/* 2. BRAND LOGO */}
-            <div className="lg:col-span-1">
-              <Card className="h-full">
-                <CardHeader
-                  title="Brand Logo"
-                  icon={<Ico d={D.image} className="h-4 w-4" />}
-                />
+            {/* 4. BRAND STATISTICS */}
+            <div>
+              <p
+                className="mb-2 text-[10px] font-bold uppercase tracking-widest"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Brand Statistics
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  { label: "Total Products", value: totalProducts, icon: D.box, color: "var(--accent)" },
+                  { label: "Active Products", value: activeProducts, icon: D.check, color: "#34d399" },
+                  { label: "Inactive Products", value: inactiveProducts, icon: D.minus, color: "#f87171" },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: "var(--bg-tertiary)", color: stat.color }}
+                    >
+                      <Ico d={stat.icon} className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p
+                        className="text-[18px] font-bold leading-tight tabular-nums"
+                        style={{ color: stat.color }}
+                      >
+                        {stat.value}
+                      </p>
+                      <p className="truncate text-[10px]" style={{ color: "var(--text-muted)" }}>
+                        {stat.label}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 5. RELATED PRODUCTS */}
+            <Card>
+              <CardHeader
+                title="Related Products"
+                icon={<Ico d={D.box} className="h-4 w-4" />}
+                action={
+                  productsLoading ? null : (
+                    <button
+                      type="button"
+                      onClick={() => setTab("products")}
+                      className="flex items-center gap-1 text-[11px] hover:underline"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      View All <Ico d={D.chevron} className="h-3 w-3" />
+                    </button>
+                  )
+                }
+              />
+              {productsLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10">
+                  <Spin />
+                  <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                    Loading products...
+                  </span>
+                </div>
+              ) : brandProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div
+                    className="mb-3 flex h-10 w-10 items-center justify-center rounded-full"
+                    style={{ backgroundColor: "var(--bg-tertiary)" }}
+                  >
+                    <Ico d={D.box} className="h-4 w-4 opacity-50" sw={1.5} />
+                  </div>
+                  <p className="text-[12px] font-medium">No products linked yet</p>
+                  <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    Link products to see them here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                  {brandProducts.slice(0, 4).map((product, index) => (
+                    <div
+                      key={product._id || index}
+                      className="rounded-lg p-3"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p
+                            className="truncate text-[12px] font-semibold"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {product.name || "—"}
+                          </p>
+                          <p
+                            className="mt-0.5 truncate font-mono text-[10px]"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {product.product_code || product.sku || "No code"}
+                          </p>
+                        </div>
+                        <span
+                          className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium"
+                          style={{
+                            backgroundColor:
+                              product.status === "active"
+                                ? "rgba(34,197,94,.10)"
+                                : "rgba(239,68,68,.10)",
+                            color:
+                              product.status === "active" ? "var(--success)" : "var(--danger)",
+                          }}
+                        >
+                          {product.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 truncate text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                        {product.category_id?.name || product.description || "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* 6. RECENT ACTIVITY */}
+            <Card>
+              <CardHeader
+                title="Recent Activity"
+                icon={<Ico d={D.activity} className="h-4 w-4" />}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setTab("activity")}
+                    className="flex items-center gap-1 text-[11px] hover:underline"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    View All <Ico d={D.chevron} className="h-3 w-3" />
+                  </button>
+                }
+              />
+              <div className="space-y-4 p-4">
+                <div className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className="flex h-7 w-7 items-center justify-center rounded-full"
+                      style={{ backgroundColor: "rgba(16,185,129,.12)", color: "var(--accent)" }}
+                    >
+                      <Ico d={D.plus} className="h-3.5 w-3.5" />
+                    </div>
+                    {hasUpdates && (
+                      <div className="mt-1 h-full w-px" style={{ backgroundColor: "var(--border-color)" }} />
+                    )}
+                  </div>
+                  <div className="pb-1">
+                    <p className="text-[12px] font-medium">Brand Created</p>
+                    <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      by{" "}
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {brand.createdby?.name || "—"}
+                      </span>
+                    </p>
+                    <p className="mt-1 font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateTime(brand.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                {hasUpdates ? (
+                  <div className="flex gap-3">
+                    <div
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                      style={{ backgroundColor: "rgba(96,165,250,.12)", color: "#60a5fa" }}
+                    >
+                      <Ico d={D.pencil} className="h-3.5 w-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-medium">Brand Updated</p>
+                      <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        by{" "}
+                        <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {brand.updatedby?.name || "—"}
+                        </span>
+                      </p>
+                      <p className="mt-1 font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
+                        {formatDateTime(brand.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="ml-10 rounded-lg border px-3 py-2"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      borderColor: "var(--border-color)",
+                    }}
+                  >
+                    <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      No updates recorded yet.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="space-y-4">
+            {/* 7. BRAND LOGO */}
+            <Card className="h-full">
+              <CardHeader
+                title="Brand Logo"
+                icon={<Ico d={D.image} className="h-4 w-4" />}
+              />
                 <div className="p-4 flex flex-col">
                   {hasLogo ? (
                     <div className="flex flex-col">
@@ -754,155 +1017,33 @@ export default function BrandDetailPage() {
                   )}
                 </div>
               </Card>
-            </div>
 
-            {/* 3. DESCRIPTION */}
-            <div className="lg:col-span-1">
-              <Card className="h-full">
-                <CardHeader
-                  title="Description"
-                  icon={<Ico d={D.activity} className="h-4 w-4" />}
+            {/* 8. QUICK INFO */}
+            <Card>
+              <CardHeader
+                title="Quick Info"
+                icon={<Ico d={D.tag} className="h-4 w-4" />}
+              />
+              <div className="px-4 pb-4">
+                <InfoRow label="Brand Code" value={brand.brand_code} mono />
+                <InfoRow label="Country" value={brand.country || "—"} />
+                <InfoRow
+                  label="Status"
+                  value={brand.is_active ? "Active" : "Inactive"}
+                  green={brand.is_active}
                 />
-                <div className="p-4">
-                  {brand.description ? (
-                    <p
-                      className="whitespace-pre-wrap break-words text-[12px] leading-6"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      {brand.description}
-                    </p>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-6 text-center">
-                      <div
-                        className="mb-2 flex h-8 w-8 items-center justify-center rounded-full"
-                        style={{ backgroundColor: "var(--bg-tertiary)" }}
-                      >
-                        <Ico d={D.minus} className="h-3 w-3 opacity-50" sw={1.6} />
-                      </div>
-                      <p className="text-[11px] font-medium">No description added</p>
-                      <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                        Add a description to provide more context about this brand.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-          </div>
-
-          {/* BOTTOM ROW: PRODUCTS (Full Width) */}
-          <div className="col-span-4">
-             <Card>
-              <div
-                className="flex items-center justify-between border-b px-4 py-3"
-                style={{ borderColor: "var(--border-color)" }}
-              >
-                <div className="flex items-center gap-2">
-                  <Ico d={D.box} className="h-4 w-4" style={{ color: "var(--accent)" }} />
-                  <h3 className="text-[12px] font-semibold">Products</h3>
-                  <span
-                    className="rounded-full px-1.5 py-0.5 text-[9px]"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    {totalProducts}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setTab("products")}
-                  className="flex items-center gap-1 text-[11px] hover:underline"
-                  style={{ color: "var(--accent)" }}
-                >
-                  View All <Ico d={D.chevron} className="h-3 w-3" />
-                </button>
+                <InfoRow label="Created At" value={formatDateTime(brand.created_at)} />
+                <InfoRow label="Created By" value={brand.createdby?.name} />
+                <InfoRow
+                  label="Updated At"
+                  value={hasUpdates ? formatDateTime(brand.updated_at) : "Never"}
+                />
+                <InfoRow
+                  label="Updated By"
+                  value={hasUpdates ? brand.updatedby?.name : "—"}
+                  isLast
+                />
               </div>
-
-              {productsLoading ? (
-                <div className="flex justify-center py-10">
-                  <Spin />
-                </div>
-              ) : brandProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div
-                    className="mb-3 flex h-10 w-10 items-center justify-center rounded-full"
-                    style={{ backgroundColor: "var(--bg-tertiary)" }}
-                  >
-                    <Ico d={D.box} className="h-4 w-4 opacity-50" sw={1.5} />
-                  </div>
-                  <p className="text-[12px] font-medium">No products linked yet</p>
-                  <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    Link products to see them here.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[12px]">
-                    <thead style={{ backgroundColor: "var(--bg-table)" }}>
-                      <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                        <th
-                          className="py-2.5 pl-4 pr-2 text-left text-[10px] font-medium"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          PRODUCT NAME
-                        </th>
-                        <th
-                          className="px-2 py-2.5 text-left text-[10px] font-medium"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          CODE
-                        </th>
-                        <th
-                          className="py-2.5 pr-4 text-left text-[10px] font-medium"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          STATUS
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brandProducts.slice(0, 5).map((product, index) => (
-                        <tr
-                          key={product._id || index}
-                          style={{
-                            borderBottom:
-                              index < 4 && index < brandProducts.length - 1
-                                ? "1px solid var(--border-color)"
-                                : "none",
-                          }}
-                        >
-                          <td className="py-2.5 pl-4 pr-2 font-medium">{product.name}</td>
-                          <td
-                            className="px-2 py-2.5 font-mono text-[11px]"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            {product.product_code || product.sku}
-                          </td>
-                          <td className="py-2.5 pr-4">
-                            <span
-                              className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
-                              style={{
-                                backgroundColor:
-                                  product.status === "active"
-                                    ? "rgba(34,197,94,.10)"
-                                    : "rgba(239,68,68,.10)",
-                                color:
-                                  product.status === "active"
-                                    ? "var(--success)"
-                                    : "var(--danger)",
-                              }}
-                            >
-                              {product.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </Card>
           </div>
 

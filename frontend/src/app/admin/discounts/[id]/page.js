@@ -208,7 +208,15 @@ export default function DiscountDetailPage() {
   });
 
   const isActive = getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled";
-  const hasUpdates = Boolean(discount?.created_at && discount?.updated_at && discount.created_at !== discount.updated_at);
+  // "Updated" entry sirf tab jab discount really edit/save hua ho:
+  // updateDiscount updatedBy set karta hai; create par wo null rehta hai.
+  // (created_at/updated_at snake_case model par exist nahi karte — createdAt/updatedAt use karo)
+  const hasUpdates = Boolean(
+    discount?.updatedBy ||
+    ((discount?.created_at ?? discount?.createdAt) !== undefined &&
+      (discount?.updated_at ?? discount?.updatedAt) !== undefined &&
+      (discount?.updated_at ?? discount?.updatedAt) !== (discount?.created_at ?? discount?.createdAt))
+  );
   
   const targetCount = useMemo(() => {
     if (!discount) return 0;

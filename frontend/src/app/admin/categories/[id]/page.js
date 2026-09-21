@@ -43,6 +43,8 @@ const D = {
   folder: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z",
   dots: "M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z", // Vertical dots
   eye: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
+  chevron: "M9 5l7 7-7 7",
+  user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
 };
 
 /* =========================================================
@@ -606,7 +608,7 @@ export default function CategoryDetailPage() {
   const categoryId = getId(params?.id);
   const backPath = "/admin/categories";
 
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("attributes");
   const [showDelete, setShowDelete] = useState(false);
   
   // ✅ NEW: Edit Modal States
@@ -753,55 +755,166 @@ export default function CategoryDetailPage() {
     // UPDATED: Wider container (98%), less bottom padding (pb-6), small top padding (pt-2)
     <div className="w-[98%] max-w-[1600px] mx-auto space-y-5 pb-6 pt-2 relative" style={{ color: "var(--text-primary)" }}>
 
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-3">
+      {/* BREADCRUMB + HEADER + INFO CARD */}
+      <div>
+        {/* Breadcrumb */}
+        <nav
+          className="mb-2 flex items-center gap-2 text-[12px]"
+          style={{ color: "var(--text-muted)" }}
+        >
           <button
             type="button"
             onClick={() => router.push(backPath)}
-            className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-0.5"
+            className="transition-colors hover:text-[var(--text-primary)]"
           >
-            <Ico d={D.back} className="w-4 h-4" />
+            Categories
           </button>
+          <Ico d={D.chevron} className="w-3 h-3" />
+          {parentCategoryName !== "None" && (
+            <>
+              <span className="max-w-[180px] truncate">{parentCategoryName}</span>
+              <Ico d={D.chevron} className="w-3 h-3" />
+            </>
+          )}
+          <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
+            {category.name}
+          </span>
+        </nav>
+
+        {/* Header Row: Title + Actions */}
+        <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-[22px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">{category.name}</h1>
-              <StatusBadge active={category.is_active !== false} />
-            </div>
-            {category.description && (
-              <p className="text-[13px] mt-1.5 max-w-xl leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                {category.description}
-              </p>
-            )}
-            <div className="flex items-center gap-4 mt-3 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                <Ico d={D.box} className="w-3.5 h-3.5" /> {categoryAttributes.length} attribute{categoryAttributes.length !== 1 ? "s" : ""}
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                <Ico d={D.clock} className="w-3.5 h-3.5" /> {formatDateTime(category.created_at)}
-              </span>
-            </div>
+            <h1 className="text-[20px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">
+              Category Details
+            </h1>
+            <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              View and manage category information, attributes and settings.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-3.5 h-3.5" />}>
+              Edit
+            </Button>
+            <Button
+              danger
+              onClick={() => setShowDelete(true)}
+              icon={<Ico d={D.trash} className="w-3.5 h-3.5" />}
+            >
+              Delete
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-3.5 h-3.5" />}>
-            Edit
-          </Button>
-          <Button
-            danger
-            onClick={() => setShowDelete(true)}
-            icon={<Ico d={D.trash} className="w-3.5 h-3.5" />}
+        {/* Category Info Card (Compact) */}
+        <div
+          className="rounded-xl px-5 py-4 flex flex-col gap-5 lg:flex-row lg:items-center"
+          style={cardStyle}
+        >
+          {/* LEFT: Identity */}
+          <div className="flex flex-1 items-start gap-3.5 min-w-0">
+            <div className="w-12 h-12 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
+              <Ico d={D.folder} className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
+                  {category.name}
+                </h2>
+                <span
+                  className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {category.category_code || category.slug || "—"}
+                </span>
+              </div>
+              {category.slug && category.slug !== category.category_code && (
+                <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  Slug: {category.slug}
+                </p>
+              )}
+              {category.description && (
+                <p className="mt-2 max-w-md text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  {category.description}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <StatusBadge active={category.is_active !== false} />
+                <span
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <Ico d={D.user} className="w-3.5 h-3.5" /> Created by{" "}
+                  {category.createdby?.name || "—"}
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <Ico d={D.clock} className="w-3.5 h-3.5" /> Created:{" "}
+                  {formatDateTime(category.created_at)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Basic Information */}
+          <div
+            className="flex shrink-0 flex-col gap-2.5 border-t pt-4 lg:min-w-[280px] lg:border-l lg:border-t-0 lg:pb-1 lg:pl-6 lg:pt-1"
+            style={{ borderColor: "var(--border-color)" }}
           >
-            Delete
-          </Button>
+            <p
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Basic Information
+            </p>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                Category Name
+              </span>
+              <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
+                {category.name}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                Category Code
+              </span>
+              <span
+                className="rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold text-[var(--accent)]"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+              >
+                {category.category_code || "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                Parent Category
+              </span>
+              <span className="max-w-[140px] truncate text-[12px] font-semibold text-[var(--accent)]">
+                {parentCategoryName}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                Attributes
+              </span>
+              <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
+                {categoryAttributes.length}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* TABS */}
       <div className="flex items-center gap-1 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
-          { id: "overview", label: "Overview", icon: D.eye },
           { id: "attributes", label: "Attributes", count: categoryAttributes.length, icon: D.box },
           { id: "history", label: "History", icon: D.clock },
         ].map((item) => {
@@ -837,222 +950,6 @@ export default function CategoryDetailPage() {
           );
         })}
       </div>
-
-      {/* OVERVIEW TAB */}
-      {tab === "overview" && (
-        // UPDATED: Grid uses minmax for left column and fixed width for right column to balance proportions
-        // Added items-stretch to ensure both cards match height
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_400px] gap-6 items-stretch">
-          
-          {/* LEFT COLUMN: Assigned Attributes Table */}
-          {/* Added h-full to stretch to match right column */}
-          <div className="rounded-xl overflow-hidden flex flex-col h-full" style={cardStyle}>
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Assigned Attributes</h3>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">These attributes are available for products in this category.</p>
-              </div>
-              <Button primary icon={<Ico d={D.box} className="w-3.5 h-3.5" />} onClick={() => setTab("attributes")}>
-                Manage Attributes
-              </Button>
-            </div>
-            
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left">
-                <thead>
-                  <tr style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-10">#</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options / Values</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoryAttributes.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-10 text-center">
-                        <p className="text-[13px] text-[var(--text-muted)]">No attributes assigned yet.</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    categoryAttributes.slice(0, 5).map((attr, idx) => {
-                      const optionLabels = sanitizeOptionLabels(attr.values);
-                      const isMultiSelect = attr.data_type === "multi_select" || attr.data_type === "select";
-                      const isBoolean = attr.data_type === "boolean";
-                      const isActive = attr.is_active !== false;
-                      const attrId = getAttributeId(attr);
-                      const isMenuOpen = activeMenuId === attrId;
-
-                      const PREVIEW_LIMIT = 3;
-                      const visibleOptions = optionLabels.slice(0, PREVIEW_LIMIT);
-                      const hiddenCount = optionLabels.length - PREVIEW_LIMIT;
-
-                      return (
-                        <tr
-                          key={attr._id}
-                          className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group"
-                          style={{ borderBottom: "1px solid var(--border-color)", opacity: isActive ? 1 : 0.5 }}
-                        >
-                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
-                          <td className="px-5 py-3 text-[13px] font-medium text-[var(--text-primary)]">{attr.name}</td>
-                          <td className="px-5 py-3">
-                            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
-                              {getDataTypeLabel(attr.data_type)}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3">
-                            {isMultiSelect ? (
-                              <div className="flex flex-wrap gap-1">
-                                {visibleOptions.map((label, i) => (
-                                  <span key={i} className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium rounded truncate max-w-[80px]" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
-                                    {label}
-                                  </span>
-                                ))}
-                                {hiddenCount > 0 && <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>+{hiddenCount} more</span>}
-                              </div>
-                            ) : isBoolean ? (
-                              <span className="text-[11px] text-[var(--text-secondary)]">Yes, No</span>
-                            ) : (
-                              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>\u2014</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3">
-                            <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
-                              style={{
-                                backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
-                                color: isActive ? "#34d399" : "#f87171",
-                                border: `1px solid ${isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"}`,
-                              }}
-                            >
-                              <span className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
-                              {isActive ? "Active" : "Inactive"}
-                            </span>
-                          </td>
-                          
-                          {/* ACTION COLUMN */}
-                          <td className="px-5 py-3">
-                            <div className="flex items-center justify-end relative action-menu-container">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(isMenuOpen ? null : attrId);
-                                }}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                              >
-                                <Ico d={D.dots} className="w-4 h-4" />
-                              </button>
-
-                              {/* DROPDOWN MENU */}
-                              {isMenuOpen && (
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl z-50 overflow-visible pointer-events-auto">
-                                  <div className="py-1">
-                                    <button
-                                      onClick={() => {
-                                        setViewPanelAttr(attr);
-                                        setActiveMenuId(null);
-                                      }}
-                                      className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
-                                    >
-                                      <Ico d={D.eye} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                                      View Options
-                                    </button>
-                                    
-                                    <button
-                                      onClick={(e) => {
-                                        // ✅ FIX ISSUE 1: Stop propagation to prevent row click
-                                        e.stopPropagation();
-                                        const fullAttr = categoryAttributes.find((a) => getAttributeId(a) === attrId);
-                                        if (fullAttr) {
-                                          // ✅ FIX ISSUE 1: Close view panel if open
-                                          setViewPanelAttr(null);
-                                          setAttrEditTarget(fullAttr);
-                                          setAttrEditOpen(true);
-                                        }
-                                        setActiveMenuId(null);
-                                      }}
-                                      className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
-                                    >
-                                      <Ico d={D.edit} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                                      Edit Attribute
-                                    </button>
-
-                                    <div className="h-px bg-[var(--border-color)] my-1" />
-
-                                    <button
-                                      onClick={() => handleToggleAttributeActive(attr)}
-                                      className="w-full px-4 py-2 text-left text-[12px] font-medium hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
-                                      style={{ color: isActive ? "#f87171" : "#34d399" }}
-                                    >
-                                      <Ico d={isActive ? "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-3.5 h-3.5" />
-                                      {isActive ? "Disable" : "Enable"}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {categoryAttributes.length > 5 && (
-              <div className="px-5 py-3 border-t border-[var(--border-color)] text-center shrink-0">
-                <button onClick={() => setTab("attributes")} className="text-[11px] font-medium text-[var(--accent)] hover:underline">
-                  View all {categoryAttributes.length} attributes
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: Category Information */}
-          {/* Added h-full to stretch to match left column */}
-          <div className="rounded-xl overflow-hidden flex flex-col h-full" style={cardStyle}>
-            <div className="px-5 py-4 border-b border-[var(--border-color)] shrink-0">
-              <h3 className="text-[14px] font-bold text-[var(--text-primary)]">Category Information</h3>
-            </div>
-            <div className="p-5 space-y-4 flex-1">
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Category Name</span>
-                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{category.name}</span>
-                </div>
-                
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Slug</span>
-                  <span className="text-[13px] font-mono font-medium text-[var(--text-secondary)] text-right break-all">{category.slug || category.category_code || "\u2014"}</span>
-                </div>
-
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Created At</span>
-                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{formatDateTime(category.created_at)}</span>
-                </div>
-
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] w-28 shrink-0 pt-0.5">Created By</span>
-                  <span className="text-[13px] font-medium text-[var(--text-primary)] text-right">{category.createdby?.name || "—"}</span>
-                </div>
-              </div>
-
-              {category.description && (
-                <div className="pt-4 border-t border-[var(--border-color)]">
-                  <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Description</p>
-                  <p className="text-[12px] leading-relaxed text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-color)]">
-                    {category.description}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>
-      )}
 
       {/* ATTRIBUTES TAB */}
       {tab === "attributes" && (

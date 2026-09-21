@@ -205,6 +205,7 @@ export default function DealDetailPage() {
     queryKey: ["deal", dealId],
     queryFn: () => dealApi.getById(dealId),
     enabled: !!dealId,
+    retry: false,
   });
 
   const { data: allProducts = [] } = useQuery({

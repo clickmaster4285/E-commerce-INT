@@ -26,7 +26,7 @@ import {
 import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
 
-/* ═══════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    REUSABLE COMPONENTS
 ═══════════════════════════════════════════════ */
 
@@ -486,7 +486,7 @@ export default function ProfilePage() {
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
 
-        {/* ══ HEADER — Avatar + Name + Role + Store Badge ══ */}
+        {/* ══ HEADER — Avatar + Name + Store Badge ═ */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-5 p-5">
 
@@ -529,12 +529,9 @@ export default function ProfilePage() {
               >
                 {profile.name}
               </h1>
-              <p
-                className="text-[13px] font-semibold mb-2.5"
-                style={{ color: "var(--accent)" }}
-              >
-                {profile.role}
-              </p>
+              
+              {/* REMOVED ROLE TEXT HERE */}
+              
               <div
                 className="inline-flex items-center gap-2 rounded-full px-3 py-1"
                 style={{
@@ -577,7 +574,9 @@ export default function ProfilePage() {
               </div>
               <InfoRow icon={Calendar} label="Joined:" value={profile.joinDate} />
               <InfoRow icon={Clock} label="Last Login:" value={profile.lastLogin} />
-              <InfoRow icon={Award} label="Role:" value={profile.role} accent />
+              
+              {/* REMOVED ROLE ROW HERE */}
+              
               <InfoRow icon={ShieldCheck} label="Status:" value="Active & Verified" accent />
             </div>
 
@@ -796,7 +795,9 @@ export default function ProfilePage() {
                     </h4>
                     <div className="mt-1">
                       <InfoRow icon={User} label="Username:" value={profile.username} />
-                      <InfoRow icon={Award} label="Role:" value={profile.role} accent />
+                      
+                      {/* REMOVED ROLE ROW HERE */}
+                      
                       <InfoRow icon={Calendar} label="Member Since:" value={profile.memberSince} />
                       <InfoRow icon={ShieldCheck} label="Account:" value="Active & Verified" accent />
                     </div>

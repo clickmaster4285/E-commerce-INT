@@ -951,11 +951,160 @@ export default function ProductDetailPage() {
   const firstVariant = variants[0];
   const productImage = firstVariant?.images?.[0] ? getImageUrl(firstVariant.images[0].img_url) : null;
 
+  // Hero side panel: attribute summary (derived from existing variant attributes)
+  const attributeSummary = (() => {
+    const map = {};
+    (variants || []).forEach((v) => {
+      Object.entries(v.attributes || {}).forEach(([name, value]) => {
+        const n = String(name || "").trim();
+        if (!n) return;
+        const val = String(value ?? "").trim();
+        if (!map[n]) map[n] = new Set();
+        if (val) map[n].add(val);
+      });
+    });
+    return Object.entries(map).map(([name, vals]) => ({ name, display: vals.size > 1 ? "Multiple" : [...vals][0] || "—" }));
+  })();
+  const attributeCount = attributeSummary.length;
+  const tagCount = allAssignedTags.length;
+
   // Helper to open gallery
   const openGallery = (index) => {
     setCurrentImageIndex(index);
     setShowImageGallery(true);
   };
+
+  // ==================== VARIANTS SECTION (shared: Overview + Variants tabs) ====================
+  const variantsSection = (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
+        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{totalVariants} {totalVariants === 1 ? "variant" : "variants"} · {totalStock} units total</p>
+      </div>
+      <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+        <Plus className="w-4 h-4" /> Add Variant
+      </button>
+    </div>
+
+    {variants.length === 0 ? (
+      <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+          <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
+        </div>
+        <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
+        <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
+        <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+          <Plus className="w-4 h-4" /> Create First Variant
+        </button>
+      </div>
+    ) : (
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <table className="w-full text-[12px]">
+          <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+            <tr>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Image</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">SKU</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Variant / Color</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Price</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Stock</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Status</th>
+              <th className="text-right px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {variants.map((variant, index) => {
+              const isLowStock = Number(variant.quantity) <= 5;
+              const isActive = variant.status === "active" || !variant.status;
+              return (
+                <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                  <td className="px-4 py-4">
+                    {variant.images?.length > 0 ? (
+                      <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
+                        <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
+                  <td className="px-4 py-4">
+                    <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
+                    {variant.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {variant.tags.slice(0, 2).map((tag, idx) => (
+                          <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                        ))}
+                        {variant.tags.length > 2 && (
+                          <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
+                  <td className="px-4 py-4">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                      style={{
+                        backgroundColor: isActive ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                        color: isActive ? "#10b981" : "#ef4444",
+                        border: `1px solid ${isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                      }}>
+                      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "#10b981" : "#ef4444" }} />
+                      {isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-right relative z-10">
+                    <MoreMenu actions={[
+                      { 
+                        label: "Edit Variant", 
+                        icon: <Edit3 className="w-3.5 h-3.5" />, 
+                        onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) 
+                      },
+                      { 
+                        label: "Add Tag", 
+                        icon: <TagIcon className="w-3.5 h-3.5" />, 
+                        onClick: () => { 
+                          setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); 
+                          setShowVariantTagsModal(true); 
+                          setVariantTagInput(""); 
+                        } 
+                      },
+                      { 
+                        label: isActive ? "Disable" : "Enable", 
+                        icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
+                        onClick: () => {
+                          const updatedVariants = product.variants.map(v => 
+                            String(v._id) === String(variant._id) 
+                              ? { ...v, status: isActive ? "inactive" : "active" } 
+                              : v
+                          );
+                          const data = new FormData();
+                          data.append("variants", JSON.stringify(updatedVariants));
+                          updateMutation.mutate({ id: product._id, data });
+                        }
+                      },
+                      { 
+                        label: "Delete", 
+                        icon: <Trash2 className="w-3.5 h-3.5" />, 
+                        destructive: true, 
+                        onClick: () => {
+                          setDeleteVariantTarget(variant);
+                        } 
+                      },
+                    ]} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+  );
 
   return (
     <div className="w-full space-y-5 pb-10">
@@ -969,60 +1118,51 @@ export default function ProductDetailPage() {
         />
       )}
 
-      {/* BREADCRUMB */}
-      <nav className="flex items-center gap-2 text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-        <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors">Products</button>
-        <ChevronRight className="w-3 h-3" />
-        <span className="font-medium text-[var(--text-secondary)]">Product Details</span>
-      </nav>
-
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <button
-            onClick={() => router.push("/admin/products")}
-            className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-0.5"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-[20px] md:text-[24px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
-                {product.name}
-              </h1>
-              <StatusBadge active={product.status === "active"} size="md" />
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              <span>{totalVariants} Variants</span>
-              <span className="opacity-30">|</span>
-              <span>{totalStock} Units</span>
-              <span className="opacity-30">|</span>
-              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />Created {fd(product.created_at)}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+      {/* HEADER: Breadcrumb + Actions */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <nav className="flex items-center flex-wrap gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors font-medium">Products</button>
+          <ChevronRight className="w-3 h-3 shrink-0" />
+          {product.category_id?.name && (
+            <>
+              <span className="max-w-[160px] truncate">{product.category_id.name}</span>
+              <ChevronRight className="w-3 h-3 shrink-0" />
+            </>
+          )}
+          {product.brand_id?.name && (
+            <>
+              <span className="max-w-[160px] truncate">{product.brand_id.name}</span>
+              <ChevronRight className="w-3 h-3 shrink-0" />
+            </>
+          )}
+          <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{product.name}</span>
+        </nav>
+        <div className="flex items-center gap-2">
           <button
             onClick={handleEdit}
-            className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90"
+            className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            <Pencil className="w-4 h-4" /> Edit
+            <Pencil className="w-3.5 h-3.5" /> Edit
           </button>
-          <MoreMenu actions={[
-            { label: "Edit Product", icon: <Edit3 className="w-4 h-4" />, onClick: handleEdit },
-            { label: "Delete Product", icon: <Trash2 className="w-4 h-4" />, destructive: true, onClick: handleDelete },
-          ]} />
+          <button
+            onClick={handleDelete}
+            className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
+            style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Remove
+          </button>
         </div>
       </div>
 
-      {/* PRODUCT HERO */}
-      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+      {/* PRODUCT HERO: Gallery + Info + Meta panel */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+        <div className="xl:col-span-9 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
           {/* Image Area - NOW CLICKABLE */}
           <div className="relative bg-[var(--bg-tertiary)] p-6 md:p-8 flex items-center justify-center min-h-[320px] md:min-h-[420px] group">
             {firstVariant?.images?.length > 0 ? (
-              <div className="w-full max-w-md">
+              <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
                 <button 
                   onClick={() => openGallery(0)}
@@ -1045,7 +1185,7 @@ export default function ProductDetailPage() {
 
                 {/* Clickable Thumbnails */}
                 {firstVariant.images.length > 1 && (
-                  <div className="flex gap-2 mt-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="flex max-h-[380px] w-14 shrink-0 flex-col gap-2 overflow-y-auto pb-1 scrollbar-hide">
                     {firstVariant.images.map((img, i) => (
                       <button
                         key={i}
@@ -1076,10 +1216,11 @@ export default function ProductDetailPage() {
 
           {/* Info Area */}
           <div className="p-6 md:p-8 flex flex-col gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
-            </div>
+            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
             
+            <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
+            </p>
             <div className="flex items-baseline gap-3">
               <span className="text-2xl font-extrabold" style={{ color: "var(--text-primary)" }}>
                 Rs. {Number(firstVariant?.selling_price || product.variants?.[0]?.selling_price || 0).toLocaleString()}
@@ -1088,27 +1229,114 @@ export default function ProductDetailPage() {
                 <span className="text-base line-through" style={{ color: "var(--text-muted)" }}>{priceRange}</span>
               ) : null}
             </div>
-            
-            <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
-            </p>
-            
-            <div className="flex flex-wrap gap-2">
-              {(displayTagNames || []).map((tag) => (
-                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "#10b981" : "#ef4444" }} />
+              <span className="text-[12px] font-bold" style={{ color: product.status === "active" ? "#10b981" : "#ef4444" }}>
+                {product.status === "active" ? "In Stock" : "Inactive"}
+              </span>
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                (Total: {totalStock} units)
+              </span>
             </div>
             
-            {/* Simplified Quick Info Grid */}
-            <div className="grid grid-cols-2 gap-3 mt-1">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
-                <p className="text-[10px] uppercase tracking-wide font-bold mb-0.5" style={{ color: "var(--text-muted)" }}>Category</p>
-                <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.category_id?.name || "—"}</p>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Layers3 className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Variants</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalVariants}</p>
               </div>
               <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
-                <p className="text-[10px] uppercase tracking-wide font-bold mb-0.5" style={{ color: "var(--text-muted)" }}>Brand</p>
-                <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.brand_id?.name || "—"}</p>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Package className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Stock</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalStock}</p>
               </div>
+              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <FileText className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Attributes</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{attributeCount}</p>
+              </div>
+              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TagIcon className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Tags</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{tagCount}</p>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        {/* SIDE PANEL: Brand / Category / Key Attributes */}
+        <div className="xl:col-span-3 rounded-2xl overflow-hidden self-start" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-5 flex flex-col gap-4">
+            {/* Brand */}
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Brand</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[12px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                    {ini(product.brand_id?.name)}
+                  </div>
+                  <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {product.brand_id?.name || "—"}
+                  </span>
+                </div>
+                {product.brand_id?._id && (
+                  <button type="button" onClick={() => router.push(`/admin/brands/${product.brand_id._id}`)} className="flex items-center gap-0.5 text-[11px] font-medium hover:underline shrink-0" style={{ color: "var(--accent)" }}>
+                    View brand <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div className="border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Category</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                    <Box className="w-4 h-4" />
+                  </div>
+                  <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {product.category_id?.name || "—"}
+                  </span>
+                </div>
+                {product.category_id?._id && (
+                  <button type="button" onClick={() => router.push(`/admin/categories/${product.category_id._id}`)} className="flex items-center gap-0.5 text-[11px] font-medium hover:underline shrink-0" style={{ color: "var(--accent)" }}>
+                    View category <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Key Attributes */}
+            <div className="border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Key Attributes</p>
+              {attributeSummary.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {attributeSummary.slice(0, 4).map((attr) => (
+                      <div key={attr.name} className="rounded-lg p-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                        <p className="truncate text-[10px] font-semibold" style={{ color: "var(--text-primary)" }}>{attr.name}</p>
+                        <p className="truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{attr.display}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => router.push(`/admin/products/${id}/add-variant`)} className="mt-2.5 flex items-center gap-0.5 text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
+                    View all attributes <ChevronRight className="w-3 h-3" />
+                  </button>
+                </>
+              ) : (
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No attributes set on variants.</p>
+              )}
             </div>
           </div>
         </div>
@@ -1154,71 +1382,155 @@ export default function ProductDetailPage() {
           <div className="space-y-6">
             {activeTab === "overview" && (
               <div className="space-y-5">
-                {/* Product Details + Description - Full Width Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                  <div className="lg:col-span-2 self-start">
+                {/* Product Details + Description + Variants | Side cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  <div className="lg:col-span-2 flex flex-col gap-5">
                     {/* Product Details */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
-                        <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
-                          <Package className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
-                          <p className="text-[10px] text-[var(--text-muted)]">Basic information and configuration</p>
-                        </div>
+                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
+                        <span className="text-[10px] font-medium text-[var(--text-muted)]">Basic information</span>
                       </div>
-                      <div className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
+                      <div className="p-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">SKU</p>
+                            <p className="text-[14px] font-mono font-medium text-[var(--text-secondary)]">{firstVariant?.sku || variants?.[0]?.sku || "—"}</p>
+                          </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.name}</p>
                           </div>
-                          {(product.product_code || product.sku) && (
-                            <div>
-                              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Code</p>
-                              <p className="text-[14px] font-mono text-[var(--text-secondary)]">{product.product_code || product.sku}</p>
-                            </div>
-                          )}
-                          <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
-                          </div>
-                          <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Brand</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.brand_id?.name || "—"}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Status</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? "Active" : "Inactive"}</p>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Tax Rate</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.tax || 0}%</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Status</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? "Active" : "Inactive"}</p>
+                          </div>
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Price Range</p>
                             <p className="text-[14px] font-semibold text-[var(--accent)]">{priceRange}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Total Stock</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{totalStock} units</p>
                           </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Created at</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{fd(product.created_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Description + Tags */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Description</h3>
+                      </div>
+                      <div className="p-5 space-y-5">
+                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
+                          {product.description || "No description provided for this product."}
+                        </p>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Tags</p>
+                            {displayTagNames.length > 0 && (
+                              <button type="button" onClick={() => setActiveTab("tags")} className="text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
+                                Manage
+                              </button>
+                            )}
+                          </div>
+                          {displayTagNames.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {(displayTagNames || []).map((tag) => (
+                                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[12px] text-[var(--text-muted)]">No tags assigned to this product yet.</p>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3 self-start">
-                    {/* Description */}
+                  <div className="flex flex-col gap-3">
+                    {/* Product Images */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                       <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30 flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Description</h3>
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Images</h3>
+                        <span className="text-[10px] font-medium text-[var(--text-muted)]">{firstVariant?.images?.length || 0} {firstVariant?.images?.length === 1 ? "image" : "images"}</span>
                       </div>
                       <div className="p-3">
-                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
-                          {product.description || "No description provided for this product."}
-                        </p>
+                        {firstVariant?.images?.length > 0 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openGallery(0)}
+                              className="group/img relative block w-full overflow-hidden rounded-lg border border-[var(--border-color)]"
+                            >
+                              <img src={getImageUrl(firstVariant.images[0].img_url)} alt={product.name} className="w-full h-36 object-cover" />
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
+                                <span className="flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover/img:opacity-100">
+                                  <ZoomIn className="w-3 h-3" /> View
+                                </span>
+                              </span>
+                            </button>
+                            {firstVariant.images.length > 1 && (
+                              <div className="mt-2 grid grid-cols-4 gap-2">
+                                {firstVariant.images.slice(1, 4).map((img, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => openGallery(i + 1)}
+                                    className="h-14 w-full overflow-hidden rounded-md border border-[var(--border-color)] transition-all hover:ring-2 hover:ring-[var(--accent)]"
+                                  >
+                                    <img src={getImageUrl(img.img_url)} alt="" className="h-full w-full object-cover" />
+                                  </button>
+                                ))}
+                                {firstVariant.images.length > 4 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openGallery(4)}
+                                    className="flex h-14 w-full items-center justify-center rounded-md text-[11px] font-bold"
+                                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                                  >
+                                    +{firstVariant.images.length - 4}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-dashed" style={{ borderColor: "var(--border-color)" }}>
+                            <ImageIcon className="mb-1 h-6 w-6" style={{ color: "var(--text-muted)" }} />
+                            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No images available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Info */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Quick Info</h3>
+                      </div>
+                      <div className="px-3 pb-3 pt-1">
+                        <DataRow label="Total Stock" value={`${totalStock} units`} highlight />
+                        <DataRow label="Total Variants" value={totalVariants} />
+                        <DataRow label="Stock Value" value={`Rs. ${totalValue.toLocaleString()}`} />
+                        <DataRow label="Price Range" value={priceRange} highlight mono />
+                        <DataRow label="Tax Rate" value={`${product.tax || 0}%`} />
                       </div>
                     </div>
 
@@ -1276,140 +1588,14 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Variants (shared section) */}
+                {variantsSection}
               </div>
             )}
 
             {/* VARIANTS TAB */}
-            {activeTab === "variants" && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{totalVariants} {totalVariants === 1 ? "variant" : "variants"} · {totalStock} units total</p>
-                  </div>
-                  <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                    <Plus className="w-4 h-4" /> Add Variant
-                  </button>
-                </div>
-
-                {variants.length === 0 ? (
-                  <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                      <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
-                    </div>
-                    <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
-                    <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
-                    <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Plus className="w-4 h-4" /> Create First Variant
-                    </button>
-                  </div>
-                ) : (
-                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                    <table className="w-full text-[12px]">
-                      <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                        <tr>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Image</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">SKU</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Variant / Color</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Price</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Stock</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Status</th>
-                          <th className="text-right px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {variants.map((variant, index) => {
-                          const isLowStock = Number(variant.quantity) <= 5;
-                          const isActive = variant.status === "active" || !variant.status;
-                          return (
-                            <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                              <td className="px-4 py-4">
-                                {variant.images?.length > 0 ? (
-                                  <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
-                                    <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
-                                  </button>
-                                ) : (
-                                  <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
-                                    <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
-                              <td className="px-4 py-4">
-                                <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
-                                {variant.tags?.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {variant.tags.slice(0, 2).map((tag, idx) => (
-                                      <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
-                                    ))}
-                                    {variant.tags.length > 2 && (
-                                      <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
-                              <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
-                              <td className="px-4 py-4">
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                                  style={{
-                                    backgroundColor: isActive ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                                    color: isActive ? "#10b981" : "#ef4444",
-                                    border: `1px solid ${isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
-                                  }}>
-                                  <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "#10b981" : "#ef4444" }} />
-                                  {isActive ? "Active" : "Inactive"}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 text-right relative z-10">
-                                <MoreMenu actions={[
-                                  { 
-                                    label: "Edit Variant", 
-                                    icon: <Edit3 className="w-3.5 h-3.5" />, 
-                                    onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) 
-                                  },
-                                  { 
-                                    label: "Add Tag", 
-                                    icon: <TagIcon className="w-3.5 h-3.5" />, 
-                                    onClick: () => { 
-                                      setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); 
-                                      setShowVariantTagsModal(true); 
-                                      setVariantTagInput(""); 
-                                    } 
-                                  },
-                                  { 
-                                    label: isActive ? "Disable" : "Enable", 
-                                    icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
-                                    onClick: () => {
-                                      const updatedVariants = product.variants.map(v => 
-                                        String(v._id) === String(variant._id) 
-                                          ? { ...v, status: isActive ? "inactive" : "active" } 
-                                          : v
-                                      );
-                                      const data = new FormData();
-                                      data.append("variants", JSON.stringify(updatedVariants));
-                                      updateMutation.mutate({ id: product._id, data });
-                                    }
-                                  },
-                                  { 
-                                    label: "Delete", 
-                                    icon: <Trash2 className="w-3.5 h-3.5" />, 
-                                    destructive: true, 
-                                    onClick: () => {
-                                      setDeleteVariantTarget(variant);
-                                    } 
-                                  },
-                                ]} />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
+            {activeTab === "variants" && variantsSection}
 
             {/* TAGS TAB */}
             {activeTab === "tags" && (

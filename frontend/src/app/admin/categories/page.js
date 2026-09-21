@@ -213,7 +213,14 @@ const [viewMode, setViewMode] = useState(() => {
           })
           .filter((a) => !!a.attribute_id);
         if (catId && properAttrs.length > 0) {
-          try { await categoryApi.updateAttributes(String(catId), properAttrs); } catch (err) { console.error("Attribute sync failed:", err); }
+          const storedAttrs = savedCategory?.attributes || [];
+          // Create API attributes khud persist karta hai — foran baad sync
+          // chalane se attributes shape differ hoti hai aur fake "Category
+          // Updated" history entry ban jati hai. Isliye sync sirf fallback
+          // ke tor par chalao (jab create mein attributes persist na hon).
+          if (storedAttrs.length === 0) {
+            try { await categoryApi.updateAttributes(String(catId), properAttrs); } catch (err) { console.error("Attribute sync failed:", err); }
+          }
         }
       } catch (syncErr) { console.error("Attribute sync step failed:", syncErr); }
       await Promise.all([

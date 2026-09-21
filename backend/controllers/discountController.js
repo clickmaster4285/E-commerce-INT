@@ -1,5 +1,7 @@
 const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
 
 const emitSocketEvent = (event, data) => {
@@ -7,6 +9,21 @@ const emitSocketEvent = (event, data) => {
     const io = getIO();
     if (io) io.emit(event, data);
   } catch (_) {}
+};
+
+// createdBy/updatedBy creator User ya Employee dono ho sakta hai.
+// Model ref sirf User hai, isliye populate fail hone par Employee se resolve karo.
+const resolveCreatorInfo = async (rawId) => {
+  if (!rawId) return null;
+  try {
+    const user = await User.findById(rawId).select("name email").lean();
+    if (user) return user;
+    const employee = await Employee.findById(rawId).select("name email").lean();
+    if (employee) return employee;
+    return null;
+  } catch (_) {
+    return null;
+  }
 };
 
 // =====================================================
@@ -326,6 +343,12 @@ exports.getDiscounts = async (req, res) => {
 
 exports.getDiscountById = async (req, res) => {
   try {
+    // createdBy/updatedBy ke raw ids (populate fail hone par fallback ke liye)
+    const raw = await Discount.findOne({
+      _id: req.params.id,
+      is_deleted: false,
+    }).select("createdBy updatedBy").lean();
+
     const discount = await Discount.findOne({
       _id: req.params.id,
       is_deleted: false,
@@ -340,7 +363,17 @@ exports.getDiscountById = async (req, res) => {
       return res.status(404).json({ message: "Discount not found" });
     }
 
-    return res.status(200).json(discount);
+    // Creator User nahi balki Employee hai to populate null deta hai —
+    // actual user name properly resolve karo (User -> Employee fallback).
+    const obj = discount.toObject();
+    if (!obj.createdBy) {
+      obj.createdBy = await resolveCreatorInfo(raw?.createdBy);
+    }
+    if (!obj.updatedBy) {
+      obj.updatedBy = await resolveCreatorInfo(raw?.updatedBy);
+    }
+
+    return res.status(200).json(obj);
   } catch (error) {
     console.error("Get Discount By ID Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
