@@ -234,7 +234,7 @@ const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries 
 
   return (
     <div ref={containerRef} className="relative">
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid color-mix(in srgb, var(--success) 45%, transparent)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         <div className="flex items-center gap-2 min-w-0">
           {selectedCountry ? (
             <>
@@ -268,12 +268,12 @@ const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries 
               filteredCountries.map((country) => {
                 const isSelected = country.name === value;
                 return (
-                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "var(--success-soft)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
-                      <span className="truncate text-[13px]" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "var(--success-text)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
                     </div>
-                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />}
+                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--success-text)" }} />}
                   </button>
                 );
               })
@@ -1608,7 +1608,7 @@ const [viewMode, setViewMode] = useState(() => {
                   const img = p?.variants?.[0]?.images?.[0]?.img_url;
                   const firstVariantSku = p?.variants?.[0]?.sku || "";
                   return (
-                    <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
+                    <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
                           {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
@@ -1681,7 +1681,7 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><AlertTriangle className="h-5 w-5 text-red-500" /></div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "var(--danger-soft)" }}><AlertTriangle className="h-5 w-5 text-red-500" /></div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold">Delete "{productToDelete.name}"?</h3>
                 <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
@@ -2036,7 +2036,7 @@ function SectionTitle({ children }) {
 }
 function StatusBadge({ status }) {
   const active = status === "active";
-  return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>{active ? "Active" : "Inactive"}</span>;
+  return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{active ? "Active" : "Inactive"}</span>;
 }
 function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
   return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
@@ -2104,17 +2104,17 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
             onClick={(e) => { e.stopPropagation(); setOpen(false); onView(product); }}
             className={menuItemClass}
             style={{ color: "var(--text-primary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <Eye className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+            <Eye className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
           </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen(false); onEdit(product); }}
             className={menuItemClass}
             style={{ color: "var(--text-primary)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             <Pencil className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
@@ -2124,8 +2124,8 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
             disabled={isToggling}
             onClick={(e) => { e.stopPropagation(); setOpen(false); onToggle(product); }}
             className={menuItemClass + " disabled:opacity-50"}
-            style={{ color: isActive ? "#f87171" : "#34d399" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+            style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             <Power className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
@@ -2136,8 +2136,8 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
             disabled={isDeleting}
             onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(product); }}
             className={menuItemClass + " disabled:opacity-50"}
-            style={{ color: "#f87171" }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+            style={{ color: "var(--danger-text)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
             <Trash2 className="w-4 h-4 shrink-0" /> Delete
@@ -2195,7 +2195,7 @@ function AddAttributeValueControl({ attr, onAdd }) {
   };
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={`Add a new value to ${attr.name}`}>
+      <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={`Add a new value to ${attr.name}`}>
         <Plus className="h-3 w-3" /> Add Value
       </button>
     );
@@ -2203,7 +2203,7 @@ function AddAttributeValueControl({ attr, onAdd }) {
   return (
     <div className="flex items-center gap-1.5">
       <input type="text" autoFocus value={value} onChange={(ev) => setValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setOpen(false); setValue(""); } }} placeholder="New value..." disabled={adding} className="h-9 px-2.5 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} />
-      <button type="button" onClick={handleSave} disabled={adding || !String(value || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold inline-flex items-center gap-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "#10b981", cursor: adding || !String(value || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{adding ? "..." : "Add"}</button>
+      <button type="button" onClick={handleSave} disabled={adding || !String(value || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold inline-flex items-center gap-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: adding || !String(value || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{adding ? "..." : "Add"}</button>
       <button type="button" onClick={() => { setOpen(false); setValue(""); }} disabled={adding} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: adding ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
     </div>
   );
@@ -2275,7 +2275,7 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
           {options.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
-          <option value="__add_new__" style={{ color: "#34d399", fontWeight: 600 }}>+ Add {attr.name}</option>
+          <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>+ Add {attr.name}</option>
         </select>
         <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
       </div>
@@ -2314,7 +2314,7 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
     return (
       <div className="flex items-center gap-1.5">
         <input type="text" autoFocus value={newValue} onChange={(ev) => setNewValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setAdding(false); setNewValue(""); } }} placeholder={`New ${attr.name} value...`} disabled={saving} className="h-9 flex-1 rounded-md px-3 text-sm outline-none disabled:opacity-50" style={inputStyle} />
-        <button type="button" onClick={handleSave} disabled={saving || !String(newValue || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "#10b981", cursor: saving || !String(newValue || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{saving ? "..." : "Add"}</button>
+        <button type="button" onClick={handleSave} disabled={saving || !String(newValue || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: saving || !String(newValue || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{saving ? "..." : "Add"}</button>
         <button type="button" onClick={() => { setAdding(false); setNewValue(""); }} disabled={saving} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
       </div>
     );
@@ -2323,7 +2323,7 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
     <select value={value || ""} onChange={(e) => { const v = e.target.value; if (v === "__add_new__") { setAdding(true); return; } onChange(v); }} className="h-9 w-full rounded-md px-3 text-sm outline-none" style={inputStyle}>
       <option value="">Select {attr.name}</option>
       {assignedOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
-      <option value="__add_new__" style={{ color: "#34d399", fontWeight: 600 }}>+ Add new value...</option>
+      <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>+ Add new value...</option>
     </select>
   );
 }

@@ -213,7 +213,14 @@ const [viewMode, setViewMode] = useState(() => {
           })
           .filter((a) => !!a.attribute_id);
         if (catId && properAttrs.length > 0) {
-          try { await categoryApi.updateAttributes(String(catId), properAttrs); } catch (err) { console.error("Attribute sync failed:", err); }
+          const storedAttrs = savedCategory?.attributes || [];
+          // Create API attributes khud persist karta hai — foran baad sync
+          // chalane se attributes shape differ hoti hai aur fake "Category
+          // Updated" history entry ban jati hai. Isliye sync sirf fallback
+          // ke tor par chalao (jab create mein attributes persist na hon).
+          if (storedAttrs.length === 0) {
+            try { await categoryApi.updateAttributes(String(catId), properAttrs); } catch (err) { console.error("Attribute sync failed:", err); }
+          }
         }
       } catch (syncErr) { console.error("Attribute sync step failed:", syncErr); }
       await Promise.all([
@@ -723,17 +730,17 @@ const [viewMode, setViewMode] = useState(() => {
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewDetail(category); }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(category); }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
@@ -751,8 +758,8 @@ const [viewMode, setViewMode] = useState(() => {
               }}
               disabled={toggleStatusMutation.isPending}
               className={menuItemClass + " disabled:opacity-50"}
-              style={{ color: isActive ? "#f87171" : "#34d399" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
@@ -762,8 +769,8 @@ const [viewMode, setViewMode] = useState(() => {
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(category); }}
               className={menuItemClass}
-              style={{ color: "#f87171" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+              style={{ color: "var(--danger-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <TrashIcon className="w-4 h-4 shrink-0" /> Delete
@@ -1178,8 +1185,8 @@ const [viewMode, setViewMode] = useState(() => {
 
         {/* ===== Bulk selection bar ===== */}
         {selectedIds.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
               <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
@@ -1219,13 +1226,13 @@ const [viewMode, setViewMode] = useState(() => {
                     return (
                       <tr key={category._id} className="transition cursor-pointer" style={{ borderBottom: index < paginatedCategories.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
                         onClick={() => handleViewDetail(category)}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}>
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(category._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[100px] block" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</span></td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-4 h-4" /></div>
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
                             <span className="font-medium text-[13px] truncate max-w-[140px]">{category.name}</span>
                           </div>
                         </td>
@@ -1234,8 +1241,8 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive
-                              ? { backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.2)" }
-                              : { backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+                              ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }
+                              : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                             {isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
@@ -1259,7 +1266,7 @@ const [viewMode, setViewMode] = useState(() => {
                   style={{ ...cardStyle, backgroundColor: isMobileSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}>
                   <div className="flex items-center gap-2.5 min-w-0">
                     <input type="checkbox" checked={isMobileSelected} onChange={() => toggleSelect(category._id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded cursor-pointer shrink-0" style={{ accentColor: "var(--accent)" }} />
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-4 h-4" /></div>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium truncate leading-tight">{category.name}</p>
                       <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</p>
@@ -1267,7 +1274,7 @@ const [viewMode, setViewMode] = useState(() => {
                   </div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? "None" : parentName}</span>
-                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.2)" } : { backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}>{isMobileActive ? "Active" : "Inactive"}</span>
+                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{isMobileActive ? "Active" : "Inactive"}</span>
                   </div>
                   <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                     <ActionButtons category={category} />
@@ -1284,7 +1291,7 @@ const [viewMode, setViewMode] = useState(() => {
               return (
                 <div key={category._id} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}><FolderIcon className="w-5 h-5" /></div>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-5 h-5" /></div>
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-[12px] sm:text-[13px] truncate">{category.name}</p>
@@ -1328,7 +1335,7 @@ const [viewMode, setViewMode] = useState(() => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-sm rounded-lg p-6" style={cardStyle}>
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
               <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? `Delete "${deleteTarget.categories[0].name}"?` : `Delete ${deleteTarget.categories.length} categories?`}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The category(ies) will be permanently removed.</p></div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">

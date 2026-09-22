@@ -90,14 +90,14 @@ const Avatar = ({ brand, size = "w-8 h-8" }) => {
     return <img src={logoUrl} alt={brand.name} className={`${size} rounded-full object-cover shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
   }
   return (
-    <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
+    <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
       {getInitials(brand.name)}
     </div>
   );
 };
 
 const StatusBadge = ({ active }) => (
-  <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={active ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" } : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
+  <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={active ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
     {active ? "Active" : "Inactive"}
   </span>
 );
@@ -154,7 +154,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
   return (
     <div ref={containerRef} className="relative">
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid color-mix(in srgb, var(--success) 45%, transparent)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         <div className="flex items-center gap-2 min-w-0">
           {selectedCountry ? (
             <>
@@ -190,12 +190,12 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
               filteredCountries.map((country) => {
                 const isSelected = country.name === value;
                 return (
-                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "var(--success-soft)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
-                      <span className="truncate text-[13px]" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "var(--success-text)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
                     </div>
-                    {isSelected && <CheckIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />}
+                    {isSelected && <CheckIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--success-text)" }} />}
                   </button>
                 );
               })
@@ -603,17 +603,17 @@ export default function BrandsPage() {
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleViewBrand(brand._id); }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Details
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleEdit(brand); }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
@@ -627,8 +627,8 @@ export default function BrandsPage() {
               }}
               disabled={toggleStatusMutation.isPending}
               className={menuItemClass + " disabled:opacity-50"}
-              style={{ color: isActive ? "#f87171" : "#34d399" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
@@ -638,8 +638,8 @@ export default function BrandsPage() {
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); handleDelete(brand); }}
               className={menuItemClass}
-              style={{ color: "#f87171" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+              style={{ color: "var(--danger-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <TrashIcon className="w-4 h-4 shrink-0" /> Delete
@@ -720,8 +720,8 @@ export default function BrandsPage() {
 
         {/* ===== Bulk selection bar ===== */}
         {selectedIds.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
               <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
@@ -763,7 +763,7 @@ export default function BrandsPage() {
                   {paginatedBrands.map((brand, index) => {
                     const isSelected = selectedIds.includes(brand._id);
                     return (
-                      <tr key={brand._id} onClick={() => handleViewBrand(brand._id)} className="transition cursor-pointer" style={{ borderBottom: index < paginatedBrands.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}>
+                      <tr key={brand._id} onClick={() => handleViewBrand(brand._id)} className="transition cursor-pointer" style={{ borderBottom: index < paginatedBrands.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(brand._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><span className="text-[11px] sm:text-[13px] font-mono truncate max-w-[70px] sm:max-w-[100px] block" style={{ color: "var(--text-secondary)" }}>{brand.brand_code || "—"}</span></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5">
@@ -1022,7 +1022,7 @@ export default function BrandsPage() {
           <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
           <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <div className="flex-1 min-w-0">

@@ -68,6 +68,12 @@ const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
   </svg>
 );
+const EyeIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
 
 /* ================= Helpers ================= */
 const getInitials = (name) => {
@@ -84,9 +90,9 @@ const getStockStatus = (item) => {
 };
 
 const STATUS_META = {
-  in: { label: "In Stock", color: "#34d399", backgroundColor: "rgba(16,185,129,0.1)" },
-  low: { label: "Low Stock", color: "#f59e0b", backgroundColor: "rgba(245,158,11,0.12)" },
-  out: { label: "Out of Stock", color: "#ef4444", backgroundColor: "rgba(239,68,68,0.1)" },
+  in: { label: "In Stock", color: "var(--success-text)", backgroundColor: "var(--success-soft)" },
+  low: { label: "Low Stock", color: "var(--warning)", backgroundColor: "var(--warning-soft)" },
+  out: { label: "Out of Stock", color: "var(--danger)", backgroundColor: "var(--danger-soft)" },
 };
 
 const ADD_REASONS = ["New Purchase", "Customer Return", "Inventory Correction", "Supplier Bonus"];
@@ -101,7 +107,7 @@ const formatDateTime = (date) => {
 
 /* ================= Small Components ================= */
 const Avatar = ({ name, size = "w-8 h-8" }) => (
-  <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
+  <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
     {getInitials(name)}
   </div>
 );
@@ -158,6 +164,7 @@ export default function ManageStockPage() {
   });
 
   const [adjustError, setAdjustError] = useState("");
+  const [detailsTarget, setDetailsTarget] = useState(null);
   const itemsPerPage = 20;
 
   const dropdownRef = useRef(null);
@@ -203,6 +210,23 @@ export default function ManageStockPage() {
       setAdjustError(msg);
     },
   });
+
+  // ===== Stock Details Drawer: variant-specific history (existing API reuse) =====
+  const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isError: detailsHistoryError } = useQuery({
+    queryKey: ["stock-history", "variant", detailsTarget?._id],
+    queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 50, variantId: detailsTarget._id }),
+    enabled: !!detailsTarget?._id,
+  });
+  const detailsHistory = detailsHistoryData?.items || detailsHistoryData || [];
+
+  const openDetails = (item) => setDetailsTarget(item);
+  const closeDetails = () => setDetailsTarget(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape" && detailsTarget) closeDetails(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [detailsTarget]);
 
     const summary = useMemo(() => {
     // Current page counts
@@ -370,8 +394,8 @@ export default function ManageStockPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {[
             { label: "Total Variants", value: summary.totalVariants, sub: `Across ${summary.totalProducts} products` },
-            { label: "In Stock", value: summary.inStock, color: "#34d399", isCurrentPage: summary.isPageSpecific },
-            { label: "Low Stock", value: summary.lowStock, color: "#f59e0b", isCurrentPage: summary.isPageSpecific },
+            { label: "In Stock", value: summary.inStock, color: "var(--success-text)", isCurrentPage: summary.isPageSpecific },
+            { label: "Low Stock", value: summary.lowStock, color: "var(--warning)", isCurrentPage: summary.isPageSpecific },
             { label: "Out of Stock", value: summary.outOfStock, color: "var(--danger)", isCurrentPage: summary.isPageSpecific },
           ].map((card, idx) => (
             <div key={idx} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
@@ -445,7 +469,7 @@ export default function ManageStockPage() {
     <div className="flex items-center gap-1.5 min-w-0">
       <span className="font-medium text-[13px] truncate max-w-[160px]">{item.product_name}</span>
       {item.product_is_deleted && (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
           Deleted
         </span>
       )}
@@ -454,14 +478,19 @@ export default function ManageStockPage() {
 </td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
-                              <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "#f59e0b" : "var(--text-primary)" }}>{item.quantity} units</span></td>
+                              <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{item.quantity} units</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{item.min_qnt}</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{item.max_qnt}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                                <button onClick={() => openAdjustModal(item)} disabled={adjustMutation.isPending} className="h-8 px-3 rounded-md text-[12px] font-semibold transition hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 ml-auto" style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399" }} title="Adjust Stock">
-                                  <EditIcon className="w-3.5 h-3.5" /> Adjust Stock
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button onClick={() => openDetails(item)} disabled={adjustMutation.isPending} className="h-8 px-2.5 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }} title="View Stock Details">
+                                    <EyeIcon className="w-3.5 h-3.5" /> View
+                                  </button>
+                                  <button onClick={() => openAdjustModal(item)} disabled={adjustMutation.isPending} className="h-8 px-3 rounded-md text-[12px] font-semibold transition hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }} title="Adjust Stock">
+                                    <EditIcon className="w-3.5 h-3.5" /> Adjust Stock
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -482,14 +511,14 @@ export default function ManageStockPage() {
                         style={cardStyle}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
                             <BoxIcon className="w-4 h-4" />
                           </div>
                                                <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="text-[13px] font-medium truncate leading-tight">{item.product_name}</p>
                               {item.product_is_deleted && (
-                                <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
+                                <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                                   Deleted
                                 </span>
                               )}
@@ -498,17 +527,24 @@ export default function ManageStockPage() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-2 min-w-0">
-                          <span className="text-[12px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "#f59e0b" : "var(--text-primary)" }}>
+                          <span className="text-[12px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>
                             {item.quantity} units
                           </span>
                           <StatusPill status={status} />
                         </div>
-                        <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }}>
-                          <button 
-                            onClick={() => openAdjustModal(item)} 
-                            disabled={adjustMutation.isPending} 
-                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center text-[12px] font-semibold gap-1.5" 
-                            style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399" }}
+                        <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border-color)" }}>
+                          <button
+                            onClick={() => openDetails(item)}
+                            className="flex-shrink-0 min-h-[44px] px-3 rounded-md transition hover:opacity-80 flex items-center justify-center text-[12px] font-semibold gap-1.5"
+                            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                          >
+                            <EyeIcon className="w-4 h-4" /> Details
+                          </button>
+                          <button
+                            onClick={() => openAdjustModal(item)}
+                            disabled={adjustMutation.isPending}
+                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center text-[12px] font-semibold gap-1.5"
+                            style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
                             <EditIcon className="w-4 h-4" /> Adjust
                           </button>
@@ -570,7 +606,7 @@ export default function ManageStockPage() {
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.variant_title}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{h.previous_quantity} units</span></td>
-                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "#f59e0b" : change > 0 ? "#34d399" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
+                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{h.new_quantity} units</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{h.reason || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
@@ -601,7 +637,186 @@ export default function ManageStockPage() {
         )}
       </div>
 
-      {/* ================= ADJUST STOCK MODAL ================= */}
+      {/* ================= STOCK DETAILS DRAWER ================= */}
+      {detailsTarget && (() => {
+        const status = getStockStatus(detailsTarget);
+        const meta = STATUS_META[status];
+        const qty = Number(detailsTarget.quantity ?? 0);
+        const min = Number(detailsTarget.min_qnt ?? 0);
+        const max = Number(detailsTarget.max_qnt ?? 0);
+        const hasMax = max > 0;
+        const pct = hasMax ? Math.min(100, Math.max(0, (qty / max) * 100)) : 0;
+        const latest = detailsHistory[0] || null;
+        const changeColor = (c) => (c > 0 ? "var(--success-text)" : c < 0 ? "var(--danger)" : "var(--warning)");
+
+        return (
+          <div className="fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDetails} />
+
+            <div className="absolute right-0 top-0 h-full w-full sm:w-[520px] max-w-full flex flex-col shadow-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", borderLeft: "1px solid var(--border-color)", animation: "drawerIn 0.25s ease-out" }}>
+              <style>{`@keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+
+              {/* HEADER */}
+              <div className="px-5 py-4 shrink-0 flex items-start justify-between gap-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar name={detailsTarget.product_name} size="w-10 h-10" />
+                  <div className="min-w-0">
+                    <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>Stock Details</h3>
+                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[11px] truncate max-w-[180px]" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</span>
+                      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsTarget.sku}</span>
+                      <StatusPill status={status} />
+                    </div>
+                  </div>
+                </div>
+                <button onClick={closeDetails} className="p-1.5 rounded-md transition hover:opacity-70 shrink-0" style={{ color: "var(--text-muted)", backgroundColor: "var(--bg-tertiary)" }}>
+                  <CloseIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* BODY */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {/* PRODUCT INFORMATION */}
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product Information</h4>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={detailsTarget.product_name} size="w-10 h-10" />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                        <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2.5 pt-1">
+                      {[
+                        { label: "SKU", value: detailsTarget.sku || "—", mono: true },
+                        { label: "Variant", value: detailsTarget.title || "—" },
+                      ].map((row) => (
+                        <div key={row.label} className="flex items-center justify-between gap-3 pb-2.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                          <span className="text-[11px] shrink-0" style={{ color: "var(--text-muted)" }}>{row.label}</span>
+                          <span className={`text-[12px] text-right truncate ${row.mono ? "font-mono" : "font-medium"}`} style={{ color: "var(--text-secondary)" }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {/* INVENTORY OVERVIEW */}
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Inventory Overview</h4>
+                  </div>
+                  <div className="p-4">
+                    <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                      <p className="text-[10px] font-medium leading-tight" style={{ color: "var(--text-muted)" }}>Current Stock</p>
+                      <p className="text-[24px] font-bold mt-1 leading-tight" style={{ color: "var(--text-primary)" }}>{qty}</p>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>units</p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>Status</span>
+                      <StatusPill status={status} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* STOCK HISTORY (variant-specific) */}
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Stock History</h4>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsHistory.length} records</span>
+                  </div>
+                  <div className="p-4">
+                    {detailsHistoryLoading ? (
+                      <div className="space-y-3">
+                        {[0, 1, 2].map((i) => (
+                          <div key={i} className="p-3 rounded-lg animate-pulse" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                            <div className="h-3 w-1/3 rounded" style={{ backgroundColor: "var(--bg-card)" }} />
+                            <div className="h-2.5 w-2/3 rounded mt-2" style={{ backgroundColor: "var(--bg-card)" }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : detailsHistoryError ? (
+                      <p className="text-[12px] text-center py-3" style={{ color: "var(--danger)" }}>Unable to load stock history.</p>
+                    ) : detailsHistory.length === 0 ? (
+                      <p className="text-[12px] text-center py-3" style={{ color: "var(--text-muted)" }}>No stock activity recorded yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {detailsHistory.map((h) => {
+                          const change = h.change_quantity ?? 0;
+                          return (
+                            <div key={h._id} className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
+                                  {change > 0 ? `+${change}` : change} units
+                                </span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{h.reason || h.adjustment_type || "—"}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
+                                <span style={{ color: "var(--text-muted)" }}>Previous Stock: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.previous_quantity ?? 0}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>New Stock: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.new_quantity ?? 0}</span></span>
+                                <span className="truncate" style={{ color: "var(--text-muted)" }}>Updated By: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name || "—"}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>Date: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatDateTime(h.created_at)}</span></span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* RECENT ACTIVITY */}
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Recent Activity</h4>
+                  </div>
+                  <div className="p-4">
+                    {latest ? (
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Action</span>
+                          <span className="text-[12px] font-semibold" style={{ color: changeColor(latest.change_quantity ?? 0) }}>
+                            {(latest.change_quantity ?? 0) > 0 ? "Added" : "Removed"} {Math.abs(latest.change_quantity ?? 0)} units
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Reason</span>
+                          <span className="text-[12px] truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>{latest.reason || "—"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Performed By</span>
+                          <span className="text-[12px] truncate max-w-[160px]" style={{ color: "var(--text-secondary)" }}>{latest.performed_by_name || "—"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Date & Time</span>
+                          <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{formatDateTime(latest.created_at)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No stock activity recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* FOOTER ACTIONS */}
+              <div className="px-5 py-4 shrink-0 flex items-center gap-3" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                <button onClick={closeDetails} className="flex-1 h-10 rounded-lg text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Close</button>
+                <button
+                  onClick={() => { const t = detailsTarget; closeDetails(); openAdjustModal(t); }}
+                  disabled={adjustMutation.isPending}
+                  className="flex-1 h-10 rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}
+                >
+                  Adjust Stock
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {adjustTarget && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="w-full sm:max-w-xl rounded-t-2xl sm:rounded-xl overflow-hidden max-h-[90vh] sm:max-h-[85vh] flex flex-col" style={cardStyle}>
@@ -635,8 +850,8 @@ export default function ManageStockPage() {
                     <div className="text-right shrink-0">
                       <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-muted)" }}>In Stock</p>
                       <div className="flex items-center gap-1.5 mt-0.5 justify-end">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "#f59e0b" : "#34d399" }} />
-                        <p className="text-[16px] font-bold" style={{ color: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "#f59e0b" : "#34d399" }}>{adjustTarget.quantity}</p>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "var(--warning)" : "var(--success-text)" }} />
+                        <p className="text-[16px] font-bold" style={{ color: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "var(--warning)" : "var(--success-text)" }}>{adjustTarget.quantity}</p>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>units</span>
                       </div>
                     </div>
@@ -648,8 +863,8 @@ export default function ManageStockPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Stock Adjustment</p>
                   <div className="grid grid-cols-2 gap-3 mb-3.5">
                     {[
-                      { value: "add", label: "Add Stock", icon: "+", color: "#34d399" },
-                      { value: "remove", label: "Remove Stock", icon: "−", color: "#ef4444" },
+                      { value: "add", label: "Add Stock", icon: "+", color: "var(--success-text)" },
+                      { value: "remove", label: "Remove Stock", icon: "−", color: "var(--danger)" },
                     ].map((opt) => {
                       const isActive = adjustForm.type === opt.value;
                       const currentStock = Number(adjustTarget.quantity ?? 0);
@@ -714,9 +929,9 @@ export default function ManageStockPage() {
                     
                     {adjustForm.type === "remove" && (
                       <div className="flex items-center gap-1.5 mt-1.5">
-                        <InfoIcon className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+                        <InfoIcon className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} />
                         <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                          Maximum removable: <span className="font-semibold" style={{ color: "#f59e0b" }}>{adjustTarget.quantity} units</span>
+                          Maximum removable: <span className="font-semibold" style={{ color: "var(--warning)" }}>{adjustTarget.quantity} units</span>
                         </p>
                       </div>
                     )}
@@ -728,13 +943,13 @@ export default function ManageStockPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>New Stock</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.quantity}</span>
-                        <span className="text-[11px] font-semibold" style={{ color: adjustForm.type === "add" ? "#34d399" : "#ef4444" }}>
+                        <span className="text-[11px] font-semibold" style={{ color: adjustForm.type === "add" ? "var(--success-text)" : "var(--danger)" }}>
                           {adjustForm.type === "add" ? `+${Number(adjustForm.quantity.trim())}` : `−${Number(adjustForm.quantity.trim())}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>=</span>
-                        <span className="text-[15px] font-bold" style={{ color: computedNewStock === 0 ? "var(--danger)" : computedNewStock <= (adjustTarget.min_qnt ?? 0) ? "#f59e0b" : "#34d399" }}>{computedNewStock}</span>
+                        <span className="text-[15px] font-bold" style={{ color: computedNewStock === 0 ? "var(--danger)" : computedNewStock <= (adjustTarget.min_qnt ?? 0) ? "var(--warning)" : "var(--success-text)" }}>{computedNewStock}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>units</span>
                       </div>
                     </div>
@@ -817,7 +1032,7 @@ export default function ManageStockPage() {
                 </div>
 
                 {adjustError && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                  <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                     <AlertTriangleIcon />
                     <p className="text-[12px]" style={{ color: "var(--danger)" }}>{adjustError}</p>
                   </div>

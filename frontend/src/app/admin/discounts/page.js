@@ -105,12 +105,12 @@ const dateToISO = (value) => {
 
 const StatusBadge = ({ status }) => {
   const config = {
-    active: { text: "Active", bg: "rgba(16,185,129,0.10)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
-    scheduled: { text: "Scheduled", bg: "rgba(59,130,246,0.10)", color: "#60a5fa", border: "rgba(59,130,246,0.25)" },
-    expired: { text: "Expired", bg: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "rgba(245,158,11,0.25)" },
-    disabled: { text: "Disabled", bg: "rgba(239,68,68,0.10)", color: "#f87171", border: "rgba(239,68,68,0.25)" },
-    inactive: { text: "Inactive", bg: "rgba(239,68,68,0.10)", color: "#f87171", border: "rgba(239,68,68,0.25)" },
-    draft: { text: "Draft", bg: "rgba(148,163,184,0.10)", color: "#94a3b8", border: "rgba(148,163,184,0.25)" },
+    active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    scheduled: { text: "Scheduled", bg: "var(--info-soft)", color: "var(--info-text)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
+    expired: { text: "Expired", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+    disabled: { text: "Disabled", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    draft: { text: "Draft", bg: "rgba(148,163,184,0.10)", color: "var(--text-muted)", border: "rgba(148,163,184,0.25)" },
   };
   const item = config[status] || config.disabled;
   return (
@@ -775,8 +775,8 @@ export default function DiscountsPage() {
 
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
-          <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
+          <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
               <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
@@ -816,7 +816,7 @@ export default function DiscountsPage() {
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-4 h-4" /></div>
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
                             </div>
@@ -838,14 +838,14 @@ export default function DiscountsPage() {
             {paginatedDiscounts.map((discount) => (
               <div key={discount._id || discount.id} onClick={() => handleView(discount._id || discount.id)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.10)", color: "#34d399" }}><TagIcon className="w-5 h-5" /></div>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-5 h-5" /></div>
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "#34d399" }}>{formatValue(discount)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>
@@ -1069,7 +1069,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
                     formType === 'product' && ids.length > 0 ? (
                       <span
                         className="px-2.5 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap"
-                        style={{ backgroundColor: "rgba(16,185,129,0.10)", borderColor: "rgba(16,185,129,0.25)", color: "#34d399" }}
+                        style={{ backgroundColor: "var(--success-soft)", borderColor: "color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}
                       >
                         Total: {formatCurrency(totalSelectedValue)}
                       </span>
@@ -1171,7 +1171,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
                           style={{ borderTop: "1px dashed var(--border-color)", color: "var(--text-muted)" }}
                         >
                           <span>Selected Products: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{selectedItemsDetails.length}</span></span>
-                          <span>Total Value: <span className="font-bold" style={{ color: "#34d399" }}>{formatCurrency(totalSelectedValue)}</span></span>
+                          <span>Total Value: <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalSelectedValue)}</span></span>
                         </div>
                       )}
                     </div>
@@ -1490,11 +1490,11 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
                     onClick={() => toggle(id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition"
                     style={{
-                      backgroundColor: selected ? "rgba(16,185,129,0.10)" : "transparent",
+                      backgroundColor: selected ? "var(--success-soft)" : "transparent",
                       border: `1px solid ${selected ? "rgba(16,185,129,0.30)" : "transparent"}`,
                     }}
                     onMouseEnter={(e) => {
-                      if (!selected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
+                      if (!selected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)";
                     }}
                     onMouseLeave={(e) => {
                       if (!selected) e.currentTarget.style.backgroundColor = "transparent";
@@ -1579,7 +1579,7 @@ function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle
             <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
               <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{draftIds.length}</span> selected
               {type === "product" && draftIds.length > 0 && (
-                <> · <span className="font-bold" style={{ color: "#34d399" }}>{formatCurrency(totalDraftValue)}</span></>
+                <> · <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalDraftValue)}</span></>
               )}
             </span>
             {draftIds.length > 0 && (
@@ -1653,7 +1653,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
           {name}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[12px] font-bold font-mono" style={{ color: "#34d399" }}>
+          <span className="text-[12px] font-bold font-mono" style={{ color: "var(--success-text)" }}>
             {formatCurrency(price)}
           </span>
           {variantCount > 1 && (
@@ -1769,7 +1769,7 @@ function ProductDetailsModal({ product, onClose }) {
               <p className="text-[15px] font-bold truncate" style={{ color: "var(--text-primary)" }}>
                 {name}
               </p>
-              <p className="text-[18px] font-bold font-mono mt-0.5" style={{ color: "#34d399" }}>
+              <p className="text-[18px] font-bold font-mono mt-0.5" style={{ color: "var(--success-text)" }}>
                 {formatCurrency(price)}
               </p>
               {variantCount > 0 && (

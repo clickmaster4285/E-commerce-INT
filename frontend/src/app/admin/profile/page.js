@@ -26,7 +26,7 @@ import {
 import { useSocket } from "@/hooks/useSocket";
 import { toast } from "sonner";
 
-/* ═══════════════════════════════════════════════
+/* ══════════════════════════════════════════════
    REUSABLE COMPONENTS
 ═══════════════════════════════════════════════ */
 
@@ -448,7 +448,7 @@ export default function ProfilePage() {
           className="max-w-md w-full rounded-lg p-6 text-center"
           style={cardStyle}
         >
-          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "#ef4444" }} />
+          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--danger)" }} />
           <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             {error}
@@ -486,7 +486,7 @@ export default function ProfilePage() {
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
 
-        {/* ══ HEADER — Avatar + Name + Role + Store Badge ══ */}
+        {/* ══ HEADER — Avatar + Name + Store Badge ═ */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-5 p-5">
 
@@ -529,12 +529,9 @@ export default function ProfilePage() {
               >
                 {profile.name}
               </h1>
-              <p
-                className="text-[13px] font-semibold mb-2.5"
-                style={{ color: "var(--accent)" }}
-              >
-                {profile.role}
-              </p>
+              
+              {/* REMOVED ROLE TEXT HERE */}
+              
               <div
                 className="inline-flex items-center gap-2 rounded-full px-3 py-1"
                 style={{
@@ -577,7 +574,9 @@ export default function ProfilePage() {
               </div>
               <InfoRow icon={Calendar} label="Joined:" value={profile.joinDate} />
               <InfoRow icon={Clock} label="Last Login:" value={profile.lastLogin} />
-              <InfoRow icon={Award} label="Role:" value={profile.role} accent />
+              
+              {/* REMOVED ROLE ROW HERE */}
+              
               <InfoRow icon={ShieldCheck} label="Status:" value="Active & Verified" accent />
             </div>
 
@@ -595,9 +594,9 @@ export default function ProfilePage() {
 
               {/* ✅ CHANGE 3: Show permission warning if no access */}
               {!hasProfilePermission && (
-                <div className="mb-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                  <AlertCircle size={14} style={{ color: "#f87171" }} />
-                  <p className="text-[11px]" style={{ color: "#f87171" }}>You don't have permission to change password</p>
+                <div className="mb-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+                  <AlertCircle size={14} style={{ color: "var(--danger-text)" }} />
+                  <p className="text-[11px]" style={{ color: "var(--danger-text)" }}>You don't have permission to change password</p>
                 </div>
               )}
 
@@ -796,7 +795,9 @@ export default function ProfilePage() {
                     </h4>
                     <div className="mt-1">
                       <InfoRow icon={User} label="Username:" value={profile.username} />
-                      <InfoRow icon={Award} label="Role:" value={profile.role} accent />
+                      
+                      {/* REMOVED ROLE ROW HERE */}
+                      
                       <InfoRow icon={Calendar} label="Member Since:" value={profile.memberSince} />
                       <InfoRow icon={ShieldCheck} label="Account:" value="Active & Verified" accent />
                     </div>
