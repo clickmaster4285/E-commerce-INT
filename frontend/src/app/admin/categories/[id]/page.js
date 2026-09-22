@@ -858,6 +858,31 @@ export default function CategoryDetailPage() {
                   <Ico d={D.clock} className="w-3.5 h-3.5" /> Created:{" "}
                   {formatDateTime(category.created_at)}
                 </span>
+                {category.updatedby ? (
+                  <>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <Ico d={D.clock} className="w-3.5 h-3.5" /> Updated:{" "}
+                      {formatDateTime(category.updated_at)}
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <Ico d={D.user} className="w-3.5 h-3.5" /> Updated by{" "}
+                      {category.updatedby?.name || "—"}
+                    </span>
+                  </>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 text-[11px] font-medium"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <Ico d={D.clock} className="w-3.5 h-3.5" /> Updated: Never
+                  </span>
+                )}
               </div>
             </div>
           </div>

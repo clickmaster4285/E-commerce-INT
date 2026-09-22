@@ -77,6 +77,9 @@ const MOCKUP_ORDERS = [
   ['#ORD-104', '$56.25', 'Complete'],
 ];
 
+// Add the reference artwork at frontend/public/images/admin-login-left.png.
+const LOGIN_PANEL_IMAGE_SRC = '/images/admin-login-left.png';
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -89,6 +92,7 @@ export default function AdminLoginPage() {
     password: '',
   });
   const [error, setError] = useState('');
+  const [hasPanelImage, setHasPanelImage] = useState(true);
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
@@ -177,10 +181,10 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen w-full">
       {/* ============ LEFT — BRAND PANEL (sidebar-matched tokens) ============ */}
       <aside
-        className="relative z-20 hidden shrink-0 flex-col px-9 py-8 text-white lg:flex lg:w-[46%] xl:w-[50%] xl:px-10 xl:py-9"
+        className="relative z-20 hidden shrink-0 flex-col overflow-hidden px-8 py-7 text-white lg:flex lg:w-[48%] xl:w-[52%] xl:px-14 xl:py-10"
         style={{
           background:
-            'radial-gradient(64% 52% at 76% 46%, rgba(59,130,246,0.22), transparent 62%), radial-gradient(46% 42% at 10% 84%, rgba(37,99,235,0.16), transparent 64%), linear-gradient(155deg, var(--bg-sidebar) 0%, color-mix(in srgb, var(--bg-sidebar) 78%, var(--accent)) 55%, color-mix(in srgb, var(--bg-sidebar) 55%, var(--accent)) 100%)',
+            'radial-gradient(62% 54% at 82% 42%, color-mix(in srgb, var(--accent) 38%, transparent), transparent 65%), linear-gradient(148deg, var(--bg-sidebar) 0%, color-mix(in srgb, var(--bg-sidebar) 82%, var(--accent)) 100%)',
         }}
       >
         {/* Clipped decorative layer (plant silhouette) */}
@@ -189,21 +193,51 @@ export default function AdminLoginPage() {
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
           <svg
-            viewBox="0 0 220 300"
-            className="absolute bottom-0 left-0 h-72"
-            fill="#080e1a"
-            opacity="0.95"
+            viewBox="0 0 220 330"
+            className="absolute bottom-0 left-0 h-[240px]"
+            fill="none"
           >
-            <path d="M60 300 C58 220 40 170 8 138 C46 150 66 192 70 244 C74 198 66 148 40 106 C78 130 90 182 88 238 Z" />
-            <path d="M96 300 C96 214 102 152 132 98 C142 152 130 212 114 262 Z" />
-            <path d="M28 300 C34 242 30 202 4 170 C36 176 56 216 58 268 Z" />
+            <path
+              d="M104 272 C102 196 82 146 48 114 C90 128 112 174 114 230 C118 182 108 130 80 86 C120 112 134 166 130 224 Z"
+              style={{
+                fill: 'color-mix(in srgb, var(--accent) 24%, var(--bg-sidebar))',
+              }}
+            />
+            <path
+              d="M136 272 C136 190 144 126 176 70 C186 126 172 190 154 244 Z"
+              style={{
+                fill: 'color-mix(in srgb, var(--accent) 14%, var(--bg-sidebar))',
+              }}
+            />
+            <path
+              d="M64 272 C70 212 66 170 38 136 C72 144 94 186 96 242 Z"
+              style={{
+                fill: 'color-mix(in srgb, var(--accent) 14%, var(--bg-sidebar))',
+              }}
+            />
+            <rect
+              x="56"
+              y="264"
+              width="116"
+              height="16"
+              rx="7"
+              style={{
+                fill: 'color-mix(in srgb, var(--accent) 10%, var(--bg-sidebar))',
+              }}
+            />
+            <path
+              d="M62 280 H166 L154 318 C152 324 147 328 141 328 H87 C81 328 76 324 74 318 Z"
+              style={{
+                fill: 'color-mix(in srgb, var(--bg-sidebar) 55%, #000000)',
+              }}
+            />
           </svg>
         </div>
 
         {/* Brand */}
         <div className="relative flex items-center gap-3">
           <div
-            className="flex h-11 w-11 items-center justify-center rounded-xl"
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
             style={{
               background: 'linear-gradient(135deg, var(--info), var(--accent))',
               boxShadow: '0 10px 24px rgba(37, 99, 235, 0.35)',
@@ -222,34 +256,34 @@ export default function AdminLoginPage() {
                 Admin
               </span>
             </p>
-            <p className="text-[11px] text-[var(--text-sidebar-muted)]">
+            <p className="text-[10px] text-indigo-200/75">
               E-commerce Admin Panel
             </p>
           </div>
         </div>
 
         {/* Hero */}
-        <div className="relative mt-8 max-w-[440px]">
-          <h1 className="text-[30px] font-extrabold leading-[1.18] tracking-tight text-[var(--text-inverse)] xl:text-[34px]">
+        <div className="relative mt-9 max-w-[440px]">
+          <h1 className="text-[29px] font-extrabold leading-[1.16] tracking-tight text-white xl:text-[34px]">
             Manage Your Store
             <br />
             with{' '}
             <span
               style={{
-                color: 'color-mix(in srgb, var(--accent) 45%, #ffffff)',
+                  color: 'color-mix(in srgb, var(--accent) 45%, #ffffff)',
               }}
             >
               Confidence
             </span>
           </h1>
-          <p className="mt-3.5 text-[13.5px] leading-relaxed text-[var(--text-sidebar-muted)]">
+          <p className="mt-3 text-[12.5px] leading-[1.55] text-indigo-100/70">
             Control your products, categories, orders, users and more — all in
             one powerful admin panel.
           </p>
         </div>
 
         {/* Feature list */}
-        <div className="relative mt-7 space-y-2.5">
+        <div className="relative mt-6 space-y-2">
           {PANEL_FEATURES.map((feature) => {
             const FeatureIcon = feature.icon;
 
@@ -258,20 +292,18 @@ export default function AdminLoginPage() {
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                   style={{
-                    background:
-                      'color-mix(in srgb, var(--accent) 20%, transparent)',
-                    border:
-                      '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.20)',
+                    background: 'color-mix(in srgb, var(--accent) 20%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
                   }}
                 >
                   <FeatureIcon size={14} aria-hidden="true" />
                 </span>
                 <span>
-                  <span className="block text-[13px] font-semibold text-[var(--text-inverse)]">
+                  <span className="block text-[11px] font-semibold text-white">
                     {feature.title}
                   </span>
-                  <span className="block text-[10.5px] text-[var(--text-sidebar-muted)]">
+                  <span className="block text-[9px] text-indigo-100/65">
                     {feature.desc}
                   </span>
                 </span>
@@ -280,26 +312,29 @@ export default function AdminLoginPage() {
           })}
         </div>
 
-        {/* Dashboard mockup — decorative illustration */}
+        {/* Dashboard mockup — decorative illustration (flat, reference style) */}
         <div
           aria-hidden="true"
-          className="relative z-10 mt-auto hidden -mb-2 lg:-mr-12 lg:block xl:-mr-20"
+          className={`relative z-10 -mb-3 mt-auto pl-10 ${hasPanelImage ? 'flex' : 'hidden xl:flex'}`}
         >
-          <div
-            style={{
-              transform:
-                'perspective(1400px) rotateX(4deg) rotateY(-7deg) rotate(-3.5deg)',
-              transformOrigin: 'left bottom',
-            }}
-          >
+          {hasPanelImage && (
+            <img
+              src={LOGIN_PANEL_IMAGE_SRC}
+              alt="EcomAdmin dashboard preview"
+              className="h-auto max-h-[330px] w-[510px] object-contain object-left-bottom"
+              onError={() => setHasPanelImage(false)}
+            />
+          )}
+          {!hasPanelImage && (
             <div
-              className="flex w-[540px] gap-2 rounded-2xl p-2"
+              className="flex w-full max-w-[720px] gap-2 rounded-2xl p-2"
               style={{
                 background:
-                  'color-mix(in srgb, var(--bg-sidebar) 88%, var(--accent))',
+                  'color-mix(in srgb, var(--bg-sidebar) 72%, #000000)',
                 border:
-                  '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                boxShadow: '0 40px 80px rgba(2, 6, 23, 0.55)',
+                  '1px solid color-mix(in srgb, var(--text-inverse) 10%, transparent)',
+                boxShadow:
+                  '0 24px 48px rgba(2, 6, 23, 0.45), 0 6px 16px rgba(2, 6, 23, 0.35)',
               }}
             >
               {/* Mini sidebar */}
@@ -307,7 +342,7 @@ export default function AdminLoginPage() {
                 className="w-36 shrink-0 rounded-xl p-3"
                 style={{
                   background:
-                    'color-mix(in srgb, var(--bg-sidebar) 62%, #000000)',
+                    'color-mix(in srgb, var(--bg-sidebar) 90%, var(--accent))',
                 }}
               >
                 <div className="mb-3 flex items-center gap-1.5 px-1">
@@ -488,16 +523,15 @@ export default function AdminLoginPage() {
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Secure badge */}
         <div
-          className="absolute bottom-7 left-9 z-20 hidden items-center gap-2.5 rounded-xl px-3.5 py-2.5 xl:flex"
+          className="absolute bottom-8 left-10 z-20 hidden items-center gap-2.5 rounded-xl px-3.5 py-2.5 xl:flex"
           style={{
             background: 'var(--bg-sidebar-hover)',
-            border:
-              '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
             boxShadow: '0 18px 40px rgba(2, 6, 23, 0.5)',
           }}
         >
@@ -638,7 +672,9 @@ export default function AdminLoginPage() {
                   </label>
                   <input
                     id="admin-email"
-                    type="email"
+                    type="text"
+                    inputMode="email"
+                    spellCheck={false}
                     value={email}
                     onChange={handleEmailChange}
                     placeholder="Enter your email"

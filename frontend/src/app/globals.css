@@ -282,6 +282,16 @@ p {
   outline-offset: 2px;
 }
 
+/* Admin login fields: focus ring sirf outer card par show ho —
+   inner input par koi browser/global outline nahi (double-border bug fix) */
+#admin-email:focus,
+#admin-password:focus,
+#admin-email:focus-visible,
+#admin-password:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--accent);

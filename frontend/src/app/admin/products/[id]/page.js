@@ -524,6 +524,25 @@ export default function ProductDetailPage() {
     enabled: !!productCategoryId, retry: false,
   });
 
+  // Initialize live events from database state so pre-existing updates are shown
+  useEffect(() => {
+    if (!product) return;
+    setLiveEvents((prev) => {
+      // Only seed once: if prev already has events, keep them.
+      if (prev.length > 0) return prev;
+      const initial = [];
+      if (product?.updatedby && product?.updated_at) {
+        initial.push({
+          key: `live-u-init-${product._id || id}`,
+          type: "updated",
+          user: product.updatedby || null,
+          date: product.updated_at || new Date().toISOString(),
+        });
+      }
+      return initial;
+    });
+  }, [product?._id, id]);
+
   const ATTRIBUTE_PRESETS = useMemo(() => {
     const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
     if (!source.length) return [];
@@ -1541,6 +1560,10 @@ export default function ProductDetailPage() {
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Created at</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{fd(product.created_at)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Updated at</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.updated_at ? fd(product.updated_at) : "Never"}</p>
                           </div>
                         </div>
                       </div>

@@ -12,18 +12,39 @@ export function useBrandSocketSync() {
 
     if (!socket || !isConnected) return;
 
-    const invalidateBrands = (eventName) => {
+    const handleUpdated = (data) => {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
+      const brandId = data?._id || data?.id;
+      if (brandId) {
+        queryClient.invalidateQueries({ queryKey: ["brand", brandId] });
+      }
     };
 
-    socket.on("brandCreated", () => invalidateBrands("brandCreated"));
-    socket.on("brandUpdated", () => invalidateBrands("brandUpdated"));
-    socket.on("brandDeleted", () => invalidateBrands("brandDeleted"));
+    const handleCreated = (data) => {
+      queryClient.invalidateQueries({ queryKey: ["brands"] });
+      const brandId = data?._id || data?.id;
+      if (brandId) {
+        queryClient.invalidateQueries({ queryKey: ["brand", brandId] });
+      }
+    };
+
+    const handleDeleted = (data) => {
+      queryClient.invalidateQueries({ queryKey: ["brands"] });
+      const brandId = data?._id || data?.id || (typeof data === "string" ? data : null);
+      if (brandId) {
+        queryClient.invalidateQueries({ queryKey: ["brand", brandId] });
+        queryClient.removeQueries({ queryKey: ["brand", brandId] });
+      }
+    };
+
+    socket.on("brandCreated", handleCreated);
+    socket.on("brandUpdated", handleUpdated);
+    socket.on("brandDeleted", handleDeleted);
 
     return () => {
-      socket.off("brandCreated");
-      socket.off("brandUpdated");
-      socket.off("brandDeleted");
+      socket.off("brandCreated", handleCreated);
+      socket.off("brandUpdated", handleUpdated);
+      socket.off("brandDeleted", handleDeleted);
     };
   }, [socket, isConnected, queryClient]);
 
