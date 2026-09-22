@@ -229,6 +229,7 @@ export function CartProvider({ children }) {
             dealSavings: Number(dealInfo.savings) || 0,
             dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
             dealDiscountValue: Number(dealInfo.dealDiscountValue) || 0,
+            dealMinQuantity: Number(dealInfo.minQuantity) || 1,
             dealRegularPrice: regularPrice,
             ...(dealInfo.dealType === "buy_x_get_y"
               ? {
@@ -264,7 +265,7 @@ export function CartProvider({ children }) {
     }
   };
 
-  // ✅ UPDATE QTY — with STOCK CHECK
+  // ✅ UPDATE QTY — with STOCK CHECK + MIN QUANTITY CHECK
     const updateQty = (key, qty) => {
     if (qty <= 0) return save(cartRef.current.filter((i) => i.key !== key));
 
@@ -278,6 +279,33 @@ export function CartProvider({ children }) {
       toast.error(`Only ${max} available in stock for "${item?.name || "this item"}"`);
       qty = max;
       if (qty <= 0) return;
+    }
+
+    // ✅ MIN QUANTITY CHECK — if qty falls below deal's minQuantity, remove deal
+    if (item?.dealId && item?.dealMinQuantity) {
+      const minQty = Number(item.dealMinQuantity) || 1;
+      if (qty < minQty) {
+        // Revert to regular price, remove deal info
+        save(cartRef.current.map((i) => {
+          if (i.key !== key) return i;
+          return {
+            ...i,
+            dealId: null,
+            dealType: null,
+            dealName: null,
+            dealBadge: null,
+            dealSavings: 0,
+            dealOriginalPrice: 0,
+            dealDiscountValue: 0,
+            dealMinQuantity: 0,
+            dealBuyQuantity: 0,
+            dealGetQuantity: 0,
+            price: i.dealRegularPrice || i.price,
+          };
+        }));
+        toast.info(`Minimum ${minQty} items required for deal — deal removed`);
+        return;
+      }
     }
 
     save(cartRef.current.map((i) => (i.key === key ? { ...i, qty } : i)));
@@ -343,6 +371,90 @@ export function CartProvider({ children }) {
   const count = cart.reduce((s, i) => s + i.qty, 0);
   const selectedCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
 
+  // ✅ APPLY DEAL TO CART ITEM — deal select/remove from dropdown + AUTO FILL min qty
+  const applyDealToItem = (key, deal) => {
+    const item = cartRef.current.find((i) => i.key === key);
+    if (!item) return;
+
+    const regularPrice = Number(item.dealRegularPrice || item.regularPrice || item.price || 0);
+
+    if (!deal) {
+      // ✅ Remove deal — revert to regular price, keep qty same
+      save(cartRef.current.map((i) => {
+        if (i.key !== key) return i;
+        return {
+          ...i,
+          dealId: null,
+          dealType: null,
+          dealName: null,
+          dealBadge: null,
+          dealSavings: 0,
+          dealOriginalPrice: 0,
+          dealDiscountValue: 0,
+          dealMinQuantity: 0,
+          dealBuyQuantity: 0,
+          dealGetQuantity: 0,
+          price: regularPrice,
+        };
+      }));
+      toast.info("Deal removed");
+      return;
+    }
+
+    // ✅ Calculate required minimum quantity
+    const minQty = Number(deal.minQuantity) || 1;
+    const buyQty = deal.type === "buy_x_get_y" ? (Number(deal.buyQuantity) || 0) : 0;
+    const requiredQty = Math.max(minQty, buyQty);
+
+    // ✅ Auto-fill: if current qty < required, increase to required
+    let newQty = item.qty;
+    if (item.qty < requiredQty) {
+      // Check stock limit
+      const stock = item.stock != null ? Number(item.stock) : null;
+      if (stock !== null && requiredQty > stock) {
+        newQty = stock;
+        toast.warning(`Only ${stock} in stock — setting to max`);
+      } else {
+        newQty = requiredQty;
+      }
+    }
+
+    // ✅ Calculate deal price
+    let linePrice = regularPrice;
+    if (deal.type === "percentage" && Number(deal.discountValue) > 0) {
+      linePrice = Math.round(regularPrice * (1 - Number(deal.discountValue) / 100));
+    } else if (deal.type === "fixed_amount" && Number(deal.discountValue) > 0) {
+      linePrice = Math.max(0, regularPrice - Number(deal.discountValue));
+    }
+
+    save(cartRef.current.map((i) => {
+      if (i.key !== key) return i;
+      return {
+        ...i,
+        qty: newQty,
+        dealId: deal._id,
+        dealType: deal.type,
+        dealName: deal.name,
+        dealBadge: null,
+        dealSavings: 0,
+        dealOriginalPrice: regularPrice,
+        dealDiscountValue: Number(deal.discountValue) || 0,
+        dealMinQuantity: minQty,
+        dealRegularPrice: regularPrice,
+        price: linePrice,
+        ...(deal.type === "buy_x_get_y"
+          ? { dealBuyQuantity: deal.buyQuantity || 0, dealGetQuantity: deal.getQuantity || 0 }
+          : { dealBuyQuantity: 0, dealGetQuantity: 0 }),
+      };
+    }));
+
+    if (newQty > item.qty) {
+      toast.success(`"${deal.name}" applied — qty auto-set to ${newQty}`);
+    } else {
+      toast.success(`"${deal.name}" deal applied!`);
+    }
+  };
+
   const getDealInfoForItem = (item) => {
     if (!item.dealId || item.dealType !== "buy_x_get_y") return null;
     return {
@@ -368,6 +480,7 @@ export function CartProvider({ children }) {
         isCartOpen,
         setIsCartOpen,
         getDealInfoForItem,
+        applyDealToItem,
         // Selection
         selectedKeys,
         selectedItems,

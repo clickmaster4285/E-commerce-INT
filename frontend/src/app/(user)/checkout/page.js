@@ -510,6 +510,15 @@ function CheckoutContent() {
     if (paymentMethod === "bank" && !bankForm.senderName.trim()) {
       return toast.error("Sender name is required for bank transfer");
     }
+    // ✅ MIN QUANTITY CHECK — reject order if any deal item qty is below minQuantity
+    for (const item of itemsWithDiscounts) {
+      if (item.dealId && item.dealMinQuantity) {
+        const minQty = Number(item.dealMinQuantity) || 1;
+        if (item.qty < minQty) {
+          return toast.error(`"${item.name}" requires minimum ${minQty} items for deal. Current: ${item.qty}`);
+        }
+      }
+    }
     setPlacing(true);
     try {
            await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod, shipping, bank_sender_name: bankForm.senderName || null, bank_transaction_ref: bankForm.transactionRef || null });

@@ -26,9 +26,13 @@ const sanitizePhone = (phone) => {
 /**
  * Validate phone number
  * @param {string} phone - Raw phone input
+ * @param {object} [options] - Optional overrides (e.g. { min: 6, max: 15 })
  * @returns {{ valid: boolean, sanitized: string|null, message: string }}
  */
-const validatePhone = (phone) => {
+const validatePhone = (phone, options = {}) => {
+  const minDigits = Number.isInteger(options.min) ? options.min : PHONE_MIN_LENGTH;
+  const maxDigits = Number.isInteger(options.max) ? options.max : PHONE_MAX_LENGTH;
+
   if (!phone || (typeof phone === "string" && phone.trim() === "")) {
     return { valid: true, sanitized: "", message: "" };
   }
@@ -38,12 +42,12 @@ const validatePhone = (phone) => {
     return { valid: false, sanitized: null, message: "Phone number cannot be empty" };
   }
 
-  if (sanitized.length < PHONE_MIN_LENGTH) {
-    return { valid: false, sanitized: null, message: `Phone number must be at least ${PHONE_MIN_LENGTH} digits` };
+  if (sanitized.length < minDigits) {
+    return { valid: false, sanitized: null, message: `Phone number must be at least ${minDigits} digits` };
   }
 
-  if (sanitized.length > PHONE_MAX_LENGTH) {
-    return { valid: false, sanitized: null, message: `Phone number must be at most ${PHONE_MAX_LENGTH} digits` };
+  if (sanitized.length > maxDigits) {
+    return { valid: false, sanitized: null, message: `Phone number must be at most ${maxDigits} digits` };
   }
 
   return { valid: true, sanitized, message: "" };

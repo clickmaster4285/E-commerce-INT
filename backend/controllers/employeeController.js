@@ -282,7 +282,7 @@ exports.createEmployee = async (req, res) => {
 
     let sanitizedPhone = "";
     if (phone) {
-      const phoneResult = validatePhone(phone);
+      const phoneResult = validatePhone(phone, { min: 6, max: 15 });
       if (!phoneResult.valid) {
         return res.status(400).json({ success: false, message: phoneResult.message });
       }
@@ -480,7 +480,7 @@ exports.updateEmployee = async (req, res) => {
         String(employee[field] ?? "") !== String(updates[field] ?? "")
       ) {
         if (field === "phone") {
-          const phoneResult = validatePhone(updates[field]);
+          const phoneResult = validatePhone(updates[field], { min: 6, max: 15 });
           if (!phoneResult.valid) {
             return res.status(400).json({ success: false, message: phoneResult.message });
           }

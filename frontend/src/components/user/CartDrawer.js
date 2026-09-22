@@ -7,12 +7,14 @@
   import {
     X, Plus, Minus, Trash2, ShoppingBag, Package, Tag, Check,
     Sparkles, Loader2, Zap, Truck, PackageOpen, ChevronDown, ArrowRight,
+    BadgePercent,
   } from "lucide-react";
   import { toast } from "sonner";
   import { useQuery } from "@tanstack/react-query";          // ✅ ADD
 import { shippingApi } from "@/apis/user/shippingApi"; 
   import { useCart } from "./CartContext";
   import { useDiscounts } from "./DiscountContext";
+  import DealInfoDropdown from "./DealInfoDropdown";
   import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
 
   const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -50,6 +52,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const router = useRouter();
     const { cart, isCartOpen, setIsCartOpen, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems } = useCart();
     const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
+    // ✅ Deal picker — kaunsa card ka popup khula hai (sirf ek waqt pe ek)
+    const [openDealCardKey, setOpenDealCardKey] = useState(null);
 
   // ✅ Shipping config (standard fee admin settings se)
   const { data: shipConfig } = useQuery({
@@ -423,6 +427,9 @@ import { shippingApi } from "@/apis/user/shippingApi";
                             onToggleSelect={() => toggleLineSelected(row.key)}
                             isDeal
                             dealBadge={dealGroup.dealBadge}
+                            openDealPicker={openDealCardKey === row.key}
+                            onToggleDealPicker={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
+                            onCloseDealPicker={() => setOpenDealCardKey(null)}
                           />
                         ))}
                         </ul>
@@ -447,6 +454,9 @@ import { shippingApi } from "@/apis/user/shippingApi";
                           onRemove={handleRemove}
                           isSelected={isLineSelected(row.key)}
                           onToggleSelect={() => toggleLineSelected(row.key)}
+                          openDealPicker={openDealCardKey === row.key}
+                          onToggleDealPicker={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
+                          onCloseDealPicker={() => setOpenDealCardKey(null)}
                         />
                       ))}
                     </ul>
@@ -564,9 +574,10 @@ import { shippingApi } from "@/apis/user/shippingApi";
     );
   }
 
-  function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null }) {
+  function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
+    const { applyDealToItem } = useCart();
     return (
-      <li className={`cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
+      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
         {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
         <button
           type="button"
@@ -592,7 +603,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
               {row.variantTitle && (<p className="mt-0.5 truncate text-[10px] text-[var(--user-text-muted)]">{row.variantTitle}</p>)}
               {row.brand && (<p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--user-text-subtle)] truncate">{row.brand}</p>)}
             </div>
-            <button type="button" onClick={() => onRemove(row)} aria-label={`Remove ${row.name} from cart`} className="-mr-1 -mt-0.5 rounded-lg p-1.5 text-[var(--user-text-subtle)] transition-colors hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)]">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(row); }} aria-label={`Remove ${row.name} from cart`} className="-mr-1 -mt-0.5 rounded-lg p-1.5 text-[var(--user-text-subtle)] transition-colors hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)]">
               <Trash2 size={14} aria-hidden="true" />
             </button>
           </div>
@@ -623,7 +634,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
   </button>
             </div>
 
-            <div className="text-right leading-tight">
+            <div className="text-right leading-tight relative">
               <p className="text-[13px] font-bold text-[var(--user-accent)]">
                 {fmt(row.lineTotal)}
                 {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
@@ -647,6 +658,24 @@ import { shippingApi } from "@/apis/user/shippingApi";
               )}
             </div>
           </div>
+
+          {/* ✅ DEALS BUTTON — bottom-left of card */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
+            aria-label="View available deals"
+            className="absolute bottom-2.5 left-2.5 z-20 flex h-6 items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+          >
+            <BadgePercent size={10} />
+            <span>Deals</span>
+          </button>
+
+          <DealInfoDropdown
+            cartItem={row.raw}
+            onApplyDeal={(deal) => applyDealToItem(row.key, deal)}
+            open={openDealPicker}
+            onClose={onCloseDealPicker}
+          />
         </div>
       </li>
     );

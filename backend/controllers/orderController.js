@@ -96,6 +96,31 @@ const placeOrder = async (req, res) => {
       const dealBuyQuantity = Number(item.dealBuyQuantity || 0);
       const dealGetQuantity = Number(item.dealGetQuantity || 0);
 
+      // ✅ MIN QUANTITY CHECK — server-side validation
+      if (dealId) {
+        const dealDoc = await Deal.findById(dealId).select("minQuantity type buyQuantity isActive").lean();
+        if (dealDoc && dealDoc.isActive) {
+          const minQty = Number(dealDoc.minQuantity) || 1;
+          if (dealDoc.type === "buy_x_get_y") {
+            const buyQty = Number(dealDoc.buyQuantity) || 0;
+            const threshold = Math.max(minQty, buyQty);
+            if (qty < threshold) {
+              return res.status(400).json({
+                success: false,
+                message: `"${item.name}" requires minimum ${threshold} items for this deal. You have: ${qty}`,
+              });
+            }
+          } else {
+            if (qty < minQty) {
+              return res.status(400).json({
+                success: false,
+                message: `"${item.name}" requires minimum ${minQty} items for this deal. You have: ${qty}`,
+              });
+            }
+          }
+        }
+      }
+
       // Discount name (frontend se ya product se fallback)
       const discountName = item.discountName || "";
 

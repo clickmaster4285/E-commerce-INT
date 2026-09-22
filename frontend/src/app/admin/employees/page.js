@@ -357,6 +357,10 @@ export default function EmployeesPage() {
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!formData.department.trim()) return toast.error("Department is required");
 
+    const phoneDigits = formData.phone.replace(/\D/g, "");
+    if (phoneDigits && phoneDigits.length < 6) return toast.error("Phone number must be at least 6 digits");
+    if (phoneDigits.length > 15) return toast.error("Phone number must be at most 15 digits");
+
     if (!editingEmployee) {
       if (!formData.password) return toast.error("Password is required");
       if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
@@ -881,7 +885,7 @@ export default function EmployeesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
-                  <input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="+92 300 1234567" />
+                  <input type="tel" inputMode="numeric" maxLength={15} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 15) })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="03001234567" />
                 </div>
               </div>
 

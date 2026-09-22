@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
+import DealInfoDropdown from "@/components/user/DealInfoDropdown";
 import { shippingApi } from "@/apis/user/shippingApi";
 import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
 
@@ -45,9 +46,11 @@ function getDealBadgeConfig(deal) {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection } = useCart();
+  const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection, applyDealToItem } = useCart();
   const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
   const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
+  // ✅ Deal picker — kaunsa card ka popup khula hai (sirf ek waqt pe ek)
+  const [openDealCardKey, setOpenDealCardKey] = useState(null);
 
   // ✅ SHIPPING METHOD — derived from active free-shipping deal (no selector on cart page)
   const activeFreeShippingDeal = hasFreeShippingDeal(cart)
@@ -262,7 +265,9 @@ export default function CartPage() {
   };
 
   const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => (
-    <div className={`group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
+    <div
+      onClick={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
+      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
       !isSelected ? "opacity-60" : ""
     } ${
       isDeal
@@ -272,7 +277,7 @@ export default function CartPage() {
       {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
       <button
         type="button"
-        onClick={() => onToggleSelect?.()}
+        onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
         aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
         aria-pressed={isSelected}
         className="shrink-0 p-1 mt-0.5 sm:mt-1 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
@@ -335,6 +340,13 @@ export default function CartPage() {
               <p className="text-xs text-[var(--user-text-subtle)] line-through">{fmt(row.originalPrice * row.qty)}</p>
             )}
           </div>
+
+          <DealInfoDropdown
+            cartItem={row.raw}
+            onApplyDeal={(deal) => applyDealToItem(row.key, deal)}
+            open={openDealCardKey === row.key}
+            onClose={() => setOpenDealCardKey(null)}
+          />
         </div>
       </div>
 
@@ -343,7 +355,7 @@ export default function CartPage() {
         <div className="flex items-center gap-1 rounded-xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-1">
           <button
             type="button"
-            onClick={() => row.qty > 1 && updateQty(row.key, row.qty - 1)}
+            onClick={(e) => { e.stopPropagation(); row.qty > 1 && updateQty(row.key, row.qty - 1); }}
             disabled={row.qty <= 1}
             aria-label="Decrease"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-90 disabled:pointer-events-none disabled:opacity-30 transition"
@@ -353,7 +365,7 @@ export default function CartPage() {
           <span className="w-9 text-center text-sm font-black tabular-nums text-[var(--user-text)]">{row.qty}</span>
           <button
             type="button"
-            onClick={() => updateQty(row.key, row.qty + 1)}
+            onClick={(e) => { e.stopPropagation(); updateQty(row.key, row.qty + 1); }}
             aria-label="Increase"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-90 transition"
           >
@@ -375,7 +387,7 @@ export default function CartPage() {
 
         <button
           type="button"
-          onClick={() => handleRemove(row)}
+          onClick={(e) => { e.stopPropagation(); handleRemove(row); }}
           aria-label={`Remove ${row.name}`}
           className="p-2 rounded-lg text-[var(--user-text-subtle)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] transition"
         >
@@ -729,7 +741,7 @@ export default function CartPage() {
                     <span className="text-[11px] font-black uppercase tracking-wider text-purple-500">{dealGroup.dealBadge || dealGroup.dealName}</span>
                   </div>
                   {dealGroup.items.map((row) => (
-                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
+                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} onApplyDeal={(deal) => applyDealToItem(row.key, deal)} openDealPicker={openDealCardKey === row.key} onToggleDealPicker={(force) => setOpenDealCardKey((prev) => force === false ? null : (prev === row.key ? null : row.key))} />
                   ))}
                 </div>
               ))}
@@ -742,7 +754,7 @@ export default function CartPage() {
                     <span className="text-[11px] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Items ({groupedItems.regular.length})</span>
                   </div>
                   {groupedItems.regular.map((row) => (
-                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
+                    <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} onApplyDeal={(deal) => applyDealToItem(row.key, deal)} openDealPicker={openDealCardKey === row.key} onToggleDealPicker={(force) => setOpenDealCardKey((prev) => force === false ? null : (prev === row.key ? null : row.key))} />
                   ))}
                 </div>
               )}
@@ -783,14 +795,16 @@ export default function CartPage() {
 }
 
 // ✅ MOBILE cart card (Daraz-style) — reusable in mobile tree, uses passed-in handlers.
-function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) {
+function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect, onApplyDeal, openDealPicker = false, onToggleDealPicker }) {
   const img = getImgUrl(row.image);
   return (
-    <div className={`bg-[var(--user-bg-card)] rounded-xl border border-[var(--user-border)] p-3 mb-2 flex items-start gap-2 ${!isSelected ? "opacity-60" : ""}`}>
+    <div
+      onClick={() => onToggleDealPicker?.()}
+      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border border-[var(--user-border)] p-3 mb-2 flex items-start gap-2 ${!isSelected ? "opacity-60" : ""}`}>
       {/* ✅ Selection checkbox (unchanged) */}
       <button
         type="button"
-        onClick={() => onToggleSelect?.()}
+        onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
         aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
         aria-pressed={isSelected}
         className="shrink-0 p-1 mt-0.5 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
@@ -821,7 +835,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           </Link>
           <button
             type="button"
-            onClick={() => onRemove(row)}
+            onClick={(e) => { e.stopPropagation(); onRemove(row); }}
             aria-label={`Remove ${row.name}`}
             className="shrink-0 -mt-0.5 -mr-0.5 h-7 w-7 flex items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] active:scale-90 transition"
           >
@@ -853,6 +867,13 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           </div>
         ) : null}
 
+        <DealInfoDropdown
+          cartItem={row.raw}
+          onApplyDeal={onApplyDeal}
+          open={openDealPicker}
+          onClose={() => onToggleDealPicker?.(false)}
+        />
+
         {/* ✅ Row 2 — Price (left) + QTY stepper (right) — neche wali line khatam */}
         <div className="flex items-center justify-between gap-2 mt-1.5">
           <div className="flex items-baseline gap-1.5 min-w-0">
@@ -864,7 +885,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-elevated)] overflow-hidden shrink-0">
             <button
               type="button"
-              onClick={onDec}
+              onClick={(e) => { e.stopPropagation(); onDec(); }}
               disabled={row.qty <= 1}
               aria-label="Decrease"
               className="h-7 w-7 flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition"
@@ -874,7 +895,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
             <span className="w-7 text-center text-[12px] font-black tabular-nums text-[var(--user-text)]">{row.qty}</span>
             <button
               type="button"
-              onClick={onInc}
+              onClick={(e) => { e.stopPropagation(); onInc(); }}
               aria-label="Increase"
               className="h-7 w-7 flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
             >

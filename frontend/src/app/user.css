@@ -210,6 +210,29 @@
   animation: cart-qty-pop 0.2s ease-out;
 }
 
+/* ==========================================
+   DEAL PICKER PANEL ANIMATION
+========================================== */
+@keyframes deal-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.deal-picker-panel {
+  animation: deal-picker-in 0.18s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-picker-panel {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cart-item-in,
   .cart-qty-pop {
