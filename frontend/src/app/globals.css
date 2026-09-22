@@ -1,46 +1,46 @@
 @import "tailwindcss";
 
-/* Simple professional navy and blue theme */
+/* Admin dashboard light theme */
 :root {
-  --bg-primary: #0f1720;
-  --bg-secondary: #111a26;
-  --bg-tertiary: #1e2b3b;
-  --bg-sidebar: #111a26;
-  --bg-sidebar-hover: #1d3048;
-  --bg-sidebar-active: #3155d8;
-  --bg-navbar: #111a26;
-  --bg-card: #17212d;
-  --bg-card-alt: #1d2a39;
-  --bg-table: #151f2a;
-  --bg-input: #192838;
+  --bg-primary: #e8edf3;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #e2e8f0;
+  --bg-sidebar: #111827;
+  --bg-sidebar-hover: #1f2937;
+  --bg-sidebar-active: #2563eb;
+  --bg-navbar: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f1f5f9;
+  --bg-table: #f1f5f9;
+  --bg-input: #f1f5f9;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #b8c5d6;
-  --text-muted: #64748b;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #475569;
   --text-sidebar: #f8fafc;
   --text-sidebar-muted: #94a3b8;
-  --text-navbar: #f8fafc;
-  --text-inverse: #0f1720;
+  --text-navbar: #0f172a;
+  --text-inverse: #ffffff;
 
-  --border-color: #263445;
-  --border-sidebar: #223348;
-  --border-navbar: #263445;
-  --border-card: #263445;
+  --border-color: #cbd5e1;
+  --border-sidebar: #1f2937;
+  --border-navbar: #cbd5e1;
+  --border-card: #cbd5e1;
 
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   --accent-text: #ffffff;
-  --accent-soft: rgba(59, 130, 246, 0.16);
-  --tag: #334155;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --tag: #e2e8f0;
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --success: #22c55e;
   --warning: #f59e0b;
-  --info: #60a5fa;
+  --info: #3b82f6;
 
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 6px 16px rgb(0 0 0 / 0.28);
-  --shadow-lg: 0 16px 36px rgb(0 0 0 / 0.38);
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 6px 16px rgb(15 23 42 / 0.09);
+  --shadow-lg: 0 16px 36px rgb(15 23 42 / 0.13);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -50,41 +50,41 @@
 
 /* ✅ FIXED: Light Mode Variables with Explicit Sidebar Colors */
 html.light {
-  --bg-primary: #f5f7fb;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #eef2f7;
+  --bg-primary: #e8edf3;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #e2e8f0;
   
   /* Sidebar Specific Fixes for Light Mode */
-  --bg-sidebar: #ffffff;
-  --bg-sidebar-hover: #f1f5f9;
-  --bg-sidebar-active: #eff6ff; /* Light blue background for active item */
-  --bg-navbar: #ffffff;
+  --bg-sidebar: #111827;
+  --bg-sidebar-hover: #1f2937;
+  --bg-sidebar-active: #2563eb;
+  --bg-navbar: #f8fafc;
   
   --bg-card: #ffffff;
-  --bg-card-alt: #f8fafc;
+  --bg-card-alt: #f1f5f9;
   --bg-table: #f1f5f9;
   --bg-input: #f1f5f9;
 
   /* Text Colors - Ensuring Sidebar Text is Dark */
   --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-secondary: #334155;
+  --text-muted: #475569;
   
-  --text-sidebar: #0f172a;        /* ✅ Dark text for sidebar items */
-  --text-sidebar-muted: #64748b;  /* ✅ Muted but visible text */
+  --text-sidebar: #f8fafc;
+  --text-sidebar-muted: #94a3b8;
   --text-navbar: #0f172a;
   --text-inverse: #ffffff;
 
   /* Borders */
-  --border-color: #dbe3ed;
-  --border-sidebar: #e2e8f0;      /* ✅ Lighter border for sidebar */
-  --border-navbar: #dbe3ed;
-  --border-card: #dbe3ed;
+  --border-color: #cbd5e1;
+  --border-sidebar: #1f2937;
+  --border-navbar: #cbd5e1;
+  --border-card: #cbd5e1;
 
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   --accent-text: #ffffff;
-  --accent-soft: rgba(59, 130, 246, 0.12);
+  --accent-soft: rgba(37, 99, 235, 0.12);
   --tag: #e2e8f0;
   --danger: #ef4444;
   --danger-hover: #dc2626;

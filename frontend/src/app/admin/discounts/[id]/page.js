@@ -96,14 +96,14 @@ function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
   const c = colors[color] || colors.emerald;
 
   return (
-    <div className="rounded-xl p-4 transition-all hover:shadow-md" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+    <div className="rounded-lg p-3 transition-all hover:shadow-md" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
       <div className="flex items-start justify-between mb-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.bg, border: `1px solid ${c.border}` }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.bg, border: `1px solid ${c.border}` }}>
           <Icon className="w-5 h-5" style={{ color: c.text }} />
         </div>
       </div>
       <p className="text-[11px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
-      <p className="text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{value}</p>
+      <p className="text-[18px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{value}</p>
       {subValue && <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{subValue}</p>}
     </div>
   );
@@ -111,31 +111,31 @@ function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
 
 function InfoCard({ icon: Icon, title, children, action, bodyClassName = "" }) {
   return (
-    <div className="rounded-xl overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-      <div className="px-5 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+    <div className="rounded-lg overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+            <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
               <Icon className="w-4 h-4" />
             </div>
           )}
-          <h3 className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>{title}</h3>
+          <h3 className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{title}</h3>
         </div>
         {action}
       </div>
-         <div className={`p-5 flex-1 ${bodyClassName}`}>{children}</div>
+         <div className={`p-4 flex-1 ${bodyClassName}`}>{children}</div>
     </div>
   );
 }
 
 function DataRow({ label, value, mono, highlight, icon: Icon }) {
   return (
-    <div className="flex items-center justify-between py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+    <div className="flex items-center justify-between gap-4 py-2.5">
       <div className="flex items-center gap-2.5">
         {Icon && <Icon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />}
         <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
-      <span className={`text-[13px] font-semibold text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
+      <span className={`text-[12px] font-semibold text-right break-words max-w-[60%] ${mono ? "font-mono" : ""}`}
         style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value || "—"}</span>
     </div>
   );
@@ -278,29 +278,29 @@ export default function DiscountDetailPage() {
   ];
 
   return (
-    <div className="w-full pb-8 space-y-6">
+    <div className="w-full pb-8 space-y-4">
       {/* HEADER */}
       <div>
-        <button onClick={() => router.push(backPath)} className="flex items-center gap-2 text-[12px] font-medium mb-4 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
+        <button onClick={() => router.push(backPath)} className="flex items-center gap-2 text-[11px] font-medium mb-3 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
           <ArrowLeft className="w-4 h-4" /> Back to Discounts
         </button>
 
-        <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col lg:flex-row gap-6">
+        <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-4 md:p-5">
+            <div className="flex flex-col lg:flex-row gap-5">
               {/* Icon */}
-              <div className="w-full lg:w-48 shrink-0">
-                <div className="w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                  <Percent className="w-20 h-20" style={{ color: "var(--accent)" }} />
+              <div className="w-16 shrink-0">
+                <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", border: "1px solid var(--border-color)" }}>
+                  <Percent className="w-8 h-8" style={{ color: "var(--accent)" }} />
                 </div>
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h1 className="text-2xl md:text-3xl font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                      <h1 className="text-xl md:text-2xl font-bold truncate" style={{ color: "var(--text-primary)" }}>
                         {discount.name || "Untitled Discount"}
                       </h1>
                       <StatusBadge active={isActive} label={getDiscountStatus(discount).toUpperCase()} />
@@ -316,12 +316,12 @@ export default function DiscountDetailPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => router.push(backPath)} className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition"
+                    <button onClick={() => router.push(backPath)} className="h-9 px-3 rounded-lg text-[11px] font-semibold flex items-center gap-2 transition"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                       <ArrowLeft className="w-4 h-4" /> Back
                     </button>
                     <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
-                      className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
+                      className="h-9 px-3 rounded-lg text-[11px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
                       style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
@@ -329,7 +329,7 @@ export default function DiscountDetailPage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-4">
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Value</p>
                     <p className="text-[14px] font-bold" style={{ color: "#10b981" }}>{formatDiscountValue(discount)}</p>
@@ -345,8 +345,8 @@ export default function DiscountDetailPage() {
                     </p>
                   </div>
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Priority</p>
-                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{discount.priority || "1"}</p>
+                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Start Date</p>
+                    <p className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{fd(discount.startDate || discount.start_at)}</p>
                   </div>
                 </div>
               </div>
@@ -356,13 +356,13 @@ export default function DiscountDetailPage() {
       </div>
 
       {/* TABS */}
-      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
+      <div className="flex items-center gap-5 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
         {tabList.map((tb) => {
           const active = tab === tb.id;
           const Icon = tb.icon;
           return (
             <button key={tb.id} type="button" onClick={() => setTab(tb.id)}
-              className="relative flex items-center gap-2 whitespace-nowrap pb-2.5 text-[12px] font-semibold transition-all bg-transparent border-none shadow-none"
+              className="relative flex items-center gap-2 whitespace-nowrap pb-2 text-[11px] font-semibold transition-all bg-transparent border-none shadow-none"
               style={{
                 color: active ? "var(--accent)" : "var(--text-muted)",
               }}>
@@ -382,9 +382,9 @@ export default function DiscountDetailPage() {
 
       {/* OVERVIEW TAB */}
       {tab === "overview" && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <MetricCard icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price"} color="emerald" />
             <MetricCard icon={DollarSign} label="Value" value={formatDiscountValue(discount)} color="blue" />
             <MetricCard icon={Target} label="Targets" value={targetCount === 0 ? "All" : String(targetCount)} subValue={targetLabel} color="purple" />
@@ -392,7 +392,7 @@ export default function DiscountDetailPage() {
           </div>
 
                    {/* ✅ Discount Info LEFT + Description RIGHT — equal height */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <InfoCard icon={Tag} title="Discount Information">
               <div className="space-y-1">
                 <DataRow icon={Hash} label="Discount Name" value={discount.name} />

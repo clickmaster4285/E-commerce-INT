@@ -133,8 +133,97 @@ function EmptyState({ icon: Icon, title, description, action }) {
   );
 }
 
+function AllAttributesModal({ attributes, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="all-attributes-title"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    >
+      <div
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl shadow-2xl"
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+      >
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 px-5 py-4"
+          style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 id="all-attributes-title" className="text-[15px] font-bold">All Attributes</h2>
+              <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                Product attributes and specifications
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-md p-2 transition hover:bg-red-500/10 hover:text-red-400" style={{ color: "var(--text-muted)" }} aria-label="Close attributes">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {attributes.length === 0 ? (
+            <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+              <p className="text-[12px]">No attributes are available for this product.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {attributes.map((attribute) => (
+                <div key={attribute.name} className="min-w-0 rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                  <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{attribute.value || "—"}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 justify-end px-5 py-3" style={{ backgroundColor: "var(--bg-tertiary)", borderTop: "1px solid var(--border-color)" }}>
+          <button type="button" onClick={onClose} className="h-9 rounded-md px-4 text-[12px] font-bold transition hover:brightness-110" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Tag entries can be plain strings or legacy { name } objects
 const tagNameOf = (t) => (typeof t === "object" && t !== null ? t.name : t);
+
+// Attribute values can be plain strings/numbers or nested objects such as
+// { Brand: "Dell" } / { label, value } coming from the attribute configuration.
+// Always resolve a readable value so "[object Object]" is never rendered.
+const attrValueOf = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw).trim();
+  }
+  if (Array.isArray(raw)) return raw.map(attrValueOf).filter(Boolean).join(", ");
+  if (typeof raw === "object") {
+    const direct = raw.value ?? raw.label ?? raw.name ?? raw.display ?? raw.title ?? raw.text;
+    if (direct !== undefined && direct !== null && direct !== raw) return attrValueOf(direct);
+    return Object.values(raw).map(attrValueOf).filter(Boolean).join(", ");
+  }
+  return String(raw);
+};
 
 // ==================== COMPACT 3-DOT MENU ====================
 
@@ -350,6 +439,7 @@ export default function ProductDetailPage() {
   // Gallery State
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showAllAttributes, setShowAllAttributes] = useState(false);
 
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams?.get("tab");
@@ -406,7 +496,12 @@ export default function ProductDetailPage() {
     };
     const handleUpdated = (data) => {
       if (String(data?._id) !== String(id)) return;
-      setLiveEvents((prev) => [...prev, { key: `live-u-${Date.now()}`, type: "updated", user: data?.updatedby || null, date: data?.updated_at || new Date().toISOString() }]);
+      const date = data?.updated_at || new Date().toISOString();
+      setLiveEvents((prev) => {
+        // Ignore re-delivered socket events so an update is never listed twice.
+        if (prev.some((e) => e.type === "updated" && e.date === date)) return prev;
+        return [...prev, { key: `live-u-${Date.now()}`, type: "updated", user: data?.updatedby || null, date }];
+      });
     };
     socket.on("productDeleted", handleDeleted);
     socket.on("productCreated", handleCreated);
@@ -579,7 +674,7 @@ export default function ProductDetailPage() {
         cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
         quantity: String(v.quantity ?? 0),
         attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
-          const strValue = String(value ?? "");
+          const strValue = attrValueOf(value);
           const preset = rawAttributes.find((a) => a.name === name);
           const isMulti = preset?.data_type === "multi_select";
           return { name, value: isMulti ? strValue.split(",").map((s) => s.trim()).filter(Boolean)[0] || "" : strValue, isCustom: false };
@@ -908,7 +1003,8 @@ export default function ProductDetailPage() {
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
-  const wasUp = Boolean(product?.updatedby);
+  const liveUpdatedEvents = liveEvents.filter((e) => e.type === "updated");
+  const latestLiveUpdate = liveUpdatedEvents[liveUpdatedEvents.length - 1] || null;
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
   (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n).trim()); }); });
@@ -958,12 +1054,25 @@ export default function ProductDetailPage() {
       Object.entries(v.attributes || {}).forEach(([name, value]) => {
         const n = String(name || "").trim();
         if (!n) return;
-        const val = String(value ?? "").trim();
+        const val = attrValueOf(value);
         if (!map[n]) map[n] = new Set();
         if (val) map[n].add(val);
       });
     });
     return Object.entries(map).map(([name, vals]) => ({ name, display: vals.size > 1 ? "Multiple" : [...vals][0] || "—" }));
+  })();
+  const allAttributeDetails = (() => {
+    const valuesByName = new Map();
+    (variants || []).forEach((variant) => {
+      Object.entries(variant.attributes || {}).forEach(([name, value]) => {
+        const cleanName = String(name || "").trim();
+        const cleanValue = attrValueOf(value);
+        if (!cleanName || !cleanValue) return;
+        if (!valuesByName.has(cleanName)) valuesByName.set(cleanName, new Set());
+        valuesByName.get(cleanName).add(cleanValue);
+      });
+    });
+    return [...valuesByName.entries()].map(([name, values]) => ({ name, value: [...values].join(", ") }));
   })();
   const attributeCount = attributeSummary.length;
   const tagCount = allAssignedTags.length;
@@ -1118,33 +1227,37 @@ export default function ProductDetailPage() {
         />
       )}
 
+      {showAllAttributes && (
+        <AllAttributesModal
+          attributes={allAttributeDetails}
+          onClose={() => setShowAllAttributes(false)}
+        />
+      )}
+
       {/* HEADER: Breadcrumb + Actions */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <nav className="flex items-center flex-wrap gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-          <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors font-medium">Products</button>
-          <ChevronRight className="w-3 h-3 shrink-0" />
-          {product.category_id?.name && (
-            <>
-              <span className="max-w-[160px] truncate">{product.category_id.name}</span>
-              <ChevronRight className="w-3 h-3 shrink-0" />
-            </>
-          )}
-          {product.brand_id?.name && (
-            <>
-              <span className="max-w-[160px] truncate">{product.brand_id.name}</span>
-              <ChevronRight className="w-3 h-3 shrink-0" />
-            </>
-          )}
-          <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{product.name}</span>
-        </nav>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleEdit}
-            className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-          >
-            <Pencil className="w-3.5 h-3.5" /> Edit
-          </button>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <nav className="flex items-center flex-wrap gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors font-medium">Products</button>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            {product.category_id?.name && (
+              <>
+                <span className="max-w-[160px] truncate">{product.category_id.name}</span>
+                <ChevronRight className="w-3 h-3 shrink-0" />
+              </>
+            )}
+            {product.brand_id?.name && (
+              <>
+                <span className="max-w-[160px] truncate">{product.brand_id.name}</span>
+                <ChevronRight className="w-3 h-3 shrink-0" />
+              </>
+            )}
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{product.name}</span>
+          </nav>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h1>
+          <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>View product information, variants, status and related details.</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleDelete}
             className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
@@ -1157,10 +1270,10 @@ export default function ProductDetailPage() {
 
       {/* PRODUCT HERO: Gallery + Info + Meta panel */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
-        <div className="xl:col-span-9 rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+        <div className="xl:col-span-8 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-0">
           {/* Image Area - NOW CLICKABLE */}
-          <div className="relative bg-[var(--bg-tertiary)] p-6 md:p-8 flex items-center justify-center min-h-[320px] md:min-h-[420px] group">
+          <div className="relative bg-[var(--bg-tertiary)] p-5 md:p-6 flex items-center justify-center min-h-[280px] md:min-h-[340px] group">
             {firstVariant?.images?.length > 0 ? (
               <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
@@ -1172,7 +1285,7 @@ export default function ProductDetailPage() {
                     src={getImageUrl(firstVariant.images[0].img_url)}
                     alt={product.name}
                     className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    style={{ maxHeight: 380 }}
+                    style={{ maxHeight: 300 }}
                   />
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -1185,7 +1298,7 @@ export default function ProductDetailPage() {
 
                 {/* Clickable Thumbnails */}
                 {firstVariant.images.length > 1 && (
-                  <div className="flex max-h-[380px] w-14 shrink-0 flex-col gap-2 overflow-y-auto pb-1 scrollbar-hide">
+                  <div className="flex max-h-[300px] w-14 shrink-0 flex-col gap-2 overflow-y-auto pb-1 scrollbar-hide">
                     {firstVariant.images.map((img, i) => (
                       <button
                         key={i}
@@ -1215,7 +1328,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Info Area */}
-          <div className="p-6 md:p-8 flex flex-col gap-4">
+          <div className="p-5 md:p-6 flex flex-col gap-4">
             <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
@@ -1275,7 +1388,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* SIDE PANEL: Brand / Category / Key Attributes */}
-        <div className="xl:col-span-3 rounded-2xl overflow-hidden self-start" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="xl:col-span-4 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="p-5 flex flex-col gap-4">
             {/* Brand */}
             <div>
@@ -1330,7 +1443,7 @@ export default function ProductDetailPage() {
                       </div>
                     ))}
                   </div>
-                  <button type="button" onClick={() => router.push(`/admin/products/${id}/add-variant`)} className="mt-2.5 flex items-center gap-0.5 text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
+                  <button type="button" onClick={() => setShowAllAttributes(true)} className="mt-2.5 flex items-center gap-0.5 text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
                     View all attributes <ChevronRight className="w-3 h-3" />
                   </button>
                 </>
@@ -1384,7 +1497,7 @@ export default function ProductDetailPage() {
               <div className="space-y-5">
                 {/* Product Details + Description + Variants | Side cards */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  <div className="lg:col-span-2 flex flex-col gap-5">
+                  <div className="lg:col-span-2 flex flex-col gap-5 self-start">
                     {/* Product Details */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                       <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
@@ -1462,6 +1575,8 @@ export default function ProductDetailPage() {
                         </div>
                       </div>
                     </div>
+
+                    {variantsSection}
                   </div>
 
                   <div className="flex flex-col gap-3">
@@ -1560,27 +1675,27 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
 
-                    {wasUp && (
+                    {latestLiveUpdate && (
                       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                         <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
                           <h3 className="text-sm font-bold text-[var(--text-primary)]">Updated By</h3>
                         </div>
                         <div className="p-3">
-                          {product.updatedby ? (
+                          {latestLiveUpdate.user ? (
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-3">
-                                <Avatar user={product.updatedby} size="md" color="blue" />
+                                <Avatar user={latestLiveUpdate.user} size="md" color="blue" />
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{product.updatedby.name || product.updatedby.email}</p>
-                                  <p className="text-[11px] text-[var(--text-muted)]">{product.updatedby.email || "—"}</p>
+                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{latestLiveUpdate.user.name || latestLiveUpdate.user.email}</p>
+                                  <p className="text-[11px] text-[var(--text-muted)]">{latestLiveUpdate.user.email || "—"}</p>
                                 </div>
                               </div>
-                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
                               <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
-                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
                             </div>
                           )}
                         </div>
@@ -1589,8 +1704,6 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Variants (shared section) */}
-                {variantsSection}
               </div>
             )}
 
@@ -1746,7 +1859,7 @@ export default function ProductDetailPage() {
                       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
                         <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
                       </div>
-                      {wasUp && (
+                      {latestLiveUpdate && (
                         <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
                       )}
                     </div>
@@ -1765,30 +1878,6 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
                   </div>
-
-                  {wasUp && (
-                    <div className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.12)" }}>
-                          <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />
-                        </div>
-                      </div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Product Updated</h4>
-                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                              Updated by <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{product.updatedby?.name || "—"}</span>
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(product.updated_at)}</p>
-                            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(product.updated_at)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {liveEvents.map((ev, i) => (
                     <div key={ev.key} className="flex gap-4">
@@ -1826,7 +1915,7 @@ export default function ProductDetailPage() {
                     </div>
                   ))}
 
-                  {!wasUp && liveEvents.length === 0 && (
+                  {liveEvents.length === 0 && (
                     <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                       <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet. Product has not been modified since creation.</span>

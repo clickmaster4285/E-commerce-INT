@@ -143,7 +143,7 @@ function Button({
 function Card({ children, className = "" }) {
   return (
     <div
-      className={`overflow-hidden rounded-xl ${className}`}
+      className={`overflow-hidden rounded-lg ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         border: "1px solid var(--border-color)",
@@ -157,8 +157,8 @@ function Card({ children, className = "" }) {
 function CardHeader({ icon, title, action }) {
   return (
     <div
-      className="flex items-center justify-between px-4 py-3"
-      style={{ borderBottom: "1px solid var(--border-color)" }}
+      className="flex items-center justify-between px-4 py-2.5"
+      style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
     >
       <div className="flex items-center gap-2">
         {icon && <span style={{ color: "var(--accent)" }}>{icon}</span>}
@@ -171,17 +171,16 @@ function CardHeader({ icon, title, action }) {
   );
 }
 
-function InfoRow({ label, value, green = false, mono = false, isLast = false }) {
+function InfoRow({ label, value, green = false, mono = false, isLast = false, compact = false }) {
   return (
     <div
-      className="flex items-center justify-between gap-4 py-2" 
-      style={{ borderBottom: !isLast ? "1px solid var(--border-color)" : "none" }}
+      className={`flex min-w-0 flex-col gap-0.5 ${compact ? "py-1.5" : "py-2"}`}
     >
-      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
         {label}
       </span>
       <span
-        className={`text-[12px] text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
+        className={`max-w-full break-words text-[12px] font-medium ${mono ? "font-mono" : ""}`}
         style={{ color: green ? "#34d399" : "var(--text-primary)" }}
       >
         {value || "—"}
@@ -492,7 +491,7 @@ export default function BrandDetailPage() {
   }
 
   return (
-    <div className="w-full space-y-4 pb-10" style={{ color: "var(--text-primary)" }}>
+    <div className="w-full space-y-4 pb-8" style={{ color: "var(--text-primary)" }}>
       {/* ===== BREADCRUMB ===== */}
       <nav className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
         <button
@@ -508,9 +507,26 @@ export default function BrandDetailPage() {
         </span>
       </nav>
 
-      {/* ===== HEADER: Title + Actions ===== */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-[20px] leading-tight font-bold tracking-tight">Brand Details</h1>
+      {/* ===== HEADER: Back, Title + Actions ===== */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(backPath)}
+            className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold transition hover:bg-[var(--bg-tertiary)]"
+            style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+            aria-label="Back to Brands"
+          >
+            <Ico d={D.back} className="h-3.5 w-3.5" />
+            <span>Back</span>
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-[21px] leading-tight font-bold tracking-tight">Brand Details</h1>
+            <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+              View and manage brand information, status and related details.
+            </p>
+          </div>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button primary onClick={openEdit}>
             <Ico d={D.edit} className="h-3.5 w-3.5" /> Edit
@@ -525,83 +541,81 @@ export default function BrandDetailPage() {
         </div>
       </div>
 
-      {/* ===== BACK LINK ===== */}
-      <button
-        type="button"
-        onClick={() => router.push(backPath)}
-        className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:underline"
-        style={{ color: "var(--accent)" }}
-      >
-        <Ico d={D.back} className="h-3.5 w-3.5" /> Back to Brands
-      </button>
-
       {/* ===== BRAND BANNER CARD ===== */}
-      <Card className="p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+      <Card className="p-3.5 md:p-4">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_0.8fr_0.95fr] xl:gap-0">
           {/* Logo */}
-          {hasLogo ? (
-            <div
-              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              <img
-                src={logoSrc}
-                alt={brand.name}
-                onError={() => setLogoFailed(true)}
-                className="max-h-full max-w-full object-contain p-1.5"
-              />
-            </div>
-          ) : (
-            <div
-              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                border: "1px dashed var(--border-color)",
-              }}
-            >
-              <Ico d={D.image} className="h-5 w-5 opacity-40" sw={1.4} />
-            </div>
-          )}
-
-          {/* Identity */}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-[17px] leading-tight font-bold">{brand.name}</h2>
-              <StatusPill active={brand.is_active} />
-            </div>
-            <span
-              className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                borderColor: "var(--border-color)",
-              }}
-            >
-              {brand.brand_code || "—"}
-            </span>
-            {brand.description && (
-              <p
-                className="mt-2 max-w-2xl text-[12px] leading-relaxed"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {brand.description}
-              </p>
+          <div className="flex min-w-0 items-start gap-3.5 xl:pr-5">
+            {hasLogo ? (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <img src={logoSrc} alt={brand.name} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
+              </div>
+            ) : (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                <Ico d={D.image} className="h-5 w-5 opacity-40" sw={1.4} />
+              </div>
             )}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h2 className="text-[17px] leading-tight font-bold">{brand.name}</h2>
+                <StatusPill active={brand.is_active} />
+              </div>
+              <span className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>
+                {brand.brand_code || "—"}
+              </span>
+              {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{brand.description}</p>}
+              <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
+                <span><span className="mr-1">Country</span><strong style={{ color: "var(--text-primary)" }}>{brand.country || "—"}</strong></span>
+                <span><span className="mr-1">Created At</span><strong style={{ color: "var(--text-primary)" }}>{formatDateTime(brand.created_at)}</strong></span>
+                <span><span className="mr-1">Created By</span><strong style={{ color: "var(--text-primary)" }}>{brand.createdby?.name || "—"}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Status summary */}
+          <div className="space-y-2.5 xl:border-l xl:border-r xl:px-4" style={{ borderColor: "var(--border-color)" }}>
+            <div className="rounded-lg p-2.5" style={{ backgroundColor: "var(--accent-soft)", border: "1px solid var(--border-color)" }}>
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: brand.is_active ? "rgba(16,185,129,.16)" : "rgba(239,68,68,.14)", color: brand.is_active ? "var(--accent)" : "var(--danger)" }}>
+                  <Ico d={D.check} className="h-3.5 w-3.5" />
+                </span>
+                <div>
+                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Brand Status</p>
+                  <p className="text-[13px] font-bold" style={{ color: brand.is_active ? "var(--accent)" : "var(--danger)" }}>{brand.is_active ? "Active" : "Inactive"}</p>
+                </div>
+              </div>
+              <p className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>{brand.is_active ? "This brand is visible and available in the store." : "This brand is currently hidden from the store."}</p>
+            </div>
+            <div className="rounded-lg p-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Total Products</p>
+              <p className="mt-1 text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{totalProducts}</p>
+            </div>
+          </div>
+
+          {/* Quick information */}
+          <div className="overflow-hidden rounded-lg xl:ml-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            <div className="border-b px-3 py-2.5" style={{ borderColor: "var(--border-color)" }}>
+              <h3 className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>Quick Information</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 px-3 py-1">
+              <InfoRow label="Brand Code" value={brand.brand_code} mono compact />
+              <InfoRow label="Country" value={brand.country || "—"} compact />
+              <InfoRow label="Logo Size" value={fileSize(brand.logo?.img_size)} compact />
+              <InfoRow label="Status" value={brand.is_active ? "Active" : "Inactive"} green={brand.is_active} isLast compact />
+            </div>
           </div>
         </div>
       </Card>
 
       {/* ===== TABS ===== */}
       <div
-        className="flex items-center gap-6 overflow-x-auto border-b"
+        className="flex items-center gap-5 overflow-x-auto border-b"
         style={{ borderColor: "var(--border-color)" }}
       >
         {[
-          { id: "overview", label: "Overview" },
+          { id: "overview", label: "Brand Information" },
           { id: "products", label: "Products", badge: totalProducts },
-          { id: "activity", label: "Activity" },
+          { id: "activity", label: "History" },
         ].map((item) => {
           const active = tab === item.id;
           return (
@@ -609,7 +623,7 @@ export default function BrandDetailPage() {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className="relative flex items-center gap-2 py-2.5 text-[12px] font-medium whitespace-nowrap transition-colors"
+              className="relative flex items-center gap-2 py-2 text-[11px] font-medium whitespace-nowrap transition-colors"
               style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
             >
               {item.label}
@@ -637,9 +651,9 @@ export default function BrandDetailPage() {
 
       {/* ===== OVERVIEW TAB ===== */}
       {tab === "overview" && (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
           {/* LEFT COLUMN */}
-          <div className="space-y-4 lg:col-span-2">
+          <div className="space-y-3 lg:col-span-2">
           
           {/* Reference-style two-column overview layout */}
             
@@ -649,18 +663,20 @@ export default function BrandDetailPage() {
                 title="Brand Information"
                 icon={<Ico d={D.tag} className="h-4 w-4" />}
               />
-              <div className="px-4 pb-4">
-                <InfoRow label="Brand Code" value={brand.brand_code} mono />
-                <InfoRow label="Brand Name" value={brand.name} />
-                <InfoRow label="Country" value={brand.country || "—"} />
-                <InfoRow
-                  label="Status"
-                  value={brand.is_active ? "Active" : "Inactive"}
-                  green={brand.is_active}
-                  isLast
-                />
+              <div className="px-4 pb-3">
+                <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                  <InfoRow label="Brand Code" value={brand.brand_code} mono />
+                  <InfoRow label="Brand Name" value={brand.name} />
+                  <InfoRow label="Country" value={brand.country || "—"} />
+                  <InfoRow
+                    label="Status"
+                    value={brand.is_active ? "Active" : "Inactive"}
+                    green={brand.is_active}
+                    isLast
+                  />
+                </div>
                 <div
-                  className="mt-3 rounded-lg p-3"
+                    className="mt-2 rounded-lg p-3"
                   style={{
                     backgroundColor: "var(--bg-tertiary)",
                     border: "1px solid var(--border-color)",
@@ -674,7 +690,7 @@ export default function BrandDetailPage() {
                   </p>
                   {brand.description ? (
                     <p
-                      className="whitespace-pre-wrap break-words text-[12px] leading-6"
+                      className="whitespace-pre-wrap break-words text-[12px] leading-5"
                       style={{ color: "var(--text-secondary)" }}
                     >
                       {brand.description}
@@ -694,7 +710,7 @@ export default function BrandDetailPage() {
                 title="Additional Details"
                 icon={<Ico d={D.clock} className="h-4 w-4" />}
               />
-              <div className="px-4 pb-4">
+              <div className="grid grid-cols-1 gap-x-8 px-4 pb-2 sm:grid-cols-2">
                 <InfoRow label="Created At" value={formatDateTime(brand.created_at)} />
                 <InfoRow label="Created By" value={brand.createdby?.name} />
                 <InfoRow
@@ -711,7 +727,7 @@ export default function BrandDetailPage() {
 
             {/* 3. RECORD INFO BANNER */}
             <div
-              className="flex items-start gap-3 rounded-xl px-4 py-3"
+                className="flex items-start gap-3 rounded-lg px-4 py-2.5"
               style={{
                 backgroundColor: "rgba(16,185,129,.08)",
                 border: "1px solid rgba(16,185,129,.25)",
@@ -745,12 +761,12 @@ export default function BrandDetailPage() {
             {/* 4. BRAND STATISTICS */}
             <div>
               <p
-                className="mb-2 text-[10px] font-bold uppercase tracking-widest"
+                className="mb-1.5 text-[10px] font-bold uppercase tracking-widest"
                 style={{ color: "var(--text-muted)" }}
               >
                 Brand Statistics
               </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {[
                   { label: "Total Products", value: totalProducts, icon: D.box, color: "var(--accent)" },
                   { label: "Active Products", value: activeProducts, icon: D.check, color: "#34d399" },
@@ -758,7 +774,7 @@ export default function BrandDetailPage() {
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    className="flex items-center gap-3 rounded-lg px-3.5 py-2.5"
                     style={{
                       backgroundColor: "var(--bg-card)",
                       border: "1px solid var(--border-color)",
@@ -957,7 +973,7 @@ export default function BrandDetailPage() {
           {/* RIGHT COLUMN */}
           <div className="space-y-4">
             {/* 7. BRAND LOGO */}
-            <Card className="h-full">
+            <Card>
               <CardHeader
                 title="Brand Logo"
                 icon={<Ico d={D.image} className="h-4 w-4" />}

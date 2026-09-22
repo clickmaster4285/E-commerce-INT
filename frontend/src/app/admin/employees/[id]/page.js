@@ -266,6 +266,52 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   );
 }
 
+function EmployeeOverview({ employee, name, email, phone, role, status, avatar, department, address, empId, joinDate, ordersHandled, salesGenerated, productsAdded, performanceRating, permissions, filteredPermissions, enabledCount, totalCount, tabs, activeTab, setActiveTab, filteredActivities, canEditPermissions, setPermissionsData, setShowPermissionsModal, openEditModal, router }) {
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px" };
+  const infoItems = [["Full Name", name], ["Username", email.split("@")[0]], ["Email Address", email], ["Phone Number", phone || "N/A"], ["Department", department], ["Employee Code", empId]];
+  const stats = [["Orders Handled", ordersHandled, ShoppingCart, "#22c55e"], ["Sales Generated", `$${salesGenerated.toLocaleString()}`, DollarSign, "#f59e0b"], ["Products Added", productsAdded, Package, "#3b82f6"], ["Performance Rating", performanceRating, Star, "#f59e0b"]];
+
+  const openPermissions = () => {
+    const initialData = {};
+    Object.keys(ALLOWED_PERMISSIONS).forEach((key) => {
+      initialData[key] = permissions?.[key] !== undefined ? permissions[key] : ALLOWED_PERMISSIONS[key].default;
+    });
+    setPermissionsData(initialData);
+    setShowPermissionsModal(true);
+  };
+
+  return <>
+    <div className="flex flex-col gap-3 border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px]">
+          <button onClick={() => router.back()} className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
+          <span style={{ color: "var(--text-muted)" }}>/</span><button onClick={() => router.push("/admin/employees")} style={{ color: "var(--text-muted)" }}>Employees</button><span style={{ color: "var(--text-muted)" }}>/</span><span style={{ color: "var(--text-secondary)" }}>Employee Details</span>
+        </div>
+        <button onClick={() => openEditModal(employee)} className="h-8 px-3 rounded-md text-[11px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Pencil className="w-3 h-3" /> Edit</button>
+      </div>
+      <div><h1 className="text-lg font-bold">Employee Details</h1><p className="text-[10px]" style={{ color: "var(--text-muted)" }}>View and manage employee information, permissions and activities.</p></div>
+    </div>
+
+    <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_170px] gap-3 p-3 rounded-lg" style={cardStyle}>
+      <div className="flex items-center gap-3 min-w-0">
+        {avatar ? <img src={avatar} alt={name} className="w-14 h-14 rounded-full object-cover shrink-0" /> : <div className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--accent)" }}>{name.charAt(0).toUpperCase()}</div>}
+        <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="text-sm font-bold truncate">{name}</h2><StatusBadge status={status} /></div><div className="space-y-1 mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}><p className="flex items-center gap-1.5"><User className="w-3 h-3" /> {email.split("@")[0]}</p><p className="flex items-center gap-1.5 truncate"><Mail className="w-3 h-3" /> {email}</p><p className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {phone}</p></div></div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-l pl-3" style={{ borderColor: "var(--border-color)" }}><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Role</p><p className="text-[10px] font-medium capitalize">{role}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Employee Code</p><p className="text-[10px] font-medium">{empId}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Department</p><p className="text-[10px] font-medium">{department}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Joined At</p><p className="text-[10px] font-medium">{joinDate}</p></div></div>
+      <div className="grid grid-cols-2 xl:grid-cols-1 gap-1.5">{stats.map(([label, value, Icon, color]) => <div key={label} className="flex items-center gap-2 rounded-md px-2 py-1.5" style={{ backgroundColor: "var(--bg-tertiary)" }}><Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} /><div className="min-w-0"><p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[11px] font-bold">{value}</p></div></div>)}</div>
+      <div className="col-span-full border-t pt-2 flex items-center gap-4 overflow-x-auto no-scrollbar" style={{ borderColor: "var(--border-color)" }}>{tabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="text-[10px] whitespace-nowrap pb-1 border-b-2" style={{ color: activeTab === tab.id ? "var(--accent)" : "var(--text-muted)", borderColor: activeTab === tab.id ? "var(--accent)" : "transparent" }}>{tab.label}</button>)}</div>
+    </section>
+
+    <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.8fr_0.9fr] gap-3">
+      <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Personal Information</h3><button onClick={() => openEditModal(employee)} className="text-[10px] flex items-center gap-1" style={{ color: "var(--accent)" }}><Pencil className="w-3 h-3" /> Edit</button></div><div className="grid grid-cols-2 gap-x-4 gap-y-3">{infoItems.map(([label, value]) => <div key={label}><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-medium mt-0.5 break-words">{value}</p></div>)}</div><div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-color)" }}><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Address</p><p className="text-[10px] mt-0.5">{address}</p></div></section>
+      <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Permissions</h3>{canEditPermissions && <button onClick={openPermissions} className="text-[10px] flex items-center gap-1" style={{ color: "var(--accent)" }}><Pencil className="w-3 h-3" /> Edit</button>}</div><div className="grid grid-cols-2 gap-x-3 gap-y-2">{filteredPermissions.map(({ key, label, value }) => <div key={key} className="flex items-center gap-1.5 text-[9px]"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: value ? "#22c55e" : "#ef4444" }} /> <span className="truncate">{label}</span></div>)}</div><p className="text-[9px] mt-4" style={{ color: "var(--text-muted)" }}>{enabledCount} of {totalCount} enabled</p></section>
+      <section className="p-3 rounded-lg min-h-[190px]" style={cardStyle}><div className="flex items-center justify-between mb-2"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Recent Activities</h3><button onClick={() => setActiveTab("all")} className="text-[9px]" style={{ color: "var(--accent)" }}>View All</button></div><div className="space-y-2 max-h-[215px] overflow-y-auto custom-scrollbar">{filteredActivities.length ? filteredActivities.slice(0, 5).map((activity, index) => <div key={activity._id || index} className="flex gap-2 border-b pb-2 last:border-0" style={{ borderColor: "var(--border-color)" }}><ActivityIcon category={activity.category} size="sm" /><div className="min-w-0"><p className="text-[9px] leading-snug">{activity.action}</p><p className="text-[8px] mt-0.5" style={{ color: "var(--text-muted)" }}>{new Date(activity.timestamp).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</p></div></div>) : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>No activity found</p>}</div></section>
+    </div>
+
+    {activeTab === "permissions" && <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Access Control</h3><span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{Math.round((enabledCount / totalCount) * 100)}% Enabled</span></div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">{filteredPermissions.map(({ key, label, value }) => <div key={key} className="p-2 rounded-md border" style={{ borderColor: value ? "rgba(16,185,129,0.25)" : "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}><p className="text-[10px] font-medium">{label}</p><p className="text-[9px] mt-1" style={{ color: value ? "#22c55e" : "#ef4444" }}>{value ? "Enabled" : "Disabled"}</p></div>)}</div></section>}
+  </>;
+}
+
 // ==========================================
 // ACTIVITY STYLES
 // ==========================================
@@ -1305,10 +1351,41 @@ export default function EmployeeDetailPage() {
           "var(--text-primary)",
       }}
     >
+      <EmployeeOverview
+        employee={employee}
+        name={name}
+        email={email}
+        phone={phone}
+        role={role}
+        status={status}
+        avatar={avatar}
+        department={department}
+        address={address}
+        empId={empId}
+        joinDate={joinDate}
+        ordersHandled={ordersHandled}
+        salesGenerated={salesGenerated}
+        productsAdded={productsAdded}
+        performanceRating={performanceRating}
+        permissions={permissions}
+        filteredPermissions={filteredPermissions}
+        enabledCount={enabledCount}
+        totalCount={totalCount}
+        tabs={tabs}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        filteredActivities={filteredActivities}
+        canEditPermissions={canEditPermissions}
+        setPermissionsData={setPermissionsData}
+        setShowPermissionsModal={setShowPermissionsModal}
+        openEditModal={openEditModal}
+        router={router}
+      />
+
       {/* ==========================================
           HEADER
       ========================================== */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
             onClick={() =>
@@ -1399,7 +1476,7 @@ export default function EmployeeDetailPage() {
       {/* ==========================================
           MAIN GRID
       ========================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ==========================================
             LEFT COLUMN
         ========================================== */}
@@ -2323,7 +2400,7 @@ export default function EmployeeDetailPage() {
                                           const safeChanges = activity.details.changes.filter(
                                             (c) => {
                                               const f = String(c.field || "").toLowerCase();
-                                              return (
+return (
                                                 !f.includes("password") &&
                                                 !f.includes("token") &&
                                                 !f.includes("secret") &&
