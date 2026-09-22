@@ -89,13 +89,13 @@ function StatusPill({ active }) {
       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
       style={{
         backgroundColor: active ? "rgba(34,197,94,.12)" : "rgba(239,68,68,.12)",
-        color: active ? "#34d399" : "#f87171",
+        color: active ? "var(--success-text)" : "var(--danger-text)",
         border: `1px solid ${active ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.25)"}`,
       }}
     >
       <span
         className="h-1.5 w-1.5 rounded-full"
-        style={{ backgroundColor: active ? "#34d399" : "#f87171" }}
+        style={{ backgroundColor: active ? "var(--success-text)" : "var(--danger-text)" }}
       />
       {active ? "Active" : "Inactive"}
     </span>
@@ -181,7 +181,7 @@ function InfoRow({ label, value, green = false, mono = false, isLast = false, co
       </span>
       <span
         className={`max-w-full break-words text-[12px] font-medium ${mono ? "font-mono" : ""}`}
-        style={{ color: green ? "#34d399" : "var(--text-primary)" }}
+        style={{ color: green ? "var(--success-text)" : "var(--text-primary)" }}
       >
         {value || "—"}
       </span>
@@ -254,7 +254,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
   return (
     <div ref={containerRef} className="relative">
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} className="h-9 w-full px-3 rounded-md text-sm flex items-center justify-between gap-2 outline-none transition disabled:opacity-50 cursor-pointer" style={{ backgroundColor: "var(--bg-tertiary)", border: isOpen ? "1px solid color-mix(in srgb, var(--success) 45%, transparent)" : "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         <div className="flex items-center gap-2 min-w-0">
           {selectedCountry ? (
             <>
@@ -290,12 +290,12 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
               filteredCountries.map((country) => {
                 const isSelected = country.name === value;
                 return (
-                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "rgba(16, 185, 129, 0.1)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                  <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "var(--success-soft)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
-                      <span className="truncate text-[13px]" style={{ color: isSelected ? "#34d399" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "var(--success-text)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
                     </div>
-                    {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 shrink-0" style={{ color: "#34d399" }} />}
+                    {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--success-text)" }} />}
                   </button>
                 );
               })
@@ -631,7 +631,7 @@ export default function BrandDetailPage() {
                 <span
                   className="rounded-full px-1.5 py-0.5 text-[9px]"
                   style={{
-                    backgroundColor: active ? "rgba(16,185,129,.12)" : "var(--bg-tertiary)",
+                    backgroundColor: active ? "var(--success-soft)" : "var(--bg-tertiary)",
                     color: active ? "var(--accent)" : "var(--text-muted)",
                   }}
                 >
@@ -769,8 +769,8 @@ export default function BrandDetailPage() {
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {[
                   { label: "Total Products", value: totalProducts, icon: D.box, color: "var(--accent)" },
-                  { label: "Active Products", value: activeProducts, icon: D.check, color: "#34d399" },
-                  { label: "Inactive Products", value: inactiveProducts, icon: D.minus, color: "#f87171" },
+                  { label: "Active Products", value: activeProducts, icon: D.check, color: "var(--success-text)" },
+                  { label: "Inactive Products", value: inactiveProducts, icon: D.minus, color: "var(--danger-text)" },
                 ].map((stat) => (
                   <div
                     key={stat.label}
@@ -872,7 +872,7 @@ export default function BrandDetailPage() {
                             backgroundColor:
                               product.status === "active"
                                 ? "rgba(34,197,94,.10)"
-                                : "rgba(239,68,68,.10)",
+                                : "var(--danger-soft)",
                             color:
                               product.status === "active" ? "var(--success)" : "var(--danger)",
                           }}
@@ -910,7 +910,7 @@ export default function BrandDetailPage() {
                   <div className="flex flex-col items-center">
                     <div
                       className="flex h-7 w-7 items-center justify-center rounded-full"
-                      style={{ backgroundColor: "rgba(16,185,129,.12)", color: "var(--accent)" }}
+                      style={{ backgroundColor: "var(--success-soft)", color: "var(--accent)" }}
                     >
                       <Ico d={D.plus} className="h-3.5 w-3.5" />
                     </div>
@@ -936,7 +936,7 @@ export default function BrandDetailPage() {
                   <div className="flex gap-3">
                     <div
                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                      style={{ backgroundColor: "rgba(96,165,250,.12)", color: "#60a5fa" }}
+                      style={{ backgroundColor: "rgba(96,165,250,.12)", color: "var(--info-text)" }}
                     >
                       <Ico d={D.pencil} className="h-3.5 w-3.5" />
                     </div>
@@ -1171,7 +1171,7 @@ export default function BrandDetailPage() {
                               backgroundColor:
                                 product.status === "active"
                                   ? "rgba(34,197,94,.10)"
-                                  : "rgba(239,68,68,.10)",
+                                  : "var(--danger-soft)",
                               color:
                                 product.status === "active"
                                   ? "var(--success)"
@@ -1205,7 +1205,7 @@ export default function BrandDetailPage() {
                   <div
                     className="flex h-7 w-7 items-center justify-center rounded-full"
                     style={{
-                      backgroundColor: "rgba(16,185,129,.12)",
+                      backgroundColor: "var(--success-soft)",
                       color: "var(--accent)",
                     }}
                   >
@@ -1247,7 +1247,7 @@ export default function BrandDetailPage() {
                       className="flex h-7 w-7 items-center justify-center rounded-full"
                       style={{
                         backgroundColor: "rgba(96,165,250,.12)",
-                        color: "#60a5fa",
+                        color: "var(--info-text)",
                       }}
                     >
                       <Ico d={D.pencil} className="h-3.5 w-3.5" />
@@ -1503,7 +1503,7 @@ export default function BrandDetailPage() {
             <div className="flex gap-3">
               <div
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                style={{ backgroundColor: "rgba(239,68,68,.10)", color: "#f87171" }}
+                style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}
               >
                 <Ico d={D.warn} className="h-4 w-4" />
               </div>

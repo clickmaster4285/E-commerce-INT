@@ -40,19 +40,19 @@ const getImageUrl = (itemOrPath) => {
 };
 
 const ORDER_STATUS_CONFIG = {
-  pending:    { bg: "rgba(245,158,11,0.10)",  color: "#fbbf24", border: "rgba(245,158,11,0.25)" },
-  confirmed:  { bg: "rgba(59,130,246,0.10)",  color: "#60a5fa", border: "rgba(59,130,246,0.25)" },
-  processing: { bg: "rgba(168,85,247,0.10)",  color: "#c084fc", border: "rgba(168,85,247,0.25)" },
-  shipped:    { bg: "rgba(99,102,241,0.10)",  color: "#818cf8", border: "rgba(99,102,241,0.25)" },
-  delivered:  { bg: "rgba(16,185,129,0.10)",  color: "#34d399", border: "rgba(16,185,129,0.25)" },
-  cancelled:  { bg: "rgba(239,68,68,0.10)",   color: "#f87171", border: "rgba(239,68,68,0.25)" },
+  pending:    { bg: "var(--warning-soft)",  color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  confirmed:  { bg: "var(--info-soft)",  color: "var(--info-text)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
+  processing: { bg: "var(--purple-soft)",  color: "var(--purple-text)", border: "color-mix(in srgb, var(--purple) 28%, transparent)" },
+  shipped:    { bg: "var(--info-soft)",  color: "var(--indigo-text)", border: "var(--info-soft)" },
+  delivered:  { bg: "var(--success-soft)",  color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  cancelled:  { bg: "var(--danger-soft)",   color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
 };
 
 const PAYMENT_STATUS_CONFIG = {
-  paid:     { label: "Paid",     bg: "rgba(16,185,129,0.10)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
-  pending:  { label: "Unpaid",   bg: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "rgba(245,158,11,0.25)" },
-  failed:   { label: "Failed",   bg: "rgba(239,68,68,0.10)",  color: "#f87171", border: "rgba(239,68,68,0.25)" },
-  refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
+  paid:     { label: "Paid",     bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  pending:  { label: "Unpaid",   bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  failed:   { label: "Failed",   bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+  refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
 
 const STATUS_ICON_MAP = {
@@ -342,7 +342,7 @@ export default function OrdersPage() {
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {isError && (
               <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
-                style={{ backgroundColor: "var(--danger, #ef4444)", color: "#fff" }}>
+                style={{ backgroundColor: "var(--danger, var(--danger))", color: "#fff" }}>
                 Retry Loading
               </button>
             )}
@@ -402,7 +402,7 @@ export default function OrdersPage() {
           <div className="flex flex-wrap items-center gap-2">
             {activeFilters.map((f) => (
               <span key={f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
-                style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", color: "#34d399" }}>
+                style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}>
                 {f.label}
                 <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
               </span>
@@ -415,8 +415,8 @@ export default function OrdersPage() {
         {/* Bulk Actions - Mobile optimized */}
         {selectedIds.length > 0 && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-lg px-3 sm:px-4 py-3 sm:py-2.5"
-            style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} order{selectedIds.length > 1 ? "s" : ""} selected</p>
+            style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} order{selectedIds.length > 1 ? "s" : ""} selected</p>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => runBulkStatus("confirmed")} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
@@ -430,7 +430,7 @@ export default function OrdersPage() {
               </button>
               <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
-                style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 <BanIcon className="w-3.5 h-3.5" /> Cancel
               </button>
               <button onClick={() => setSelectedIds([])}
@@ -504,7 +504,7 @@ export default function OrdersPage() {
                             borderBottom: isExpanded ? "none" : "1px solid var(--border-color)",
                             backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}
                           onClick={() => openDetailPage(order)}
                         >
@@ -740,8 +740,8 @@ export default function OrdersPage() {
             style={{ ...cardStyle, animation: "modalSlideUp 0.3s ease-out" }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertIcon className="w-5 h-5" style={{ color: "var(--danger, #ef4444)" }} />
+                style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertIcon className="w-5 h-5" style={{ color: "var(--danger, var(--danger))" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">Cancel {selectedIds.length} order{selectedIds.length > 1 ? "s" : ""}?</h3>
@@ -752,7 +752,7 @@ export default function OrdersPage() {
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                    Cancellation Reason <span style={{ color: "#f87171" }}>*</span>
+                    Cancellation Reason <span style={{ color: "var(--danger-text)" }}>*</span>
                   </label>
                   <textarea
                     value={cancelReason}
@@ -771,7 +771,7 @@ export default function OrdersPage() {
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
               <button onClick={runCancelWithReason} disabled={bulkBusy || cancelBusy || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
-                style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
               </button>
             </div>

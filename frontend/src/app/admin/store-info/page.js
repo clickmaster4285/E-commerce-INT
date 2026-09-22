@@ -77,7 +77,7 @@ const EMPTY_FORM = {
   year_established: "",
   store_status: "open",
   maintenance_message: "",
-  primary_color: "#10b981",
+  primary_color: "var(--success)",
   meta_title: "",
   meta_description: "",
   meta_keywords: "",
@@ -518,11 +518,11 @@ export default function StoreInfoPage() {
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isSelected
-        ? "rgba(16,185,129,0.1)"
+        ? "var(--success-soft)"
         : state.isFocused
         ? "var(--bg-tertiary)"
         : "transparent",
-      color: state.isSelected ? "#34d399" : "var(--text-primary)",
+      color: state.isSelected ? "var(--success-text)" : "var(--text-primary)",
       fontSize: "13px",
       padding: "8px 10px",
     }),
@@ -592,7 +592,7 @@ export default function StoreInfoPage() {
             border-color: var(--border-color) !important;
           }
           .react-tel-input .form-control:focus {
-            border-color: rgba(16,185,129,0.5) !important;
+            border-color: color-mix(in srgb, var(--success) 45%, transparent) !important;
           }
           .react-tel-input .flag-dropdown {
             background-color: transparent !important;
@@ -662,8 +662,8 @@ export default function StoreInfoPage() {
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                 <div className="rounded-lg overflow-hidden lg:col-span-2" style={cardStyle}>
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}>
-                      <Store size={16} style={{ color: "#34d399" }} />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--success-soft)" }}>
+                      <Store size={16} style={{ color: "var(--success-text)" }} />
                     </div>
                     <div>
                       <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Basic Information</h3>
@@ -687,7 +687,7 @@ export default function StoreInfoPage() {
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Primary Brand Color</label>
                       <div className="flex items-center gap-2">
                         <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border-color)" }}>
-                          <input type="color" name="primary_color" value={formData.primary_color || "#10b981"} onChange={handleChange}
+                          <input type="color" name="primary_color" value={formData.primary_color || "var(--success)"} onChange={handleChange}
                             className="absolute -left-1 -top-1 h-12 w-12 cursor-pointer" />
                         </div>
                         <input type="text" name="primary_color" value={formData.primary_color} onChange={handleChange}
@@ -701,8 +701,8 @@ export default function StoreInfoPage() {
                 {/* Logo Card */}
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(245,158,11,0.1)" }}>
-                      <ImageIcon size={16} style={{ color: "#fbbf24" }} />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--warning-soft)" }}>
+                      <ImageIcon size={16} style={{ color: "var(--warning-text)" }} />
                     </div>
                     <div>
                       <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Store Logo</h3>
@@ -760,8 +760,8 @@ export default function StoreInfoPage() {
               {/* ── ROW 2: CONTACT ── */}
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
                 <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(139,92,246,0.1)" }}>
-                    <Mail size={16} style={{ color: "#a78bfa" }} />
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--purple-soft)" }}>
+                    <Mail size={16} style={{ color: "var(--purple-text)" }} />
                   </div>
                   <div>
                     <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Contact Information</h3>
@@ -807,7 +807,7 @@ export default function StoreInfoPage() {
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(244,63,94,0.1)" }}>
-                      <MapPin size={16} style={{ color: "#fb7185" }} />
+                      <MapPin size={16} style={{ color: "var(--rose)" }} />
                     </div>
                     <div>
                       <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Location</h3>
@@ -851,7 +851,7 @@ export default function StoreInfoPage() {
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(249,115,22,0.1)" }}>
-                      <Briefcase size={16} style={{ color: "#fb923c" }} />
+                      <Briefcase size={16} style={{ color: "var(--orange)" }} />
                     </div>
                     <div>
                       <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Business Details</h3>
@@ -906,8 +906,8 @@ export default function StoreInfoPage() {
               {/* ── ROW 4: SOCIAL ── */}
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
                 <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.1)" }}>
-                    <Share2 size={16} style={{ color: "#818cf8" }} />
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--info-soft)" }}>
+                    <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
                   </div>
                   <div>
                     <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Social Profiles</h3>
@@ -939,7 +939,7 @@ export default function StoreInfoPage() {
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
                 <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(20,184,166,0.1)" }}>
-                    <ShieldCheck size={16} style={{ color: "#2dd4bf" }} />
+                    <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
                   </div>
                   <div>
                     <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>SEO & Policies</h3>
@@ -983,11 +983,11 @@ export default function StoreInfoPage() {
   // ====================================================
 
   const socialProfiles = [
-    { key: "facebook", label: "Facebook", Icon: IconFacebook, color: "#60a5fa", bg: "rgba(59,130,246,0.1)" },
-    { key: "instagram", label: "Instagram", Icon: IconInstagram, color: "#f472b6", bg: "rgba(236,72,153,0.1)" },
+    { key: "facebook", label: "Facebook", Icon: IconFacebook, color: "var(--info-text)", bg: "var(--info-soft)" },
+    { key: "instagram", label: "Instagram", Icon: IconInstagram, color: "var(--pink)", bg: "rgba(236,72,153,0.1)" },
     { key: "twitter", label: "Twitter", Icon: IconTwitter, color: "#38bdf8", bg: "rgba(14,165,233,0.1)" },
     { key: "linkedin", label: "LinkedIn", Icon: IconLinkedin, color: "#93c5fd", bg: "rgba(37,99,235,0.1)" },
-    { key: "youtube", label: "YouTube", Icon: IconYoutube, color: "#f87171", bg: "rgba(239,68,68,0.1)" },
+    { key: "youtube", label: "YouTube", Icon: IconYoutube, color: "var(--danger-text)", bg: "var(--danger-soft)" },
   ];
 
   return (
@@ -1058,12 +1058,12 @@ export default function StoreInfoPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
-                    style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }}>
+                    style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
                     Store
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
                     <span className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: formData.store_status === "open" ? "#34d399" : "#f87171" }} />
+                      style={{ backgroundColor: formData.store_status === "open" ? "var(--success-text)" : "var(--danger-text)" }} />
                     {formData.store_status === "open" ? "Open" : "Closed"}
                   </span>
                 </div>
@@ -1092,8 +1092,8 @@ export default function StoreInfoPage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(139,92,246,0.1)" }}>
-                <Mail size={16} style={{ color: "#a78bfa" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--purple-soft)" }}>
+                <Mail size={16} style={{ color: "var(--purple-text)" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Contact Information</h3>
@@ -1111,7 +1111,7 @@ export default function StoreInfoPage() {
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(244,63,94,0.1)" }}>
-                <MapPin size={16} style={{ color: "#fb7185" }} />
+                <MapPin size={16} style={{ color: "var(--rose)" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Location</h3>
@@ -1135,7 +1135,7 @@ export default function StoreInfoPage() {
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(249,115,22,0.1)" }}>
-                <Briefcase size={16} style={{ color: "#fb923c" }} />
+                <Briefcase size={16} style={{ color: "var(--orange)" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Business Details</h3>
@@ -1154,8 +1154,8 @@ export default function StoreInfoPage() {
 
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}>
-                <Store size={16} style={{ color: "#34d399" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--success-soft)" }}>
+                <Store size={16} style={{ color: "var(--success-text)" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Store Settings</h3>
@@ -1166,8 +1166,8 @@ export default function StoreInfoPage() {
               <div className="flex items-center justify-between rounded-lg px-4 py-3.5"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}>
-                    <Check size={16} style={{ color: "#34d399" }} />
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--success-soft)" }}>
+                    <Check size={16} style={{ color: "var(--success-text)" }} />
                   </div>
                   <div>
                     <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Store Status</p>
@@ -1176,15 +1176,15 @@ export default function StoreInfoPage() {
                 </div>
                 <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
                   style={formData.store_status === "open"
-                    ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                    : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
+                    ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }
+                    : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                   {formData.store_status || "—"}
                 </span>
               </div>
               {formData.maintenance_message && (
                 <div className="mt-4 rounded-lg px-4 py-3"
-                  style={{ backgroundColor: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)" }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#fbbf24" }}>Maintenance Message</p>
+                  style={{ backgroundColor: "rgba(245,158,11,0.06)", border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)" }}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--warning-text)" }}>Maintenance Message</p>
                   <p className="text-[12px] mt-1 leading-5" style={{ color: "var(--text-secondary)" }}>{formData.maintenance_message}</p>
                 </div>
               )}
@@ -1195,8 +1195,8 @@ export default function StoreInfoPage() {
         {/* ── SOCIAL ── */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.1)" }}>
-              <Share2 size={16} style={{ color: "#818cf8" }} />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--info-soft)" }}>
+              <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
             </div>
             <div>
               <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Social Profiles</h3>
@@ -1233,7 +1233,7 @@ export default function StoreInfoPage() {
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
           <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(20,184,166,0.1)" }}>
-              <ShieldCheck size={16} style={{ color: "#2dd4bf" }} />
+              <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
             </div>
             <div>
               <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>SEO & Store Policies</h3>

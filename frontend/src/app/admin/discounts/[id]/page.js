@@ -75,11 +75,11 @@ function StatusBadge({ active, label }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
       style={{
-        backgroundColor: active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-        color: active ? "#10b981" : "#ef4444",
-        border: `1px solid ${active ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+        backgroundColor: active ? "var(--success-soft)" : "var(--danger-soft)",
+        color: active ? "var(--success)" : "var(--danger)",
+        border: `1px solid ${active ? "color-mix(in srgb, var(--success) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)"}`,
       }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "#10b981" : "#ef4444" }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "var(--success)" : "var(--danger)" }} />
       {displayLabel}
     </span>
   );
@@ -87,11 +87,11 @@ function StatusBadge({ active, label }) {
 
 function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.08)", text: "#10b981", border: "rgba(16,185,129,0.2)" },
-    blue: { bg: "rgba(59,130,246,0.08)", text: "#3b82f6", border: "rgba(59,130,246,0.2)" },
-    purple: { bg: "rgba(168,85,247,0.08)", text: "#a855f7", border: "rgba(168,85,247,0.2)" },
-    amber: { bg: "rgba(245,158,11,0.08)", text: "#f59e0b", border: "rgba(245,158,11,0.2)" },
-    red: { bg: "rgba(239,68,68,0.08)", text: "#ef4444", border: "rgba(239,68,68,0.2)" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)", border: "color-mix(in srgb, var(--purple) 28%, transparent)" },
+    amber: { bg: "var(--warning-soft)", text: "var(--warning)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+    red: { bg: "var(--danger-soft)", text: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const c = colors[color] || colors.emerald;
 
@@ -136,7 +136,7 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
         <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
       <span className={`text-[12px] font-semibold text-right break-words max-w-[60%] ${mono ? "font-mono" : ""}`}
-        style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value || "—"}</span>
+        style={{ color: highlight ? "var(--success)" : "var(--text-primary)" }}>{value || "—"}</span>
     </div>
   );
 }
@@ -144,9 +144,9 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
 function Avatar({ user, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.12)", text: "#10b981" },
-    blue: { bg: "rgba(59,130,246,0.12)", text: "#3b82f6" },
-    purple: { bg: "rgba(168,85,247,0.12)", text: "#a855f7" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
   };
   const c = colors[color] || colors.emerald;
 
@@ -258,8 +258,8 @@ export default function DiscountDetailPage() {
     return (
       <div className="w-full flex items-center justify-center py-24">
         <div className="flex flex-col items-center gap-4 max-w-md text-center px-6 py-10 rounded-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-            <AlertTriangle className="w-7 h-7" style={{ color: "#ef4444" }} />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
+            <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
           </div>
           <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Discount Not Found</h2>
           <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This discount does not exist or has been deleted.</p>
@@ -306,7 +306,7 @@ export default function DiscountDetailPage() {
                       <StatusBadge active={isActive} label={getDiscountStatus(discount).toUpperCase()} />
                     </div>
                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      <span className="flex items-center gap-1.5 font-bold" style={{ color: "#10b981" }}>
+                      <span className="flex items-center gap-1.5 font-bold" style={{ color: "var(--success)" }}>
                         <Percent className="w-3.5 h-3.5" /> {formatDiscountValue(discount)}
                       </span>
                       <span className="opacity-50">•</span>
@@ -322,7 +322,7 @@ export default function DiscountDetailPage() {
                     </button>
                     <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
                       className="h-9 px-3 rounded-lg text-[11px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
                   </div>
@@ -332,7 +332,7 @@ export default function DiscountDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-4">
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Value</p>
-                    <p className="text-[14px] font-bold" style={{ color: "#10b981" }}>{formatDiscountValue(discount)}</p>
+                    <p className="text-[14px] font-bold" style={{ color: "var(--success)" }}>{formatDiscountValue(discount)}</p>
                   </div>
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Apply To</p>
@@ -564,7 +564,7 @@ export default function DiscountDetailPage() {
 
             {!discount.selectedProducts?.length && !discount.selectedCategories?.length && !discount.selectedBrands?.length && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "#10b981" }} />
+                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "var(--success)" }} />
                 <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>This discount applies to all products automatically.</span>
               </div>
             )}
@@ -580,8 +580,8 @@ export default function DiscountDetailPage() {
               {/* Created Event */}
               <div className="flex gap-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
-                    <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)" }}>
+                    <Plus className="w-5 h-5" style={{ color: "var(--success)" }} />
                   </div>
                   {hasUpdates && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
                 </div>
@@ -618,8 +618,8 @@ export default function DiscountDetailPage() {
               {hasUpdates ? (
                 <div className="flex gap-4">
                   <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.12)" }}>
-                      <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)" }}>
+                      <Pencil className="w-5 h-5" style={{ color: "var(--info)" }} />
                     </div>
                   </div>
                   <div className="flex-1">
@@ -706,8 +706,8 @@ export default function DiscountDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{discount.name}"?</h3>

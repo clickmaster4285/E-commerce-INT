@@ -34,19 +34,19 @@ const getImageUrl = (itemOrPath) => {
 };
 
 const ORDER_STATUS_CONFIG = {
-  pending:    { bg: "rgba(245,158,11,0.10)",  color: "#fbbf24", border: "rgba(245,158,11,0.25)" },
-  confirmed:  { bg: "rgba(59,130,246,0.10)",  color: "#60a5fa", border: "rgba(59,130,246,0.25)" },
-  processing: { bg: "rgba(168,85,247,0.10)",  color: "#c084fc", border: "rgba(168,85,247,0.25)" },
-  shipped:    { bg: "rgba(99,102,241,0.10)",  color: "#818cf8", border: "rgba(99,102,241,0.25)" },
-  delivered:  { bg: "rgba(16,185,129,0.10)",  color: "#34d399", border: "rgba(16,185,129,0.25)" },
-  cancelled:  { bg: "rgba(239,68,68,0.10)",   color: "#f87171", border: "rgba(239,68,68,0.25)" },
+  pending:    { bg: "var(--warning-soft)",  color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  confirmed:  { bg: "var(--info-soft)",  color: "var(--info-text)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
+  processing: { bg: "var(--purple-soft)",  color: "var(--purple-text)", border: "color-mix(in srgb, var(--purple) 28%, transparent)" },
+  shipped:    { bg: "var(--info-soft)",  color: "var(--indigo-text)", border: "var(--info-soft)" },
+  delivered:  { bg: "var(--success-soft)",  color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  cancelled:  { bg: "var(--danger-soft)",   color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
 };
 
 const PAYMENT_STATUS_CONFIG = {
-  paid:     { label: "Paid",     bg: "rgba(16,185,129,0.10)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
-  pending:  { label: "Unpaid",   bg: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "rgba(245,158,11,0.25)" },
-  failed:   { label: "Failed",   bg: "rgba(239,68,68,0.10)",  color: "#f87171", border: "rgba(239,68,68,0.25)" },
-  refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "#94a3b8", border: "rgba(100,116,139,0.25)" },
+  paid:     { label: "Paid",     bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  pending:  { label: "Unpaid",   bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  failed:   { label: "Failed",   bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+  refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
 
 function StatusBadge({ status }) {
@@ -104,7 +104,7 @@ function StatusStepper({ order }) {
           <React.Fragment key={step}>
             <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
               <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
-                style={{ backgroundColor: done ? "#10b981" : "transparent", borderColor: done ? "#10b981" : "var(--border-color)", color: "#fff" }}>
+                style={{ backgroundColor: done ? "var(--success)" : "transparent", borderColor: done ? "var(--success)" : "var(--border-color)", color: "#fff" }}>
                 {done ? <CheckIcon className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--border-color)" }} />}
               </div>
               <span className="text-[10px] font-semibold capitalize text-center leading-tight"
@@ -113,7 +113,7 @@ function StatusStepper({ order }) {
               </span>
             </div>
             <div className="flex-1 h-0.5 mt-3 mx-1 rounded min-w-[20px]"
-              style={{ backgroundColor: connectorGreen ? "#10b981" : "var(--border-color)" }} />
+              style={{ backgroundColor: connectorGreen ? "var(--success)" : "var(--border-color)" }} />
           </React.Fragment>
         );
       })}
@@ -121,14 +121,14 @@ function StatusStepper({ order }) {
       <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
         <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
           style={{
-            backgroundColor: paymentDone ? "#10b981" : "transparent",
-            borderColor: paymentDone ? "#10b981" : paymentWaiting ? "#fbbf24" : "var(--border-color)",
-            color: paymentDone ? "#fff" : paymentWaiting ? "#fbbf24" : "var(--border-color)",
+            backgroundColor: paymentDone ? "var(--success)" : "transparent",
+            borderColor: paymentDone ? "var(--success)" : paymentWaiting ? "var(--warning-text)" : "var(--border-color)",
+            color: paymentDone ? "#fff" : paymentWaiting ? "var(--warning-text)" : "var(--border-color)",
           }}>
           {paymentDone ? <CheckIcon className="w-3 h-3" /> : <BanknoteIcon className="w-3 h-3" />}
         </div>
         <span className="text-[10px] font-semibold text-center leading-tight"
-          style={{ color: paymentDone ? "var(--text-primary)" : paymentWaiting ? "#fbbf24" : "var(--text-muted)" }}>
+          style={{ color: paymentDone ? "var(--text-primary)" : paymentWaiting ? "var(--warning-text)" : "var(--text-muted)" }}>
           Payment
         </span>
       </div>
@@ -136,10 +136,10 @@ function StatusStepper({ order }) {
       {cancelled && (
         <div className="flex flex-col items-center gap-1.5 min-w-[64px] ml-2">
           <div className="w-6 h-6 rounded-full flex items-center justify-center border-2"
-            style={{ backgroundColor: "#ef4444", borderColor: "#ef4444", color: "#fff" }}>
+            style={{ backgroundColor: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }}>
             <XIcon className="w-3 h-3" />
           </div>
-          <span className="text-[10px] font-semibold" style={{ color: "#f87171" }}>Cancelled</span>
+          <span className="text-[10px] font-semibold" style={{ color: "var(--danger-text)" }}>Cancelled</span>
         </div>
       )}
     </div>
@@ -154,9 +154,9 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
   if (status === "cancelled") {
     return (
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
-        style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
-        <LockIcon className="w-4 h-4" style={{ color: "#f87171" }} />
-        <span className="text-xs font-semibold" style={{ color: "#f87171" }}>This order is cancelled</span>
+        style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+        <LockIcon className="w-4 h-4" style={{ color: "var(--danger-text)" }} />
+        <span className="text-xs font-semibold" style={{ color: "var(--danger-text)" }}>This order is cancelled</span>
       </div>
     );
   }
@@ -168,7 +168,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           onClick={onPaymentReceived}
           disabled={isPaymentPending}
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
-          style={{ backgroundColor: "#10b981", color: "#fff" }}>
+          style={{ backgroundColor: "var(--success)", color: "#fff" }}>
           {isPaymentPending ? <Spinner className="w-4 h-4" /> : <BanknoteIcon className="w-4 h-4" />}
           Payment Received
         </button>
@@ -176,9 +176,9 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
     }
     return (
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
-        style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)" }}>
-        <CheckCircleIcon className="w-4 h-4" style={{ color: "#34d399" }} />
-        <span className="text-xs font-semibold" style={{ color: "#34d399" }}>Order completed & payment received</span>
+        style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+        <CheckCircleIcon className="w-4 h-4" style={{ color: "var(--success-text)" }} />
+        <span className="text-xs font-semibold" style={{ color: "var(--success-text)" }}>Order completed & payment received</span>
       </div>
     );
   }
@@ -188,7 +188,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       {status === "pending" && (
         <button onClick={() => onUpdate("confirmed")} disabled={isPending}
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
-          style={{ backgroundColor: "#3b82f6", color: "#fff" }}>
+          style={{ backgroundColor: "var(--info)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
           Confirm Order
         </button>
@@ -197,7 +197,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       {(status === "confirmed" || status === "processing") && (
         <button onClick={() => onUpdate("shipped")} disabled={isPending}
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
-          style={{ backgroundColor: "#6366f1", color: "#fff" }}>
+          style={{ backgroundColor: "var(--indigo)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <TruckIcon className="w-4 h-4" />}
           Mark as Shipped
         </button>
@@ -206,7 +206,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       {status === "shipped" && (
         <button onClick={() => onUpdate("delivered")} disabled={isPending}
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
-          style={{ backgroundColor: "#10b981", color: "#fff" }}>
+          style={{ backgroundColor: "var(--success)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <HomeIcon className="w-4 h-4" />}
           Mark as Delivered
         </button>
@@ -214,7 +214,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 
       <button onClick={onCancel} disabled={isPending}
         className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{ backgroundColor: "var(--bg-card)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger-text)" }}>
         <BanIcon className="w-4 h-4" />
         Cancel Order
       </button>
@@ -437,7 +437,7 @@ export default function OrderDetailPage({ params }) {
 
             <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <TotalRow label="Subtotal" value={`Rs. ${order.subtotal?.toLocaleString()}`} />
-              {savings > 0 && <TotalRow label="Discount savings" value={`− Rs. ${savings.toLocaleString()}`} accent="#34d399" />}
+              {savings > 0 && <TotalRow label="Discount savings" value={`− Rs. ${savings.toLocaleString()}`} accent="var(--success-text)" />}
               <TotalRow label="Shipping" value={`Rs. ${order.shipping?.toLocaleString()}`} />
               <TotalRow label="Tax" value={`Rs. ${order.tax?.toLocaleString()}`} />
               <div className="flex justify-between text-base font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
@@ -457,8 +457,8 @@ export default function OrderDetailPage({ params }) {
             style={{ ...cardStyle, animation: "modalSlideUp 0.3s ease-out" }}>
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertIcon className="w-5 h-5" style={{ color: "#f87171" }} />
+                style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">Cancel Order {order.order_number}?</h3>
@@ -467,7 +467,7 @@ export default function OrderDetailPage({ params }) {
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                    Cancellation Reason <span style={{ color: "#f87171" }}>*</span>
+                    Cancellation Reason <span style={{ color: "var(--danger-text)" }}>*</span>
                   </label>
                   <textarea
                     value={cancelReason}
@@ -488,7 +488,7 @@ export default function OrderDetailPage({ params }) {
               </button>
               <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
-                style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel"}
               </button>
             </div>

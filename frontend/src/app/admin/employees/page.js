@@ -132,7 +132,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
               className="w-full text-left px-3 py-2 text-[13px] transition hover:bg-white/5"
               style={{
                 color: "var(--text-primary)",
-                backgroundColor: inputValue === dept ? "rgba(16,185,129,0.1)" : "transparent",
+                backgroundColor: inputValue === dept ? "var(--success-soft)" : "transparent",
               }}
             >
               {dept}
@@ -143,7 +143,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           {hasInput && !exactMatch && (
             <div
               className="px-3 py-2 text-[12px] font-medium border-t mt-1 flex items-center gap-2"
-              style={{ borderColor: "var(--border-color)", color: "#34d399" }}
+              style={{ borderColor: "var(--border-color)", color: "var(--success-text)" }}
             >
               <Plus className="w-3 h-3" /> Creating new: "{inputValue.trim()}"
             </div>
@@ -602,8 +602,8 @@ export default function EmployeesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
           { label: "Total", value: staffEmployees.length, color: "var(--text-primary)" },
-          { label: "Active", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "#34d399" },
-          { label: "Inactive", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "#f87171" },
+          { label: "Active", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "var(--success-text)" },
+          { label: "Inactive", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "var(--danger-text)" },
         ].map((stat, idx) => (
           <div key={idx} className="rounded-lg px-4 py-3" style={cardStyle}>
             <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
@@ -651,11 +651,11 @@ export default function EmployeesPage() {
         <div
           className="flex items-center justify-between rounded-lg px-4 h-10"
           style={{
-            backgroundColor: "rgba(16,185,129,0.08)",
-            border: "1px solid rgba(16,185,129,0.3)",
+            backgroundColor: "var(--success-soft)",
+            border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
           }}
         >
-          <p className="text-sm font-medium" style={{ color: "#34d399" }}>
+          <p className="text-sm font-medium" style={{ color: "var(--success-text)" }}>
             {selectedIds.length} selected
           </p>
           <div className="flex items-center gap-3">
@@ -739,7 +739,7 @@ export default function EmployeesPage() {
                         router.push(`/admin/employees/${emp._id}`);
                       }}
                       onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-tertiary)";
+                        if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)";
@@ -766,7 +766,7 @@ export default function EmployeesPage() {
                           ) : (
                             <div
                               className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                              style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#34d399" }}
+                              style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                             >
                               {empName?.charAt(0).toUpperCase()}
                             </div>
@@ -796,8 +796,8 @@ export default function EmployeesPage() {
                           className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide"
                           style={
                             empStatus === "active"
-                              ? { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                              : { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }
+                              ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }
+                              : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }
                           }
                         >
                           {empStatus === "active" ? "Active" : "Inactive"}
@@ -942,7 +942,7 @@ export default function EmployeesPage() {
               {`@keyframes modalScaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}`}
             </style>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">
@@ -995,7 +995,7 @@ export default function EmployeesPage() {
             style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}
           >
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div className="flex-1 min-w-0">

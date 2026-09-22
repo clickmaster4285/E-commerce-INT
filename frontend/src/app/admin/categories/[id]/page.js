@@ -134,11 +134,11 @@ function getDataTypeBadgeStyle(type) {
   switch (type) {
     case "multi_select":
     case "select":
-      return { backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" };
+      return { backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid color-mix(in srgb, var(--purple) 28%, transparent)" };
     case "boolean":
-      return { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.2)" };
+      return { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" };
     case "color":
-      return { backgroundColor: "rgba(236,72,153,0.1)", color: "#f472b6", border: "1px solid rgba(236,72,153,0.2)" };
+      return { backgroundColor: "rgba(236,72,153,0.1)", color: "var(--pink)", border: "1px solid rgba(236,72,153,0.2)" };
     default:
       return { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" };
   }
@@ -155,9 +155,9 @@ function StatusBadge({ active = true }) {
     <span
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider"
       style={{
-        backgroundColor: active ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
-        color: active ? "#34d399" : "#ef4444",
-        border: `1px solid ${active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)"}`,
+        backgroundColor: active ? "var(--success-soft)" : "var(--danger-soft)",
+        color: active ? "var(--success-text)" : "var(--danger)",
+        border: `1px solid ${active ? "var(--success-soft)" : "var(--danger-soft)"}`,
       }}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-red-500"}`} />
@@ -175,8 +175,8 @@ function Button({ children, onClick, danger = false, primary = false, disabled =
       className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       style={{
         backgroundColor: primary ? "var(--accent)" : "transparent",
-        color: primary ? "white" : danger ? "#ef4444" : "var(--text-secondary)",
-        border: primary ? "none" : danger ? "1px solid rgba(239,68,68,0.2)" : "1px solid var(--border-color)",
+        color: primary ? "white" : danger ? "var(--danger)" : "var(--text-secondary)",
+        border: primary ? "none" : danger ? "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" : "1px solid var(--border-color)",
       }}
     >
       {icon}
@@ -933,7 +933,7 @@ export default function CategoryDetailPage() {
                 <span
                   className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[9px] font-bold tabular-nums"
                   style={{
-                    backgroundColor: active ? "rgba(16,185,129,0.12)" : "var(--bg-tertiary)",
+                    backgroundColor: active ? "var(--success-soft)" : "var(--bg-tertiary)",
                     color: active ? "var(--accent)" : "var(--text-muted)",
                   }}
                 >
@@ -967,7 +967,7 @@ export default function CategoryDetailPage() {
               {variantAttributes.length > 0 && (
                 <span
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold"
-                  style={{ backgroundColor: "rgba(139,92,246,0.08)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.12)" }}
+                  style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -1033,19 +1033,19 @@ export default function CategoryDetailPage() {
                           <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.12)" }}>
-                                <Ico d={D.box} className="w-4 h-4" style={{ color: "#a78bfa" }} />
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", border: "1px solid var(--purple-soft)" }}>
+                                <Ico d={D.box} className="w-4 h-4" style={{ color: "var(--purple-text)" }} />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{attr.name}</p>
                                   {isVariant && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.08)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.12)" }}>
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       Variant
                                     </span>
                                   )}
                                   {!isActive && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.12)" }}>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid var(--danger-soft)" }}>
                                       Disabled
                                     </span>
                                   )}
@@ -1075,7 +1075,7 @@ export default function CategoryDetailPage() {
                               )
                             ) : isBoolean ? (
                               boolValue ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "rgba(16,185,129,0.08)" : "rgba(107,114,128,0.08)", color: boolValue === "Yes" ? "#34d399" : "#9ca3af", border: `1px solid ${boolValue === "Yes" ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)"}` }}>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "var(--success-soft)" : "rgba(107,114,128,0.08)", color: boolValue === "Yes" ? "var(--success-text)" : "var(--text-muted)", border: `1px solid ${boolValue === "Yes" ? "var(--success-soft)" : "rgba(107,114,128,0.12)"}` }}>
                                   {boolValue}
                                 </span>
                               ) : (
@@ -1089,9 +1089,9 @@ export default function CategoryDetailPage() {
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
                               style={{
-                                backgroundColor: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
-                                color: isActive ? "#34d399" : "#f87171",
-                                border: `1px solid ${isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)"}`,
+                                backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)",
+                                color: isActive ? "var(--success-text)" : "var(--danger-text)",
+                                border: `1px solid ${isActive ? "var(--success-soft)" : "var(--danger-soft)"}`,
                               }}
                             >
                               <span className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
@@ -1173,7 +1173,7 @@ export default function CategoryDetailPage() {
                                           toggleStatusMutation.mutate({ attrId, currentActive: isActive });
                                         }}
                                         className={`w-full px-4 py-2 text-left text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-[var(--bg-tertiary)]"}`}
-                                        style={{ color: isActive ? "#f87171" : "#34d399", pointerEvents: isTogglingThis ? "none" : "auto" }}
+                                        style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)", pointerEvents: isTogglingThis ? "none" : "auto" }}
                                       >
                                         {isTogglingThis ? (
                                           <>
@@ -1319,8 +1319,8 @@ export default function CategoryDetailPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-[400px] rounded-xl p-6 shadow-2xl" style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.12)" }}>
-                <Ico d={D.trash} className="w-5 h-5" style={{ color: "#ef4444" }} />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid var(--danger-soft)" }}>
+                <Ico d={D.trash} className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div>
                 <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">Delete Category?</h3>

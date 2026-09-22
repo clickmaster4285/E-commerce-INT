@@ -284,8 +284,8 @@ export default function AdminLayout({ children }) {
     const saved = Cookies.get('theme') || 'dark';
 
     document.documentElement.classList.toggle(
-      'light',
-      saved === 'light'
+      'dark',
+      saved === 'dark'
     );
 
     const frame = requestAnimationFrame(() => setTheme(saved));
@@ -575,8 +575,8 @@ export default function AdminLayout({ children }) {
     );
 
     document.documentElement.classList.toggle(
-      'light',
-      newTheme === 'light'
+      'dark',
+      newTheme === 'dark'
     );
   };
 

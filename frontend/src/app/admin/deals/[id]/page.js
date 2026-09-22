@@ -85,10 +85,10 @@ function formatTarget(value) {
 ========================================================= */
 function StatusBadge({ status }) {
   const config = {
-    active: { bg: "rgba(16,185,129,0.12)", color: "#10b981", border: "rgba(16,185,129,0.3)", label: "ACTIVE" },
-    scheduled: { bg: "rgba(59,130,246,0.12)", color: "#3b82f6", border: "rgba(59,130,246,0.3)", label: "SCHEDULED" },
-    expired: { bg: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "rgba(245,158,11,0.3)", label: "EXPIRED" },
-    disabled: { bg: "rgba(239,68,68,0.12)", color: "#ef4444", border: "rgba(239,68,68,0.3)", label: "DISABLED" },
+    active: { bg: "var(--success-soft)", color: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)", label: "ACTIVE" },
+    scheduled: { bg: "var(--info-soft)", color: "var(--info)", border: "color-mix(in srgb, var(--info) 28%, transparent)", label: "SCHEDULED" },
+    expired: { bg: "var(--warning-soft)", color: "var(--warning)", border: "color-mix(in srgb, var(--warning) 28%, transparent)", label: "EXPIRED" },
+    disabled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "DISABLED" },
   };
   const item = config[status] || config.disabled;
   return (
@@ -102,11 +102,11 @@ function StatusBadge({ status }) {
 
 function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.08)", text: "#10b981", border: "rgba(16,185,129,0.2)" },
-    blue: { bg: "rgba(59,130,246,0.08)", text: "#3b82f6", border: "rgba(59,130,246,0.2)" },
-    purple: { bg: "rgba(168,85,247,0.08)", text: "#a855f7", border: "rgba(168,85,247,0.2)" },
-    amber: { bg: "rgba(245,158,11,0.08)", text: "#f59e0b", border: "rgba(245,158,11,0.2)" },
-    red: { bg: "rgba(239,68,68,0.08)", text: "#ef4444", border: "rgba(239,68,68,0.2)" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)", border: "color-mix(in srgb, var(--purple) 28%, transparent)" },
+    amber: { bg: "var(--warning-soft)", text: "var(--warning)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+    red: { bg: "var(--danger-soft)", text: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const c = colors[color] || colors.emerald;
 
@@ -151,7 +151,7 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
         <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
       <span className={`text-[13px] font-semibold text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
-        style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value || "—"}</span>
+        style={{ color: highlight ? "var(--success)" : "var(--text-primary)" }}>{value || "—"}</span>
     </div>
   );
 }
@@ -159,9 +159,9 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
 function Avatar({ user, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.12)", text: "#10b981" },
-    blue: { bg: "rgba(59,130,246,0.12)", text: "#3b82f6" },
-    purple: { bg: "rgba(168,85,247,0.12)", text: "#a855f7" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
   };
   const c = colors[color] || colors.emerald;
 
@@ -277,8 +277,8 @@ export default function DealDetailPage() {
     return (
       <div className="w-full flex items-center justify-center py-24">
         <div className="flex flex-col items-center gap-4 max-w-md text-center px-6 py-10 rounded-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-            <AlertTriangle className="w-7 h-7" style={{ color: "#ef4444" }} />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
+            <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
           </div>
           <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Deal Not Found</h2>
           <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This deal does not exist or has been removed.</p>
@@ -326,7 +326,7 @@ export default function DealDetailPage() {
                       <StatusBadge status={status} />
                       {deal.isFeatured && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                          style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" }}>
+                          style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning)", border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)" }}>
                           <Sparkles className="w-3 h-3" /> Featured
                         </span>
                       )}
@@ -338,7 +338,7 @@ export default function DealDetailPage() {
                           <span className="opacity-50">•</span>
                         </>
                       ) : null}
-                      <span className="flex items-center gap-1.5 font-bold" style={{ color: "#10b981" }}>
+                      <span className="flex items-center gap-1.5 font-bold" style={{ color: "var(--success)" }}>
                         <Percent className="w-3.5 h-3.5" /> {formatDealValue(deal)}
                       </span>
                       <span className="opacity-50">•</span>
@@ -355,7 +355,7 @@ export default function DealDetailPage() {
                   
                     <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
                       className="h-10 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
                   </div>
@@ -365,7 +365,7 @@ export default function DealDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Value</p>
-                    <p className="text-[14px] font-bold" style={{ color: "#10b981" }}>{formatDealValue(deal)}</p>
+                    <p className="text-[14px] font-bold" style={{ color: "var(--success)" }}>{formatDealValue(deal)}</p>
                   </div>
                   <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                     <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Target</p>
@@ -536,7 +536,7 @@ export default function DealDetailPage() {
               </div>
               <div className="p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <p className="text-[10px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Offer Value</p>
-                <p className="text-[16px] font-bold" style={{ color: "#10b981" }}>{formatDealValue(deal)}</p>
+                <p className="text-[16px] font-bold" style={{ color: "var(--success)" }}>{formatDealValue(deal)}</p>
               </div>
             </div>
 
@@ -556,7 +556,7 @@ export default function DealDetailPage() {
                 <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                   <Percent className="w-5 h-5 mx-auto mb-2" style={{ color: "var(--accent)" }} />
                   <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Discount</p>
-                  <p className="text-2xl font-bold" style={{ color: "#10b981" }}>{deal.getDiscountValue || 100}%</p>
+                  <p className="text-2xl font-bold" style={{ color: "var(--success)" }}>{deal.getDiscountValue || 100}%</p>
                 </div>
               </div>
             )}
@@ -566,7 +566,7 @@ export default function DealDetailPage() {
               <div className="p-5 rounded-lg text-center mb-6" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Gift className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--accent)" }} />
                 <p className="text-[10px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Bundle Fixed Price</p>
-                <p className="text-3xl font-bold" style={{ color: "#10b981" }}>Rs. {deal.bundlePrice}</p>
+                <p className="text-3xl font-bold" style={{ color: "var(--success)" }}>Rs. {deal.bundlePrice}</p>
               </div>
             )}
 
@@ -575,7 +575,7 @@ export default function DealDetailPage() {
               <div className="p-5 rounded-lg text-center mb-6" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Truck className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--accent)" }} />
                 <p className="text-[10px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Free Shipping Offer</p>
-                <p className="text-2xl font-bold" style={{ color: "#10b981" }}>Free Shipping</p>
+                <p className="text-2xl font-bold" style={{ color: "var(--success)" }}>Free Shipping</p>
                 {deal.minOrderValue && (
                   <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>On orders above Rs. {deal.minOrderValue}</p>
                 )}
@@ -654,7 +654,7 @@ export default function DealDetailPage() {
 
             {deal.applyTo === "all" && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "#10b981" }} />
+                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "var(--success)" }} />
                 <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>This deal applies to <strong style={{ color: "var(--text-primary)" }}>all products</strong> in the store automatically.</span>
               </div>
             )}
@@ -670,8 +670,8 @@ export default function DealDetailPage() {
               {/* Created Event */}
               <div className="flex gap-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
-                    <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)" }}>
+                    <Plus className="w-5 h-5" style={{ color: "var(--success)" }} />
                   </div>
                   {hasUpdates && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
                 </div>
@@ -708,8 +708,8 @@ export default function DealDetailPage() {
               {hasUpdates ? (
                 <div className="flex gap-4">
                   <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.12)" }}>
-                      <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)" }}>
+                      <Pencil className="w-5 h-5" style={{ color: "var(--info)" }} />
                     </div>
                   </div>
                   <div className="flex-1">
@@ -796,8 +796,8 @@ export default function DealDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{deal.name}"?</h3>

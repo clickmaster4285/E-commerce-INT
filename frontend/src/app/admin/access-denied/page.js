@@ -51,7 +51,7 @@ export default function AccessDeniedPage() {
       {/* Background glow */}
       <div
         className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full blur-[150px] opacity-[0.07] pointer-events-none"
-        style={{ backgroundColor: '#ef4444' }}
+        style={{ backgroundColor: 'var(--danger)' }}
       />
       {/* Grid */}
       <div
@@ -81,7 +81,7 @@ export default function AccessDeniedPage() {
           <div
             className="absolute top-0 left-1/4 right-1/4 h-[2px] rounded-full"
             style={{
-              background: 'linear-gradient(90deg, transparent, #ef4444, transparent)',
+              background: 'linear-gradient(90deg, transparent, var(--danger), transparent)',
               opacity: 0.5,
             }}
           />
@@ -91,12 +91,12 @@ export default function AccessDeniedPage() {
             <div
               className="w-20 h-20 rounded-2xl flex items-center justify-center"
               style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                boxShadow: '0 0 40px rgba(239, 68, 68, 0.1)',
+                backgroundColor: 'var(--danger-soft)',
+                border: '1px solid var(--danger-soft)',
+                boxShadow: '0 0 40px var(--danger-soft)',
               }}
             >
-              <ShieldX size={38} style={{ color: '#ef4444' }} />
+              <ShieldX size={38} style={{ color: 'var(--danger)' }} />
             </div>
           </div>
 
@@ -105,14 +105,14 @@ export default function AccessDeniedPage() {
             <div
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full"
               style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
+                backgroundColor: 'var(--danger-soft)',
+                border: '1px solid var(--danger-soft)',
               }}
             >
-              <AlertTriangle size={12} style={{ color: '#f87171' }} />
+              <AlertTriangle size={12} style={{ color: 'var(--danger-text)' }} />
               <span
                 className="text-[11px] font-bold uppercase tracking-[0.12em]"
-                style={{ color: '#f87171' }}
+                style={{ color: 'var(--danger-text)' }}
               >
                 403 — Forbidden
               </span>
@@ -139,8 +139,8 @@ export default function AccessDeniedPage() {
             style={{ color: 'rgba(255,255,255,0.28)' }}
           >
             Please contact your{' '}
-            <span style={{ color: '#10b981', fontWeight: 600 }}>administrator</span> or{' '}
-            <span style={{ color: '#10b981', fontWeight: 600 }}>staff manager</span> to
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>administrator</span> or{' '}
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>staff manager</span> to
             request access. They can enable permissions from{' '}
             <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
               Employee Settings → Access Permissions
@@ -153,18 +153,18 @@ export default function AccessDeniedPage() {
             className="rounded-xl p-5 mb-8 text-left max-w-[520px] mx-auto"
             style={{
               backgroundColor: 'rgba(16, 185, 129, 0.03)',
-              border: '1px solid rgba(16, 185, 129, 0.08)',
+              border: '1px solid var(--success-soft)',
             }}
           >
             <div className="flex items-start gap-3">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
                 style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                  border: '1px solid rgba(16, 185, 129, 0.12)',
+                  backgroundColor: 'var(--success-soft)',
+                  border: '1px solid var(--success-soft)',
                 }}
               >
-                <Mail size={14} style={{ color: '#10b981' }} />
+                <Mail size={14} style={{ color: 'var(--success)' }} />
               </div>
               <div>
                 <p
@@ -186,7 +186,7 @@ export default function AccessDeniedPage() {
                     >
                       <span
                         className="mt-1.5 w-1 h-1 rounded-full shrink-0"
-                        style={{ backgroundColor: 'rgba(16, 185, 129, 0.5)' }}
+                        style={{ backgroundColor: 'color-mix(in srgb, var(--success) 45%, transparent)' }}
                       />
                       {item}
                     </li>
@@ -203,19 +203,19 @@ export default function AccessDeniedPage() {
               disabled={isLoggingOut}
               className="w-full sm:w-auto h-11 px-7 rounded-xl text-[13px] font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60"
               style={{
-                backgroundColor: '#ef4444',
+                backgroundColor: 'var(--danger)',
                 color: '#fff',
-                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.2)',
+                boxShadow: '0 4px 20px color-mix(in srgb, var(--danger) 28%, transparent)',
               }}
               onMouseEnter={(e) => {
                 if (!isLoggingOut) {
-                  e.currentTarget.style.backgroundColor = '#dc2626';
-                  e.currentTarget.style.boxShadow = '0 6px 30px rgba(239, 68, 68, 0.35)';
+                  e.currentTarget.style.backgroundColor = 'var(--danger-hover)';
+                  e.currentTarget.style.boxShadow = '0 6px 30px color-mix(in srgb, var(--danger) 28%, transparent)';
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#ef4444';
-                e.currentTarget.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.2)';
+                e.currentTarget.style.backgroundColor = 'var(--danger)';
+                e.currentTarget.style.boxShadow = '0 4px 20px color-mix(in srgb, var(--danger) 28%, transparent)';
               }}
             >
               <LogOut size={15} />
@@ -261,7 +261,7 @@ export default function AccessDeniedPage() {
                 className="h-full rounded-full transition-all duration-1000 ease-linear"
                 style={{
                   width: `${((20 - countdown) / 20) * 100}%`,
-                  backgroundColor: '#ef4444',
+                  backgroundColor: 'var(--danger)',
                   opacity: 0.6,
                 }}
               />

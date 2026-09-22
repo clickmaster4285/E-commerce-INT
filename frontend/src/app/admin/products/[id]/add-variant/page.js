@@ -293,7 +293,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
             className="flex-1 h-10 px-3 rounded-lg text-sm outline-none border"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              borderColor: addError ? "#ef4444" : "var(--border-color)",
+              borderColor: addError ? "var(--danger)" : "var(--border-color)",
               color: "var(--text-primary)",
             }}
             autoFocus

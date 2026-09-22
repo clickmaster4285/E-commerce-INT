@@ -448,7 +448,7 @@ export default function ProfilePage() {
           className="max-w-md w-full rounded-lg p-6 text-center"
           style={cardStyle}
         >
-          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "#ef4444" }} />
+          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--danger)" }} />
           <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             {error}
@@ -594,9 +594,9 @@ export default function ProfilePage() {
 
               {/* ✅ CHANGE 3: Show permission warning if no access */}
               {!hasProfilePermission && (
-                <div className="mb-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                  <AlertCircle size={14} style={{ color: "#f87171" }} />
-                  <p className="text-[11px]" style={{ color: "#f87171" }}>You don't have permission to change password</p>
+                <div className="mb-3 flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+                  <AlertCircle size={14} style={{ color: "var(--danger-text)" }} />
+                  <p className="text-[11px]" style={{ color: "var(--danger-text)" }}>You don't have permission to change password</p>
                 </div>
               )}
 

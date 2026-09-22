@@ -62,11 +62,11 @@ function StatusBadge({ active, size = "sm" }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold uppercase tracking-wide ${sizeClasses}`}
       style={{
-        backgroundColor: active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-        color: active ? "#10b981" : "#ef4444",
-        border: `1px solid ${active ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+        backgroundColor: active ? "var(--success-soft)" : "var(--danger-soft)",
+        color: active ? "var(--success)" : "var(--danger)",
+        border: `1px solid ${active ? "color-mix(in srgb, var(--success) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)"}`,
       }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "#10b981" : "#ef4444" }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "var(--success)" : "var(--danger)" }} />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -100,7 +100,7 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
         <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
       <span className={`text-[13px] font-semibold text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
-        style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value}</span>
+        style={{ color: highlight ? "var(--success)" : "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }
@@ -108,9 +108,9 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
 function Avatar({ user, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.12)", text: "#10b981" },
-    blue: { bg: "rgba(59,130,246,0.12)", text: "#3b82f6" },
-    purple: { bg: "rgba(168,85,247,0.12)", text: "#a855f7" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
   };
   const c = colors[color] || colors.emerald;
   return (
@@ -297,7 +297,7 @@ function MoreMenu({ actions }) {
               onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick?.(); }}
               disabled={action.disabled}
               className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 opacity-100 pointer-events-auto cursor-pointer"
-              style={{ color: action.destructive ? "#ef4444" : "var(--text-primary)" }}
+              style={{ color: action.destructive ? "var(--danger)" : "var(--text-primary)" }}
             >
               {action.icon && <span className="w-4 h-4 flex items-center justify-center shrink-0">{action.icon}</span>}
               <span>{action.label}</span>
@@ -984,8 +984,8 @@ export default function ProductDetailPage() {
   if (isError || !product) return (
     <div className="w-full flex items-center justify-center py-24">
       <div className="flex flex-col items-center gap-4 max-w-md text-center px-6 py-10 rounded-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-          <AlertTriangle className="w-7 h-7" style={{ color: "#ef4444" }} />
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
+          <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
         </div>
         <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Product Not Found</h2>
         <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This product does not exist or has been removed.</p>
@@ -1152,16 +1152,16 @@ export default function ProductDetailPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
-                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "var(--success)" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "var(--danger)" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
                   <td className="px-4 py-4">
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                       style={{
-                        backgroundColor: isActive ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                        color: isActive ? "#10b981" : "#ef4444",
-                        border: `1px solid ${isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+                        backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)",
+                        color: isActive ? "var(--success)" : "var(--danger)",
+                        border: `1px solid ${isActive ? "color-mix(in srgb, var(--success) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)"}`,
                       }}>
-                      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "#10b981" : "#ef4444" }} />
+                      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "var(--success)" : "var(--danger)" }} />
                       {isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
@@ -1261,7 +1261,7 @@ export default function ProductDetailPage() {
           <button
             onClick={handleDelete}
             className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
-            style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
+            style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}
           >
             <Trash2 className="w-3.5 h-3.5" /> Remove
           </button>
@@ -1343,8 +1343,8 @@ export default function ProductDetailPage() {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "#10b981" : "#ef4444" }} />
-              <span className="text-[12px] font-bold" style={{ color: product.status === "active" ? "#10b981" : "#ef4444" }}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "var(--success)" : "var(--danger)" }} />
+              <span className="text-[12px] font-bold" style={{ color: product.status === "active" ? "var(--success)" : "var(--danger)" }}>
                 {product.status === "active" ? "In Stock" : "Inactive"}
               </span>
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
@@ -1848,16 +1848,16 @@ export default function ProductDetailPage() {
             {activeTab === "activity" && (
               <InfoCard icon={Activity} title="Activity Timeline" action={
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
-                  style={{ backgroundColor: isConnected ? "rgba(16,185,129,0.12)" : "var(--bg-tertiary)", color: isConnected ? "#10b981" : "var(--text-muted)" }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "#10b981" : "var(--text-muted)" }} />
+                  style={{ backgroundColor: isConnected ? "var(--success-soft)" : "var(--bg-tertiary)", color: isConnected ? "var(--success)" : "var(--text-muted)" }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "var(--success)" : "var(--text-muted)" }} />
                   {isConnected ? "Live" : "Offline"}
                 </span>
               }>
                 <div className="space-y-6">
                   <div className="flex gap-4">
                     <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
-                        <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)" }}>
+                        <Plus className="w-5 h-5" style={{ color: "var(--success)" }} />
                       </div>
                       {latestLiveUpdate && (
                         <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
@@ -1882,8 +1882,8 @@ export default function ProductDetailPage() {
                   {liveEvents.map((ev, i) => (
                     <div key={ev.key} className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: ev.type === "created" ? "rgba(16,185,129,0.12)" : "rgba(59,130,246,0.12)" }}>
-                          {ev.type === "created" ? <Plus className="w-5 h-5" style={{ color: "#10b981" }} /> : <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />}
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: ev.type === "created" ? "var(--success-soft)" : "var(--info-soft)" }}>
+                          {ev.type === "created" ? <Plus className="w-5 h-5" style={{ color: "var(--success)" }} /> : <Pencil className="w-5 h-5" style={{ color: "var(--info)" }} />}
                         </div>
                         {i < liveEvents.length - 1 && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
                       </div>
@@ -1891,7 +1891,7 @@ export default function ProductDetailPage() {
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-                              {ev.type === "created" ? "Product Created" : "Product Updated"} <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#10b981" }}>LIVE</span>
+                              {ev.type === "created" ? "Product Created" : "Product Updated"} <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
                             </h4>
                             <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                               {ev.type === "created" ? "Added to the system" : "Details were modified"}
@@ -1947,7 +1947,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-4 px-4 py-2 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                  style={{ backgroundColor: currentStep > 1 ? "#10b981" : "var(--bg-card)", color: currentStep > 1 ? "#fff" : "var(--text-muted)" }}>
+                  style={{ backgroundColor: currentStep > 1 ? "var(--success)" : "var(--bg-card)", color: currentStep > 1 ? "#fff" : "var(--text-muted)" }}>
                   {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : "1"}
                 </div>
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 1 ? "var(--text-primary)" : "var(--text-muted)" }}>Product Info</span>
@@ -1955,7 +1955,7 @@ export default function ProductDetailPage() {
               <div className="h-px w-8" style={{ backgroundColor: "var(--border-color)" }} />
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                  style={{ backgroundColor: currentStep === 2 ? "#10b981" : "var(--bg-card)", color: currentStep === 2 ? "#fff" : "var(--text-muted)" }}>2</div>
+                  style={{ backgroundColor: currentStep === 2 ? "var(--success)" : "var(--bg-card)", color: currentStep === 2 ? "#fff" : "var(--text-muted)" }}>2</div>
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 2 ? "var(--text-primary)" : "var(--text-muted)" }}>Variants</span>
               </div>
             </div>
@@ -2075,7 +2075,7 @@ export default function ProductDetailPage() {
                                 <Copy className="w-4 h-4" />
                               </button>
                               <button type="button" title="Delete" onClick={(e) => { e.stopPropagation(); removeVariant(index); }}
-                                className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "#ef4444" }}>
+                                className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "var(--danger)" }}>
                                 <Trash2 className="w-4 h-4" />
                               </button>
                               <ChevronDown className={`w-5 h-5 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
@@ -2125,9 +2125,9 @@ export default function ProductDetailPage() {
                                   ))}
                                 </div>
                                 {variant.cost_price !== "" && variant.selling_price !== "" && Number(variant.selling_price) <= Number(variant.cost_price) && (
-                                  <div className="mt-3 flex items-center gap-2 rounded-lg border px-4 py-3" style={{ borderColor: "rgba(239,68,68,0.3)", backgroundColor: "rgba(239,68,68,0.1)" }}>
-                                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "#ef4444" }} />
-                                    <p className="text-[11px] font-semibold" style={{ color: "#ef4444" }}>Selling Price must be greater than Cost Price</p>
+                                  <div className="mt-3 flex items-center gap-2 rounded-lg border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--danger) 28%, transparent)", backgroundColor: "var(--danger-soft)" }}>
+                                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "var(--danger)" }} />
+                                    <p className="text-[11px] font-semibold" style={{ color: "var(--danger)" }}>Selling Price must be greater than Cost Price</p>
                                   </div>
                                 )}
                               </div>
@@ -2181,7 +2181,7 @@ export default function ProductDetailPage() {
                                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                                           <span className="truncate">{attr.name || "—"}</span>
                                           {attr._creating && <span className="text-[10px] font-normal italic" style={{ color: "var(--text-muted)" }}>creating…</span>}
-                                          {attr._createError && <span className="text-[10px] font-normal italic" style={{ color: "#ef4444" }}>failed</span>}
+                                          {attr._createError && <span className="text-[10px] font-normal italic" style={{ color: "var(--danger)" }}>failed</span>}
                                         </div>
                                         {preset ? (
                                           isMulti ? (
@@ -2190,7 +2190,7 @@ export default function ProductDetailPage() {
                                               {!selectedSingle && <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Select an option...</span>}
                                               {selectedSingle && (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                                  style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>
+                                                  style={{ backgroundColor: "var(--success-soft)", color: "var(--success)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
                                                   {selectedSingle}
                                                   <button type="button" onClick={() => setSingleValue("")} className="ml-0.5 rounded-full p-0.5 hover:bg-black/10">
                                                     <X className="w-3 h-3" />
@@ -2218,7 +2218,7 @@ export default function ProductDetailPage() {
                                             className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
                                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                         )}
-                                        <button type="button" onClick={() => removeAttribute(index, ai)} className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "#ef4444" }}>
+                                        <button type="button" onClick={() => removeAttribute(index, ai)} className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "var(--danger)" }}>
                                           <Trash2 className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -2382,7 +2382,7 @@ export default function ProductDetailPage() {
                   {(editingVariantForTags.tags || []).length > 0 ? (
                     (editingVariantForTags.tags || []).map((tag, idx) => (
                       <span key={`${tag}-${idx}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
-                        style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)" }}>
+                        style={{ backgroundColor: "var(--success-soft)", color: "var(--success)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
                         <TagIcon className="w-3 h-3" />
                         {tag}
                         <button onClick={() => handleRemoveVariantTag(tag)} className="ml-1 rounded-full p-0.5 hover:bg-black/20">
@@ -2405,8 +2405,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{product.name}"?</h3>
@@ -2429,8 +2429,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Variant?</h3>
@@ -2453,8 +2453,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Tag?</h3>

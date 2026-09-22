@@ -81,14 +81,14 @@ function StatusBadge({ status }) {
       style={
         active
           ? {
-              backgroundColor: "rgba(16,185,129,0.1)",
-              color: "#34d399",
-              border: "1px solid rgba(16,185,129,0.3)",
+              backgroundColor: "var(--success-soft)",
+              color: "var(--success-text)",
+              border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
             }
           : {
-              backgroundColor: "rgba(239,68,68,0.1)",
-              color: "#f87171",
-              border: "1px solid rgba(239,68,68,0.3)",
+              backgroundColor: "var(--danger-soft)",
+              color: "var(--danger-text)",
+              border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)",
             }
       }
     >
@@ -228,7 +228,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
                   color: "var(--text-primary)",
                   backgroundColor:
                     inputValue === dept
-                      ? "rgba(16,185,129,0.1)"
+                      ? "var(--success-soft)"
                       : "transparent",
                 }}
                 onMouseEnter={(e) => {
@@ -265,52 +265,553 @@ function DepartmentDropdown({ value, onChange, disabled }) {
     </div>
   );
 }
-
-function EmployeeOverview({ employee, name, email, phone, role, status, avatar, department, address, empId, joinDate, ordersHandled, salesGenerated, productsAdded, performanceRating, permissions, filteredPermissions, enabledCount, totalCount, tabs, activeTab, setActiveTab, filteredActivities, canEditPermissions, setPermissionsData, setShowPermissionsModal, openEditModal, router }) {
-  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: "8px" };
-  const infoItems = [["Full Name", name], ["Username", email.split("@")[0]], ["Email Address", email], ["Phone Number", phone || "N/A"], ["Department", department], ["Employee Code", empId]];
-  const stats = [["Orders Handled", ordersHandled, ShoppingCart, "#22c55e"], ["Sales Generated", `$${salesGenerated.toLocaleString()}`, DollarSign, "#f59e0b"], ["Products Added", productsAdded, Package, "#3b82f6"], ["Performance Rating", performanceRating, Star, "#f59e0b"]];
-
+// ==========================================
+// EMPLOYEE OVERVIEW (visible layout)
+// ==========================================
+function EmployeeOverview({
+  employee,
+  name,
+  email,
+  phone,
+  role,
+  status,
+  avatar,
+  department,
+  address,
+  empId,
+  joinDate,
+  ordersHandled,
+  salesGenerated,
+  productsAdded,
+  performanceRating,
+  permissions,
+  filteredPermissions,
+  enabledCount,
+  totalCount,
+  tabs,
+  activeTab,
+  setActiveTab,
+  filteredActivities,
+  canEditPermissions,
+  setPermissionsData,
+  setShowPermissionsModal,
+  openEditModal,
+  router,
+  updatedInfo,
+}) {
   const openPermissions = () => {
     const initialData = {};
     Object.keys(ALLOWED_PERMISSIONS).forEach((key) => {
-      initialData[key] = permissions?.[key] !== undefined ? permissions[key] : ALLOWED_PERMISSIONS[key].default;
+      initialData[key] =
+        permissions?.[key] !== undefined
+          ? permissions[key]
+          : ALLOWED_PERMISSIONS[key].default;
     });
     setPermissionsData(initialData);
     setShowPermissionsModal(true);
   };
 
-  return <>
-    <div className="flex flex-col gap-3 border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px]">
-          <button onClick={() => router.back()} className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}><ArrowLeft className="w-3.5 h-3.5" /> Back</button>
-          <span style={{ color: "var(--text-muted)" }}>/</span><button onClick={() => router.push("/admin/employees")} style={{ color: "var(--text-muted)" }}>Employees</button><span style={{ color: "var(--text-muted)" }}>/</span><span style={{ color: "var(--text-secondary)" }}>Employee Details</span>
+  const relativeTime = (ts) => {
+    if (!ts) return "";
+    const minutes = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    return `${Math.floor(minutes / 1440)}d ago`;
+  };
+
+  const infoItems = [
+    ["Full Name", name],
+    ["Username", email.split("@")[0]],
+    ["Email Address", email],
+    ["Phone Number", phone || "N/A"],
+    ["Department", department],
+    ["Employee Code", empId],
+  ];
+
+  const STAT_TONES = {
+    success: { bg: "var(--success-soft)", color: "var(--success-text)" },
+    warning: { bg: "var(--warning-soft)", color: "var(--warning-text)" },
+    info: { bg: "var(--info-soft)", color: "var(--info-text)" },
+    accent: { bg: "var(--accent-soft)", color: "var(--accent)" },
+  };
+
+  const stats = [
+    { label: "Orders Handled", value: String(ordersHandled ?? 0), icon: ShoppingCart, tone: "success" },
+    { label: "Sales Generated", value: `$${Number(salesGenerated || 0).toLocaleString()}`, icon: DollarSign, tone: "warning" },
+    { label: "Products Added", value: String(productsAdded ?? 0), icon: Package, tone: "info" },
+    { label: "Performance Rating", value: String(performanceRating ?? 0), icon: Star, tone: "accent" },
+  ];
+
+  return (
+    <>
+      {/* ============ BREADCRUMB + HEADER ============ */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }} aria-label="Breadcrumb">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1.5 font-medium transition-opacity hover:opacity-80"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
+          <span style={{ opacity: 0.6 }}>/</span>
+          <button onClick={() => router.push("/admin/employees")} className="font-medium transition-opacity hover:opacity-80">
+            Employees
+          </button>
+          <span style={{ opacity: 0.6 }}>/</span>
+          <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+            Employee Details
+          </span>
+        </nav>
+
+        <button onClick={() => openEditModal(employee)} className="btn-primary">
+          <Pencil className="h-3.5 w-3.5" /> Edit Employee
+        </button>
+      </div>
+
+      <div>
+        <h1 className="text-[19px] font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
+          Employee Details
+        </h1>
+        <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          View and manage employee information, permissions and activities.
+        </p>
+      </div>
+
+      {/* ============ HERO CARD ============ */}
+      <section className="card p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          {/* Identity */}
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
+            <div className="relative shrink-0">
+              {avatar ? (
+                <img
+                  src={avatar}
+                  alt={name}
+                  className="h-14 w-14 rounded-full border object-cover"
+                  style={{ borderColor: "var(--border-color)" }}
+                />
+              ) : (
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold"
+                  style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+                >
+                  {name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {status === "active" && (
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2"
+                  style={{ backgroundColor: "var(--success)", borderColor: "var(--bg-card)" }}
+                />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-[15px] font-bold" style={{ color: "var(--text-primary)" }}>
+                  {name}
+                </h2>
+                <StatusBadge status={status} />
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]" style={{ color: "var(--text-muted)" }}>
+                <span className="flex items-center gap-1.5">
+                  <User className="h-3 w-3" /> {email.split("@")[0]}
+                </span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Mail className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{email}</span>
+                </span>
+                {phone && phone !== "N/A" && (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="h-3 w-3" /> {phone}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Key facts */}
+          <div
+            className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2.5 border-t pt-3.5 sm:grid-cols-4 lg:border-l lg:border-t-0 lg:pl-5"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            {[
+              ["Role", role],
+              ["Employee Code", empId],
+              ["Department", department],
+              ["Joined At", joinDate],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <p className="text-[9.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                  {label}
+                </p>
+                <p className="mt-0.5 truncate text-[12.5px] font-bold capitalize" style={{ color: "var(--text-primary)" }}>
+                  {value || "—"}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-        <button onClick={() => openEditModal(employee)} className="h-8 px-3 rounded-md text-[11px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Pencil className="w-3 h-3" /> Edit</button>
+
+        {/* Updated info — shown only when the employee was actually updated */}
+        {updatedInfo && (
+          <div className="mt-3.5 flex items-center gap-2 border-t pt-3 text-[11px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+            <Pencil className="h-3 w-3 shrink-0" style={{ color: "var(--info)" }} />
+            <span>
+              Last updated by{" "}
+              <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
+                {updatedInfo.name}
+              </span>{" "}
+              · {updatedInfo.date}
+            </span>
+          </div>
+        )}
+      </section>
+
+      {/* ============ PERFORMANCE STATS ============ */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map(({ label, value, icon: Icon, tone }) => {
+          const toneStyle = STAT_TONES[tone];
+          return (
+            <div key={label} className="card flex min-w-0 items-center gap-3 p-3.5">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: toneStyle.bg, color: toneStyle.color }}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[9.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                  {label}
+                </p>
+                <p className="mt-0.5 truncate text-[13px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
+                  {value}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
-      <div><h1 className="text-lg font-bold">Employee Details</h1><p className="text-[10px]" style={{ color: "var(--text-muted)" }}>View and manage employee information, permissions and activities.</p></div>
-    </div>
 
-    <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_170px] gap-3 p-3 rounded-lg" style={cardStyle}>
-      <div className="flex items-center gap-3 min-w-0">
-        {avatar ? <img src={avatar} alt={name} className="w-14 h-14 rounded-full object-cover shrink-0" /> : <div className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--accent)" }}>{name.charAt(0).toUpperCase()}</div>}
-        <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="text-sm font-bold truncate">{name}</h2><StatusBadge status={status} /></div><div className="space-y-1 mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}><p className="flex items-center gap-1.5"><User className="w-3 h-3" /> {email.split("@")[0]}</p><p className="flex items-center gap-1.5 truncate"><Mail className="w-3 h-3" /> {email}</p><p className="flex items-center gap-1.5"><Phone className="w-3 h-3" /> {phone}</p></div></div>
+      {/* ============ SECTION TABS ============ */}
+      <div
+        className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5"
+        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+        role="tablist"
+        aria-label="Employee sections"
+      >
+        {tabs.map((tab) => {
+          const TabIcon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.id)}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-semibold transition-all duration-150"
+              style={
+                isActive
+                  ? { backgroundColor: "var(--bg-card)", color: "var(--accent)", boxShadow: "var(--shadow-sm)" }
+                  : { color: "var(--text-muted)" }
+              }
+            >
+              <TabIcon className="h-3.5 w-3.5" />
+              {tab.label}
+              {tab.id === "all" && (
+                <span
+                  className="ml-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+                >
+                  <span className="h-1 w-1 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
+                  LIVE
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-l pl-3" style={{ borderColor: "var(--border-color)" }}><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Role</p><p className="text-[10px] font-medium capitalize">{role}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Employee Code</p><p className="text-[10px] font-medium">{empId}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Department</p><p className="text-[10px] font-medium">{department}</p></div><div><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Joined At</p><p className="text-[10px] font-medium">{joinDate}</p></div></div>
-      <div className="grid grid-cols-2 xl:grid-cols-1 gap-1.5">{stats.map(([label, value, Icon, color]) => <div key={label} className="flex items-center gap-2 rounded-md px-2 py-1.5" style={{ backgroundColor: "var(--bg-tertiary)" }}><Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} /><div className="min-w-0"><p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[11px] font-bold">{value}</p></div></div>)}</div>
-      <div className="col-span-full border-t pt-2 flex items-center gap-4 overflow-x-auto no-scrollbar" style={{ borderColor: "var(--border-color)" }}>{tabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="text-[10px] whitespace-nowrap pb-1 border-b-2" style={{ color: activeTab === tab.id ? "var(--accent)" : "var(--text-muted)", borderColor: activeTab === tab.id ? "var(--accent)" : "transparent" }}>{tab.label}</button>)}</div>
-    </section>
 
-    <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_0.8fr_0.9fr] gap-3">
-      <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Personal Information</h3><button onClick={() => openEditModal(employee)} className="text-[10px] flex items-center gap-1" style={{ color: "var(--accent)" }}><Pencil className="w-3 h-3" /> Edit</button></div><div className="grid grid-cols-2 gap-x-4 gap-y-3">{infoItems.map(([label, value]) => <div key={label}><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-medium mt-0.5 break-words">{value}</p></div>)}</div><div className="mt-3 pt-3 border-t" style={{ borderColor: "var(--border-color)" }}><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Address</p><p className="text-[10px] mt-0.5">{address}</p></div></section>
-      <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Permissions</h3>{canEditPermissions && <button onClick={openPermissions} className="text-[10px] flex items-center gap-1" style={{ color: "var(--accent)" }}><Pencil className="w-3 h-3" /> Edit</button>}</div><div className="grid grid-cols-2 gap-x-3 gap-y-2">{filteredPermissions.map(({ key, label, value }) => <div key={key} className="flex items-center gap-1.5 text-[9px]"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: value ? "#22c55e" : "#ef4444" }} /> <span className="truncate">{label}</span></div>)}</div><p className="text-[9px] mt-4" style={{ color: "var(--text-muted)" }}>{enabledCount} of {totalCount} enabled</p></section>
-      <section className="p-3 rounded-lg min-h-[190px]" style={cardStyle}><div className="flex items-center justify-between mb-2"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Recent Activities</h3><button onClick={() => setActiveTab("all")} className="text-[9px]" style={{ color: "var(--accent)" }}>View All</button></div><div className="space-y-2 max-h-[215px] overflow-y-auto custom-scrollbar">{filteredActivities.length ? filteredActivities.slice(0, 5).map((activity, index) => <div key={activity._id || index} className="flex gap-2 border-b pb-2 last:border-0" style={{ borderColor: "var(--border-color)" }}><ActivityIcon category={activity.category} size="sm" /><div className="min-w-0"><p className="text-[9px] leading-snug">{activity.action}</p><p className="text-[8px] mt-0.5" style={{ color: "var(--text-muted)" }}>{new Date(activity.timestamp).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</p></div></div>) : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>No activity found</p>}</div></section>
-    </div>
+      {/* ============ INFO CARDS ============ */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {/* Personal Information */}
+        <section className="card p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              <User className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Personal Information
+            </h3>
+            <button
+              onClick={() => openEditModal(employee)}
+              className="flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
+              style={{ color: "var(--accent)" }}
+            >
+              <Pencil className="h-3 w-3" /> Edit
+            </button>
+          </div>
 
-    {activeTab === "permissions" && <section className="p-3 rounded-lg" style={cardStyle}><div className="flex items-center justify-between mb-3"><h3 className="text-[11px] font-semibold flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Access Control</h3><span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{Math.round((enabledCount / totalCount) * 100)}% Enabled</span></div><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">{filteredPermissions.map(({ key, label, value }) => <div key={key} className="p-2 rounded-md border" style={{ borderColor: value ? "rgba(16,185,129,0.25)" : "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}><p className="text-[10px] font-medium">{label}</p><p className="text-[9px] mt-1" style={{ color: value ? "#22c55e" : "#ef4444" }}>{value ? "Enabled" : "Disabled"}</p></div>)}</div></section>}
-  </>;
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+            {infoItems.map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <p className="text-[9.5px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                  {label}
+                </p>
+                <p className="mt-0.5 break-words text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {value || "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 border-t pt-2.5" style={{ borderColor: "var(--border-color)" }}>
+            <p className="text-[9.5px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+              Address
+            </p>
+            <p className="mt-0.5 text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
+              {address || "Not provided"}
+            </p>
+          </div>
+        </section>
+
+        {/* Permissions */}
+        <section className="card p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Permissions
+            </h3>
+            {canEditPermissions && (
+              <button
+                onClick={openPermissions}
+                className="flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
+                style={{ color: "var(--accent)" }}
+              >
+                <Pencil className="h-3 w-3" /> Edit
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+            {filteredPermissions.map(({ key, label, value }) => (
+              <div key={key} className="flex min-w-0 items-center gap-1.5 text-[11px]">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: value ? "var(--success)" : "var(--danger)" }}
+                />
+                <span className="truncate" style={{ color: "var(--text-secondary)" }}>
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 border-t pt-2.5 text-[10.5px] font-medium" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+            {enabledCount} of {totalCount} enabled
+          </p>
+        </section>
+
+        {/* Recent Activities (live via socket) */}
+        <section className="card flex flex-col p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Recent Activities
+            </h3>
+            <button
+              onClick={() => setActiveTab("all")}
+              className="flex items-center gap-1.5 text-[11px] font-semibold transition-opacity hover:opacity-80"
+              style={{ color: "var(--accent)" }}
+            >
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+              >
+                <span className="h-1 w-1 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
+                LIVE
+              </span>
+              View All
+            </button>
+          </div>
+
+          <div className="max-h-[230px] min-h-[120px] flex-1 space-y-2 overflow-y-auto pr-1">
+            {filteredActivities.length ? (
+              filteredActivities.slice(0, 6).map((activity, index) => {
+                const colors = getActivityColor(activity.category);
+                return (
+                  <div
+                    key={activity._id || index}
+                    className="flex gap-2.5 border-b pb-2 last:border-b-0"
+                    style={{ borderColor: "var(--border-color)" }}
+                  >
+                    <ActivityIcon category={activity.category} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium leading-snug" style={{ color: "var(--text-primary)" }}>
+                        {activity.action}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold"
+                          style={{ backgroundColor: colors.bg, color: colors.color }}
+                        >
+                          {activity.category}
+                        </span>
+                        <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
+                          {relativeTime(activity.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex h-full items-center justify-center py-6 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                No activity found
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* ============ ACCESS CONTROL (Permissions tab) ============ */}
+      {activeTab === "permissions" && (
+        <section className="card p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Access Control
+            </h3>
+            <span
+              className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              {totalCount ? Math.round((enabledCount / totalCount) * 100) : 0}% Enabled
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {filteredPermissions.map(({ key, label, value }) => (
+              <div
+                key={key}
+                className="rounded-lg border p-2.5"
+                style={{
+                  borderColor: value ? "color-mix(in srgb, var(--success) 28%, transparent)" : "var(--border-color)",
+                  backgroundColor: value ? "var(--success-soft)" : "var(--bg-card-alt)",
+                }}
+              >
+                <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {label}
+                </p>
+                <p
+                  className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold"
+                  style={{ color: value ? "var(--success-text)" : "var(--danger-text)" }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "currentColor" }} />
+                  {value ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ============ ACTIVITY LOG (full timeline, live via socket) ============ */}
+      {activeTab === "all" && (
+        <section className="card p-4">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+              <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Activity Log
+            </h3>
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold"
+                style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
+                LIVE
+              </span>
+              <span className="text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                {filteredActivities.length} {filteredActivities.length === 1 ? "event" : "events"}
+              </span>
+            </div>
+          </div>
+
+          <div className="max-h-[520px] overflow-y-auto pr-1">
+            {filteredActivities.length ? (
+              filteredActivities.map((activity, index) => {
+                const colors = getActivityColor(activity.category);
+                const isLast = index === filteredActivities.length - 1;
+                return (
+                  <div key={activity._id || index} className="relative flex gap-3 pb-4 last:pb-0">
+                    {!isLast && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-[13px] top-8 h-full w-px"
+                        style={{ backgroundColor: "var(--border-color)" }}
+                      />
+                    )}
+
+                    <span className="relative z-10 mt-0.5">
+                      <ActivityIcon category={activity.category} size="sm" />
+                    </span>
+
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <p className="text-[12px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
+                        {activity.action}
+                      </p>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold"
+                          style={{ backgroundColor: colors.bg, color: colors.color }}
+                        >
+                          {activity.category}
+                        </span>
+
+                        {activity.performedByName && (
+                          <>
+                            <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
+                              by{" "}
+                              <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
+                                {activity.performedByName}
+                              </span>
+                            </span>
+                            <span style={{ color: "var(--text-muted)" }}>·</span>
+                          </>
+                        )}
+
+                        <span className="text-[9.5px] font-medium" style={{ color: "var(--text-muted)" }}>
+                          {relativeTime(activity.timestamp)}
+                        </span>
+
+                        <span className="text-[9.5px]" style={{ color: "var(--text-muted)", opacity: 0.85 }}>
+                          {new Date(activity.timestamp).toLocaleString("en-US", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex items-center justify-center py-10 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                No activity found for this employee yet.
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+    </>
+  );
 }
+
+
+
+
+
 
 // ==========================================
 // ACTIVITY STYLES
@@ -318,32 +819,32 @@ function EmployeeOverview({ employee, name, email, phone, role, status, avatar, 
 const ACTIVITY_STYLES = {
   "Employee Management": {
     icon: Users,
-    bg: "rgba(99, 102, 241, 0.1)",
-    color: "#818cf8",
+    bg: "var(--info-soft)",
+    color: "var(--indigo-text)",
   },
 
   "Order Management": {
     icon: ShoppingCart,
-    bg: "rgba(16, 185, 129, 0.1)",
-    color: "#34d399",
+    bg: "var(--success-soft)",
+    color: "var(--success-text)",
   },
 
   "Product Management": {
     icon: Package,
-    bg: "rgba(59, 130, 246, 0.1)",
-    color: "#60a5fa",
+    bg: "var(--info-soft)",
+    color: "var(--info-text)",
   },
 
   "Customer Management": {
     icon: Users,
     bg: "rgba(251, 191, 36, 0.1)",
-    color: "#fbbf24",
+    color: "var(--warning-text)",
   },
 
   "Coupon Management": {
     icon: Star,
-    bg: "rgba(168, 85, 247, 0.1)",
-    color: "#c084fc",
+    bg: "var(--purple-soft)",
+    color: "var(--purple-text)",
   },
 
   Authentication: {
@@ -355,20 +856,20 @@ const ACTIVITY_STYLES = {
   "Store Management": {
     icon: Store,
     bg: "rgba(244, 114, 182, 0.1)",
-    color: "#f472b6",
+    color: "var(--pink)",
   },
 
   "Discount Management": {
     icon: Percent,
     bg: "rgba(236, 72, 153, 0.1)",
-    color: "#ec4899",
+    color: "var(--pink)",
   },
 };
 
 const DEFAULT_ACTIVITY_STYLE = {
   icon: FileText,
   bg: "rgba(148, 163, 184, 0.1)",
-  color: "#94a3b8",
+  color: "var(--text-muted)",
 };
 
 function ActivityIcon({ category, size = "sm" }) {
@@ -1258,6 +1759,33 @@ export default function EmployeeDetailPage() {
       )
     : "N/A";
 
+  // ==========================================
+  // "LAST UPDATED" INFO — shown only when the
+  // record was genuinely updated after creation
+  // ==========================================
+  const updatedInfo = (() => {
+    const updatedDate = employee.updated_at ? new Date(employee.updated_at) : null;
+    const createdDate = employee.created_at ? new Date(employee.created_at) : null;
+
+    if (!updatedDate || Number.isNaN(updatedDate.getTime())) return null;
+    if (!createdDate || Number.isNaN(createdDate.getTime())) return null;
+    if (updatedDate.getTime() - createdDate.getTime() < 60000) return null;
+
+    return {
+      name:
+        employee.updatedby?.name ||
+        employee.updatedby?.email ||
+        "Admin",
+      date: updatedDate.toLocaleString("en-US", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  })();
+
   const cardStyle = {
     backgroundColor:
       "var(--bg-card)",
@@ -1345,7 +1873,7 @@ export default function EmployeeDetailPage() {
 
   return (
     <div
-      className="w-full min-h-screen space-y-6"
+      className="w-full min-h-screen space-y-4"
       style={{
         color:
           "var(--text-primary)",
@@ -1380,1337 +1908,8 @@ export default function EmployeeDetailPage() {
         setShowPermissionsModal={setShowPermissionsModal}
         openEditModal={openEditModal}
         router={router}
+        updatedInfo={updatedInfo}
       />
-
-      {/* ==========================================
-          HEADER
-      ========================================== */}
-      <div className="hidden flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() =>
-              router.back()
-            }
-            className="p-2 rounded-lg transition hover:bg-white/5"
-            style={{
-              border:
-                "1px solid var(--border-color)",
-            }}
-          >
-            <ArrowLeft
-              className="w-5 h-5"
-              style={{
-                color:
-                  "var(--text-secondary)",
-              }}
-            />
-          </button>
-
-          <div className="flex items-center gap-2 text-[13px]">
-            <span
-              className="cursor-pointer hover:underline"
-              style={{
-                color:
-                  "var(--text-muted)",
-              }}
-              onClick={() =>
-                router.push(
-                  "/admin/employees"
-                )
-              }
-            >
-              Employees
-            </span>
-
-            <span
-              style={{
-                color:
-                  "var(--text-muted)",
-              }}
-            >
-              /
-            </span>
-
-            <span
-              className="font-medium flex items-center gap-2"
-              style={{
-                color:
-                  "var(--text-primary)",
-              }}
-            >
-              Employee Details
-
-              {isFetching && (
-                <Loader2
-                  className="w-3 h-3 animate-spin"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                />
-              )}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() =>
-              openEditModal(
-                employee
-              )
-            }
-            className="min-h-[44px] h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
-            style={{
-              backgroundColor:
-                "#7c3aed",
-              color: "#fff",
-            }}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Edit Employee
-          </button>
-        </div>
-      </div>
-
-      {/* ==========================================
-          MAIN GRID
-      ========================================== */}
-      <div className="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ==========================================
-            LEFT COLUMN
-        ========================================== */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* PROFILE CARD */}
-          <div
-            className="rounded-xl p-5 text-center"
-            style={cardStyle}
-          >
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                {avatar ? (
-                  <img
-                    src={avatar}
-                    alt={name}
-                    className="h-24 w-24 rounded-full object-cover border-4"
-                    style={{
-                      borderColor:
-                        "rgba(124,58,237,0.3)",
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="h-24 w-24 rounded-full flex items-center justify-center text-4xl font-bold"
-                    style={{
-                      backgroundColor:
-                        "rgba(124,58,237,0.15)",
-                      color: "#c084fc",
-                      border:
-                        "4px solid rgba(124,58,237,0.3)",
-                    }}
-                  >
-                    {name
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-                )}
-
-                {status === "active" && (
-                  <div
-                    className="absolute bottom-1 right-1 w-4 h-4 rounded-full border-2"
-                    style={{
-                      backgroundColor:
-                        "#34d399",
-                      borderColor:
-                        "var(--bg-card)",
-                    }}
-                  />
-                )}
-              </div>
-
-              <h2 className="text-lg font-bold mt-3">
-                {name}
-              </h2>
-
-              <div className="flex items-center gap-2 mt-1.5">
-                <StatusBadge
-                  status={status}
-                />
-              </div>
-
-              <p
-                className="text-[12px] mt-1"
-                style={{
-                  color:
-                    "var(--text-muted)",
-                }}
-              >
-                {department ||
-                  role}
-              </p>
-
-              <div
-                className="w-full mt-4 pt-4 border-t space-y-2.5 text-left"
-                style={{
-                  borderColor:
-                    "var(--border-color)",
-                }}
-              >
-                <div
-                  className="flex items-center gap-2.5 text-[12px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  <IdCard className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    {empId ||
-                      "EMP-00000"}
-                  </span>
-                </div>
-
-                <div
-                  className="flex items-center gap-2.5 text-[12px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  <Mail className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">
-                    {email}
-                  </span>
-                </div>
-
-                <div
-                  className="flex items-center gap-2.5 text-[12px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  <Phone className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    {phone ||
-                      "N/A"}
-                  </span>
-                </div>
-
-                <div
-                  className="flex items-center gap-2.5 text-[12px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  <MapPin className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">
-                    {address ||
-                      "Not provided"}
-                  </span>
-                </div>
-
-                <div
-                  className="flex items-center gap-2.5 text-[12px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  <Calendar className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Joined on{" "}
-                    {joinDate}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* EMPLOYEE INFORMATION */}
-          <div
-            className="rounded-xl p-4"
-            style={cardStyle}
-          >
-            <h3
-              className="text-[13px] font-semibold flex items-center gap-2 mb-3"
-              style={{
-                color:
-                  "var(--text-primary)",
-              }}
-            >
-              <User
-                className="w-3.5 h-3.5"
-                style={{
-                  color:
-                    "var(--text-muted)",
-                }}
-              />
-
-              Employee Information
-            </h3>
-
-            <div className="space-y-2.5">
-              {[
-                {
-                  label: "Full Name",
-                  value: name,
-                },
-
-                {
-                  label: "Username",
-                  value:
-                    email.split(
-                      "@"
-                    )[0],
-                },
-
-                {
-                  label: "Phone",
-                  value:
-                    phone || "N/A",
-                },
-
-                {
-                  label: "Role",
-                  value: role,
-                  capitalize:
-                    true,
-                },
-
-                {
-                  label:
-                    "Department",
-                  value:
-                    department,
-                },
-              ].map(
-                (item, i) => (
-                  <div
-                    key={i}
-                    className={
-                      i > 0
-                        ? "border-t pt-2"
-                        : ""
-                    }
-                    style={{
-                      borderColor:
-                        "var(--border-color)",
-                    }}
-                  >
-                    <p
-                      className="text-[10px] mb-0.5"
-                      style={{
-                        color:
-                          "var(--text-muted)",
-                      }}
-                    >
-                      {item.label}
-                    </p>
-
-                    <p
-                      className={`text-[12px] font-medium ${
-                        item.capitalize
-                          ? "capitalize"
-                          : ""
-                      }`}
-                    >
-                      {item.value}
-                    </p>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ==========================================
-            RIGHT COLUMN
-        ========================================== */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* STATS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              {
-                label:
-                  "Total Orders",
-                value:
-                  ordersHandled,
-                icon:
-                  ShoppingCart,
-                color:
-                  "#c084fc",
-                bg:
-                  "rgba(124,58,237,0.1)",
-                link:
-                  "View all orders →",
-              },
-
-              {
-                label:
-                  "Total Sales",
-                value: `$${salesGenerated.toLocaleString()}`,
-                icon:
-                  DollarSign,
-                color:
-                  "#60a5fa",
-                bg:
-                  "rgba(59,130,246,0.1)",
-                link:
-                  "View sales →",
-              },
-
-              {
-                label:
-                  "Products Added",
-                value:
-                  productsAdded,
-                icon:
-                  Package,
-                color:
-                  "#34d399",
-                bg:
-                  "rgba(16,185,129,0.1)",
-                link:
-                  "View products →",
-              },
-
-              {
-                label:
-                  "Performance",
-                value: `${performanceRating} / 5`,
-                icon:
-                  Star,
-                color:
-                  "#fbbf24",
-                bg:
-                  "rgba(251,191,36,0.1)",
-                link:
-                  "View reviews →",
-              },
-            ].map(
-              (stat, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl p-3"
-                  style={
-                    cardStyle
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="p-1.5 rounded-full"
-                      style={{
-                        backgroundColor:
-                          stat.bg,
-                      }}
-                    >
-                      <stat.icon
-                        className="w-4 h-4"
-                        style={{
-                          color:
-                            stat.color,
-                        }}
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p
-                        className="text-[10px] leading-tight truncate"
-                        style={{
-                          color:
-                            "var(--text-muted)",
-                        }}
-                      >
-                        {stat.label}
-                      </p>
-
-                      <p className="text-base font-bold leading-tight">
-                        {stat.value}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    className="text-[10px] mt-1.5 flex items-center gap-0.5 hover:underline leading-tight"
-                    style={{
-                      color:
-                        "var(--text-muted)",
-                    }}
-                  >
-                    {stat.link}
-                  </button>
-                </div>
-              )
-            )}
-          </div>
-
-          {/* TABS */}
-          <ScrollableTabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={
-              setActiveTab
-            }
-          />
-
-          {/* ==========================================
-              PERMISSIONS TAB
-          ========================================== */}
-          {activeTab ===
-          "permissions" ? (
-            <div
-              className="rounded-xl p-6 animate-in fade-in duration-300"
-              style={cardStyle}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h3
-                    className="text-[15px] font-bold flex items-center gap-2"
-                    style={{
-                      color:
-                        "var(--text-primary)",
-                    }}
-                  >
-                    <ShieldCheck className="w-5 h-5 text-purple-400" />
-
-                    Access Control
-                  </h3>
-
-                  <p
-                    className="text-[12px] mt-1"
-                    style={{
-                      color:
-                        "var(--text-muted)",
-                    }}
-                  >
-                    Manage module-level
-                    access for this
-                    employee
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="text-right hidden sm:block">
-                    <p
-                      className="text-[10px] font-medium uppercase tracking-wider"
-                      style={{
-                        color:
-                          "var(--text-muted)",
-                      }}
-                    >
-                      Access Level
-                    </p>
-
-                    <p className="text-sm font-bold text-emerald-400">
-                      {Math.round(
-                        (enabledCount /
-                          totalCount) *
-                          100
-                      )}
-                      % Enabled
-                    </p>
-                  </div>
-
-                  {canEditPermissions && (
-                    <button
-                      onClick={() => {
-                        const initialData =
-                          {};
-
-                        Object.keys(
-                          ALLOWED_PERMISSIONS
-                        ).forEach(
-                          (key) => {
-                            initialData[
-                              key
-                            ] =
-                              permissions?.[
-                                key
-                              ] !==
-                              undefined
-                                ? permissions[
-                                    key
-                                  ]
-                                : ALLOWED_PERMISSIONS[
-                                    key
-                                  ]
-                                    .default;
-                          }
-                        );
-
-                        setPermissionsData(
-                          initialData
-                        );
-
-                        setShowPermissionsModal(
-                          true
-                        );
-                      }}
-                      className="min-h-[44px] h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-lg shadow-purple-900/20"
-                      style={{
-                        backgroundColor:
-                          "#7c3aed",
-                        color: "#fff",
-                      }}
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-
-                      Configure Access
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {isSelfView && (
-                <div
-                  className="mb-5 p-3 rounded-lg text-[12px] flex items-start gap-2"
-                  style={{
-                    backgroundColor:
-                      "rgba(251,191,36,0.08)",
-                    color:
-                      "#fbbf24",
-                    border:
-                      "1px solid rgba(251,191,36,0.2)",
-                  }}
-                >
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-
-                  <span>
-                    <strong>
-                      Security
-                      Restriction:
-                    </strong>{" "}
-                    You cannot
-                    modify your own
-                    permissions.
-                    Only another
-                    admin or staff
-                    member can
-                    change them.
-                  </span>
-                </div>
-              )}
-
-              {totalCount > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {filteredPermissions.map(
-                    ({
-                      key,
-                      label,
-                      value,
-                    }) => (
-                      <div
-                        key={key}
-                        className="group relative p-4 rounded-xl border transition-all duration-200 flex items-center justify-between hover:border-opacity-50"
-                        style={{
-                          backgroundColor:
-                            value
-                              ? "rgba(16,185,129,0.02)"
-                              : "var(--bg-tertiary)",
-
-                          borderColor:
-                            value
-                              ? "rgba(16,185,129,0.2)"
-                              : "var(--border-color)",
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-                            style={{
-                              backgroundColor:
-                                value
-                                  ? "rgba(16,185,129,0.1)"
-                                  : "rgba(148, 163, 184, 0.1)",
-
-                              color:
-                                value
-                                  ? "#34d399"
-                                  : "#94a3b8",
-                            }}
-                          >
-                            <ShieldCheck className="w-5 h-5" />
-                          </div>
-
-                          <div>
-                            <span
-                              className="text-[13px] font-bold block"
-                              style={{
-                                color:
-                                  "var(--text-primary)",
-                              }}
-                            >
-                              {label}
-                            </span>
-
-                            <span
-                              className="text-[10px] block mt-0.5"
-                              style={{
-                                color:
-                                  "var(--text-muted)",
-                              }}
-                            >
-                              {value
-                                ? "Full access granted"
-                                : "Access restricted"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <span
-                          className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border"
-                          style={{
-                            backgroundColor:
-                              value
-                                ? "rgba(16,185,129,0.1)"
-                                : "rgba(239,68,68,0.1)",
-
-                            color:
-                              value
-                                ? "#34d399"
-                                : "#f87171",
-
-                            border:
-                              `1px solid ${
-                                value
-                                  ? "rgba(16,185,129,0.2)"
-                                  : "rgba(239,68,68,0.2)"
-                              }`,
-                          }}
-                        >
-                          {value
-                            ? "Enabled"
-                            : "Disabled"}
-                        </span>
-                      </div>
-                    )
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-10">
-                  <ShieldCheck
-                    className="w-8 h-8 mx-auto opacity-30 mb-2"
-                    style={{
-                      color:
-                        "var(--text-muted)",
-                    }}
-                  />
-
-                  <p className="text-[13px] font-medium">
-                    No permissions
-                    configured
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* ==========================================
-               ACTIVITY
-            ========================================== */
-            <div className="space-y-6">
-              <div
-                className="rounded-xl p-4"
-                style={cardStyle}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <h3
-                    className="text-[13px] font-semibold flex items-center gap-2"
-                    style={{
-                      color:
-                        "var(--text-primary)",
-                    }}
-                  >
-                    {tabs.find(
-                      (t) =>
-                        t.id ===
-                        activeTab
-                    )?.icon &&
-                      React.createElement(
-                        tabs.find(
-                          (t) =>
-                            t.id ===
-                            activeTab
-                        ).icon,
-                        {
-                          className:
-                            "w-4 h-4",
-
-                          style: {
-                            color:
-                              "var(--text-muted)",
-                          },
-                        }
-                      )}
-
-                    {
-                      tabs.find(
-                        (t) =>
-                          t.id ===
-                          activeTab
-                      )?.label
-                    }
-
-                    <span
-                      className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1"
-                      style={{
-                        backgroundColor:
-                          "rgba(16,185,129,0.15)",
-                        color:
-                          "#34d399",
-                      }}
-                    >
-                      <span
-                        className="w-1.5 h-1.5 rounded-full animate-pulse"
-                        style={{
-                          backgroundColor:
-                            "#34d399",
-                        }}
-                      />
-
-                      LIVE
-                    </span>
-                  </h3>
-
-                  <span
-                    className="text-[10px] font-medium px-2 py-0.5 rounded-md"
-                    style={{
-                      backgroundColor:
-                        "var(--bg-tertiary)",
-                      color:
-                        "var(--text-muted)",
-                    }}
-                  >
-                    {
-                      filteredActivities.length
-                    }{" "}
-                    records
-                  </span>
-                </div>
-
-                <div className="space-y-1 max-h-[520px] overflow-y-auto pr-1 custom-scrollbar">
-                  {filteredActivities.length >
-                  0 ? (
-                    filteredActivities
-                      .slice(0, 20)
-                      .map(
-                        (
-                          activity,
-                          index
-                        ) => {
-                          const colors =
-                            getActivityColor(
-                              activity.category
-                            );
-
-                          const activityTime =
-                            new Date(
-                              activity.timestamp
-                            );
-
-                          const isRecent =
-                            Date.now() -
-                              activityTime.getTime() <
-                            60000;
-
-                          const isLast =
-                            index ===
-                            Math.min(
-                              filteredActivities.length,
-                              20
-                            ) -
-                              1;
-
-                          return (
-                            <div
-                              key={
-                                activity._id ||
-                                index
-                              }
-                              className="relative"
-                            >
-                              {!isLast && (
-                                <div
-                                  className="absolute left-[14px] top-[28px] bottom-[-4px] w-px"
-                                  style={{
-                                    backgroundColor:
-                                      "var(--border-color)",
-                                  }}
-                                />
-                              )}
-
-                              <div
-                                className="flex items-start gap-3 p-2 rounded-lg transition-all duration-500"
-                                style={{
-                                  backgroundColor:
-                                    isRecent
-                                      ? "rgba(16,185,129,0.05)"
-                                      : "transparent",
-
-                                  borderLeft:
-                                    isRecent
-                                      ? "2px solid #34d399"
-                                      : "2px solid transparent",
-                                }}
-                              >
-                                <div className="relative z-10 mt-0.5">
-                                  <ActivityIcon
-                                    category={
-                                      activity.category
-                                    }
-                                    size="sm"
-                                  />
-                                </div>
-
-                                <div className="flex-1 min-w-0 pt-0.5">
-                                  <p className="text-[12px] font-medium leading-snug">
-                                    {
-                                      activity.action
-                                    }
-                                  </p>
-
-                                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                    <span
-                                      className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
-                                      style={{
-                                        backgroundColor:
-                                          colors.bg,
-                                        color:
-                                          colors.color,
-                                      }}
-                                    >
-                                      {
-                                        activity.category
-                                      }
-                                    </span>
-
-                                    {activity.performedByName && (
-                                      <>
-                                        <span
-                                          style={{
-                                            color:
-                                              "var(--text-muted)",
-                                          }}
-                                        >
-                                          •
-                                        </span>
-
-                                        <span
-                                          className="text-[10px]"
-                                          style={{
-                                            color:
-                                              "var(--text-muted)",
-                                          }}
-                                        >
-                                          by{" "}
-                                          <span className="font-medium">
-                                            {
-                                              activity.performedByName
-                                            }
-                                          </span>
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {activity.details?.changes &&
-                                    activity
-                                      .details
-                                      .changes
-                                      .length >
-                                      0 && (
-                                      <div className="mt-1.5 flex flex-wrap gap-1">
-                                        {activity.details.changes
-                                          .filter(
-                                            (c) => {
-                                              const f = String(
-                                                c.field || ""
-                                              ).toLowerCase();
-                                              return (
-                                                !f.includes("password") &&
-                                                !f.includes("token") &&
-                                                !f.includes("secret") &&
-                                                !f.includes("key") &&
-                                                !f.includes("cookie") &&
-                                                !f.includes("hash") &&
-                                                !f.includes("credential")
-                                              );
-                                            }
-                                          )
-                                          .slice(
-                                            0,
-                                            3
-                                          )
-                                          .map(
-                                            (
-                                              change,
-                                              i
-                                            ) => (
-                                              <span
-                                                key={
-                                                  i
-                                                }
-                                                className="px-1.5 py-0.5 rounded text-[9px] font-mono"
-                                                style={{
-                                                  backgroundColor:
-                                                    "var(--bg-tertiary)",
-                                                  color:
-                                                    "var(--text-muted)",
-                                                  border:
-                                                    "1px solid var(--border-color)",
-                                                }}
-                                              >
-                                                <span
-                                                  style={{
-                                                    color:
-                                                      "#f87171",
-                                                  }}
-                                                >
-                                                  {String(
-                                                    change.oldValue
-                                                  ).slice(
-                                                    0,
-                                                    10
-                                                  )}
-                                                </span>
-
-                                                <span className="mx-0.5">
-                                                  →
-                                                </span>
-
-                                                <span
-                                                  style={{
-                                                    color:
-                                                      "#34d399",
-                                                  }}
-                                                >
-                                                  {String(
-                                                    change.newValue
-                                                  ).slice(
-                                                    0,
-                                                    10
-                                                  )}
-                                                </span>
-                                              </span>
-                                            )
-                                          )}
-
-                                        {(() => {
-                                          const safeChanges = activity.details.changes.filter(
-                                            (c) => {
-                                              const f = String(c.field || "").toLowerCase();
-return (
-                                                !f.includes("password") &&
-                                                !f.includes("token") &&
-                                                !f.includes("secret") &&
-                                                !f.includes("key") &&
-                                                !f.includes("cookie") &&
-                                                !f.includes("hash") &&
-                                                !f.includes("credential")
-                                              );
-                                            }
-                                          );
-                                          return safeChanges.length > 3 ? (
-                                            <span className="px-1.5 py-0.5 rounded text-[9px]" style={{ color: "var(--text-muted)" }}>
-                                              +{safeChanges.length - 3} more
-                                            </span>
-                                          ) : null;
-                                        })()}
-                                      </div>
-                                    )}
-                                </div>
-
-                                <div className="text-right shrink-0 flex flex-col items-end gap-0.5 pt-0.5">
-                                  <span
-                                    className="text-[10px] whitespace-nowrap font-medium"
-                                    style={{
-                                      color:
-                                        "var(--text-secondary)",
-                                    }}
-                                  >
-                                    {activityTime.toLocaleDateString(
-                                      "en-GB",
-                                      {
-                                        day: "2-digit",
-                                        month:
-                                          "short",
-                                      }
-                                    )}
-                                  </span>
-
-                                  <span
-                                    className="text-[9px] whitespace-nowrap"
-                                    style={{
-                                      color:
-                                        "var(--text-muted)",
-                                    }}
-                                  >
-                                    {activityTime.toLocaleTimeString(
-                                      "en-US",
-                                      {
-                                        hour:
-                                          "2-digit",
-                                        minute:
-                                          "2-digit",
-                                        hour12:
-                                          true,
-                                      }
-                                    )}
-                                  </span>
-
-                                  {isRecent && (
-                                    <span
-                                      className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded-full text-[8px] font-bold"
-                                      style={{
-                                        backgroundColor:
-                                          "rgba(16,185,129,0.15)",
-                                        color:
-                                          "#34d399",
-                                      }}
-                                    >
-                                      <span
-                                        className="w-1 h-1 rounded-full animate-pulse"
-                                        style={{
-                                          backgroundColor:
-                                            "#34d399",
-                                        }}
-                                      />
-
-                                      LIVE
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-                      )
-                  ) : (
-                    <div className="text-center py-10">
-                      <div
-                        className="inline-flex p-3 rounded-full mb-3"
-                        style={{
-                          backgroundColor:
-                            "var(--bg-tertiary)",
-                        }}
-                      >
-                        {React.createElement(
-                          tabs.find(
-                            (t) =>
-                              t.id ===
-                              activeTab
-                          )?.icon ||
-                            Clock,
-                          {
-                            className:
-                              "w-5 h-5 opacity-40",
-
-                            style: {
-                              color:
-                                "var(--text-muted)",
-                            },
-                          }
-                        )}
-                      </div>
-
-                      <p
-                        className="text-[13px] font-medium"
-                        style={{
-                          color:
-                            "var(--text-primary)",
-                        }}
-                      >
-                        No activity
-                        found
-                      </p>
-
-                      <p
-                        className="text-[11px] mt-1"
-                        style={{
-                          color:
-                            "var(--text-muted)",
-                        }}
-                      >
-                        {activeTab ===
-                        "all"
-                          ? "Changes will appear here in real-time"
-                          : `No recent activities related to ${tabs
-                              .find(
-                                (t) =>
-                                  t.id ===
-                                  activeTab
-                              )
-                              ?.label.toLowerCase()}`}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ==========================================
-              PERFORMANCE
-          ========================================== */}
-          <div
-            className="rounded-xl p-4"
-            style={cardStyle}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3
-                className="text-[13px] font-semibold flex items-center gap-2"
-                style={{
-                  color:
-                    "var(--text-primary)",
-                }}
-              >
-                <TrendingUp
-                  className="w-4 h-4"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                />
-
-                Performance Summary
-              </h3>
-
-              <select
-                className="h-7 px-2 rounded text-[11px] font-medium appearance-none pr-6 cursor-pointer"
-                style={{
-                  border:
-                    "1px solid var(--border-color)",
-                  color:
-                    "var(--text-secondary)",
-                  backgroundColor:
-                    "var(--bg-card)",
-                }}
-              >
-                <option>
-                  This Month
-                </option>
-                <option>
-                  Last 30 Days
-                </option>
-                <option>
-                  Last 90 Days
-                </option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                {
-                  label:
-                    "Orders Handled",
-                  value:
-                    ordersHandled,
-                  trend:
-                    "12%",
-                },
-
-                {
-                  label:
-                    "Sales Generated",
-                  value: `$${salesGenerated.toLocaleString()}`,
-                  trend:
-                    "15%",
-                },
-
-                {
-                  label:
-                    "Products Added",
-                  value:
-                    productsAdded,
-                  trend:
-                    "8%",
-                },
-              ].map(
-                (item, i) => (
-                  <div
-                    key={i}
-                    className="p-2.5 rounded-lg"
-                    style={{
-                      backgroundColor:
-                        "var(--bg-tertiary)",
-                    }}
-                  >
-                    <p
-                      className="text-[10px]"
-                      style={{
-                        color:
-                          "var(--text-muted)",
-                      }}
-                    >
-                      {item.label}
-                    </p>
-
-                    <p className="text-base font-bold mt-0.5">
-                      {item.value}
-                    </p>
-
-                    <p
-                      className="text-[9px] mt-0.5 flex items-center gap-1"
-                      style={{
-                        color:
-                          "#34d399",
-                      }}
-                    >
-                      <TrendingUp className="w-2.5 h-2.5" />
-
-                      {item.trend}
-                    </p>
-                  </div>
-                )
-              )}
-
-              <div
-                className="p-2.5 rounded-lg"
-                style={{
-                  backgroundColor:
-                    "var(--bg-tertiary)",
-                }}
-              >
-                <p
-                  className="text-[10px]"
-                  style={{
-                    color:
-                      "var(--text-muted)",
-                  }}
-                >
-                  Customer Rating
-                </p>
-
-                <p className="text-base font-bold mt-0.5 flex items-center gap-1.5">
-                  {performanceRating}
-
-                  <span className="text-xs font-normal flex gap-0.5">
-                    {[...Array(5)].map(
-                      (_, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            color:
-                              i <
-                              Math.floor(
-                                performanceRating
-                              )
-                                ? "#fbbf24"
-                                : "var(--text-muted)",
-                          }}
-                        >
-                          ★
-                        </span>
-                      )
-                    )}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ==========================================
           EDIT EMPLOYEE MODAL
@@ -3188,7 +2387,7 @@ return (
                         permissionsData[
                           key
                         ]
-                          ? "rgba(16,185,129,0.3)"
+                          ? "color-mix(in srgb, var(--success) 28%, transparent)"
                           : "var(--border-color)",
 
                       backgroundColor:
@@ -3207,14 +2406,14 @@ return (
                             permissionsData[
                               key
                             ]
-                              ? "rgba(16,185,129,0.15)"
+                              ? "var(--success-soft)"
                               : "var(--bg-tertiary)",
 
                           color:
                             permissionsData[
                               key
                             ]
-                              ? "#34d399"
+                              ? "var(--success-text)"
                               : "var(--text-muted)",
                         }}
                       >
@@ -3315,7 +2514,7 @@ return (
                 className="min-h-[44px] flex-1 h-10 rounded-lg text-sm font-bold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center shadow-lg shadow-purple-900/20"
                 style={{
                   backgroundColor:
-                    "#7c3aed",
+                    "var(--purple-text)",
                   color: "#fff",
                 }}
               >
