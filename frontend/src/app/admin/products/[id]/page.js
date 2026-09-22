@@ -62,11 +62,11 @@ function StatusBadge({ active, size = "sm" }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold uppercase tracking-wide ${sizeClasses}`}
       style={{
-        backgroundColor: active ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-        color: active ? "#10b981" : "#ef4444",
-        border: `1px solid ${active ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+        backgroundColor: active ? "var(--success-soft)" : "var(--danger-soft)",
+        color: active ? "var(--success)" : "var(--danger)",
+        border: `1px solid ${active ? "color-mix(in srgb, var(--success) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)"}`,
       }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "#10b981" : "#ef4444" }} />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: active ? "var(--success)" : "var(--danger)" }} />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -100,7 +100,7 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
         <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
       <span className={`text-[13px] font-semibold text-right truncate max-w-[60%] ${mono ? "font-mono" : ""}`}
-        style={{ color: highlight ? "#10b981" : "var(--text-primary)" }}>{value}</span>
+        style={{ color: highlight ? "var(--success)" : "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }
@@ -108,9 +108,9 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
 function Avatar({ user, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
-    emerald: { bg: "rgba(16,185,129,0.12)", text: "#10b981" },
-    blue: { bg: "rgba(59,130,246,0.12)", text: "#3b82f6" },
-    purple: { bg: "rgba(168,85,247,0.12)", text: "#a855f7" },
+    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
+    blue: { bg: "var(--info-soft)", text: "var(--info)" },
+    purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
   };
   const c = colors[color] || colors.emerald;
   return (
@@ -133,8 +133,97 @@ function EmptyState({ icon: Icon, title, description, action }) {
   );
 }
 
+function AllAttributesModal({ attributes, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="all-attributes-title"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    >
+      <div
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl shadow-2xl"
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+      >
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 px-5 py-4"
+          style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 id="all-attributes-title" className="text-[15px] font-bold">All Attributes</h2>
+              <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                Product attributes and specifications
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="shrink-0 rounded-md p-2 transition hover:bg-red-500/10 hover:text-red-400" style={{ color: "var(--text-muted)" }} aria-label="Close attributes">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {attributes.length === 0 ? (
+            <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+              <p className="text-[12px]">No attributes are available for this product.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {attributes.map((attribute) => (
+                <div key={attribute.name} className="min-w-0 rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                  <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{attribute.value || "—"}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 justify-end px-5 py-3" style={{ backgroundColor: "var(--bg-tertiary)", borderTop: "1px solid var(--border-color)" }}>
+          <button type="button" onClick={onClose} className="h-9 rounded-md px-4 text-[12px] font-bold transition hover:brightness-110" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Tag entries can be plain strings or legacy { name } objects
 const tagNameOf = (t) => (typeof t === "object" && t !== null ? t.name : t);
+
+// Attribute values can be plain strings/numbers or nested objects such as
+// { Brand: "Dell" } / { label, value } coming from the attribute configuration.
+// Always resolve a readable value so "[object Object]" is never rendered.
+const attrValueOf = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw).trim();
+  }
+  if (Array.isArray(raw)) return raw.map(attrValueOf).filter(Boolean).join(", ");
+  if (typeof raw === "object") {
+    const direct = raw.value ?? raw.label ?? raw.name ?? raw.display ?? raw.title ?? raw.text;
+    if (direct !== undefined && direct !== null && direct !== raw) return attrValueOf(direct);
+    return Object.values(raw).map(attrValueOf).filter(Boolean).join(", ");
+  }
+  return String(raw);
+};
 
 // ==================== COMPACT 3-DOT MENU ====================
 
@@ -208,7 +297,7 @@ function MoreMenu({ actions }) {
               onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick?.(); }}
               disabled={action.disabled}
               className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 opacity-100 pointer-events-auto cursor-pointer"
-              style={{ color: action.destructive ? "#ef4444" : "var(--text-primary)" }}
+              style={{ color: action.destructive ? "var(--danger)" : "var(--text-primary)" }}
             >
               {action.icon && <span className="w-4 h-4 flex items-center justify-center shrink-0">{action.icon}</span>}
               <span>{action.label}</span>
@@ -350,6 +439,7 @@ export default function ProductDetailPage() {
   // Gallery State
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showAllAttributes, setShowAllAttributes] = useState(false);
 
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams?.get("tab");
@@ -406,7 +496,12 @@ export default function ProductDetailPage() {
     };
     const handleUpdated = (data) => {
       if (String(data?._id) !== String(id)) return;
-      setLiveEvents((prev) => [...prev, { key: `live-u-${Date.now()}`, type: "updated", user: data?.updatedby || null, date: data?.updated_at || new Date().toISOString() }]);
+      const date = data?.updated_at || new Date().toISOString();
+      setLiveEvents((prev) => {
+        // Ignore re-delivered socket events so an update is never listed twice.
+        if (prev.some((e) => e.type === "updated" && e.date === date)) return prev;
+        return [...prev, { key: `live-u-${Date.now()}`, type: "updated", user: data?.updatedby || null, date }];
+      });
     };
     socket.on("productDeleted", handleDeleted);
     socket.on("productCreated", handleCreated);
@@ -428,6 +523,25 @@ export default function ProductDetailPage() {
     queryFn: () => attributeApi.getByCategory(productCategoryId),
     enabled: !!productCategoryId, retry: false,
   });
+
+  // Initialize live events from database state so pre-existing updates are shown
+  useEffect(() => {
+    if (!product) return;
+    setLiveEvents((prev) => {
+      // Only seed once: if prev already has events, keep them.
+      if (prev.length > 0) return prev;
+      const initial = [];
+      if (product?.updatedby && product?.updated_at) {
+        initial.push({
+          key: `live-u-init-${product._id || id}`,
+          type: "updated",
+          user: product.updatedby || null,
+          date: product.updated_at || new Date().toISOString(),
+        });
+      }
+      return initial;
+    });
+  }, [product?._id, id]);
 
   const ATTRIBUTE_PRESETS = useMemo(() => {
     const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
@@ -579,7 +693,7 @@ export default function ProductDetailPage() {
         cost_price: String(v.cost_price ?? ""), selling_price: String(v.selling_price ?? ""),
         quantity: String(v.quantity ?? 0),
         attributes: Object.entries(v.attributes || {}).map(([name, value]) => {
-          const strValue = String(value ?? "");
+          const strValue = attrValueOf(value);
           const preset = rawAttributes.find((a) => a.name === name);
           const isMulti = preset?.data_type === "multi_select";
           return { name, value: isMulti ? strValue.split(",").map((s) => s.trim()).filter(Boolean)[0] || "" : strValue, isCustom: false };
@@ -889,8 +1003,8 @@ export default function ProductDetailPage() {
   if (isError || !product) return (
     <div className="w-full flex items-center justify-center py-24">
       <div className="flex flex-col items-center gap-4 max-w-md text-center px-6 py-10 rounded-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-          <AlertTriangle className="w-7 h-7" style={{ color: "#ef4444" }} />
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
+          <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
         </div>
         <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Product Not Found</h2>
         <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This product does not exist or has been removed.</p>
@@ -908,7 +1022,8 @@ export default function ProductDetailPage() {
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
-  const wasUp = Boolean(product?.updatedby);
+  const liveUpdatedEvents = liveEvents.filter((e) => e.type === "updated");
+  const latestLiveUpdate = liveUpdatedEvents[liveUpdatedEvents.length - 1] || null;
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
   (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n).trim()); }); });
@@ -951,11 +1066,173 @@ export default function ProductDetailPage() {
   const firstVariant = variants[0];
   const productImage = firstVariant?.images?.[0] ? getImageUrl(firstVariant.images[0].img_url) : null;
 
+  // Hero side panel: attribute summary (derived from existing variant attributes)
+  const attributeSummary = (() => {
+    const map = {};
+    (variants || []).forEach((v) => {
+      Object.entries(v.attributes || {}).forEach(([name, value]) => {
+        const n = String(name || "").trim();
+        if (!n) return;
+        const val = attrValueOf(value);
+        if (!map[n]) map[n] = new Set();
+        if (val) map[n].add(val);
+      });
+    });
+    return Object.entries(map).map(([name, vals]) => ({ name, display: vals.size > 1 ? "Multiple" : [...vals][0] || "—" }));
+  })();
+  const allAttributeDetails = (() => {
+    const valuesByName = new Map();
+    (variants || []).forEach((variant) => {
+      Object.entries(variant.attributes || {}).forEach(([name, value]) => {
+        const cleanName = String(name || "").trim();
+        const cleanValue = attrValueOf(value);
+        if (!cleanName || !cleanValue) return;
+        if (!valuesByName.has(cleanName)) valuesByName.set(cleanName, new Set());
+        valuesByName.get(cleanName).add(cleanValue);
+      });
+    });
+    return [...valuesByName.entries()].map(([name, values]) => ({ name, value: [...values].join(", ") }));
+  })();
+  const attributeCount = attributeSummary.length;
+  const tagCount = allAssignedTags.length;
+
   // Helper to open gallery
   const openGallery = (index) => {
     setCurrentImageIndex(index);
     setShowImageGallery(true);
   };
+
+  // ==================== VARIANTS SECTION (shared: Overview + Variants tabs) ====================
+  const variantsSection = (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
+        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{totalVariants} {totalVariants === 1 ? "variant" : "variants"} · {totalStock} units total</p>
+      </div>
+      <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+        <Plus className="w-4 h-4" /> Add Variant
+      </button>
+    </div>
+
+    {variants.length === 0 ? (
+      <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+          <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
+        </div>
+        <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
+        <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
+        <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+          <Plus className="w-4 h-4" /> Create First Variant
+        </button>
+      </div>
+    ) : (
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <table className="w-full text-[12px]">
+          <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+            <tr>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Image</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">SKU</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Variant / Color</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Price</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Stock</th>
+              <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Status</th>
+              <th className="text-right px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {variants.map((variant, index) => {
+              const isLowStock = Number(variant.quantity) <= 5;
+              const isActive = variant.status === "active" || !variant.status;
+              return (
+                <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                  <td className="px-4 py-4">
+                    {variant.images?.length > 0 ? (
+                      <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
+                        <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
+                        <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
+                  <td className="px-4 py-4">
+                    <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
+                    {variant.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {variant.tags.slice(0, 2).map((tag, idx) => (
+                          <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                        ))}
+                        {variant.tags.length > 2 && (
+                          <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "var(--success)" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
+                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "var(--danger)" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
+                  <td className="px-4 py-4">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+                      style={{
+                        backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)",
+                        color: isActive ? "var(--success)" : "var(--danger)",
+                        border: `1px solid ${isActive ? "color-mix(in srgb, var(--success) 28%, transparent)" : "color-mix(in srgb, var(--danger) 28%, transparent)"}`,
+                      }}>
+                      <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "var(--success)" : "var(--danger)" }} />
+                      {isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-right relative z-10">
+                    <MoreMenu actions={[
+                      { 
+                        label: "Edit Variant", 
+                        icon: <Edit3 className="w-3.5 h-3.5" />, 
+                        onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) 
+                      },
+                      { 
+                        label: "Add Tag", 
+                        icon: <TagIcon className="w-3.5 h-3.5" />, 
+                        onClick: () => { 
+                          setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); 
+                          setShowVariantTagsModal(true); 
+                          setVariantTagInput(""); 
+                        } 
+                      },
+                      { 
+                        label: isActive ? "Disable" : "Enable", 
+                        icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
+                        onClick: () => {
+                          const updatedVariants = product.variants.map(v => 
+                            String(v._id) === String(variant._id) 
+                              ? { ...v, status: isActive ? "inactive" : "active" } 
+                              : v
+                          );
+                          const data = new FormData();
+                          data.append("variants", JSON.stringify(updatedVariants));
+                          updateMutation.mutate({ id: product._id, data });
+                        }
+                      },
+                      { 
+                        label: "Delete", 
+                        icon: <Trash2 className="w-3.5 h-3.5" />, 
+                        destructive: true, 
+                        onClick: () => {
+                          setDeleteVariantTarget(variant);
+                        } 
+                      },
+                    ]} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+  );
 
   return (
     <div className="w-full space-y-5 pb-10">
@@ -969,60 +1246,55 @@ export default function ProductDetailPage() {
         />
       )}
 
-      {/* BREADCRUMB */}
-      <nav className="flex items-center gap-2 text-[12px] mb-1" style={{ color: "var(--text-muted)" }}>
-        <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors">Products</button>
-        <ChevronRight className="w-3 h-3" />
-        <span className="font-medium text-[var(--text-secondary)]">Product Details</span>
-      </nav>
+      {showAllAttributes && (
+        <AllAttributesModal
+          attributes={allAttributeDetails}
+          onClose={() => setShowAllAttributes(false)}
+        />
+      )}
 
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <button
-            onClick={() => router.push("/admin/products")}
-            className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all shrink-0 mt-0.5"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <h1 className="text-[20px] md:text-[24px] font-bold tracking-tight leading-tight" style={{ color: "var(--text-primary)" }}>
-                {product.name}
-              </h1>
-              <StatusBadge active={product.status === "active"} size="md" />
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              <span>{totalVariants} Variants</span>
-              <span className="opacity-30">|</span>
-              <span>{totalStock} Units</span>
-              <span className="opacity-30">|</span>
-              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />Created {fd(product.created_at)}</span>
-            </div>
-          </div>
+      {/* HEADER: Breadcrumb + Actions */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <nav className="flex items-center flex-wrap gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors font-medium">Products</button>
+            <ChevronRight className="w-3 h-3 shrink-0" />
+            {product.category_id?.name && (
+              <>
+                <span className="max-w-[160px] truncate">{product.category_id.name}</span>
+                <ChevronRight className="w-3 h-3 shrink-0" />
+              </>
+            )}
+            {product.brand_id?.name && (
+              <>
+                <span className="max-w-[160px] truncate">{product.brand_id.name}</span>
+                <ChevronRight className="w-3 h-3 shrink-0" />
+              </>
+            )}
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{product.name}</span>
+          </nav>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h1>
+          <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>View product information, variants, status and related details.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={handleEdit}
-            className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            onClick={handleDelete}
+            className="h-8 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
+            style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}
           >
-            <Pencil className="w-4 h-4" /> Edit
+            <Trash2 className="w-3.5 h-3.5" /> Remove
           </button>
-          <MoreMenu actions={[
-            { label: "Edit Product", icon: <Edit3 className="w-4 h-4" />, onClick: handleEdit },
-            { label: "Delete Product", icon: <Trash2 className="w-4 h-4" />, destructive: true, onClick: handleDelete },
-          ]} />
         </div>
       </div>
 
-      {/* PRODUCT HERO */}
-      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+      {/* PRODUCT HERO: Gallery + Info + Meta panel */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+        <div className="xl:col-span-8 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-0">
           {/* Image Area - NOW CLICKABLE */}
-          <div className="relative bg-[var(--bg-tertiary)] p-6 md:p-8 flex items-center justify-center min-h-[320px] md:min-h-[420px] group">
+          <div className="relative bg-[var(--bg-tertiary)] p-5 md:p-6 flex items-center justify-center min-h-[280px] md:min-h-[340px] group">
             {firstVariant?.images?.length > 0 ? (
-              <div className="w-full max-w-md">
+              <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
                 <button 
                   onClick={() => openGallery(0)}
@@ -1032,7 +1304,7 @@ export default function ProductDetailPage() {
                     src={getImageUrl(firstVariant.images[0].img_url)}
                     alt={product.name}
                     className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    style={{ maxHeight: 380 }}
+                    style={{ maxHeight: 300 }}
                   />
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -1045,7 +1317,7 @@ export default function ProductDetailPage() {
 
                 {/* Clickable Thumbnails */}
                 {firstVariant.images.length > 1 && (
-                  <div className="flex gap-2 mt-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="flex max-h-[300px] w-14 shrink-0 flex-col gap-2 overflow-y-auto pb-1 scrollbar-hide">
                     {firstVariant.images.map((img, i) => (
                       <button
                         key={i}
@@ -1075,11 +1347,12 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Info Area */}
-          <div className="p-6 md:p-8 flex flex-col gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
-            </div>
+          <div className="p-5 md:p-6 flex flex-col gap-4">
+            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
             
+            <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
+            </p>
             <div className="flex items-baseline gap-3">
               <span className="text-2xl font-extrabold" style={{ color: "var(--text-primary)" }}>
                 Rs. {Number(firstVariant?.selling_price || product.variants?.[0]?.selling_price || 0).toLocaleString()}
@@ -1088,27 +1361,114 @@ export default function ProductDetailPage() {
                 <span className="text-base line-through" style={{ color: "var(--text-muted)" }}>{priceRange}</span>
               ) : null}
             </div>
-            
-            <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
-            </p>
-            
-            <div className="flex flex-wrap gap-2">
-              {(displayTagNames || []).map((tag) => (
-                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "var(--success)" : "var(--danger)" }} />
+              <span className="text-[12px] font-bold" style={{ color: product.status === "active" ? "var(--success)" : "var(--danger)" }}>
+                {product.status === "active" ? "In Stock" : "Inactive"}
+              </span>
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+                (Total: {totalStock} units)
+              </span>
             </div>
             
-            {/* Simplified Quick Info Grid */}
-            <div className="grid grid-cols-2 gap-3 mt-1">
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
-                <p className="text-[10px] uppercase tracking-wide font-bold mb-0.5" style={{ color: "var(--text-muted)" }}>Category</p>
-                <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.category_id?.name || "—"}</p>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Layers3 className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Variants</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalVariants}</p>
               </div>
               <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
-                <p className="text-[10px] uppercase tracking-wide font-bold mb-0.5" style={{ color: "var(--text-muted)" }}>Brand</p>
-                <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{product.brand_id?.name || "—"}</p>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Package className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Stock</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalStock}</p>
               </div>
+              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <FileText className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Attributes</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{attributeCount}</p>
+              </div>
+              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TagIcon className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
+                  <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>Tags</p>
+                </div>
+                <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{tagCount}</p>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        {/* SIDE PANEL: Brand / Category / Key Attributes */}
+        <div className="xl:col-span-4 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-5 flex flex-col gap-4">
+            {/* Brand */}
+            <div>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Brand</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[12px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                    {ini(product.brand_id?.name)}
+                  </div>
+                  <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {product.brand_id?.name || "—"}
+                  </span>
+                </div>
+                {product.brand_id?._id && (
+                  <button type="button" onClick={() => router.push(`/admin/brands/${product.brand_id._id}`)} className="flex items-center gap-0.5 text-[11px] font-medium hover:underline shrink-0" style={{ color: "var(--accent)" }}>
+                    View brand <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div className="border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Category</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
+                    <Box className="w-4 h-4" />
+                  </div>
+                  <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {product.category_id?.name || "—"}
+                  </span>
+                </div>
+                {product.category_id?._id && (
+                  <button type="button" onClick={() => router.push(`/admin/categories/${product.category_id._id}`)} className="flex items-center gap-0.5 text-[11px] font-medium hover:underline shrink-0" style={{ color: "var(--accent)" }}>
+                    View category <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Key Attributes */}
+            <div className="border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Key Attributes</p>
+              {attributeSummary.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {attributeSummary.slice(0, 4).map((attr) => (
+                      <div key={attr.name} className="rounded-lg p-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                        <p className="truncate text-[10px] font-semibold" style={{ color: "var(--text-primary)" }}>{attr.name}</p>
+                        <p className="truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{attr.display}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setShowAllAttributes(true)} className="mt-2.5 flex items-center gap-0.5 text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
+                    View all attributes <ChevronRight className="w-3 h-3" />
+                  </button>
+                </>
+              ) : (
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No attributes set on variants.</p>
+              )}
             </div>
           </div>
         </div>
@@ -1154,71 +1514,161 @@ export default function ProductDetailPage() {
           <div className="space-y-6">
             {activeTab === "overview" && (
               <div className="space-y-5">
-                {/* Product Details + Description - Full Width Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                  <div className="lg:col-span-2 self-start">
+                {/* Product Details + Description + Variants | Side cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  <div className="lg:col-span-2 flex flex-col gap-5 self-start">
                     {/* Product Details */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-tertiary)]/30">
-                        <div className="w-8 h-8 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
-                          <Package className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
-                          <p className="text-[10px] text-[var(--text-muted)]">Basic information and configuration</p>
-                        </div>
+                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
+                        <span className="text-[10px] font-medium text-[var(--text-muted)]">Basic information</span>
                       </div>
-                      <div className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
+                      <div className="p-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">SKU</p>
+                            <p className="text-[14px] font-mono font-medium text-[var(--text-secondary)]">{firstVariant?.sku || variants?.[0]?.sku || "—"}</p>
+                          </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.name}</p>
                           </div>
-                          {(product.product_code || product.sku) && (
-                            <div>
-                              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Code</p>
-                              <p className="text-[14px] font-mono text-[var(--text-secondary)]">{product.product_code || product.sku}</p>
-                            </div>
-                          )}
-                          <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
-                          </div>
-                          <div className="py-4 border-t border-[var(--border-color)] md:border-t-0 md:py-4">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Brand</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.brand_id?.name || "—"}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Status</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? "Active" : "Inactive"}</p>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Tax Rate</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.tax || 0}%</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Status</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? "Active" : "Inactive"}</p>
+                          </div>
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Price Range</p>
                             <p className="text-[14px] font-semibold text-[var(--accent)]">{priceRange}</p>
                           </div>
-                          <div className="py-4 border-t border-[var(--border-color)]">
+                          <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Total Stock</p>
                             <p className="text-[14px] font-medium text-[var(--text-primary)]">{totalStock} units</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Created at</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{fd(product.created_at)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Updated at</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.updated_at ? fd(product.updated_at) : "Never"}</p>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 self-start">
-                    {/* Description */}
+                    {/* Description + Tags */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30 flex items-center justify-between">
+                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
                         <h3 className="text-sm font-bold text-[var(--text-primary)]">Description</h3>
                       </div>
-                      <div className="p-3">
+                      <div className="p-5 space-y-5">
                         <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
                           {product.description || "No description provided for this product."}
                         </p>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Tags</p>
+                            {displayTagNames.length > 0 && (
+                              <button type="button" onClick={() => setActiveTab("tags")} className="text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
+                                Manage
+                              </button>
+                            )}
+                          </div>
+                          {displayTagNames.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {(displayTagNames || []).map((tag) => (
+                                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[12px] text-[var(--text-muted)]">No tags assigned to this product yet.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {variantsSection}
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {/* Product Images */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Images</h3>
+                        <span className="text-[10px] font-medium text-[var(--text-muted)]">{firstVariant?.images?.length || 0} {firstVariant?.images?.length === 1 ? "image" : "images"}</span>
+                      </div>
+                      <div className="p-3">
+                        {firstVariant?.images?.length > 0 ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openGallery(0)}
+                              className="group/img relative block w-full overflow-hidden rounded-lg border border-[var(--border-color)]"
+                            >
+                              <img src={getImageUrl(firstVariant.images[0].img_url)} alt={product.name} className="w-full h-36 object-cover" />
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
+                                <span className="flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover/img:opacity-100">
+                                  <ZoomIn className="w-3 h-3" /> View
+                                </span>
+                              </span>
+                            </button>
+                            {firstVariant.images.length > 1 && (
+                              <div className="mt-2 grid grid-cols-4 gap-2">
+                                {firstVariant.images.slice(1, 4).map((img, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => openGallery(i + 1)}
+                                    className="h-14 w-full overflow-hidden rounded-md border border-[var(--border-color)] transition-all hover:ring-2 hover:ring-[var(--accent)]"
+                                  >
+                                    <img src={getImageUrl(img.img_url)} alt="" className="h-full w-full object-cover" />
+                                  </button>
+                                ))}
+                                {firstVariant.images.length > 4 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openGallery(4)}
+                                    className="flex h-14 w-full items-center justify-center rounded-md text-[11px] font-bold"
+                                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                                  >
+                                    +{firstVariant.images.length - 4}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex h-24 w-full flex-col items-center justify-center rounded-lg border border-dashed" style={{ borderColor: "var(--border-color)" }}>
+                            <ImageIcon className="mb-1 h-6 w-6" style={{ color: "var(--text-muted)" }} />
+                            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>No images available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Info */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Quick Info</h3>
+                      </div>
+                      <div className="px-3 pb-3 pt-1">
+                        <DataRow label="Total Stock" value={`${totalStock} units`} highlight />
+                        <DataRow label="Total Variants" value={totalVariants} />
+                        <DataRow label="Stock Value" value={`Rs. ${totalValue.toLocaleString()}`} />
+                        <DataRow label="Price Range" value={priceRange} highlight mono />
+                        <DataRow label="Tax Rate" value={`${product.tax || 0}%`} />
                       </div>
                     </div>
 
@@ -1248,27 +1698,27 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
 
-                    {wasUp && (
+                    {latestLiveUpdate && (
                       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                         <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
                           <h3 className="text-sm font-bold text-[var(--text-primary)]">Updated By</h3>
                         </div>
                         <div className="p-3">
-                          {product.updatedby ? (
+                          {latestLiveUpdate.user ? (
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-3">
-                                <Avatar user={product.updatedby} size="md" color="blue" />
+                                <Avatar user={latestLiveUpdate.user} size="md" color="blue" />
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{product.updatedby.name || product.updatedby.email}</p>
-                                  <p className="text-[11px] text-[var(--text-muted)]">{product.updatedby.email || "—"}</p>
+                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{latestLiveUpdate.user.name || latestLiveUpdate.user.email}</p>
+                                  <p className="text-[11px] text-[var(--text-muted)]">{latestLiveUpdate.user.email || "—"}</p>
                                 </div>
                               </div>
-                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
                               <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
-                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
+                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
                             </div>
                           )}
                         </div>
@@ -1276,140 +1726,12 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 </div>
+
               </div>
             )}
 
             {/* VARIANTS TAB */}
-            {activeTab === "variants" && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{totalVariants} {totalVariants === 1 ? "variant" : "variants"} · {totalStock} units total</p>
-                  </div>
-                  <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                    <Plus className="w-4 h-4" /> Add Variant
-                  </button>
-                </div>
-
-                {variants.length === 0 ? (
-                  <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                      <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
-                    </div>
-                    <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
-                    <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
-                    <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                      <Plus className="w-4 h-4" /> Create First Variant
-                    </button>
-                  </div>
-                ) : (
-                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                    <table className="w-full text-[12px]">
-                      <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                        <tr>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Image</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">SKU</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Variant / Color</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Price</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Stock</th>
-                          <th className="text-left px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Status</th>
-                          <th className="text-right px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {variants.map((variant, index) => {
-                          const isLowStock = Number(variant.quantity) <= 5;
-                          const isActive = variant.status === "active" || !variant.status;
-                          return (
-                            <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                              <td className="px-4 py-4">
-                                {variant.images?.length > 0 ? (
-                                  <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
-                                    <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
-                                  </button>
-                                ) : (
-                                  <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
-                                    <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
-                              <td className="px-4 py-4">
-                                <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
-                                {variant.tags?.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {variant.tags.slice(0, 2).map((tag, idx) => (
-                                      <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
-                                    ))}
-                                    {variant.tags.length > 2 && (
-                                      <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "#10b981" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
-                              <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "#ef4444" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
-                              <td className="px-4 py-4">
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
-                                  style={{
-                                    backgroundColor: isActive ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                                    color: isActive ? "#10b981" : "#ef4444",
-                                    border: `1px solid ${isActive ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
-                                  }}>
-                                  <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isActive ? "#10b981" : "#ef4444" }} />
-                                  {isActive ? "Active" : "Inactive"}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 text-right relative z-10">
-                                <MoreMenu actions={[
-                                  { 
-                                    label: "Edit Variant", 
-                                    icon: <Edit3 className="w-3.5 h-3.5" />, 
-                                    onClick: () => router.push(`/admin/products/${id}/add-variant?edit=${variant._id}&tab=${activeTab}`) 
-                                  },
-                                  { 
-                                    label: "Add Tag", 
-                                    icon: <TagIcon className="w-3.5 h-3.5" />, 
-                                    onClick: () => { 
-                                      setEditingVariantForTags({ ...variant, tags: variant.tags || [] }); 
-                                      setShowVariantTagsModal(true); 
-                                      setVariantTagInput(""); 
-                                    } 
-                                  },
-                                  { 
-                                    label: isActive ? "Disable" : "Enable", 
-                                    icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
-                                    onClick: () => {
-                                      const updatedVariants = product.variants.map(v => 
-                                        String(v._id) === String(variant._id) 
-                                          ? { ...v, status: isActive ? "inactive" : "active" } 
-                                          : v
-                                      );
-                                      const data = new FormData();
-                                      data.append("variants", JSON.stringify(updatedVariants));
-                                      updateMutation.mutate({ id: product._id, data });
-                                    }
-                                  },
-                                  { 
-                                    label: "Delete", 
-                                    icon: <Trash2 className="w-3.5 h-3.5" />, 
-                                    destructive: true, 
-                                    onClick: () => {
-                                      setDeleteVariantTarget(variant);
-                                    } 
-                                  },
-                                ]} />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
+            {activeTab === "variants" && variantsSection}
 
             {/* TAGS TAB */}
             {activeTab === "tags" && (
@@ -1549,18 +1871,18 @@ export default function ProductDetailPage() {
             {activeTab === "activity" && (
               <InfoCard icon={Activity} title="Activity Timeline" action={
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
-                  style={{ backgroundColor: isConnected ? "rgba(16,185,129,0.12)" : "var(--bg-tertiary)", color: isConnected ? "#10b981" : "var(--text-muted)" }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "#10b981" : "var(--text-muted)" }} />
+                  style={{ backgroundColor: isConnected ? "var(--success-soft)" : "var(--bg-tertiary)", color: isConnected ? "var(--success)" : "var(--text-muted)" }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "var(--success)" : "var(--text-muted)" }} />
                   {isConnected ? "Live" : "Offline"}
                 </span>
               }>
                 <div className="space-y-6">
                   <div className="flex gap-4">
                     <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)" }}>
-                        <Plus className="w-5 h-5" style={{ color: "#10b981" }} />
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)" }}>
+                        <Plus className="w-5 h-5" style={{ color: "var(--success)" }} />
                       </div>
-                      {wasUp && (
+                      {latestLiveUpdate && (
                         <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
                       )}
                     </div>
@@ -1580,35 +1902,11 @@ export default function ProductDetailPage() {
                     </div>
                   </div>
 
-                  {wasUp && (
-                    <div className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.12)" }}>
-                          <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />
-                        </div>
-                      </div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Product Updated</h4>
-                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                              Updated by <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{product.updatedby?.name || "—"}</span>
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(product.updated_at)}</p>
-                            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(product.updated_at)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {liveEvents.map((ev, i) => (
                     <div key={ev.key} className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: ev.type === "created" ? "rgba(16,185,129,0.12)" : "rgba(59,130,246,0.12)" }}>
-                          {ev.type === "created" ? <Plus className="w-5 h-5" style={{ color: "#10b981" }} /> : <Pencil className="w-5 h-5" style={{ color: "#3b82f6" }} />}
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: ev.type === "created" ? "var(--success-soft)" : "var(--info-soft)" }}>
+                          {ev.type === "created" ? <Plus className="w-5 h-5" style={{ color: "var(--success)" }} /> : <Pencil className="w-5 h-5" style={{ color: "var(--info)" }} />}
                         </div>
                         {i < liveEvents.length - 1 && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
                       </div>
@@ -1616,7 +1914,7 @@ export default function ProductDetailPage() {
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div>
                             <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-                              {ev.type === "created" ? "Product Created" : "Product Updated"} <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#10b981" }}>LIVE</span>
+                              {ev.type === "created" ? "Product Created" : "Product Updated"} <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
                             </h4>
                             <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                               {ev.type === "created" ? "Added to the system" : "Details were modified"}
@@ -1640,7 +1938,7 @@ export default function ProductDetailPage() {
                     </div>
                   ))}
 
-                  {!wasUp && liveEvents.length === 0 && (
+                  {liveEvents.length === 0 && (
                     <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                       <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
                       <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet. Product has not been modified since creation.</span>
@@ -1672,7 +1970,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-4 px-4 py-2 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                  style={{ backgroundColor: currentStep > 1 ? "#10b981" : "var(--bg-card)", color: currentStep > 1 ? "#fff" : "var(--text-muted)" }}>
+                  style={{ backgroundColor: currentStep > 1 ? "var(--success)" : "var(--bg-card)", color: currentStep > 1 ? "#fff" : "var(--text-muted)" }}>
                   {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : "1"}
                 </div>
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 1 ? "var(--text-primary)" : "var(--text-muted)" }}>Product Info</span>
@@ -1680,7 +1978,7 @@ export default function ProductDetailPage() {
               <div className="h-px w-8" style={{ backgroundColor: "var(--border-color)" }} />
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                  style={{ backgroundColor: currentStep === 2 ? "#10b981" : "var(--bg-card)", color: currentStep === 2 ? "#fff" : "var(--text-muted)" }}>2</div>
+                  style={{ backgroundColor: currentStep === 2 ? "var(--success)" : "var(--bg-card)", color: currentStep === 2 ? "#fff" : "var(--text-muted)" }}>2</div>
                 <span className="text-[12px] font-semibold" style={{ color: currentStep === 2 ? "var(--text-primary)" : "var(--text-muted)" }}>Variants</span>
               </div>
             </div>
@@ -1800,7 +2098,7 @@ export default function ProductDetailPage() {
                                 <Copy className="w-4 h-4" />
                               </button>
                               <button type="button" title="Delete" onClick={(e) => { e.stopPropagation(); removeVariant(index); }}
-                                className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "#ef4444" }}>
+                                className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "var(--danger)" }}>
                                 <Trash2 className="w-4 h-4" />
                               </button>
                               <ChevronDown className={`w-5 h-5 transition-transform ${expandedVariant === index ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
@@ -1850,9 +2148,9 @@ export default function ProductDetailPage() {
                                   ))}
                                 </div>
                                 {variant.cost_price !== "" && variant.selling_price !== "" && Number(variant.selling_price) <= Number(variant.cost_price) && (
-                                  <div className="mt-3 flex items-center gap-2 rounded-lg border px-4 py-3" style={{ borderColor: "rgba(239,68,68,0.3)", backgroundColor: "rgba(239,68,68,0.1)" }}>
-                                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "#ef4444" }} />
-                                    <p className="text-[11px] font-semibold" style={{ color: "#ef4444" }}>Selling Price must be greater than Cost Price</p>
+                                  <div className="mt-3 flex items-center gap-2 rounded-lg border px-4 py-3" style={{ borderColor: "color-mix(in srgb, var(--danger) 28%, transparent)", backgroundColor: "var(--danger-soft)" }}>
+                                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: "var(--danger)" }} />
+                                    <p className="text-[11px] font-semibold" style={{ color: "var(--danger)" }}>Selling Price must be greater than Cost Price</p>
                                   </div>
                                 )}
                               </div>
@@ -1906,7 +2204,7 @@ export default function ProductDetailPage() {
                                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
                                           <span className="truncate">{attr.name || "—"}</span>
                                           {attr._creating && <span className="text-[10px] font-normal italic" style={{ color: "var(--text-muted)" }}>creating…</span>}
-                                          {attr._createError && <span className="text-[10px] font-normal italic" style={{ color: "#ef4444" }}>failed</span>}
+                                          {attr._createError && <span className="text-[10px] font-normal italic" style={{ color: "var(--danger)" }}>failed</span>}
                                         </div>
                                         {preset ? (
                                           isMulti ? (
@@ -1915,7 +2213,7 @@ export default function ProductDetailPage() {
                                               {!selectedSingle && <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Select an option...</span>}
                                               {selectedSingle && (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                                  style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)" }}>
+                                                  style={{ backgroundColor: "var(--success-soft)", color: "var(--success)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
                                                   {selectedSingle}
                                                   <button type="button" onClick={() => setSingleValue("")} className="ml-0.5 rounded-full p-0.5 hover:bg-black/10">
                                                     <X className="w-3 h-3" />
@@ -1943,7 +2241,7 @@ export default function ProductDetailPage() {
                                             className="h-9 px-3 rounded-lg text-[12px] flex-1 outline-none"
                                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                         )}
-                                        <button type="button" onClick={() => removeAttribute(index, ai)} className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "#ef4444" }}>
+                                        <button type="button" onClick={() => removeAttribute(index, ai)} className="p-2 rounded-lg hover:bg-red-500/20 transition" style={{ color: "var(--danger)" }}>
                                           <Trash2 className="w-4 h-4" />
                                         </button>
                                       </div>
@@ -2107,7 +2405,7 @@ export default function ProductDetailPage() {
                   {(editingVariantForTags.tags || []).length > 0 ? (
                     (editingVariantForTags.tags || []).map((tag, idx) => (
                       <span key={`${tag}-${idx}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
-                        style={{ backgroundColor: "rgba(16,185,129,0.1)", color: "#10b981", border: "1px solid rgba(16,185,129,0.2)" }}>
+                        style={{ backgroundColor: "var(--success-soft)", color: "var(--success)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
                         <TagIcon className="w-3 h-3" />
                         {tag}
                         <button onClick={() => handleRemoveVariantTag(tag)} className="ml-1 rounded-full p-0.5 hover:bg-black/20">
@@ -2130,8 +2428,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{product.name}"?</h3>
@@ -2154,8 +2452,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Variant?</h3>
@@ -2178,8 +2476,8 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <AlertTriangle className="w-6 h-6" style={{ color: "#ef4444" }} />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete Tag?</h3>

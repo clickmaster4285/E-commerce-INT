@@ -1,10 +1,27 @@
 const mongoose = require("mongoose");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { CATEGORY_ATTRIBUTE_SEED } = require("../utils/categoryAttributeSeed");
+
+// createdby/updatedby creator User ya Employee dono ho sakta hai.
+// Model ref Employee hai, isliye populate fail hone par User se resolve karo.
+const resolveCreatorInfo = async (rawId) => {
+  if (!rawId) return null;
+  try {
+    const user = await User.findById(rawId).select("name email").lean();
+    if (user) return user;
+    const employee = await Employee.findById(rawId).select("name email").lean();
+    if (employee) return employee;
+    return null;
+  } catch (_) {
+    return null;
+  }
+};
 
 // ❌ REMOVED: getTenantId helper function
 
@@ -376,6 +393,18 @@ const getCategoryById = async (req, res) => {
 
     if (!category) {
       return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    // Creator Employee nahi balki User ho to populate null deta hai —
+    // actual user name properly resolve karo (Employee -> User fallback).
+    if (!category.createdby || !category.updatedby) {
+      const raw = await Category.findById(req.params.id).select("createdby updatedby").lean();
+      if (!category.createdby) {
+        category.createdby = await resolveCreatorInfo(raw?.createdby);
+      }
+      if (!category.updatedby) {
+        category.updatedby = await resolveCreatorInfo(raw?.updatedby);
+      }
     }
 
     return res.status(200).json({ success: true, data: category });

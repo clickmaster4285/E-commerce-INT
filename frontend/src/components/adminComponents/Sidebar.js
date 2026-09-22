@@ -26,6 +26,8 @@ import {
   Gift,
   Image as ImageIcon,
   Menu,
+  ChevronsLeft,
+  ChevronsRight,
   ShoppingCart,
   Truck,
   SlidersHorizontal, // Added for Attributes
@@ -148,6 +150,35 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // ============================================================
+  // DESKTOP COLLAPSE STATE (persisted in localStorage)
+  // ============================================================
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setIsCollapsed(window.localStorage.getItem("admin.sidebar.collapsed") === "1");
+    } catch {
+      /* storage unavailable — default expanded */
+    }
+  }, []);
+
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("admin.sidebar.collapsed", next ? "1" : "0");
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
+
+  // Icon-only mode applies to desktop only — the mobile drawer always stays expanded
+  const iconOnly = isCollapsed && !isMobileOpen;
 
   // ============================================================
   // PERMISSION STATE
@@ -471,14 +502,13 @@ export default function Sidebar({ onNavigate, userData }) {
       <aside
         className={`
           fixed inset-y-0 left-0 z-50
-          flex h-screen w-[200px] flex-col
-          overflow-hidden
+          flex h-screen w-[280px] flex-col
           border-r border-[var(--border-sidebar)]
           bg-[var(--bg-sidebar)]
           text-[var(--text-sidebar)]
-          shadow-xl
-          transition-transform duration-300 ease-in-out
+          transition-[width,transform] duration-300 ease-in-out
           md:relative md:translate-x-0
+          ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
@@ -486,28 +516,31 @@ export default function Sidebar({ onNavigate, userData }) {
             HEADER
         ================================================== */}
         <div
-          className="
-            flex h-16 shrink-0
-            items-center justify-between
-            gap-2
-            border-b border-[var(--border-sidebar)]
+          className={`
+            flex h-16 shrink-0 items-center
+            gap-2 border-b border-[var(--border-sidebar)]
             px-3
-          "
+            ${iconOnly ? "flex-col justify-center gap-0.5" : "justify-between"}
+          `}
         >
           <Link
             href="/admin/dashboard"
             onClick={handleCloseMobile}
             className="flex min-w-0 items-center gap-2"
+            title={iconOnly ? displayName : undefined}
+            aria-label={iconOnly ? displayName : undefined}
           >
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
               style={{ backgroundColor: displayColor }}
             >
               <span className="text-sm font-bold text-white">{firstLetter}</span>
             </div>
-            <span className="truncate text-sm font-semibold tracking-tight text-[var(--text-primary)]">
-              {displayName}
-            </span>
+            {!iconOnly && (
+              <span className="truncate text-sm font-semibold tracking-tight text-[var(--text-sidebar)]">
+                {displayName}
+              </span>
+            )}
           </Link>
 
           {/* MOBILE CLOSE BUTTON */}
@@ -517,31 +550,61 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label="Close sidebar"
             className="
               shrink-0 rounded-md p-1
-              text-[var(--text-muted)]
+              text-[var(--text-sidebar-muted)]
               transition-colors
               hover:bg-[var(--bg-sidebar-hover)]
-              hover:text-[var(--text-primary)]
+              hover:text-[var(--text-sidebar)]
               md:hidden
             "
           >
             <X size={18} />
+          </button>
+
+          {/* DESKTOP COLLAPSE TOGGLE */}
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            aria-label={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
+            title={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
+            className="
+              hidden h-7 w-7 shrink-0 items-center justify-center
+              rounded-lg
+              text-[var(--text-sidebar-muted)]
+              transition-colors duration-150
+              hover:bg-[var(--bg-sidebar-hover)]
+              hover:text-[var(--text-sidebar)]
+              md:inline-flex
+            "
+          >
+            {iconOnly ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
           </button>
         </div>
 
         {/* ==================================================
             NAVIGATION
         ================================================== */}
-        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2">
+        <nav
+          aria-label="Main navigation"
+          className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
+        >
           {sidebarSections.map((section) => {
             const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
             if (sectionItems.length === 0) return null;
             return (
-              <div key={section.title} className="mb-0.5">
-                <div className="px-2.5 pt-1.5 pb-0.5">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    {section.title}
-                  </span>
-                </div>
+              <div key={section.title} className="mb-1.5">
+                {iconOnly ? (
+                  <div
+                    aria-hidden="true"
+                    className="mx-auto my-2 h-px w-6 rounded-full"
+                    style={{ backgroundColor: "rgba(255,255,255,0.12)" }}
+                  />
+                ) : (
+                  <div className="px-2.5 pt-1.5 pb-1">
+                    <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                      {section.title}
+                    </span>
+                  </div>
+                )}
                 <div className="space-y-0.5">
                   {sectionItems.map((item) => {
                     const Icon = item.icon;
@@ -555,25 +618,37 @@ export default function Sidebar({ onNavigate, userData }) {
                         href={item.path}
                         onClick={handleCloseMobile}
                         aria-current={active ? "page" : undefined}
+                        title={iconOnly ? item.name : undefined}
+                        aria-label={iconOnly ? item.name : undefined}
                         className={`
-                          flex h-8
-                          items-center gap-2
-                          rounded-md
-                          px-2.5
+                          group relative flex h-9
+                          items-center gap-2.5
+                          rounded-lg
                           text-xs font-medium
-                          transition-colors
+                          transition-colors duration-150
+                          ${iconOnly ? "justify-center px-0" : "px-2.5"}
                           ${
                             active
                               ? "bg-[var(--bg-sidebar-active)] text-white"
-                              : "text-[var(--text-secondary)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-primary)]"
+                              : "text-[var(--text-sidebar-muted)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)]"
                           }
                         `}
                       >
+                        {active && !iconOnly && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute -left-2 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-white/90"
+                          />
+                        )}
                         <Icon
                           size={16}
-                          className={`shrink-0 ${active ? "text-white" : "text-[var(--text-muted)]"}`}
+                          className={`shrink-0 transition-colors ${
+                            active
+                              ? "text-white"
+                              : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
+                          }`}
                         />
-                        <span className="truncate">{item.name}</span>
+                        {!iconOnly && <span className="truncate">{item.name}</span>}
                       </Link>
                     );
                   })}
@@ -586,11 +661,17 @@ export default function Sidebar({ onNavigate, userData }) {
         {/* ==================================================
             FOOTER
         ================================================== */}
-        <div className="shrink-0 border-t border-[var(--border-sidebar)] px-3 py-2">
-          <p className="text-center text-[10px] text-[var(--text-muted)]">
-            Powered by{" "}
-            <span className="font-medium text-[var(--text-secondary)]">ClickMaster</span> v1.0
-          </p>
+        <div className="shrink-0 border-t border-[var(--border-sidebar)] px-3 py-2.5">
+          {iconOnly ? (
+            <p className="text-center text-[9px] font-semibold text-[var(--text-sidebar-muted)]">
+              v1.0
+            </p>
+          ) : (
+            <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
+              Powered by{" "}
+              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> v1.0
+            </p>
+          )}
         </div>
       </aside>
     </>

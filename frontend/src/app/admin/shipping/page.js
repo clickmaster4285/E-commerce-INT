@@ -551,7 +551,7 @@ export default function ShippingManagementPage() {
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                   <TruckIcon className="w-5 h-5" />
                 </div>
                 <div>
@@ -585,7 +585,7 @@ export default function ShippingManagementPage() {
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#a855f7" }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple)" }}>
                   <ZapIcon className="w-5 h-5" />
                 </div>
                 <div>
@@ -633,11 +633,11 @@ export default function ShippingManagementPage() {
               <tbody>
                 {/* Standard Row */}
                 <tr className="transition" style={{ borderBottom: "1px solid var(--border-color)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                         <TruckIcon className="w-4 h-4" />
                       </div>
                       <span className="font-medium text-[13px]">Standard Delivery</span>
@@ -662,11 +662,11 @@ export default function ShippingManagementPage() {
 
                 {/* Express Row */}
                 <tr className="transition"
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#a855f7" }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple)" }}>
                         <ZapIcon className="w-4 h-4" />
                       </div>
                       <span className="font-medium text-[13px]">Express Delivery</span>
@@ -692,11 +692,11 @@ export default function ShippingManagementPage() {
                 {/* ✅ Custom Shipping Methods — Express ke neeche, usi table mein */}
                 {methods.map((m) => (
                   <tr key={m._id} className="transition"
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10b981" }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>
                           <BoxIcon className="w-4 h-4" />
                         </div>
                         <span className="font-medium text-[13px]" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
@@ -716,7 +716,7 @@ export default function ShippingManagementPage() {
                           disabled={methodToggleMutation.isPending}
                           title={m.is_active ? "Deactivate" : "Activate"}
                           className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
-                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "#10b981" : "var(--text-muted)" }}
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "var(--success)" : "var(--text-muted)" }}
                         >
                           {m.is_active ? "ON" : "OFF"}
                         </button>
@@ -731,7 +731,7 @@ export default function ShippingManagementPage() {
                           onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
                           disabled={methodDeleteMutation.isPending}
                           className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
-                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "#ef4444" }}
+                          style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                         >
                           <TrashIcon className="w-4 h-4" />
                         </button>
@@ -749,7 +749,7 @@ export default function ShippingManagementPage() {
           {/* Standard Mobile Card */}
           <div className="rounded-lg p-3 space-y-2.5 transition" style={cardStyle}>
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.15)", color: "#3b82f6" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                 <TruckIcon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -774,7 +774,7 @@ export default function ShippingManagementPage() {
           {/* Express Mobile Card */}
           <div className="rounded-lg p-3 space-y-2.5 transition" style={cardStyle}>
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#a855f7" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple)" }}>
                 <ZapIcon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -800,7 +800,7 @@ export default function ShippingManagementPage() {
           {methods.map((m) => (
             <div key={m._id} className="rounded-lg p-3 space-y-2.5 transition" style={cardStyle}>
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10b981" }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>
                   <BoxIcon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -819,7 +819,7 @@ export default function ShippingManagementPage() {
                     disabled={methodToggleMutation.isPending}
                     title={m.is_active ? "Deactivate" : "Activate"}
                     className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
-                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "#10b981" : "var(--text-muted)" }}
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "var(--success)" : "var(--text-muted)" }}
                   >
                     {m.is_active ? "ON" : "OFF"}
                   </button>
@@ -834,7 +834,7 @@ export default function ShippingManagementPage() {
                     onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
                     disabled={methodDeleteMutation.isPending}
                     className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
-                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "#ef4444" }}
+                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                   >
                     <TrashIcon className="w-4 h-4" />
                   </button>

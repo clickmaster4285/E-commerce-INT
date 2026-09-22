@@ -825,17 +825,17 @@ export default function AttributesPage() {
               }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "#34d399" }} /> View Options
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Options
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); openEditModal(attr); }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
@@ -848,8 +848,8 @@ export default function AttributesPage() {
                 handleToggleAttributeActive(attr);
               }}
               className={menuItemClass}
-              style={{ color: isActive ? "#f87171" : "#34d399" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+              style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Disable" : "Enable"}
@@ -859,8 +859,8 @@ export default function AttributesPage() {
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); setDeleteTarget(attr); }}
               className={menuItemClass}
-              style={{ color: "#f87171" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.08)")}
+              style={{ color: "var(--danger-text)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               <TrashIcon className="w-4 h-4 shrink-0" /> Delete
@@ -968,11 +968,11 @@ export default function AttributesPage() {
                     return (
                       <tr key={attr._id} className="transition"
                         style={{                         borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa" }}>
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)" }}>
                               <SlidersIcon className="w-4 h-4" />
                             </div>
                             <div className="flex flex-col">
@@ -984,9 +984,9 @@ export default function AttributesPage() {
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={attr.data_type === 'multi_select' || attr.data_type === 'select'
-                              ? { backgroundColor: "rgba(139,92,246,0.1)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)" }
+                              ? { backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid color-mix(in srgb, var(--purple) 28%, transparent)" }
                               : attr.data_type === 'text'
-                              ? { backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.2)" }
+                              ? { backgroundColor: "var(--info-soft)", color: "var(--info-text)", border: "1px solid color-mix(in srgb, var(--info) 28%, transparent)" }
                               : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
                             {getDataTypeLabel(attr.data_type)}
                           </span>
@@ -1001,7 +1001,7 @@ export default function AttributesPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                            style={isActive ? { backgroundColor: "rgba(16, 185, 129, 0.1)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.2)" } : { backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+                            style={isActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                             {isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
@@ -1095,8 +1095,8 @@ export default function AttributesPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                <TrashIcon className="w-5 h-5" style={{ color: "#f87171" }} />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <TrashIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete &quot;{deleteTarget.name}&quot;?</h3>
@@ -1111,7 +1111,7 @@ export default function AttributesPage() {
               </button>
               <button onClick={handleDeleteAttribute} disabled={deleteAttributeMutation.isPending}
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
-                style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
               </button>
             </div>

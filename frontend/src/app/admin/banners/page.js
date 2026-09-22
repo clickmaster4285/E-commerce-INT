@@ -136,11 +136,11 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "nu
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    active: { backgroundColor: "rgba(16,185,129,0.1)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" },
-    inactive: { backgroundColor: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" },
-    scheduled: { backgroundColor: "rgba(59,130,246,0.1)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)" },
-    expired: { backgroundColor: "rgba(107,114,128,0.1)", color: "#9ca3af", border: "1px solid rgba(107,114,128,0.3)" },
-    draft: { backgroundColor: "rgba(245,158,11,0.1)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.3)" },
+    active: { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" },
+    inactive: { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" },
+    scheduled: { backgroundColor: "var(--info-soft)", color: "var(--info-text)", border: "1px solid color-mix(in srgb, var(--info) 28%, transparent)" },
+    expired: { backgroundColor: "rgba(107,114,128,0.1)", color: "var(--text-muted)", border: "1px solid rgba(107,114,128,0.3)" },
+    draft: { backgroundColor: "var(--warning-soft)", color: "var(--warning-text)", border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)" },
   };
   const s = styles[status] || styles.draft;
   return (
@@ -815,6 +815,20 @@ export default function BannersPage() {
   };
 
   const handleOpenAdd = () => { resetForm(); setShowModal(true); };
+
+  // ✅ Deep-link support: /admin/banners?edit=<id> opens the existing edit modal
+  // (navigated from the Banner Details page "Edit" action)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const editId = new URLSearchParams(window.location.search).get("edit");
+    if (!editId || !Array.isArray(banners) || banners.length === 0) return;
+    const target = banners.find((b) => b?._id === editId);
+    if (!target) return;
+    handleEdit(target);
+    window.history.replaceState({}, "", "/admin/banners");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [banners]);
+
   const handleToggleStatus = (banner) => {
     const id = banner?._id;
     const isActive = banner?.status === "active" || banner?.status === "scheduled";
@@ -987,10 +1001,10 @@ export default function BannersPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: "Total Banners", value: stats.total, color: "var(--text-primary)" },
-            { label: "Active", value: stats.active, color: "#34d399" },
-            { label: "Scheduled", value: stats.scheduled, color: "#60a5fa" },
-            { label: "Expired", value: stats.expired, color: "#9ca3af" },
-            { label: "Draft", value: stats.draft, color: "#fbbf24" },
+            { label: "Active", value: stats.active, color: "var(--success-text)" },
+            { label: "Scheduled", value: stats.scheduled, color: "var(--info-text)" },
+            { label: "Expired", value: stats.expired, color: "var(--text-muted)" },
+            { label: "Draft", value: stats.draft, color: "var(--warning-text)" },
           ].map((stat, i) => (
             <div key={i} className="rounded-lg p-4" style={cardStyle}>
               <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{stat.label}</p>
@@ -1038,11 +1052,11 @@ export default function BannersPage() {
 
         {/* ===== Bulk Selection Bar ===== */}
         {selectedIds.length > 0 && (
-          <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.35)" }}>
-            <p className="text-sm font-semibold" style={{ color: "#34d399" }}>{selectedIds.length} selected</p>
+          <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+              <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 <TrashIcon className="w-3.5 h-3.5" /> Delete Selected
               </button>
             </div>
@@ -1084,7 +1098,7 @@ export default function BannersPage() {
                     const isSelected = selectedIds.includes(banner._id);
                     return (
                       <tr key={banner._id} onClick={() => router.push(`${pathname}/${banner._id}`)} className="transition cursor-pointer" style={{ borderBottom: index < paginatedBanners.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-tertiary)")}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}
                       >
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
@@ -1200,10 +1214,10 @@ export default function BannersPage() {
                             else setPositionDuplicate("");
                           }}
                           placeholder="e.g., 1"
-                          style={positionDuplicate ? { borderColor: "#ef4444" } : {}}
+                          style={positionDuplicate ? { borderColor: "var(--danger)" } : {}}
                         />
                         {positionDuplicate && (
-                          <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "#ef4444" }}>
+                          <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: "var(--danger)" }}>
                             <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                             {positionDuplicate}
                           </p>
@@ -1334,8 +1348,8 @@ export default function BannersPage() {
             <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
             <div className="w-full max-w-sm rounded-xl p-5 shadow-2xl border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)", animation: "modalScaleIn 0.2s ease-out" }}>
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}>
-                  <svg className="w-5 h-5" style={{ color: "var(--danger, #ef4444)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                  <svg className="w-5 h-5" style={{ color: "var(--danger, var(--danger))" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{deleteTarget.banners.length === 1 ? `Delete "${deleteTarget.banners[0].title}"?` : `Delete ${deleteTarget.banners.length} banners?`}</h3>
@@ -1344,7 +1358,7 @@ export default function BannersPage() {
               </div>
               <div className="flex gap-2 mt-5">
                 <button onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
-                <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger, #ef4444)" }}>
+                <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                   {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
                 </button>
               </div>
