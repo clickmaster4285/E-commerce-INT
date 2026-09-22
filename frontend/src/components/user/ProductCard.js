@@ -176,6 +176,7 @@ export default function ProductCard({
         savings: price > 0 ? oldPrice - price : 0,
         originalPrice: oldPrice,
         dealDiscountValue: Number(activeDeal.discountValue) || 0,
+        minQuantity: Number(activeDeal.minQuantity) || 1,
       };
       if (activeDeal.type === "buy_x_get_y") {
         dealInfo.buyQuantity = activeDeal.buyQuantity;

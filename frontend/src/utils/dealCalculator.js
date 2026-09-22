@@ -18,7 +18,45 @@ export function isDealActive(item) {
     if (buyQty <= 0) return false;
     return Number(item.qty) >= buyQty;
   }
-  return true;
+  // ✅ For all other deal types: check minQuantity if stored on cart line
+  const minQty = Number(item.dealMinQuantity) || 1;
+  return Number(item.qty) >= minQty;
+}
+
+/**
+ * ✅ Check if minQuantity requirement is met for a deal.
+ * Admin panel se set hota hai — deal tabhi apply hogi jab user
+ * minQuantity ya us se zyada quantity buy kare.
+ *
+ * For buy_x_get_y: max(minQuantity, buyQuantity) use hota hai
+ * because buyQuantity already defines the activation threshold.
+ */
+export function isMinQuantityMet(deal, qty) {
+  if (!deal) return false;
+  const quantity = Number(qty) || 0;
+  if (deal.type === "buy_x_get_y") {
+    const buyQty = Number(deal.buyQuantity) || 0;
+    const minQty = Number(deal.minQuantity) || 1;
+    const threshold = Math.max(minQty, buyQty);
+    return quantity >= threshold;
+  }
+  const minQty = Number(deal.minQuantity) || 1;
+  return quantity >= minQty;
+}
+
+/**
+ * ✅ Get the effective minimum quantity for a deal.
+ * For buy_x_get_y: returns max(minQuantity, buyQuantity)
+ * For others: returns minQuantity
+ */
+export function getEffectiveMinQuantity(deal) {
+  if (!deal) return 1;
+  const minQty = Number(deal.minQuantity) || 1;
+  if (deal.type === "buy_x_get_y") {
+    const buyQty = Number(deal.buyQuantity) || 0;
+    return Math.max(minQty, buyQty);
+  }
+  return minQty;
 }
 
 /**
@@ -179,6 +217,8 @@ export function maxPayableQty(stock, buyQty, getQty) {
 export function getDealDisplayInfo(deal) {
   if (!deal) return null;
 
+  const minQty = Number(deal.minQuantity) || 1;
+
   if (deal.type === "buy_x_get_y") {
     const buyQty = deal.buyQuantity || 2;
     const getQty = deal.getQuantity || 1;
@@ -187,21 +227,22 @@ export function getDealDisplayInfo(deal) {
       label: `Buy ${buyQty} Get ${getQty}`,
       buyQty,
       getQty,
+      minQuantity: Math.max(minQty, buyQty),
       color: "from-purple-500 to-pink-600",
     };
   }
 
   if (deal.type === "percentage") {
-    return { type: "percentage", label: `${deal.discountValue}% OFF`, color: "from-green-500 to-emerald-600" };
+    return { type: "percentage", label: `${deal.discountValue}% OFF`, minQuantity: minQty, color: "from-green-500 to-emerald-600" };
   }
 
   if (deal.type === "fixed_amount") {
-    return { type: "fixed_amount", label: `Rs. ${deal.discountValue} OFF`, color: "from-blue-500 to-cyan-600" };
+    return { type: "fixed_amount", label: `Rs. ${deal.discountValue} OFF`, minQuantity: minQty, color: "from-blue-500 to-cyan-600" };
   }
 
   if (deal.type === "free_shipping") {
-    return { type: "free_shipping", label: "Free Shipping", color: "from-orange-500 to-red-600" };
+    return { type: "free_shipping", label: "Free Shipping", minQuantity: minQty, color: "from-orange-500 to-red-600" };
   }
 
-  return { type: deal.type, label: deal.name || "Deal", color: "from-orange-500 to-red-600" };
+  return { type: deal.type, label: deal.name || "Deal", minQuantity: minQty, color: "from-orange-500 to-red-600" };
 }

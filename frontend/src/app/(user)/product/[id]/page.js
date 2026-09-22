@@ -502,6 +502,7 @@ function ProductDetailContent({ params }) {
       dealBadge: getDealBadgeText(matchedDeal),
       savings: Math.max(0, dealOriginalPrice - dealPrice), originalPrice: dealOriginalPrice,
       dealDiscountValue: Number(matchedDeal.discountValue) || 0,
+      minQuantity: Number(matchedDeal.minQuantity) || 1,
     };
     if (matchedDeal.type === "buy_x_get_y") { info.buyQuantity = matchedDeal.buyQuantity; info.getQuantity = matchedDeal.getQuantity; }
     return info;
