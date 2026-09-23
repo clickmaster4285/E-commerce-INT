@@ -136,7 +136,9 @@ const StatusBadge = ({ status }) => {
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -146,19 +148,31 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    const next = !isOpen;
+    if (next && buttonRef.current) {
+      // Viewport-aware: open upward when there is not enough space below the trigger
+      const rect = buttonRef.current.getBoundingClientRect();
+      const MENU_HEIGHT = 200; // max-h-48 (192px) + margin
+      setDropUp(window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT);
+    }
+    setIsOpen(next);
+  };
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}
+      <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
         className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="truncate">{displayValue}</span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className="absolute z-[100] mt-1 w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100" 
+        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
@@ -1186,85 +1200,54 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   )}
 
                   {/* ========================================== */}
-                  {/* MIN QUANTITY — OPTIONAL TOGGLE + STEPPER   */}
+                  {/* MIN QUANTITY WITH CHECKBOX LOGIC           */}
                   {/* ========================================== */}
                   <div className="md:col-span-2">
-                    <div className="flex items-center justify-between gap-3 mb-1.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <label className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-                          Minimum Quantity
-                        </label>
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
-                          Optional
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={formData.has_min_quantity}
-                        title={formData.has_min_quantity ? "Enabled — click to disable" : "Disabled — click to enable"}
+                    <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
+                      <span>Min Quantity</span>
+                      <span
+                        className="flex items-center gap-2 cursor-pointer select-none group"
                         onClick={() => {
                           const newState = !formData.has_min_quantity;
-                          setFormData((prev) => ({
+                          setFormData(prev => ({
                             ...prev,
                             has_min_quantity: newState,
-                            min_quantity: newState && !prev.min_quantity ? "2" : prev.min_quantity,
+                            min_quantity: newState ? prev.min_quantity : ""
                           }));
                         }}
-                        className="relative w-9 h-5 rounded-full transition-colors shrink-0"
-                        style={{ backgroundColor: formData.has_min_quantity ? "var(--accent)" : "var(--border-color)" }}
                       >
-                        <span
-                          className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-                          style={{ transform: formData.has_min_quantity ? "translateX(16px)" : "translateX(0)" }}
-                        />
-                      </button>
-                    </div>
+                        <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">
+                          Enable Limit
+                        </span>
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
+                          }`}
+                        >
+                          {formData.has_min_quantity && <CheckIcon className="w-3 h-3 text-white" />}
+                        </div>
+                      </span>
+                    </label>
 
-                    <div
-                      className="flex items-stretch rounded-md overflow-hidden transition-opacity"
-                      style={{
-                        border: "1px solid var(--border-color)",
-                        backgroundColor: "var(--bg-tertiary)",
-                        opacity: formData.has_min_quantity ? 1 : 0.45,
-                        pointerEvents: formData.has_min_quantity ? "auto" : "none",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, min_quantity: String(Math.max(1, (Number(prev.min_quantity) || 1) - 1)) }))}
-                        className="w-9 flex items-center justify-center shrink-0 transition hover:opacity-70 disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{ borderRight: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
-                        disabled={(Number(formData.min_quantity) || 1) <= 1}
-                        title="Decrease"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-                      </button>
-                      <input
+                    <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
+                      <TextInput
                         type="number"
-                        min="1"
-                        value={formData.min_quantity || ""}
-                        onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
-                        placeholder="2"
-                        className="flex-1 h-9 text-center text-sm font-semibold outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        style={{ color: "var(--text-primary)" }}
+                        value={formData.min_quantity}
+                        onChange={(v) => setFormData({ ...formData, min_quantity: v })}
+                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"}
+                        disabled={!formData.has_min_quantity}
+                        style={{
+                          ...inputStyle,
+                          backgroundColor: !formData.has_min_quantity ? "var(--bg-secondary)" : "var(--bg-tertiary)",
+                          cursor: !formData.has_min_quantity ? "not-allowed" : "text"
+                        }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, min_quantity: String((Number(prev.min_quantity) || 0) + 1) }))}
-                        className="w-9 flex items-center justify-center shrink-0 transition hover:opacity-70"
-                        style={{ borderLeft: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
-                        title="Increase"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                      </button>
                     </div>
-
-                    <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-                      {formData.has_min_quantity
-                        ? "Deal applies only when the customer buys at least this many items"
-                        : "Deal applies regardless of item quantity"}
-                    </p>
+                    {!formData.has_min_quantity && (
+                      <p className="text-[10px] mt-1.5 italic" style={{ color: "var(--text-muted)" }}>
+                        Deal applies regardless of quantity
+                      </p>
+                    )}
                   </div>
                   {/* ========================================== */}
 

@@ -123,7 +123,9 @@ const StatusBadge = ({ status }) => {
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -133,19 +135,31 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    const next = !isOpen;
+    if (next && buttonRef.current) {
+      // Viewport-aware: open upward when there is not enough space below the trigger
+      const rect = buttonRef.current.getBoundingClientRect();
+      const MENU_HEIGHT = 200; // max-h-48 (192px) + margin
+      setDropUp(window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT);
+    }
+    setIsOpen(next);
+  };
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}
+      <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
         className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="truncate">{displayValue}</span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className="absolute z-[100] mt-1 w-full overflow-y-auto rounded-md border shadow-xl max-h-48"
+        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
