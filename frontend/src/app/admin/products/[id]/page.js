@@ -1121,7 +1121,7 @@ export default function ProductDetailPage() {
           <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
         </div>
         <p className="text-[13px] font-medium text-[var(--text-secondary)]">No variants yet</p>
-        <p className="text-[12px] text-[var(--text-muted)]">This product doesn't have any variants yet.</p>
+        <p className="text-[12px] text-[var(--text-muted)]">This product doesn&apos;t have any variants yet.</p>
         <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
           <Plus className="w-4 h-4" /> Create First Variant
         </button>
@@ -2432,7 +2432,7 @@ export default function ProductDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{product.name}"?</h3>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{product.name}&quot;?</h3>
                 <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The product and all its variants will be permanently removed.</p>
               </div>
             </div>

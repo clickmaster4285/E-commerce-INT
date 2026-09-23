@@ -101,7 +101,7 @@ const getStoreData = async () => {
 // ADMIN LAYOUT
 // ==========================================
 export default function AdminLayout({ children }) {
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const router = useRouter();
@@ -281,7 +281,7 @@ export default function AdminLayout({ children }) {
   // THEME
   // ==========================================
   useEffect(() => {
-    const saved = Cookies.get('theme') || 'dark';
+    const saved = Cookies.get('theme') || 'light';
 
     document.documentElement.classList.toggle(
       'dark',

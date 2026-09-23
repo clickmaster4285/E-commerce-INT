@@ -118,7 +118,7 @@ const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fil
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
 const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
-const SortIndicator = ({ active, direction }) => (<svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>{active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}</svg>);
+const SortIndicator = ({ active, direction }) => (<svg className={`w-3 h-3 transition ${active ? "" : "opacity-40"}`} style={{ color: "var(--accent)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>{active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}</svg>);
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
 const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>);
 const UploadIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
@@ -157,7 +157,7 @@ const FormSection = ({ number, title, description, children }) => (
   <div className="rounded-lg border p-6 shadow-sm" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
     <div className="mb-5">
       <div className="flex items-center gap-3 mb-1">
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xs font-bold">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: "var(--accent)" }}>
           {number}
         </div>
         <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>{title}</h3>
@@ -187,7 +187,7 @@ const FormField = ({ label, required, helpText, children }) => (
 const Input = ({ ...props }) => (
   <input
     {...props}
-    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder:text-gray-400"
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-gray-400"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   />
 );
@@ -195,7 +195,7 @@ const Input = ({ ...props }) => (
 const Select = ({ children, ...props }) => (
   <select
     {...props}
-    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   >
     {children}
@@ -205,7 +205,7 @@ const Select = ({ children, ...props }) => (
 const Textarea = ({ ...props }) => (
   <textarea
     {...props}
-    className="w-full px-3 py-2.5 rounded-md text-sm border outline-none transition-all duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder:text-gray-400 resize-none"
+    className="w-full px-3 py-2.5 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-gray-400 resize-none"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   />
 );
@@ -285,16 +285,16 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => !currentPreview && inputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-lg p-4 transition-all duration-200 
-          ${currentPreview 
-            ? "border-emerald-500/50 bg-emerald-500/5 cursor-default" 
-            : isDragging 
-              ? "border-emerald-500 bg-emerald-500/10 scale-[1.01]" 
-              : "hover:border-emerald-400 hover:bg-black/5 cursor-pointer"
+        className={`relative border-2 border-dashed rounded-lg p-4 transition-all duration-200
+          ${currentPreview
+            ? "cursor-default"
+            : isDragging
+              ? "scale-[1.01]"
+              : "hover:opacity-90 cursor-pointer"
           }`}
-        style={{ 
-          borderColor: currentPreview ? "" : isDragging ? "" : "var(--border-color)", 
-          backgroundColor: currentPreview ? "" : isDragging ? "" : "var(--bg-tertiary)" 
+        style={{
+          borderColor: currentPreview || isDragging ? "var(--accent)" : "var(--border-color)",
+          backgroundColor: currentPreview || isDragging ? "var(--accent-soft)" : "var(--bg-tertiary)"
         }}
       >
         {currentPreview ? (
@@ -311,17 +311,14 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div 
-              className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${
-                isDragging ? "bg-emerald-500/20 text-emerald-400" : "bg-transparent"
-              }`}
-              style={{ backgroundColor: isDragging ? "" : "var(--bg-secondary)" }}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-colors ${isDragging ? "animate-none" : ""}`}
+              style={{ backgroundColor: isDragging ? "var(--accent-soft)" : "var(--bg-secondary)", color: isDragging ? "var(--accent)" : "var(--text-muted)" }}
             >
-              <UploadIcon className={`w-6 h-6 ${isDragging ? "animate-bounce" : ""}`} style={{ color: isDragging ? "" : "var(--text-muted)" }} />
+              <UploadIcon className={`w-6 h-6 ${isDragging ? "animate-bounce" : ""}`} />
             </div>
-            
+
             {isDragging ? (
-              <p className="text-sm font-bold text-emerald-400">Drop image here</p>
+              <p className="text-sm font-bold" style={{ color: "var(--accent)" }}>Drop image here</p>
             ) : (
               <>
                 <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
@@ -359,7 +356,8 @@ const Checkbox = ({ checked, onChange, label }) => (
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
+        className="w-4 h-4 cursor-pointer"
+        style={{ accentColor: "var(--accent)" }}
       />
     </div>
     <span className="text-sm transition" style={{ color: "var(--text-primary)" }}>{label}</span>
@@ -372,8 +370,8 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
-    style={{ color: danger || success ? undefined : "var(--text-primary)" }}
+    className="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
+    style={{ color: danger ? "var(--danger-text)" : success ? "var(--success-text)" : "var(--text-primary)" }}
   >
     {icon} {label}
   </button>
@@ -870,7 +868,7 @@ export default function BannersPage() {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent-soft)]" style={inputStyle}>
         {children}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
@@ -903,7 +901,7 @@ export default function BannersPage() {
           aria-label={`Actions for ${banner?.title || "banner"}`}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
           title="Actions"
         >
@@ -1026,7 +1024,7 @@ export default function BannersPage() {
               placeholder="Search banners..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]"
               style={inputStyle} 
             />
           </div>
@@ -1327,7 +1325,7 @@ export default function BannersPage() {
                   <button
                     type="submit"
                     disabled={bannerMutation.isPending || !!positionDuplicate}
-                    className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+                    className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                   >
                     {bannerMutation.isPending ? (
                       <span className="flex items-center justify-center gap-2">

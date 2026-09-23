@@ -262,7 +262,7 @@ export default function Dashboard() {
                         Revenue: {item.revenue}%
                       </p>
 
-                      <p className="text-[var(--danger)]">
+                      <p className="text-[var(--chart-danger)]">
                         Expenses: {item.expense}%
                       </p>
                     </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
                     <div
                       className={`w-2 origin-bottom rounded-t-sm bg-[var(--accent)] transition-all duration-300 ease-out sm:w-5 md:w-7 ${
                         hoveredBar === index
-                          ? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--accent)]'
+                          ? 'scale-y-110 brightness-110'
                           : 'group-hover:scale-y-105'
                       }`}
                       style={{
@@ -284,9 +284,9 @@ export default function Dashboard() {
 
                     {/* Expense Bar */}
                     <div
-                      className={`w-2 origin-bottom rounded-t-sm bg-[var(--danger)] transition-all duration-300 ease-out sm:w-5 md:w-7 ${
+                      className={`w-2 origin-bottom rounded-t-sm bg-[var(--chart-danger)] transition-all duration-300 ease-out sm:w-5 md:w-7 ${
                         hoveredBar === index
-                          ? 'scale-y-110 brightness-125 shadow-[0_0_18px_var(--danger)]'
+                          ? 'scale-y-110 brightness-110'
                           : 'group-hover:scale-y-105'
                       }`}
                       style={{
@@ -319,7 +319,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-[var(--danger)]" />
+              <span className="h-3 w-3 rounded-full bg-[var(--chart-danger)]" />
               <span className="text-xs text-[var(--text-muted)] sm:text-sm">
                 Expenses
               </span>
