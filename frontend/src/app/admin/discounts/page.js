@@ -8,6 +8,7 @@ import { discountApi } from "../../../apis/admin/discountApi";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
+import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
 
 /* ==================== ICONS ==================== */
@@ -240,11 +241,13 @@ const getInitials = (name) => {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 };
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 const getProductImage = (product) => {
   if (!product) return null;
-  const firstVariantImage = product?.variants?.[0]?.images?.[0]?.img_url;
-  if (firstVariantImage) return firstVariantImage;
-  return null;
+  const raw = product?.variants?.[0]?.images?.[0]?.img_url;
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("blob:") || raw.startsWith("data:")) return raw;
+  return raw.startsWith("/") ? `${API_ORIGIN}${raw}` : `${API_ORIGIN}/${raw}`;
 };
 
 const getProductPrice = (product) => {
@@ -265,30 +268,58 @@ const humanizeKey = (key) => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+// ✅ Flatten any attribute value shape (string / number / array / {value|label|name} / nested {Key: "val"})
+const attrValueText = (value) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(attrValueText).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    if ("value" in value) return attrValueText(value.value);
+    if ("label" in value) return attrValueText(value.label);
+    if ("name" in value) return attrValueText(value.name);
+    // Nested objects like { "Exterior Color": "BLACK" } — join their values
+    return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
+  }
+  return "";
+};
+
+// ✅ Build a clean attribute list from product.specifications + variant.attributes
+// Merges values by attribute name across all variants (de-duplicated, order preserved)
 const getProductAttributes = (product) => {
   if (!product) return [];
-  const list = [];
+  const byName = new Map();
+
+  // Product-level specifications
   if (product.specifications && typeof product.specifications === "object") {
     Object.entries(product.specifications).forEach(([key, value]) => {
-      if (value === null || value === undefined || value === "") return;
-      if (typeof value === "object") return;
-      list.push({ name: humanizeKey(key), value: String(value) });
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
     });
   }
-  const seen = new Set();
+
+  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
-    if (variant.attributes && typeof variant.attributes === "object") {
-      Object.entries(variant.attributes).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === "") return;
-        const k = `${key}::${value}`;
-        if (seen.has(k)) return;
-        seen.add(k);
-        if (typeof value === "object") return;
-        list.push({ name: humanizeKey(key), value: String(value) });
-      });
-    }
+    const attrs = variant?.attributes;
+    if (!attrs) return;
+    const entries = Array.isArray(attrs)
+      ? attrs.map((a) => [a?.name || a?.key || a?.attribute, a?.value ?? a?.values])
+      : Object.entries(attrs);
+    entries.forEach(([key, value]) => {
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
+    });
   });
-  return list;
+
+  return [...byName.entries()]
+    .filter(([, values]) => values.size > 0)
+    .map(([name, values]) => ({ name, value: [...values].join(", ") }));
 };
 
 /* ==================== DROPDOWN MENU ITEM ==================== */
@@ -955,7 +986,7 @@ const TargetIconFor = (formType) => {
   return TagIcon;
 };
 
-function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+export function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
@@ -1345,7 +1376,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
                       onChange={(val) => setFormData({ ...formData, status: val })}
                       options={[
                         { value: "active", label: "Active" },
-                        { value: "inactive", label: "Inactive" },
+                        { value: "disabled", label: "Inactive" },
                       ]}
                       placeholder="Select Status"
                     />
@@ -1398,7 +1429,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
 }
 
 /* ==================== SELECTION MODAL ==================== */
-function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 
@@ -1707,9 +1738,26 @@ function ProductDetailsModal({ product, onClose }) {
   const name = getName(product, "product");
   const price = getProductPrice(product);
   const image = getProductImage(product);
-  const attributes = getProductAttributes(product);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
+  // Category-assigned attributes (Attribute manager) — shown even when no variant value exists
+  const categoryId = product?.category_id?._id || product?.category_id;
+  const { data: categoryAttributes = [] } = useQuery({
+    queryKey: ["category-attributes", categoryId],
+    queryFn: () => attributeApi.getByCategory(categoryId),
+    enabled: !!categoryId,
+    retry: false,
+  });
+
+  const attributes = useMemo(() => {
+    const base = getProductAttributes(product);
+    const have = new Set(base.map((a) => String(a.name).toLowerCase()));
+    const assigned = (categoryAttributes || [])
+      .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
+      .map((a) => ({ name: a.name, value: "Not set" }));
+    return [...base, ...assigned];
+  }, [product, categoryAttributes]);
 
   return (
     <div

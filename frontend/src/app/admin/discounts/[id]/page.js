@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,9 +8,13 @@ import {
   ArrowLeft, Tag, Activity, Clock, User, Percent, Layers, Target,
   Edit3, Trash2, Plus, Pencil, AlertTriangle, DollarSign, Calendar,
   TrendingUp, Hash, Box, CheckCircle2, ShoppingCart, Package, Globe,
-  Copy, X
+  Copy
 } from "lucide-react";
 import { discountApi } from "../../../../apis/admin/discountApi";
+import { productApi } from "../../../../apis/admin/productApi";
+import { categoryApi } from "../../../../apis/admin/categoryApi";
+import { brandApi } from "../../../../apis/admin/brandApi";
+import { DiscountFormModal, SelectionModal } from "../../discounts/page";
 import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
 
 /* =========================================================
@@ -94,6 +98,22 @@ const dateToISO = (value) => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+const normalizeArrayResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.discounts)) return response.discounts;
+  if (Array.isArray(response?.products)) return response.products;
+  if (Array.isArray(response?.categories)) return response.categories;
+  if (Array.isArray(response?.brands)) return response.brands;
+  return [];
+};
+
+const getId = (item) => {
+  if (!item) return "";
+  if (typeof item === "object") return String(item._id || item.id || "");
+  return String(item);
+};
+
 /* =========================================================
    UI COMPONENTS
 ========================================================= */
@@ -174,13 +194,32 @@ export default function DiscountDetailPage() {
 
   const [showDelete, setShowDelete] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const [editForm, setEditForm] = useState(null);
+  const [activeFormType, setActiveFormType] = useState(null);
+  const [selector, setSelector] = useState({ open: false, type: null });
+  const [formData, setFormData] = useState({
+    name: "", code: "", description: "",
+    selected_ids: [],
+    value_type: "percentage", value: "",
+    min_order_amount: "",
+    has_min_quantity: false,
+    min_quantity: "",
+    usage_limit: "", usage_per_customer: "",
+    start_at: "", end_at: "", status: "active",
+  });
+  const [formErrors, setFormErrors] = useState({});
 
   const { data: discount, isLoading: loading } = useQuery({
     queryKey: ["discount", discountId],
     queryFn: () => discountApi.getById(discountId),
     enabled: !!discountId,
   });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
+  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
+
 
   const deleteMutation = useMutation({
     mutationFn: () => {
@@ -217,17 +256,42 @@ export default function DiscountDetailPage() {
       (discount?.updated_at ?? discount?.updatedAt) !== (discount?.created_at ?? discount?.createdAt))
   );
   
-  const editInputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+  const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-  // ✅ Edit modal — detail page par hi khulta hai (navigation nahi)
+  const resetForm = () => {
+    setFormData({
+      name: "", code: "", description: "",
+      selected_ids: [],
+      value_type: "percentage", value: "",
+      min_order_amount: "",
+      has_min_quantity: false,
+      min_quantity: "",
+      usage_limit: "", usage_per_customer: "",
+      start_at: "", end_at: "", status: "active",
+    });
+    setSelector({ open: false, type: null });
+    setActiveFormType(null);
+    setFormErrors({});
+  };
+
+  // ✅ Edit modal — bilkul Add Discount jaisa form (detail page par hi, navigation nahi)
   const openEdit = () => {
     const d = discount;
+    const rawTarget = d?.target_type || d?.applyTo || "all_products";
+    let type = "all";
+    if (rawTarget === "specific_products" || rawTarget === "product") type = "product";
+    else if (rawTarget === "specific_categories" || rawTarget === "category") type = "category";
+    else if (rawTarget === "specific_brands" || rawTarget === "brand") type = "brand";
+    let selected_ids = [];
+    if (type === "product") selected_ids = (d?.selectedProducts || d?.selected_product_ids || []).map(getId);
+    else if (type === "category") selected_ids = (d?.selectedCategories || d?.selected_category_ids || []).map(getId);
+    else if (type === "brand") selected_ids = (d?.selectedBrands || d?.selected_brand_ids || []).map(getId);
     const rawMinQty = d?.minQuantity;
     const hasMinQty = rawMinQty !== null && rawMinQty !== undefined && rawMinQty !== "";
-    setEditForm({
-      name: d?.name || "",
-      code: d?.code || "",
-      description: d?.description || "",
+    setFormData({
+      name: d?.name || "", code: d?.code || "", description: d?.description || "",
+      selected_ids,
       value_type: d?.type === "fixed" ? "fixed_amount" : (d?.type === "fixed_price" ? "fixed_price" : "percentage"),
       value: d?.value ?? "",
       min_order_amount: d?.minOrderValue ?? "",
@@ -239,58 +303,79 @@ export default function DiscountDetailPage() {
       end_at: toDateInput(d?.endDate),
       status: isActive ? "active" : "disabled",
     });
+    setActiveFormType(type);
     setShowEdit(true);
   };
 
-  const handleEditSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!editForm) return;
-    if (!String(editForm.name || "").trim()) return toast.error("Discount name is required");
-    const manualCode = String(editForm.code || "").trim();
-    if (!manualCode) return toast.error("Discount code is required");
-    if (editForm.value === "" || Number(editForm.value) < 0) return toast.error("Valid discount value is required");
-    if (editForm.value_type === "percentage" && Number(editForm.value) > 100) return toast.error("Percentage cannot exceed 100");
+    setFormErrors({});
+    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    const manualCode = String(formData.code || "").trim();
+    if (!manualCode) {
+      setFormErrors({ code: "Discount code is required." });
+      return;
+    }
+    if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
 
-    const startDate = editForm.start_at ? dateToISO(editForm.start_at) : new Date().toISOString();
-    const endDate = editForm.end_at ? dateToISO(editForm.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    let target_type = "all_products";
+    let applyTo = "all";
+    let payloadExtras = {};
+    if (activeFormType === "product") {
+      target_type = "specific_products"; applyTo = "specific_products";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    } else if (activeFormType === "category") {
+      target_type = "specific_categories"; applyTo = "specific_categories";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    } else if (activeFormType === "brand") {
+      target_type = "brand"; applyTo = "brand";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    }
+
+    const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
+    const fallbackEnd = new Date();
+    fallbackEnd.setDate(fallbackEnd.getDate() + 30);
+    const endDate = formData.end_at ? dateToISO(formData.end_at) : fallbackEnd.toISOString();
     if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
 
-    // Existing target preserve karo — selected arrays mat bhejo (backend untouched rakhta hai)
-    const applyTo = discount?.applyTo || "all";
-    let target_type = "all_products";
-    if (applyTo === "specific_products" || applyTo === "product") target_type = "specific_products";
-    else if (applyTo === "specific_categories" || applyTo === "category") target_type = "specific_categories";
-    else if (applyTo === "specific_brands" || applyTo === "brand") target_type = "brand";
+    const finalMinQuantity = formData.has_min_quantity && formData.min_quantity ? Number(formData.min_quantity) : null;
 
     const payload = {
-      name: String(editForm.name).trim(),
+      name: String(formData.name).trim(),
       code: manualCode.toUpperCase(),
-      description: String(editForm.description || "").trim(),
-      target_type,
-      value_type: editForm.value_type,
-      value: Number(editForm.value),
-      min_order_amount: editForm.min_order_amount !== "" ? Number(editForm.min_order_amount) : "",
-      min_quantity: editForm.has_min_quantity && editForm.min_quantity ? Number(editForm.min_quantity) : null,
-      usage_limit: editForm.usage_limit !== "" ? Number(editForm.usage_limit) : "",
-      start_at: startDate,
-      end_at: endDate,
-      status: editForm.status,
+      description: String(formData.description || "").trim() || undefined,
+      target_type, applyTo,
+      value_type: formData.value_type,
+      type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
+      value: Number(formData.value),
+      min_order_amount: formData.min_order_amount !== "" ? Number(formData.min_order_amount) : undefined,
+      min_quantity: finalMinQuantity,
+      usage_limit: formData.usage_limit !== "" ? Number(formData.usage_limit) : undefined,
+      usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
+      start_at: startDate, end_at: endDate,
+      status: formData.status,
+      isActive: formData.status === "active",
+      ...payloadExtras,
     };
-    if (editForm.usage_per_customer !== "") payload.usage_per_customer = Number(editForm.usage_per_customer);
-
-    editMutation.mutate(payload);
+    Object.keys(payload).forEach((key) => { if (payload[key] === undefined || payload[key] === null || payload[key] === "") delete payload[key]; });
+    saveMutation.mutate({ id: discountId, data: payload });
   };
 
-  const editMutation = useMutation({
-    mutationFn: (payload) => {
+  const saveMutation = useMutation({
+    mutationFn: ({ id, data }) => {
       markSelfAction("update");
-      return discountApi.update(discountId, payload);
+      return discountApi.update(id || discountId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discount"] });
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       toast.success("Discount updated successfully");
       setShowEdit(false);
+      resetForm();
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || error?.message || "Failed to update discount");
@@ -611,83 +696,39 @@ export default function DiscountDetailPage() {
           </InfoCard>
         </div>
 
-      {/* EDIT MODAL — detail page par hi khulta hai */}
-      {showEdit && editForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <form onSubmit={handleEditSubmit} className="w-full max-w-xl rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Edit Discount</h3>
-              <button type="button" onClick={() => setShowEdit(false)} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><X className="w-4 h-4" /></button>
-            </div>
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[65vh] overflow-y-auto">
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Name *</label>
-                <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} placeholder="Discount name" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Code *</label>
-                <input type="text" value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] font-mono outline-none uppercase" style={editInputStyle} placeholder="SAVE20" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Discount Type</label>
-                <select value={editForm.value_type} onChange={(e) => setEditForm({ ...editForm, value_type: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none cursor-pointer" style={editInputStyle}>
-                  <option value="percentage">Percentage</option>
-                  <option value="fixed_amount">Fixed Amount</option>
-                  <option value="fixed_price">Fixed Price</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Value *</label>
-                <input type="number" min="0" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} placeholder="0" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Status</label>
-                <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none cursor-pointer" style={editInputStyle}>
-                  <option value="active">Active</option>
-                  <option value="disabled">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Start Date</label>
-                <input type="datetime-local" value={editForm.start_at} onChange={(e) => setEditForm({ ...editForm, start_at: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>End Date</label>
-                <input type="datetime-local" value={editForm.end_at} onChange={(e) => setEditForm({ ...editForm, end_at: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Min Order Amount (Rs.)</label>
-                <input type="number" min="0" value={editForm.min_order_amount} onChange={(e) => setEditForm({ ...editForm, min_order_amount: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} placeholder="No minimum" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Min Quantity</label>
-                <input type="number" min="1" disabled={!editForm.has_min_quantity} value={editForm.min_quantity} onChange={(e) => setEditForm({ ...editForm, min_quantity: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none disabled:opacity-50" style={editInputStyle} placeholder="—" />
-                <label className="flex items-center gap-2 mt-2 text-[10px] cursor-pointer" style={{ color: "var(--text-muted)" }}>
-                  <input type="checkbox" checked={editForm.has_min_quantity} onChange={(e) => setEditForm({ ...editForm, has_min_quantity: e.target.checked })} className="accent-[var(--accent)]" />
-                  Limit minimum quantity
-                </label>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Usage Limit</label>
-                <input type="number" min="1" value={editForm.usage_limit} onChange={(e) => setEditForm({ ...editForm, usage_limit: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} placeholder="Unlimited" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Per User Limit</label>
-                <input type="number" min="1" value={editForm.usage_per_customer} onChange={(e) => setEditForm({ ...editForm, usage_per_customer: e.target.value })} className="w-full h-9 px-3 rounded-md text-[12px] outline-none" style={editInputStyle} placeholder="1" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-muted)" }}>Description</label>
-                <textarea rows="2" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} className="w-full px-3 py-2 rounded-md text-[12px] outline-none resize-none" style={editInputStyle} placeholder="Optional description" />
-              </div>
-            </div>
-            <div className="px-5 py-4 flex justify-end gap-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-              <button type="button" onClick={() => setShowEdit(false)} disabled={editMutation.isPending} className="h-9 px-4 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button type="submit" disabled={editMutation.isPending} className="h-9 px-4 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50 flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                {editMutation.isPending ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
-        </div>
+      {/* EDIT MODAL — bilkul Add Discount jaisa form */}
+      {showEdit && (
+        <DiscountFormModal
+          formType={activeFormType}
+          formData={formData}
+          setFormData={setFormData}
+          formErrors={formErrors}
+          setFormErrors={setFormErrors}
+          editingDiscount={discount}
+          saveMutation={saveMutation}
+          setShowModal={setShowEdit}
+          resetForm={resetForm}
+          setSelector={setSelector}
+          handleSubmit={handleSubmit}
+          inputStyle={inputStyle}
+          products={products}
+          categories={categories}
+          brands={brands}
+        />
+      )}
+      {selector.open && (
+        <SelectionModal
+          type={selector.type}
+          items={selector.type === "product" ? products : selector.type === "category" ? categories : brands}
+          selectedIds={formData.selected_ids}
+          onClose={() => setSelector({ open: false, type: null })}
+          onApply={(ids) => {
+            setFormData((prev) => ({ ...prev, selected_ids: ids }));
+            setSelector({ open: false, type: null });
+          }}
+          inputStyle={inputStyle}
+          cardStyle={cardStyle}
+        />
       )}
 
       {/* DELETE MODAL */}
