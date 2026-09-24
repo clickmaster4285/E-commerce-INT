@@ -1,11 +1,17 @@
 @import "tailwindcss";
 
+/* Theme follows app class (not OS preference) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================================
    ADMIN PANEL — PROFESSIONAL DESIGN SYSTEM
    Light theme = default · Dark theme = html.dark
    ============================================================ */
 
 :root {
+  /* ---- Chart series (theme-tuned) ---- */
+  --chart-danger: #ef4444;
+
   /* ---- Surfaces ---- */
   --bg-primary: #f3f5f9;
   --bg-secondary: #f8fafc;
@@ -13,6 +19,7 @@
   --bg-sidebar: #0b1220;
   --bg-sidebar-hover: #16223a;
   --bg-sidebar-active: #2563eb;
+  --sidebar-divider: rgba(255, 255, 255, 0.12);
   --bg-navbar: #ffffff;
   --bg-card: #ffffff;
   --bg-card-alt: #f8fafc;
@@ -149,9 +156,10 @@ html.dark {
   --bg-primary: #0b1220;
   --bg-secondary: #0e1626;
   --bg-tertiary: #1c2941;
-  --bg-sidebar: #080e1a;
+  --bg-sidebar: #0b1220;
   --bg-sidebar-hover: #16223a;
   --bg-sidebar-active: #2563eb;
+  --sidebar-divider: rgba(255, 255, 255, 0.10);
   --bg-navbar: #0e1626;
   --bg-card: #101b2e;
   --bg-card-alt: #16233b;
@@ -169,7 +177,7 @@ html.dark {
   --text-inverse: #ffffff;
 
   --border-color: #243350;
-  --border-sidebar: #16223a;
+  --border-sidebar: #1e2c47;
   --border-navbar: #1e2c47;
   --border-card: #243350;
 
@@ -201,6 +209,7 @@ html.dark {
   --teal: #2dd4bf;
   --orange: #fb923c;
   --rose: #fb7185;
+  --chart-danger: #f87171;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.35);
@@ -282,6 +291,17 @@ p {
   outline-offset: 2px;
 }
 
+/* Text inputs/selects/textarea pe browser focus outline OFF —
+   in pe already accent border + focus ring hai, warna double-border dikhta hai
+   (Tailwind v4 utilities @layer mein hoti hain, unlayered rule unhe beat karta hai).
+   Checkbox/radio pe outline jaari rakha hai (wahan ring nahi hai — keyboard a11y). */
+input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 /* Admin login fields: focus ring sirf outer card par show ho —
    inner input par koi browser/global outline nahi (double-border bug fix) */
 #admin-email:focus,
@@ -298,60 +318,8 @@ input[type="radio"] {
 }
 
 /* BASE_APPEND_MARKER */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  min-height: 100%;
-  background: var(--bg-primary);
-  transition: background-color 0.3s ease;
-}
-
-body {
-  min-height: 100%;
-  margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-img,
-svg {
-  display: block;
-  max-width: 100%;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p {
-  margin: 0;
-}
+/* NOTE: Base styles (html/body/a/button/headings) sirf upar ek hi baar define hain —
+   yahan pehle ek duplicate block tha jo CSS bloat kar raha tha, usay hata diya gaya hai. */
 
 /* ---- Scrollbars ---- */
 ::-webkit-scrollbar {
@@ -586,6 +554,11 @@ main {
   cursor: pointer;
 }
 
+/* Dark theme: chevron stroke lighter taake dark inputs par clearly dikhe */
+html.dark .select-field {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238fa3bf' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
 /* ============================================================
    COMPONENTS — CARDS & SECTION HEADERS
    ============================================================ */
@@ -604,7 +577,7 @@ main {
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
-  border-color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-card));
 }
 
 .section-header {
@@ -996,6 +969,40 @@ main {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   LIGHT MODE VISIBILITY SHIM
+   Admin pages dark-first utilities use karte hain (bg-white/5,
+   text-gray-400, text-red-400...) jo light theme mein washed-out
+   ya invisible hote hain. Yahan unhe light-readable values pe
+   map kiya gaya hai — dark theme bilkul untouched hai.
+   NOTE: theme system 'dark' class toggle karta hai, 'light' kabhi
+   add nahi hoti — is liye scope html:not(.dark) hai.
+   SIDEBAR dono themes mein dark navy hi rehta hai (no color swap).
+   ============================================================ */
+
+/* White tints (dark subtle surfaces) → slate tints for light */
+html:not(.dark) .bg-white\/5 { background-color: rgb(15 23 42 / 0.04) !important; }
+html:not(.dark) .hover\:bg-white\/5:hover { background-color: rgb(15 23 42 / 0.06) !important; }
+html:not(.dark) .bg-white\/10 { background-color: rgb(15 23 42 / 0.06) !important; }
+html:not(.dark) .hover\:bg-white\/10:hover { background-color: rgb(15 23 42 / 0.08) !important; }
+html:not(.dark) .hover\:bg-white\/20:hover { background-color: rgb(15 23 42 / 0.12) !important; }
+html:not(.dark) .bg-white\/\[0\.02\] { background-color: rgb(15 23 42 / 0.02) !important; }
+html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: rgb(15 23 42 / 0.03) !important; }
+html:not(.dark) .hover\:bg-white\/\[0\.12\]:hover { background-color: rgb(15 23 42 / 0.08) !important; }
+
+/* Low-contrast text → darker readable equivalents */
+html:not(.dark) .text-gray-400 { color: #64748b !important; }
+html:not(.dark) .text-red-400 { color: #dc2626 !important; }
+html:not(.dark) .text-red-500 { color: #dc2626 !important; }
+html:not(.dark) .text-emerald-400 { color: #059669 !important; }
+html:not(.dark) .text-emerald-500 { color: #047857 !important; }
+html:not(.dark) .text-blue-300 { color: #1d4ed8 !important; }
+html:not(.dark) .text-blue-400 { color: #1d4ed8 !important; }
+html:not(.dark) .text-blue-500 { color: #1d4ed8 !important; }
+
+/* Dark borders → light borders */
+html:not(.dark) .border-gray-600 { border-color: #cbd5e1 !important; }
 
 /* ============================================
    AUTOFILL NORMALIZATION (login fields)

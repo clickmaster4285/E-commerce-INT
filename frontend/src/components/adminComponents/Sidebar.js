@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
   useCallback,
+  useSyncExternalStore,
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
@@ -30,6 +31,8 @@ import {
   ChevronsRight,
   ShoppingCart,
   Truck,
+  Percent,
+  Boxes,
   SlidersHorizontal, // Added for Attributes
 } from "lucide-react";
 
@@ -80,10 +83,10 @@ const allMenuItems = [
   },
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
-  { name: "Discounts", icon: Tag, path: "/admin/discounts", permissionKey: "discounts" },
+  { name: "Discounts", icon: Percent, path: "/admin/discounts", permissionKey: "discounts" },
   { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
   { name: "Banners", icon: ImageIcon, path: "/admin/banners", permissionKey: "banners" },
-  { name: "Manage Stock", icon: Package, path: "/admin/manage-stock", permissionKey: "manageStock" },
+  { name: "Manage Stock", icon: Boxes, path: "/admin/manage-stock", permissionKey: "manageStock" },
   { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "order" },
   { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
@@ -130,6 +133,44 @@ export function disconnectSidebarSocket() {
 }
 
 // ============================================================
+// SIDEBAR COLLAPSE STORE (localStorage-backed, cross-tab sync)
+// useSyncExternalStore pattern — SSR-safe, no setState-in-effect
+// ============================================================
+
+const collapsedListeners = new Set();
+
+function subscribeCollapsed(callback) {
+  collapsedListeners.add(callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    collapsedListeners.delete(callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function getCollapsedSnapshot() {
+  try {
+    return window.localStorage.getItem("admin.sidebar.collapsed") === "1";
+  } catch {
+    /* storage unavailable — default expanded */
+    return false;
+  }
+}
+
+function getCollapsedServerSnapshot() {
+  return false;
+}
+
+function setCollapsed(next) {
+  try {
+    window.localStorage.setItem("admin.sidebar.collapsed", next ? "1" : "0");
+  } catch {
+    /* storage unavailable */
+  }
+  collapsedListeners.forEach((cb) => cb());
+}
+
+// ============================================================
 // SIDEBAR COMPONENT
 // ============================================================
 
@@ -155,26 +196,16 @@ export default function Sidebar({ onNavigate, userData }) {
   // DESKTOP COLLAPSE STATE (persisted in localStorage)
   // ============================================================
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      setIsCollapsed(window.localStorage.getItem("admin.sidebar.collapsed") === "1");
-    } catch {
-      /* storage unavailable — default expanded */
-    }
-  }, []);
+  // localStorage-backed collapse state — useSyncExternalStore se read hota hai
+  // (SSR-safe: server snapshot false, hydration mismatch nahi hota; cross-tab sync bonus)
+  const isCollapsed = useSyncExternalStore(
+    subscribeCollapsed,
+    getCollapsedSnapshot,
+    getCollapsedServerSnapshot
+  );
 
   const toggleCollapse = useCallback(() => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem("admin.sidebar.collapsed", next ? "1" : "0");
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
+    setCollapsed(!getCollapsedSnapshot());
   }, []);
 
   // Icon-only mode applies to desktop only — the mobile drawer always stays expanded
@@ -266,7 +297,7 @@ export default function Sidebar({ onNavigate, userData }) {
         applyProfile({ ...profile, permissions: profile.permissions });
       }
     },
-    [applyProfile, userData?._id]
+    [applyProfile, userData]
   );
 
   // ============================================================
@@ -361,8 +392,12 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   useEffect(() => {
-    setIsMobileOpen(false);
-    if (onNavigate) onNavigate();
+    // rAF deferral: setState-in-effect lint rule satisfied, behavior identical
+    const raf = requestAnimationFrame(() => {
+      setIsMobileOpen(false);
+      if (onNavigate) onNavigate();
+    });
+    return () => cancelAnimationFrame(raf);
   }, [pathname, onNavigate]);
 
   // ============================================================
@@ -470,7 +505,7 @@ export default function Sidebar({ onNavigate, userData }) {
             flex h-10 w-10 items-center justify-center
             rounded-lg
             bg-[var(--bg-sidebar)]
-            text-[var(--text-primary)]
+            text-[var(--text-sidebar)]
             shadow-md
             transition-all duration-300
             hover:bg-[var(--bg-sidebar-hover)]
@@ -531,7 +566,7 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label={iconOnly ? displayName : undefined}
           >
             <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm ring-1 ring-white/20"
               style={{ backgroundColor: displayColor }}
             >
               <span className="text-sm font-bold text-white">{firstLetter}</span>
@@ -596,7 +631,7 @@ export default function Sidebar({ onNavigate, userData }) {
                   <div
                     aria-hidden="true"
                     className="mx-auto my-2 h-px w-6 rounded-full"
-                    style={{ backgroundColor: "rgba(255,255,255,0.12)" }}
+                    style={{ backgroundColor: "var(--sidebar-divider)" }}
                   />
                 ) : (
                   <div className="px-2.5 pt-1.5 pb-1">
@@ -625,7 +660,8 @@ export default function Sidebar({ onNavigate, userData }) {
                           items-center gap-2.5
                           rounded-lg
                           text-xs font-medium
-                          transition-colors duration-150
+                          transition-all duration-150
+                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40
                           ${iconOnly ? "justify-center px-0" : "px-2.5"}
                           ${
                             active

@@ -70,11 +70,7 @@ const dealSchema = new mongoose.Schema(
       },
     },
 
-    minOrderValue: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+
 
  
 

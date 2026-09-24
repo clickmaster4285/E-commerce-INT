@@ -8,6 +8,7 @@ import { dealApi } from "../../../apis/admin/dealApi";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
+import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
 
 /* ==================== ICONS ==================== */
@@ -135,7 +136,9 @@ const StatusBadge = ({ status }) => {
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -145,19 +148,31 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    const next = !isOpen;
+    if (next && buttonRef.current) {
+      // Viewport-aware: open upward when there is not enough space below the trigger
+      const rect = buttonRef.current.getBoundingClientRect();
+      const MENU_HEIGHT = 200; // max-h-48 (192px) + margin
+      setDropUp(window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT);
+    }
+    setIsOpen(next);
+  };
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}
+      <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
         className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="truncate">{displayValue}</span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className="absolute z-[100] mt-1 w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100" 
+        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
@@ -410,7 +425,6 @@ export default function DealsPage() {
       brandIds: formData.target_type === "brand" ? cleanBrandIds : [],
       type: formData.value_type,
       discountValue: ["percentage", "fixed_amount"].includes(formData.value_type) ? dealValue : 0,
-      minOrderValue: formData.min_order_value ? Number(formData.min_order_value) : 0,
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
@@ -808,11 +822,13 @@ const getInitials = (name) => {
 };
 
 // ✅ Resolve an image URL from a product (uses variant images as per existing API)
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 const getProductImage = (product) => {
   if (!product) return null;
-  const firstVariantImage = product?.variants?.[0]?.images?.[0]?.img_url;
-  if (firstVariantImage) return firstVariantImage;
-  return null;
+  const raw = product?.variants?.[0]?.images?.[0]?.img_url;
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("blob:") || raw.startsWith("data:")) return raw;
+  return raw.startsWith("/") ? `${API_ORIGIN}${raw}` : `${API_ORIGIN}/${raw}`;
 };
 
 // ✅ Resolve the most accurate product price (direct price > first variant price)
@@ -823,36 +839,58 @@ const getProductPrice = (product) => {
   return directPrice > 0 ? directPrice : variantPrice;
 };
 
+// ✅ Flatten any attribute value shape (string / number / array / {value|label|name} / nested {Key: "val"})
+const attrValueText = (value) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(attrValueText).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    if ("value" in value) return attrValueText(value.value);
+    if ("label" in value) return attrValueText(value.label);
+    if ("name" in value) return attrValueText(value.name);
+    // Nested objects like { "Exterior Color": "BLACK" } — join their values
+    return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
+  }
+  return "";
+};
+
 // ✅ Build a clean attribute list from product.specifications + variant.attributes
+// Merges values by attribute name across all variants (de-duplicated, order preserved)
 const getProductAttributes = (product) => {
   if (!product) return [];
-  const list = [];
+  const byName = new Map();
 
   // Product-level specifications
   if (product.specifications && typeof product.specifications === "object") {
     Object.entries(product.specifications).forEach(([key, value]) => {
-      if (value === null || value === undefined || value === "") return;
-      if (typeof value === "object") return; // skip nested objects
-      list.push({ name: humanizeKey(key), value: String(value) });
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
     });
   }
 
-  // Variant attributes (merge across all variants without duplicates)
-  const seen = new Set();
+  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
-    if (variant.attributes && typeof variant.attributes === "object") {
-      Object.entries(variant.attributes).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === "") return;
-        const k = `${key}::${value}`;
-        if (seen.has(k)) return;
-        seen.add(k);
-        if (typeof value === "object") return;
-        list.push({ name: humanizeKey(key), value: String(value) });
-      });
-    }
+    const attrs = variant?.attributes;
+    if (!attrs) return;
+    const entries = Array.isArray(attrs)
+      ? attrs.map((a) => [a?.name || a?.key || a?.attribute, a?.value ?? a?.values])
+      : Object.entries(attrs);
+    entries.forEach(([key, value]) => {
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
+    });
   });
 
-  return list;
+  return [...byName.entries()]
+    .filter(([, values]) => values.size > 0)
+    .map(([name, values]) => ({ name, value: [...values].join(", ") }));
 };
 
 const humanizeKey = (key) => {
@@ -1115,25 +1153,15 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <>
-                      <FormField label="Discount Percentage (%)">
-                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
-                      </FormField>
-                      <FormField label="Min Order Value (Rs.)" hint="Optional">
-                        <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 1000" style={inputStyle} />
-                      </FormField>
-                    </>
+                    <FormField label="Discount Percentage (%)" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
-                    <>
-                      <FormField label="Discount Amount (Rs.)">
-                        <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
-                      </FormField>
-                      <FormField label="Min Order Value (Rs.)" hint="Optional">
-                        <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 1000" style={inputStyle} />
-                      </FormField>
-                    </>
+                    <FormField label="Discount Amount (Rs.)" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                    </FormField>
                   )}
 
                   {formData.value_type === "buy_x_get_y" && (
@@ -1164,8 +1192,10 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   )}
 
                   {formData.value_type === "free_shipping" && (
-                    <FormField label="Min Order Value for Free Shipping (Rs.)" fullWidth>
-                      <TextInput type="number" value={formData.min_order_value} onChange={(v) => setFormData({ ...formData, min_order_value: v })} placeholder="e.g., 2000" style={inputStyle} />
+                    <FormField label="Free Shipping" hint="Applies to all orders" fullWidth>
+                      <div className="h-[38px] rounded-md flex items-center px-3 text-[13px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--success)" }}>
+                        Free shipping on all orders
+                      </div>
                     </FormField>
                   )}
 
@@ -1175,21 +1205,21 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   <div className="md:col-span-2">
                     <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
                       <span>Min Quantity</span>
-                      <span 
-                        className="flex items-center gap-2 cursor-pointer select-none group" 
+                      <span
+                        className="flex items-center gap-2 cursor-pointer select-none group"
                         onClick={() => {
                           const newState = !formData.has_min_quantity;
-                          setFormData(prev => ({ 
-                            ...prev, 
+                          setFormData(prev => ({
+                            ...prev,
                             has_min_quantity: newState,
-                            min_quantity: newState ? prev.min_quantity : "" 
+                            min_quantity: newState ? prev.min_quantity : ""
                           }));
                         }}
                       >
                         <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">
                           Enable Limit
                         </span>
-                        <div 
+                        <div
                           className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                             formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
                           }`}
@@ -1198,19 +1228,19 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         </div>
                       </span>
                     </label>
-                    
+
                     <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
-                      <TextInput 
-                        type="number" 
-                        value={formData.min_quantity} 
-                        onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
-                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
+                      <TextInput
+                        type="number"
+                        value={formData.min_quantity}
+                        onChange={(v) => setFormData({ ...formData, min_quantity: v })}
+                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"}
                         disabled={!formData.has_min_quantity}
                         style={{
                           ...inputStyle,
                           backgroundColor: !formData.has_min_quantity ? "var(--bg-secondary)" : "var(--bg-tertiary)",
                           cursor: !formData.has_min_quantity ? "not-allowed" : "text"
-                        }} 
+                        }}
                       />
                     </div>
                     {!formData.has_min_quantity && (
@@ -1635,9 +1665,26 @@ function ProductDetailsModal({ product, onClose }) {
   const name = getName(product, "product");
   const price = getProductPrice(product);
   const image = getProductImage(product);
-  const attributes = getProductAttributes(product);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
+  // Category-assigned attributes (Attribute manager) — shown even when no variant value exists
+  const categoryId = product?.category_id?._id || product?.category_id;
+  const { data: categoryAttributes = [] } = useQuery({
+    queryKey: ["category-attributes", categoryId],
+    queryFn: () => attributeApi.getByCategory(categoryId),
+    enabled: !!categoryId,
+    retry: false,
+  });
+
+  const attributes = useMemo(() => {
+    const base = getProductAttributes(product);
+    const have = new Set(base.map((a) => String(a.name).toLowerCase()));
+    const assigned = (categoryAttributes || [])
+      .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
+      .map((a) => ({ name: a.name, value: "Not set" }));
+    return [...base, ...assigned];
+  }, [product, categoryAttributes]);
 
   return (
     <div

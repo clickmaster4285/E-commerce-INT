@@ -120,18 +120,7 @@ const discountSchema = new mongoose.Schema(
     // PRICE RANGE
     // =====================================================
 
-    priceMin: {
-      type: Number,
-      default: null,
-      min: [0, "Minimum price cannot be negative"],
-    },
-
-    priceMax: {
-      type: Number,
-      default: null,
-      min: [0, "Maximum price cannot be negative"],
-    },
-
+  
     // =====================================================
     // CONDITIONS
     // =====================================================
@@ -178,11 +167,7 @@ const discountSchema = new mongoose.Schema(
       min: [1, "Per user limit must be at least 1"],
     },
 
-    usageCount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+
 
     // =====================================================
     // RULES
