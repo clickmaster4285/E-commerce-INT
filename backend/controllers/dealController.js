@@ -133,9 +133,9 @@ const getDeals = async (req, res) => {
       Deal.find(query)
         .populate("productIds", "name sku images selling_price")
         .populate("categoryIds", "name code")
-        .populate("brandIds", "name")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email")
+        .populate("brandIds", "name logo")
+        .populate("createdBy", "name email role")
+        .populate("updatedBy", "name email role")
         .sort({
           priority: -1,
           createdAt: -1,
@@ -180,10 +180,10 @@ const getDealById = async (req, res) => {
     const deal = await Deal.findById(id)
       .populate("productIds", "name sku images selling_price cost_price")
       .populate("categoryIds", "name code")
-      .populate("brandIds", "name")
+      .populate("brandIds", "name logo")
       .populate("bundleProducts.product", "name sku images selling_price")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+      .populate("createdBy", "name email role")
+      .populate("updatedBy", "name email role");
 
     if (!deal) {
       return res.status(404).json({
@@ -236,8 +236,10 @@ const updateDeal = async (req, res) => {
     const updatedDeal = await Deal.findById(id)
       .populate("productIds", "name sku images selling_price")
       .populate("categoryIds", "name code")
-      .populate("brandIds", "name")
-      .populate("bundleProducts.product", "name sku images selling_price");
+      .populate("brandIds", "name logo")
+      .populate("bundleProducts.product", "name sku images selling_price")
+      .populate("createdBy", "name email role")
+      .populate("updatedBy", "name email role");
 
     emitSocketEvent("deal:updated", { success: true, data: updatedDeal });
     emitSocketEvent("dealUpdated", { success: true, data: updatedDeal });

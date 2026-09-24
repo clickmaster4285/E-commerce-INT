@@ -1,6 +1,7 @@
 const Tag = require("../models/Tag");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const mongoose = require("mongoose");
 
 // Helper to resolve user/employee info
 const resolveCreator = async (userId) => {
@@ -116,11 +117,23 @@ const updateTag = async (req, res) => {
     if (!slug) slug = "tag-" + Date.now();
 
     // Check if another tag has same name/slug
-    const duplicate = await Tag.findOne({ 
-      _id: { $ne: id }, 
+    // ✅ FIX: req.params.id ek STRING hai — MongoDB string ko ObjectId se
+    // $ne comparison mein cast nahi karta, is liye tag KHUD bhi duplicate
+    // match ho jata tha (same name save karne par bhi error aata tha).
+    // ObjectId me explicitly cast karte hain taake self exclude ho.
+    const excludeId = mongoose.Types.ObjectId.isValid(id)
+      ? new mongoose.Types.ObjectId(id)
+      : null;
+
+    const duplicateQuery = {
       $or: [{ name: { $regex: new RegExp(`^${cleanName}$`, 'i') } }, { slug: slug }],
-      is_deleted: { $ne: true } 
-    });
+      is_deleted: { $ne: true }
+    };
+    if (excludeId) {
+      duplicateQuery._id = { $ne: excludeId };
+    }
+
+    const duplicate = await Tag.findOne(duplicateQuery);
 
     if (duplicate) {
       return res.status(409).json({ message: "Another tag with this name already exists" });

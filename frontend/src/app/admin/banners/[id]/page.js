@@ -21,8 +21,6 @@ import {
   Loader2,
   Monitor,
   Pencil,
-  Smartphone,
-  Tablet,
   Trash2,
   Type,
   User,
@@ -70,12 +68,6 @@ function resolveUser(user) {
   if (typeof user === "object") return user.name || user.email || "Admin";
   return "Admin";
 }
-
-const DEVICE_META = {
-  desktop: { label: "Desktop", icon: Monitor },
-  tablet: { label: "Tablet", icon: Tablet },
-  mobile: { label: "Mobile", icon: Smartphone },
-};
 
 const STATUS_META = {
   active: { label: "Active", token: "success" },
@@ -322,7 +314,6 @@ export default function BannerDetailPage() {
 
   const pages = banner.displayRules?.pages || [];
   const categoryIds = banner.displayRules?.categories || [];
-  const devices = banner.displayRules?.devices || [];
   const desktopImage = imageUrl(banner.desktopImage);
 
   const categoryName = (id) => {
@@ -334,10 +325,6 @@ export default function BannerDetailPage() {
   const updatedBy = banner.updatedby ?? banner.updatedBy;
   const wasUpdated = banner.updatedAt && banner.createdAt &&
     new Date(banner.updatedAt).getTime() - new Date(banner.createdAt).getTime() > 60000;
-
-  const displayOn = devices.length
-    ? devices.map((d) => DEVICE_META[d]?.label || formatType(d)).join(", ")
-    : null;
 
   const headerActionCls = "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition-all duration-150";
 
@@ -403,10 +390,9 @@ export default function BannerDetailPage() {
         </div>
 
         {/* ============ QUICK FACTS ============ */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <InfoTile icon={Hash} label="Position" value={String(banner.position ?? 0)} />
           <InfoTile icon={Type} label="Type" value={formatType(banner.bannerType)} />
-          <InfoTile icon={Monitor} label="Display On" value={displayOn} />
           <InfoTile icon={Calendar} label="Start Date" value={banner.startDate ? formatDate(banner.startDate, true) : null} />
           <InfoTile icon={Calendar} label="End Date" value={banner.endDate ? formatDate(banner.endDate, true) : null} />
         </div>
@@ -596,20 +582,6 @@ export default function BannerDetailPage() {
                       );
                     })
                   : <span className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No categories configured</span>}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                Devices
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {devices.length
-                  ? devices.map((device) => {
-                      const meta = DEVICE_META[device];
-                      const DeviceIcon = meta?.icon || Monitor;
-                      return <Chip key={device} tone="info" icon={DeviceIcon}>{meta?.label || formatType(device)}</Chip>;
-                    })
-                  : <span className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No devices configured</span>}
               </div>
             </div>
           </div>

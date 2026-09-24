@@ -40,6 +40,7 @@ const cartRoutes = require("./routes/cartRoutes");
 const stockRoutes = require("./routes/stockRoutes");
 const shippingRoutes = require("./routes/shippingRoutes");
 const attributeRoutes = require("./routes/attributeRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 // ==========================================
 // APP & SERVER SETUP
@@ -131,6 +132,7 @@ app.use(`${API_PREFIX}/cart`, cartRoutes);
 app.use(`${API_PREFIX}/stock`, stockRoutes);
 app.use(`${API_PREFIX}/attributes`, attributeRoutes);
 app.use(`${API_PREFIX}/shipping`, shippingRoutes);
+app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {

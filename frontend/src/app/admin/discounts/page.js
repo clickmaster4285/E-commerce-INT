@@ -2,12 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { discountApi } from "../../../apis/admin/discountApi";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
+import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
 
 /* ==================== ICONS ==================== */
@@ -80,10 +81,12 @@ const formatValue = (discount) => {
 };
 
 const getDiscountStatus = (discount) => {
-  if (discount?.status) return discount.status;
-  if (discount?.isActive === false) return "disabled";
+  // ✅ Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
   const end = discount?.end_at || discount?.endDate;
-  if (end && new Date(end) < new Date()) return "expired";
+  const isExpired = end && new Date(end) < new Date();
+  if (discount?.isActive === false) return "inactive";
+  if (["inactive", "disabled", "draft"].includes(discount?.status)) return "inactive";
+  if (isExpired) return "inactive";
   return "active";
 };
 
@@ -106,13 +109,9 @@ const dateToISO = (value) => {
 const StatusBadge = ({ status }) => {
   const config = {
     active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    scheduled: { text: "Scheduled", bg: "var(--info-soft)", color: "var(--info-text)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
-    expired: { text: "Expired", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
-    disabled: { text: "Disabled", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
     inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    draft: { text: "Draft", bg: "rgba(148,163,184,0.10)", color: "var(--text-muted)", border: "rgba(148,163,184,0.25)" },
   };
-  const item = config[status] || config.disabled;
+  const item = config[status] || config.inactive;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
@@ -124,7 +123,9 @@ const StatusBadge = ({ status }) => {
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -134,27 +135,39 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleToggle = () => {
+    if (disabled) return;
+    const next = !isOpen;
+    if (next && buttonRef.current) {
+      // Viewport-aware: open upward when there is not enough space below the trigger
+      const rect = buttonRef.current.getBoundingClientRect();
+      const MENU_HEIGHT = 200; // max-h-48 (192px) + margin
+      setDropUp(window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT);
+    }
+    setIsOpen(next);
+  };
+
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled}
+      <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
         className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="truncate">{displayValue}</span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className="absolute z-[100] mt-1 w-full overflow-y-auto rounded-md border shadow-xl max-h-48"
+        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
           ) : (
             options.map((opt) => (
               <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5 transition-colors"
-                style={{ color: value === opt.value ? "var(--accent)" : "var(--text-primary)", backgroundColor: value === opt.value ? "rgba(16,185,129,0.05)" : "transparent" }}>
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
+                style={{ color: value === opt.value ? "var(--accent)" : "var(--text-primary)", backgroundColor: value === opt.value ? "var(--accent-soft)" : "transparent" }}>
                 {opt.label}
               </button>
             ))
@@ -187,7 +200,7 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   <div className={fullWidth ? "md:col-span-2" : ""}>
     {label && (
       <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-        {label} {required && <span className="text-red-500 normal-case">*</span>}
+        {label} {required && <span className="normal-case" style={{ color: "var(--danger-text)" }}>*</span>}
       </label>
     )}
     {children}
@@ -218,10 +231,10 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
   />
 );
 
-function StatCard({ title, value, valueClass = "", cardStyle }) {
+function StatCard({ title, value, valueStyle, cardStyle }) {
   return (<div className="rounded-lg p-4 flex flex-col justify-center" style={cardStyle}>
     <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{title}</p>
-    <p className={`text-[20px] font-bold mt-1 ${valueClass}`}>{value}</p>
+    <p className="text-[20px] font-bold mt-1" style={valueStyle}>{value}</p>
   </div>);
 }
 
@@ -242,11 +255,13 @@ const getInitials = (name) => {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 };
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 const getProductImage = (product) => {
   if (!product) return null;
-  const firstVariantImage = product?.variants?.[0]?.images?.[0]?.img_url;
-  if (firstVariantImage) return firstVariantImage;
-  return null;
+  const raw = product?.variants?.[0]?.images?.[0]?.img_url;
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("blob:") || raw.startsWith("data:")) return raw;
+  return raw.startsWith("/") ? `${API_ORIGIN}${raw}` : `${API_ORIGIN}/${raw}`;
 };
 
 const getProductPrice = (product) => {
@@ -267,30 +282,58 @@ const humanizeKey = (key) => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+// ✅ Flatten any attribute value shape (string / number / array / {value|label|name} / nested {Key: "val"})
+const attrValueText = (value) => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(attrValueText).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    if ("value" in value) return attrValueText(value.value);
+    if ("label" in value) return attrValueText(value.label);
+    if ("name" in value) return attrValueText(value.name);
+    // Nested objects like { "Exterior Color": "BLACK" } — join their values
+    return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
+  }
+  return "";
+};
+
+// ✅ Build a clean attribute list from product.specifications + variant.attributes
+// Merges values by attribute name across all variants (de-duplicated, order preserved)
 const getProductAttributes = (product) => {
   if (!product) return [];
-  const list = [];
+  const byName = new Map();
+
+  // Product-level specifications
   if (product.specifications && typeof product.specifications === "object") {
     Object.entries(product.specifications).forEach(([key, value]) => {
-      if (value === null || value === undefined || value === "") return;
-      if (typeof value === "object") return;
-      list.push({ name: humanizeKey(key), value: String(value) });
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
     });
   }
-  const seen = new Set();
+
+  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
-    if (variant.attributes && typeof variant.attributes === "object") {
-      Object.entries(variant.attributes).forEach(([key, value]) => {
-        if (value === null || value === undefined || value === "") return;
-        const k = `${key}::${value}`;
-        if (seen.has(k)) return;
-        seen.add(k);
-        if (typeof value === "object") return;
-        list.push({ name: humanizeKey(key), value: String(value) });
-      });
-    }
+    const attrs = variant?.attributes;
+    if (!attrs) return;
+    const entries = Array.isArray(attrs)
+      ? attrs.map((a) => [a?.name || a?.key || a?.attribute, a?.value ?? a?.values])
+      : Object.entries(attrs);
+    entries.forEach(([key, value]) => {
+      const name = humanizeKey(key);
+      if (!name) return;
+      if (!byName.has(name)) byName.set(name, new Set());
+      const valueText = attrValueText(value);
+      if (valueText) byName.get(name).add(valueText);
+    });
   });
-  return list;
+
+  return [...byName.entries()]
+    .filter(([, values]) => values.size > 0)
+    .map(([name, values]) => ({ name, value: [...values].join(", ") }));
 };
 
 /* ==================== DROPDOWN MENU ITEM ==================== */
@@ -299,8 +342,8 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
-    style={{ color: danger || success ? undefined : "var(--text-primary)" }}
+    className="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
+    style={{ color: danger ? "var(--danger-text)" : success ? "var(--success-text)" : "var(--text-primary)" }}
   >
     {icon} {label}
   </button>
@@ -311,6 +354,7 @@ export default function DiscountsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { markSelfAction } = useDiscountSocketSync();
 
   const [search, setSearch] = useState("");
@@ -367,7 +411,10 @@ export default function DiscountsPage() {
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
 
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, targetFilter]);
+  useEffect(() => {
+    const timer = setTimeout(() => setCurrentPage(1), 0);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter, targetFilter]);
   useEffect(() => {
     if (!actionMenu) return;
     const close = () => setActionMenu(null);
@@ -433,7 +480,7 @@ export default function DiscountsPage() {
     mutationFn: ({ id, newStatus }) =>
       discountApi.update(id, {
         status: newStatus,
-        isActive: newStatus === "active" || newStatus === "scheduled",
+        isActive: newStatus === "active",
       }),
     onMutate: () => markSelfAction("update"),
     onSuccess: (_, variables) => {
@@ -463,9 +510,8 @@ export default function DiscountsPage() {
 
   const stats = useMemo(() => ({
     total: discounts.length,
-    active: discounts.filter((d) => getDiscountStatus(d) === "active" || getDiscountStatus(d) === "scheduled").length,
-    inactive: discounts.filter((d) => ["inactive", "disabled", "draft"].includes(getDiscountStatus(d))).length,
-    expired: discounts.filter((d) => getDiscountStatus(d) === "expired").length,
+    active: discounts.filter((d) => getDiscountStatus(d) === "active").length,
+    inactive: discounts.filter((d) => getDiscountStatus(d) === "inactive").length,
   }), [discounts]);
 
   const openEdit = (discount) => {
@@ -495,12 +541,22 @@ export default function DiscountsPage() {
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
-      status: discount?.status || (discount?.isActive ? "active" : "disabled"),
+      status: discount?.status === "active" ? "active" : "inactive",
     });
     setEditingDiscount(discount);
     setActiveFormType(type);
     setShowModal(true);
   };
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || !discounts.length) return;
+    const discount = discounts.find((item) => String(item?._id || item?.id) === editId);
+    if (!discount) return;
+    const timer = setTimeout(() => openEdit(discount), 0);
+    router.replace(pathname, { scroll: false });
+    return () => clearTimeout(timer);
+  }, [discounts, pathname, router, searchParams]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -554,7 +610,7 @@ export default function DiscountsPage() {
       usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
       start_at: startDate, end_at: endDate,
       status: formData.status,
-      isActive: formData.status === "active" || formData.status === "scheduled",
+      isActive: formData.status === "active",
       ...payloadExtras,
     };
 
@@ -626,7 +682,7 @@ export default function DiscountsPage() {
           aria-label={`Actions for ${discount?.name || "discount"}`}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
           title="Actions"
         >
@@ -659,9 +715,9 @@ export default function DiscountsPage() {
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled") ? "Deactivate" : "Activate"}
-                danger={(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
-                success={!(getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled")}
+                label={getDiscountStatus(discount) === "active" ? "Deactivate" : "Activate"}
+                danger={getDiscountStatus(discount) === "active"}
+                success={getDiscountStatus(discount) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
               />
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
@@ -744,11 +800,10 @@ export default function DiscountsPage() {
           </div>
 
           {/* Stats Cards Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
-            <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
-            <StatCard title="Expired" value={stats.expired} valueClass="text-amber-500" cardStyle={cardStyle} />
-            <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
+            <StatCard title="Active" value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
+            <StatCard title="Inactive" value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
           </div>
 
           {/* Search Bar & Filters Row */}
@@ -766,7 +821,7 @@ export default function DiscountsPage() {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["inactive", "Inactive"]]} />
               <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", "All Targets"], ["all_products", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
             </div>
           </div>
@@ -812,7 +867,7 @@ export default function DiscountsPage() {
                     const isSelected = selectedIds.includes(id);
                     const status = getDiscountStatus(discount);
                     return (
-                      <tr key={id} onClick={() => handleView(id)} style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent" }} className="hover:bg-white/[0.02] transition cursor-pointer">
+                      <tr key={id} onClick={() => handleView(id)} style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent" }} className="hover:bg-[var(--bg-row-hover)] transition cursor-pointer">
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -945,7 +1000,7 @@ const TargetIconFor = (formType) => {
   return TagIcon;
 };
 
-function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+export function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
@@ -1335,9 +1390,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
                       onChange={(val) => setFormData({ ...formData, status: val })}
                       options={[
                         { value: "active", label: "Active" },
-                        { value: "scheduled", label: "Scheduled" },
-                        { value: "draft", label: "Draft" },
-                        { value: "disabled", label: "Disabled" },
+                        { value: "disabled", label: "Inactive" },
                       ]}
                       placeholder="Select Status"
                     />
@@ -1390,7 +1443,7 @@ function DiscountFormModal({ formType, formData, setFormData, formErrors, setFor
 }
 
 /* ==================== SELECTION MODAL ==================== */
-function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 
@@ -1699,9 +1752,26 @@ function ProductDetailsModal({ product, onClose }) {
   const name = getName(product, "product");
   const price = getProductPrice(product);
   const image = getProductImage(product);
-  const attributes = getProductAttributes(product);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
+
+  // Category-assigned attributes (Attribute manager) — shown even when no variant value exists
+  const categoryId = product?.category_id?._id || product?.category_id;
+  const { data: categoryAttributes = [] } = useQuery({
+    queryKey: ["category-attributes", categoryId],
+    queryFn: () => attributeApi.getByCategory(categoryId),
+    enabled: !!categoryId,
+    retry: false,
+  });
+
+  const attributes = useMemo(() => {
+    const base = getProductAttributes(product);
+    const have = new Set(base.map((a) => String(a.name).toLowerCase()));
+    const assigned = (categoryAttributes || [])
+      .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
+      .map((a) => ({ name: a.name, value: "Not set" }));
+    return [...base, ...assigned];
+  }, [product, categoryAttributes]);
 
   return (
     <div

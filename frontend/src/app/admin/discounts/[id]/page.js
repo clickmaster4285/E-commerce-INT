@@ -7,9 +7,13 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Tag, Activity, Clock, User, Percent, Layers, Target,
   Edit3, Trash2, Plus, Pencil, AlertTriangle, DollarSign, Calendar,
-  TrendingUp, Hash, Box, Eye, CheckCircle2, XCircle, Zap, Shield
+  TrendingUp, Hash, Box, CheckCircle2, ShoppingCart, Package, Globe,
 } from "lucide-react";
 import { discountApi } from "../../../../apis/admin/discountApi";
+import { productApi } from "../../../../apis/admin/productApi";
+import { categoryApi } from "../../../../apis/admin/categoryApi";
+import { brandApi } from "../../../../apis/admin/brandApi";
+import { DiscountFormModal, SelectionModal } from "../../discounts/page";
 import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
 
 /* =========================================================
@@ -60,12 +64,54 @@ function formatDiscountValue(discount) {
 }
 
 function getDiscountStatus(discount) {
-  if (discount?.status) return discount.status;
-  if (discount?.isActive === false) return "inactive";
+  // ✅ Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
   const end = discount?.endDate || discount?.end_at;
-  if (end && new Date(end) < new Date()) return "expired";
+  const isExpired = end && new Date(end) < new Date();
+  if (discount?.isActive === false) return "inactive";
+  if (["inactive", "disabled", "draft", "scheduled", "expired"].includes(discount?.status)) return "inactive";
+  if (isExpired) return "inactive";
   return "active";
 }
+
+function formatDateTime(date) {
+  if (!date) return "—";
+  return new Date(date).toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+const toDateInput = (value) => {
+  if (!value) return "";
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  } catch { return ""; }
+}
+
+const dateToISO = (value) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+const normalizeArrayResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.discounts)) return response.discounts;
+  if (Array.isArray(response?.products)) return response.products;
+  if (Array.isArray(response?.categories)) return response.categories;
+  if (Array.isArray(response?.brands)) return response.brands;
+  return [];
+};
+
+const getId = (item) => {
+  if (!item) return "";
+  if (typeof item === "object") return String(item._id || item.id || "");
+  return String(item);
+};
 
 /* =========================================================
    UI COMPONENTS
@@ -85,58 +131,33 @@ function StatusBadge({ active, label }) {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, subValue, color = "emerald" }) {
-  const colors = {
-    emerald: { bg: "var(--success-soft)", text: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    blue: { bg: "var(--info-soft)", text: "var(--info)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
-    purple: { bg: "var(--purple-soft)", text: "var(--purple)", border: "color-mix(in srgb, var(--purple) 28%, transparent)" },
-    amber: { bg: "var(--warning-soft)", text: "var(--warning)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
-    red: { bg: "var(--danger-soft)", text: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-  };
-  const c = colors[color] || colors.emerald;
-
-  return (
-    <div className="rounded-lg p-3 transition-all hover:shadow-md" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: c.bg, border: `1px solid ${c.border}` }}>
-          <Icon className="w-5 h-5" style={{ color: c.text }} />
-        </div>
-      </div>
-      <p className="text-[11px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
-      <p className="text-[18px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{value}</p>
-      {subValue && <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{subValue}</p>}
-    </div>
-  );
-}
-
 function InfoCard({ icon: Icon, title, children, action, bodyClassName = "" }) {
   return (
-    <div className="rounded-lg overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-      <div className="px-4 py-3 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+    <div className="rounded-md overflow-hidden h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="px-3 py-2.5 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
-              <Icon className="w-4 h-4" />
-            </div>
+            <Icon className="w-4 h-4" style={{ color: "var(--accent)" }} />
           )}
-          <h3 className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{title}</h3>
+          <h3 className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>{title}</h3>
         </div>
         {action}
       </div>
-         <div className={`p-4 flex-1 ${bodyClassName}`}>{children}</div>
+      <div className={`p-3 flex-1 ${bodyClassName}`}>{children}</div>
     </div>
   );
 }
 
-function DataRow({ label, value, mono, highlight, icon: Icon }) {
+function DataRow({ label, value, mono, highlight, icon: Icon, action }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
+    <div className="flex items-center justify-between gap-4 py-1.5">
       <div className="flex items-center gap-2.5">
-        {Icon && <Icon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />}
-        <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
+        {Icon && <Icon className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />}
+        <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>{label}</span>
       </div>
-      <span className={`text-[12px] font-semibold text-right break-words max-w-[60%] ${mono ? "font-mono" : ""}`}
+      <span className={`text-[10px] font-semibold text-right break-words max-w-[62%] ${mono ? "font-mono" : ""}`}
         style={{ color: highlight ? "var(--success)" : "var(--text-primary)" }}>{value || "—"}</span>
+      {action}
     </div>
   );
 }
@@ -157,19 +178,6 @@ function Avatar({ user, size = "md", color = "emerald" }) {
   );
 }
 
-function EmptyState({ icon: Icon, title, description, action }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-        <Icon className="w-7 h-7" style={{ color: "var(--text-muted)" }} />
-      </div>
-      <h3 className="text-base font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>{title}</h3>
-      <p className="text-[12px] max-w-sm mb-5" style={{ color: "var(--text-muted)" }}>{description}</p>
-      {action}
-    </div>
-  );
-}
-
 /* =========================================================
    MAIN PAGE
 ========================================================= */
@@ -183,14 +191,34 @@ export default function DiscountDetailPage() {
   const discountId = params.id;
   const backPath = pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/discounts";
 
-  const [tab, setTab] = useState("overview");
   const [showDelete, setShowDelete] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [activeFormType, setActiveFormType] = useState(null);
+  const [selector, setSelector] = useState({ open: false, type: null });
+  const [formData, setFormData] = useState({
+    name: "", code: "", description: "",
+    selected_ids: [],
+    value_type: "percentage", value: "",
+    min_order_amount: "",
+    has_min_quantity: false,
+    min_quantity: "",
+    usage_limit: "", usage_per_customer: "",
+    start_at: "", end_at: "", status: "active",
+  });
+  const [formErrors, setFormErrors] = useState({});
 
   const { data: discount, isLoading: loading } = useQuery({
     queryKey: ["discount", discountId],
     queryFn: () => discountApi.getById(discountId),
     enabled: !!discountId,
   });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
+  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
+
 
   const deleteMutation = useMutation({
     mutationFn: () => {
@@ -207,7 +235,7 @@ export default function DiscountDetailPage() {
     },
   });
 
-  const isActive = getDiscountStatus(discount) === "active" || getDiscountStatus(discount) === "scheduled";
+  const isActive = getDiscountStatus(discount) === "active";
   // "Updated" entry sirf tab jab discount really edit/save hua ho:
   // updateDiscount updatedBy set karta hai; create par wo null rehta hai.
   // (created_at/updated_at snake_case model par exist nahi karte — createdAt/updatedAt use karo)
@@ -218,28 +246,131 @@ export default function DiscountDetailPage() {
       (discount?.updated_at ?? discount?.updatedAt) !== (discount?.created_at ?? discount?.createdAt))
   );
   
-  const targetCount = useMemo(() => {
-    if (!discount) return 0;
-    const applyTo = discount.applyTo || discount.target_type || "all";
-    if (applyTo === "all" || applyTo === "all_products") return 0;
-    if (discount.selectedProducts?.length) return discount.selectedProducts.length;
-    if (discount.selectedCategories?.length) return discount.selectedCategories.length;
-    if (discount.selectedBrands?.length) return discount.selectedBrands.length;
-    if (discount.selected_product_ids?.length) return discount.selected_product_ids.length;
-    if (discount.selected_category_ids?.length) return discount.selected_category_ids.length;
-    if (discount.selected_brand_ids?.length) return discount.selected_brand_ids.length;
-    return 0;
-  }, [discount]);
+  const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+  const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-  const targetLabel = useMemo(() => {
-    if (!discount) return "Targets";
-    const applyTo = discount.applyTo || discount.target_type || "all";
-    if (applyTo === "all" || applyTo === "all_products") return "All Products";
-    if (applyTo === "specific_products" || applyTo === "product") return "Products";
-    if (applyTo === "specific_categories" || applyTo === "category") return "Categories";
-    if (applyTo === "specific_brands" || applyTo === "brand") return "Brands";
-    return "Targets";
-  }, [discount]);
+  const resetForm = () => {
+    setFormData({
+      name: "", code: "", description: "",
+      selected_ids: [],
+      value_type: "percentage", value: "",
+      min_order_amount: "",
+      has_min_quantity: false,
+      min_quantity: "",
+      usage_limit: "", usage_per_customer: "",
+      start_at: "", end_at: "", status: "active",
+    });
+    setSelector({ open: false, type: null });
+    setActiveFormType(null);
+    setFormErrors({});
+  };
+
+  // ✅ Edit modal — bilkul Add Discount jaisa form (detail page par hi, navigation nahi)
+  const openEdit = () => {
+    const d = discount;
+    const rawTarget = d?.target_type || d?.applyTo || "all_products";
+    let type = "all";
+    if (rawTarget === "specific_products" || rawTarget === "product") type = "product";
+    else if (rawTarget === "specific_categories" || rawTarget === "category") type = "category";
+    else if (rawTarget === "specific_brands" || rawTarget === "brand") type = "brand";
+    let selected_ids = [];
+    if (type === "product") selected_ids = (d?.selectedProducts || d?.selected_product_ids || []).map(getId);
+    else if (type === "category") selected_ids = (d?.selectedCategories || d?.selected_category_ids || []).map(getId);
+    else if (type === "brand") selected_ids = (d?.selectedBrands || d?.selected_brand_ids || []).map(getId);
+    const rawMinQty = d?.minQuantity;
+    const hasMinQty = rawMinQty !== null && rawMinQty !== undefined && rawMinQty !== "";
+    setFormData({
+      name: d?.name || "", code: d?.code || "", description: d?.description || "",
+      selected_ids,
+      value_type: d?.type === "fixed" ? "fixed_amount" : (d?.type === "fixed_price" ? "fixed_price" : "percentage"),
+      value: d?.value ?? "",
+      min_order_amount: d?.minOrderValue ?? "",
+      has_min_quantity: hasMinQty,
+      min_quantity: hasMinQty ? rawMinQty : "",
+      usage_limit: d?.usageLimit ?? "",
+      usage_per_customer: d?.perUserLimit ?? "",
+      start_at: toDateInput(d?.startDate),
+      end_at: toDateInput(d?.endDate),
+      status: isActive ? "active" : "disabled",
+    });
+    setActiveFormType(type);
+    setShowEdit(true);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setFormErrors({});
+    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    const manualCode = String(formData.code || "").trim();
+    if (!manualCode) {
+      setFormErrors({ code: "Discount code is required." });
+      return;
+    }
+    if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+
+    let target_type = "all_products";
+    let applyTo = "all";
+    let payloadExtras = {};
+    if (activeFormType === "product") {
+      target_type = "specific_products"; applyTo = "specific_products";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    } else if (activeFormType === "category") {
+      target_type = "specific_categories"; applyTo = "specific_categories";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    } else if (activeFormType === "brand") {
+      target_type = "brand"; applyTo = "brand";
+      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
+    }
+
+    const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
+    const fallbackEnd = new Date();
+    fallbackEnd.setDate(fallbackEnd.getDate() + 30);
+    const endDate = formData.end_at ? dateToISO(formData.end_at) : fallbackEnd.toISOString();
+    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+
+    const finalMinQuantity = formData.has_min_quantity && formData.min_quantity ? Number(formData.min_quantity) : null;
+
+    const payload = {
+      name: String(formData.name).trim(),
+      code: manualCode.toUpperCase(),
+      description: String(formData.description || "").trim() || undefined,
+      target_type, applyTo,
+      value_type: formData.value_type,
+      type: formData.value_type === "fixed_amount" ? "fixed" : formData.value_type,
+      value: Number(formData.value),
+      min_order_amount: formData.min_order_amount !== "" ? Number(formData.min_order_amount) : undefined,
+      min_quantity: finalMinQuantity,
+      usage_limit: formData.usage_limit !== "" ? Number(formData.usage_limit) : undefined,
+      usage_per_customer: formData.usage_per_customer !== "" ? Number(formData.usage_per_customer) : undefined,
+      start_at: startDate, end_at: endDate,
+      status: formData.status,
+      isActive: formData.status === "active",
+      ...payloadExtras,
+    };
+    Object.keys(payload).forEach((key) => { if (payload[key] === undefined || payload[key] === null || payload[key] === "") delete payload[key]; });
+    saveMutation.mutate({ id: discountId, data: payload });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: ({ id, data }) => {
+      markSelfAction("update");
+      return discountApi.update(id || discountId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["discount"] });
+      queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      toast.success("Discount updated successfully");
+      setShowEdit(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to update discount");
+    },
+  });
 
   // Loading
   if (loading) {
@@ -271,235 +402,92 @@ export default function DiscountDetailPage() {
     );
   }
 
-  const tabList = [
-    { id: "overview", label: "Overview", icon: Eye },
-    { id: "rules", label: "Offer Rules", icon: Shield, badge: null },
-    { id: "activity", label: "Activity", icon: Activity, badge: hasUpdates ? "2" : "1" },
-  ];
-
   return (
-    <div className="w-full pb-8 space-y-4">
+    <div className="w-full pb-8 space-y-3">
       {/* HEADER */}
       <div>
-        <button onClick={() => router.push(backPath)} className="flex items-center gap-2 text-[11px] font-medium mb-3 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Discounts
-        </button>
-
-        <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="p-4 md:p-5">
-            <div className="flex flex-col lg:flex-row gap-5">
-              {/* Icon */}
-              <div className="w-16 shrink-0">
-                <div className="w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", border: "1px solid var(--border-color)" }}>
-                  <Percent className="w-8 h-8" style={{ color: "var(--accent)" }} />
-                </div>
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h1 className="text-xl md:text-2xl font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                        {discount.name || "Untitled Discount"}
-                      </h1>
-                      <StatusBadge active={isActive} label={getDiscountStatus(discount).toUpperCase()} />
-                    </div>
-                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      <span className="flex items-center gap-1.5 font-bold" style={{ color: "var(--success)" }}>
-                        <Percent className="w-3.5 h-3.5" /> {formatDiscountValue(discount)}
-                      </span>
-                      <span className="opacity-50">•</span>
-                      <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5" />{formatTarget(discount.applyTo || discount.target_type)}</span>
-                      <span className="opacity-50">•</span>
-                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{fd(discount.startDate || discount.start_at)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => router.push(backPath)} className="h-9 px-3 rounded-lg text-[11px] font-semibold flex items-center gap-2 transition"
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                      <ArrowLeft className="w-4 h-4" /> Back
-                    </button>
-                    <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
-                      className="h-9 px-3 rounded-lg text-[11px] font-semibold flex items-center gap-2 transition hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-                      <Trash2 className="w-4 h-4" /> Delete
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-4">
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Value</p>
-                    <p className="text-[14px] font-bold" style={{ color: "var(--success)" }}>{formatDiscountValue(discount)}</p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Apply To</p>
-                    <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{formatTarget(discount.applyTo || discount.target_type)}</p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Usage</p>
-                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                      {discount.usageLimit ? `${discount.usageCount || 0} / ${discount.usageLimit}` : "Unlimited"}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>Start Date</p>
-                    <p className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{fd(discount.startDate || discount.start_at)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="flex items-center gap-1.5 text-[10px] mb-2" style={{ color: "var(--text-muted)" }}>
+          <button onClick={() => router.push(backPath)} className="hover:underline">Discounts</button>
+          <span>›</span><span style={{ color: "var(--text-primary)" }}>Discount Details</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{discount.name || "Untitled Discount"}</h1>
+            <div className="flex items-center gap-1.5 mt-1 text-[10px]" style={{ color: "var(--accent)" }}><Tag className="w-3 h-3" /> {discount.code || "—"}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge active={isActive} label={isActive ? "Active" : "Inactive"} />
+            <button type="button" onClick={openEdit} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Edit3 className="w-3.5 h-3.5" /> Edit</button>
+            <button type="button" disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger)" }}><Trash2 className="w-3.5 h-3.5" /> Delete</button>
           </div>
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="flex items-center gap-5 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
-        {tabList.map((tb) => {
-          const active = tab === tb.id;
-          const Icon = tb.icon;
-          return (
-            <button key={tb.id} type="button" onClick={() => setTab(tb.id)}
-              className="relative flex items-center gap-2 whitespace-nowrap pb-2 text-[11px] font-semibold transition-all bg-transparent border-none shadow-none"
-              style={{
-                color: active ? "var(--accent)" : "var(--text-muted)",
-              }}>
-              <Icon className="w-4 h-4" />
-              {tb.label}
-              {tb.badge && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold leading-none"
-                  style={{ backgroundColor: active ? "var(--accent-soft)" : "var(--bg-tertiary)", color: active ? "var(--accent)" : "var(--text-muted)" }}>
-                  {tb.badge}
-                </span>
-              )}
-              <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full transition-all" style={{ backgroundColor: active ? "var(--accent)" : "transparent" }} />
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        {[{ icon: Percent, label: "Discount Type", value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: "Valid Period", value: `${fd(discount.startDate)} - ${fd(discount.endDate)}` }, { icon: TrendingUp, label: "Usage Limit", value: discount.usageLimit ? String(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: "Minimum Order Value", value: discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum" }].map(({ icon: Icon, label, value }) => (
+          <div key={label} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}><Icon className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /><div className="min-w-0"><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{value}</p></div></div>
+        ))}
       </div>
 
-      {/* OVERVIEW TAB */}
-      {tab === "overview" && (
-        <div className="space-y-4">
-          {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MetricCard icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price"} color="emerald" />
-            <MetricCard icon={DollarSign} label="Value" value={formatDiscountValue(discount)} color="blue" />
-            <MetricCard icon={Target} label="Targets" value={targetCount === 0 ? "All" : String(targetCount)} subValue={targetLabel} color="purple" />
-            <MetricCard icon={TrendingUp} label="Usage" value={String(discount.usageCount || 0)} subValue={discount.usageLimit ? `of ${discount.usageLimit}` : "Unlimited"} color="amber" />
-          </div>
+      {/* WORKING SECTION TABS */}
+      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)" }}>
+        {[["d-overview", "Basic Information"], ["d-target", "Targeting"], ["d-rules", "Conditions"], ["d-usage", "Usage & Limits"], ["d-activity", "History"]].map(([sectionId, label]) => (
+          <button key={sectionId} type="button"
+            onClick={() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="pb-2 text-[10px] font-semibold whitespace-nowrap transition-colors hover:text-[var(--accent)]"
+            style={{ color: "var(--text-muted)" }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-                   {/* ✅ Discount Info LEFT + Description RIGHT — equal height */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InfoCard icon={Tag} title="Discount Information">
-              <div className="space-y-1">
-                <DataRow icon={Hash} label="Discount Name" value={discount.name} />
-                <DataRow icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
-                <DataRow icon={DollarSign} label="Discount Value" value={formatDiscountValue(discount)} highlight />
-                <DataRow icon={Activity} label="Status" value={getDiscountStatus(discount).toUpperCase()} highlight={isActive} />
-                <DataRow icon={Zap} label="Priority" value={discount.priority || "1"} />
-                <DataRow icon={Shield} label="Stackable" value={discount.isStackable ? "Yes" : "No"} />
-              </div>
-            </InfoCard>
-
-                       <InfoCard icon={Activity} title="Description" bodyClassName="flex flex-col">
-              {discount.description ? (
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-secondary)" }}>
-                  {discount.description}
-                </p>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <EmptyState icon={Activity} title="No Description" description="No description has been provided for this discount." />
-                </div>
-              )}
-            </InfoCard>
-          </div>
-
-                 {/* ✅ Created + Updated — single card, andar 2 columns = hamesha aligned */}
-          <InfoCard icon={User} title="Created & Updated">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Created By</p>
-                {discount.createdBy ? (
-                  <div className="flex items-center gap-3">
-                    <Avatar user={discount.createdBy} size="lg" color="emerald" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy.name || discount.createdBy.email}</p>
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{discount.createdBy.email}</p>
-                      <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>{fd(discount.created_at || discount.createdAt)} · {tago(discount.created_at || discount.createdAt)}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>System</p>
-                )}
-              </div>
-              <div className="md:border-l md:pl-6" style={{ borderColor: "var(--border-color)" }}>
-                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Last Updated</p>
-                {hasUpdates ? (
-                  discount.updatedBy ? (
-                    <div className="flex items-center gap-3">
-                      <Avatar user={discount.updatedBy} size="lg" color="blue" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy.name || discount.updatedBy.email}</p>
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--text-muted)" }}>{discount.updatedBy.email}</p>
-                        <p className="text-[10px] mt-1.5" style={{ color: "var(--text-muted)" }}>{fd(discount.updated_at || discount.updatedAt)} · {tago(discount.updated_at || discount.updatedAt)}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{fd(discount.updated_at || discount.updatedAt)} · {tago(discount.updated_at || discount.updatedAt)}</p>
-                  )
-                ) : (
-                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet — discount has not been modified since creation.</p>
-                )}
-              </div>
-            </div>
+      <div id="d-overview" className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start scroll-mt-4">
+        <div className="space-y-3">
+          <InfoCard icon={Tag} title="Basic Information" action={<button type="button" onClick={openEdit} className="text-[9px] font-semibold" style={{ color: "var(--accent)" }}><Edit3 className="w-3 h-3 inline mr-1" /> Edit</button>}>
+            <DataRow icon={Hash} label="Code" value={discount.code} mono />
+            <DataRow icon={Tag} label="Name" value={discount.name} />
+            <DataRow icon={Activity} label="Description" value={discount.description || "—"} />
+            <DataRow icon={Percent} label="Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
+            <DataRow icon={DollarSign} label="Value" value={formatDiscountValue(discount)} highlight />
+            <DataRow icon={Target} label="Apply To" value={formatTarget(discount.applyTo)} />
+            <DataRow icon={Activity} label="Status" value={isActive ? "Active" : "Inactive"} highlight={isActive} />
           </InfoCard>
-
-          {/* Quick Summary Card */}
-          <InfoCard icon={Layers} title="Quick Summary">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
-              <DataRow icon={Target} label="Apply To" value={formatTarget(discount.applyTo || discount.target_type)} />
-              <DataRow icon={DollarSign} label="Min Order Value" value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} />
-              <DataRow icon={TrendingUp} label="Usage Limit" value={discount.usageLimit ? `${discount.usageCount || 0} / ${discount.usageLimit}` : "Unlimited"} />
-              <DataRow icon={User} label="Per User Limit" value={discount.perUserLimit ? String(discount.perUserLimit) : "1"} />
-              <DataRow icon={Zap} label="Priority" value={discount.priority || "1"} />
-              <DataRow icon={Shield} label="Stackable" value={discount.isStackable ? "Yes" : "No"} />
-              <DataRow icon={Calendar} label="Start Date" value={fd(discount.startDate || discount.start_at)} />
-              <DataRow icon={Calendar} label="End Date" value={fd(discount.endDate || discount.end_at)} />
-            </div>
+          <InfoCard icon={Package} title="Applicable Products" action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{discount.selectedProducts?.length ? `View All (${discount.selectedProducts.length})` : "Preview"}</span>}>
+            {discount.selectedProducts?.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{discount.selectedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div> : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>All products</p>}
           </InfoCard>
         </div>
-      )}
 
-      {/* OFFER RULES TAB */}
-      {tab === "rules" && (
-               <div className="space-y-6">
+        <div className="space-y-3">
+          <InfoCard icon={Calendar} title="Validity Period"><DataRow label="Start Date" value={formatDateTime(discount.startDate)} /><DataRow label="End Date" value={formatDateTime(discount.endDate)} /><p className="text-[8px] text-right mt-2" style={{ color: "var(--text-muted)" }}>{Math.max(0, Math.ceil((new Date(discount.endDate) - new Date(discount.startDate)) / 86400000))} days</p></InfoCard>
+          <InfoCard icon={TrendingUp} title="Usage Limits"><DataRow label="Total Usage Limit" value={discount.usageLimit || "Unlimited"} /><DataRow label="Per User Limit" value={discount.perUserLimit || 1} /><DataRow label="Minimum Order Value" value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} /><DataRow label="Minimum Quantity" value={discount.minQuantity || "Not set"} /></InfoCard>
+        </div>
+
+        <div className="space-y-3">
+          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title="Targeting"><DataRow icon={Globe} label="Apply To" value={formatTarget(discount.applyTo)} /><DataRow icon={Package} label="Selected Products" value={`${discount.selectedProducts?.length || 0} products`} /><DataRow icon={Layers} label="Selected Categories" value={`${discount.selectedCategories?.length || 0} categories`} /><DataRow icon={Tag} label="Selected Brands" value={`${discount.selectedBrands?.length || 0} brands`} /></InfoCard></div>
+          <InfoCard icon={User} title="Created By"><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Created {formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
+          {hasUpdates && <InfoCard icon={User} title="Updated By"><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Updated {formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
+        </div>
+      </div>
+
+
+      {/* TARGETING & CONDITIONS */}
+      <div id="d-targeting" className="scroll-mt-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InfoCard icon={Percent} title="Discount Rules">
+            <div id="d-rules" className="scroll-mt-4 h-full"><InfoCard icon={Percent} title="Discount Rules">
               <div className="space-y-1">
                 <DataRow icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage (%)" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
                 <DataRow icon={DollarSign} label="Discount Value" value={formatDiscountValue(discount)} highlight />
-                {discount.maxDiscountAmount && (
-                  <DataRow icon={Shield} label="Max Discount Cap" value={`Rs. ${discount.maxDiscountAmount}`} />
-                )}
                 <DataRow icon={DollarSign} label="Min Order Value" value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} />
                 <DataRow icon={Box} label="Min Quantity" value={discount.minQuantity ? String(discount.minQuantity) : "No minimum"} />
-                <DataRow icon={Zap} label="Priority" value={discount.priority || "1"} />
-                <DataRow icon={Shield} label="Stackable" value={discount.isStackable ? "Yes" : "No"} />
               </div>
-            </InfoCard>
+            </InfoCard></div>
 
-            <InfoCard icon={Clock} title="Usage Limits">
+            <div id="d-usage" className="scroll-mt-4 h-full"><InfoCard icon={Clock} title="Usage Limits">
               <div className="space-y-1">
                 <DataRow icon={TrendingUp} label="Total Usage Limit" value={discount.usageLimit ? String(discount.usageLimit) : "Unlimited"} />
-                <DataRow icon={Hash} label="Usage Count" value={String(discount.usageCount || 0)} />
                 <DataRow icon={User} label="Per User Limit" value={discount.perUserLimit ? String(discount.perUserLimit) : "1"} />
-                <DataRow icon={Activity} label="Status" value={discount.status || "draft"} highlight={isActive} />
-                <DataRow icon={CheckCircle2} label="Is Active" value={discount.isActive ? "Yes" : "No"} highlight={discount.isActive} />
               </div>
-            </InfoCard>
+            </InfoCard></div>
           </div>
 
           <InfoCard icon={Target} title="Applied Targets">
@@ -570,11 +558,9 @@ export default function DiscountDetailPage() {
             )}
           </InfoCard>
         </div>
-      )}
 
-      {/* ACTIVITY TAB */}
-      {tab === "activity" && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+      {/* ACTIVITY */}
+      <div id="d-activity" className="scroll-mt-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
           <InfoCard icon={Activity} title="Activity Timeline">
             <div className="space-y-6">
               {/* Created Event */}
@@ -699,6 +685,40 @@ export default function DiscountDetailPage() {
             </div>
           </InfoCard>
         </div>
+
+      {/* EDIT MODAL — bilkul Add Discount jaisa form */}
+      {showEdit && (
+        <DiscountFormModal
+          formType={activeFormType}
+          formData={formData}
+          setFormData={setFormData}
+          formErrors={formErrors}
+          setFormErrors={setFormErrors}
+          editingDiscount={discount}
+          saveMutation={saveMutation}
+          setShowModal={setShowEdit}
+          resetForm={resetForm}
+          setSelector={setSelector}
+          handleSubmit={handleSubmit}
+          inputStyle={inputStyle}
+          products={products}
+          categories={categories}
+          brands={brands}
+        />
+      )}
+      {selector.open && (
+        <SelectionModal
+          type={selector.type}
+          items={selector.type === "product" ? products : selector.type === "category" ? categories : brands}
+          selectedIds={formData.selected_ids}
+          onClose={() => setSelector({ open: false, type: null })}
+          onApply={(ids) => {
+            setFormData((prev) => ({ ...prev, selected_ids: ids }));
+            setSelector({ open: false, type: null });
+          }}
+          inputStyle={inputStyle}
+          cardStyle={cardStyle}
+        />
       )}
 
       {/* DELETE MODAL */}
@@ -710,7 +730,7 @@ export default function DiscountDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete "{discount.name}"?</h3>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{discount.name}&quot;?</h3>
                 <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The discount will be permanently removed.</p>
               </div>
             </div>

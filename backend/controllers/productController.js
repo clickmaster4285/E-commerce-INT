@@ -808,7 +808,25 @@ const updateProduct = async (req, res) => {
             variant.status = item.status === "inactive" ? "inactive" : "active";
           }
 
-          if (imagesByVariant[index]) {
+          // ✅ FIX: Variant image removal ab save par persist hoti hai.
+          // Frontend existing_images (bachi hui images ke objects) bhejta hai —
+          // purani images jo is list mein NAHI hain = user ne remove ki hui, unhe hatao.
+          // Nayi uploaded files (imagesByVariant[index]) remaining ke saath append karo.
+          // NOTE: Agar existing_images field hi na bheji ho (e.g. tag-only updates),
+          // to purana append behavior rakha gaya hai — koi accidental image loss nahi.
+          if (Array.isArray(item.existing_images)) {
+            const keptUrls = new Set(
+              item.existing_images
+                .map((img) => (typeof img === "string" ? img : img?.img_url))
+                .filter(Boolean)
+                .map(String)
+            );
+            const oldImages = Array.isArray(variant.images) ? variant.images : [];
+            const remaining = oldImages.filter((img) => keptUrls.has(String(img?.img_url)));
+            variant.images = imagesByVariant[index]
+              ? [...remaining, ...imagesByVariant[index]]
+              : remaining;
+          } else if (imagesByVariant[index]) {
             const oldImages = Array.isArray(variant.images) ? variant.images : [];
             variant.images = [...oldImages, ...imagesByVariant[index]];
           }

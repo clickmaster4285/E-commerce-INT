@@ -24,16 +24,14 @@ const displayRulesSchema = new mongoose.Schema({
 const bannerSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
-    internalName: { type: String, trim: true },
     bannerType: { type: String, enum: ["homepage_hero", "promotional", "product", "collection", "popup"], required: true },
     status: { type: String, enum: ["active", "inactive", "scheduled", "expired", "draft"], default: "draft" },
     position: { type: Number, default: 0 },
 
     desktopImage: { type: String, required: true },
    
-    backgroundColor: { type: String, default: "#ffffff" },
+    
 
-    altText: { type: String, default: "" },
 
     eyebrow: { type: String, default: "" },
     heading: { type: String, default: "" },

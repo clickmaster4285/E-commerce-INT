@@ -31,22 +31,11 @@ export default function useBannerSocketSync() {
     };
 
     const handleBannerUpdated = (result) => {
-      const data = result?.data || result;
-      if (data?._id) {
-        const bannerKey = data._id.toString();
-        queryClient.setQueryData(["adminBanners"], (oldData) => {
-          if (!oldData) return oldData;
-          if (Array.isArray(oldData)) {
-            return oldData.map((b) => b?._id?.toString() === bannerKey ? data : b);
-          }
-          if (Array.isArray(oldData.data)) {
-            return { ...oldData, data: oldData.data.map((b) => b?._id?.toString() === bannerKey ? data : b) };
-          }
-          return oldData;
-        });
-      } else {
-        invalidateBanners();
-      }
+      // NOTE: setQueryData(["adminBanners"], ...) exact key match maangta hai —
+      // page ka key ["adminBanners","paginated",page,search,...] hai, is liye
+      // partial-key setQueryData kabhi apply nahi hota tha (update show nahi hota tha).
+      // Fully socket-driven: har event pe refetch — data hamesha fresh.
+      invalidateBanners();
       if (selfActionRef.current === "update" || selfActionRef.current === "toggle") {
         selfActionRef.current = null;
       }
