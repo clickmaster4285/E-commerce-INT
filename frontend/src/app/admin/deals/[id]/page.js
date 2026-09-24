@@ -212,6 +212,7 @@ export default function DealDetailPage() {
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
     buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+    bundle_image: "",
     has_min_quantity: false,
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -282,6 +283,7 @@ export default function DealDetailPage() {
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
       buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      bundle_image: "",
       has_min_quantity: false,
       min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -308,6 +310,7 @@ export default function DealDetailPage() {
       get_quantity: d?.getQuantity ?? "",
       get_discount_value: d?.getDiscountValue ?? "",
       bundle_price: d?.bundlePrice ?? "",
+      bundle_image: d?.image || "",
       has_min_quantity: hasMinQty,
       min_quantity: hasMinQty ? rawMinQty : "",
       start_at: toDateInput(d?.startDate),
@@ -335,6 +338,11 @@ export default function DealDetailPage() {
     if (formData.value_type === "buy_x_get_y") {
       if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+    }
+
+    // ✅ Bundle deal ke liye bundle price zaroori hai
+    if (formData.value_type === "bundle" && (!formData.bundle_price || Number(formData.bundle_price) <= 0)) {
+      return toast.error("Please enter a valid Bundle Price");
     }
 
     if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
@@ -365,6 +373,8 @@ export default function DealDetailPage() {
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
       bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
+      // ✅ Bundle image — sirf bundle deal par save hoti hai, warna clear
+      image: formData.value_type === "bundle" ? String(formData.bundle_image || "") : "",
       minQuantity: finalMinQuantity,
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,

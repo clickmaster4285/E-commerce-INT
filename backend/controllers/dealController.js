@@ -470,6 +470,36 @@ const getActiveDealById = async (req, res) => {
   }
 };
 
+// ==========================================
+// UPLOAD DEAL IMAGE (BUNDLE DEAL IMAGE)
+// ==========================================
+
+const uploadDealImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Image file is required",
+      });
+    }
+
+    const url = `/uploads/deals/${req.file.filename}`;
+
+    res.status(201).json({
+      success: true,
+      message: "Deal image uploaded successfully",
+      data: { url },
+    });
+  } catch (error) {
+    console.error("Upload Deal Image Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload deal image",
+    });
+  }
+};
+
 // ... (exports mein add karna mat bhoolna)
 module.exports = {
   createDeal,
@@ -480,4 +510,5 @@ module.exports = {
   updateDeal,
   deleteDeal,
   toggleDealStatus,
+  uploadDealImage, // ✅ Bundle deal image upload
 };

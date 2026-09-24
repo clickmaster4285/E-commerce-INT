@@ -23,4 +23,13 @@ export const dealApi = {
 
   toggleStatus: (id) =>
     axiosInstance.patch(`/deals/${id}/toggle-status`).then((res) => res.data?.data || res.data),
+
+  // ✅ Bundle deal image upload (multipart) → returns { url }
+  uploadImage: (file) => {
+    const fd = new FormData();
+    fd.append("image", file);
+    return axiosInstance
+      .post("/deals/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((res) => res.data?.data?.url || res.data?.url || "");
+  },
 };

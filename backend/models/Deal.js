@@ -117,6 +117,14 @@ const dealSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // ✅ Bundle deal ki main image (admin panel se upload hoti hai)
+    // Storefront par deal card / deal detail me ye image dikhayi jati hai
+    image: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     // ==========================================
     // SCHEDULE (REQUIRED)
     // ==========================================
