@@ -457,12 +457,13 @@ export function CartProvider({ children }) {
 
   const getDealInfoForItem = (item) => {
     if (!item.dealId || item.dealType !== "buy_x_get_y") return null;
+    const basePrice = Number(item.dealRegularPrice || item.regularPrice || item.price || 0);
     return {
       buyQty: item.dealBuyQuantity || 2,
       getQty: item.dealGetQuantity || 1,
       freeItems: calculateFreeItems(item.qty, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
       payableItems: calculatePayableItems(item.qty, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
-      savings: calculateBuyXGetYSavings(item.qty, item.price, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
+      savings: calculateBuyXGetYSavings(item.qty, basePrice, item.dealBuyQuantity || 2, item.dealGetQuantity || 1),
     };
   };
 

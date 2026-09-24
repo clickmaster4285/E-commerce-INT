@@ -55,9 +55,10 @@ export default function DealDetailPage({ params }) {
   const currentPage = Number(searchParams.get("page")) || 1;
   const limit = 20;
 
-  const { data: deal, isLoading } = useQuery({
+  const { data: deal, isLoading, isError, refetch } = useQuery({
     queryKey: ["deal", id, currentPage],
     queryFn: () => dealApi.getById(id, currentPage, limit),
+    retry: 2,
   });
 
   // ✅ Full product data (variants/images/prices + populated brand) — same source as main page
@@ -82,6 +83,26 @@ export default function DealDetailPage({ params }) {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="max-w-[600px] mx-auto px-4 py-20 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+          <Flame size={32} className="text-red-500" />
+        </div>
+        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Failed to Load Deal</h1>
+        <p className="text-sm text-[var(--user-text-muted)] mb-6">Something went wrong. Please try again.</p>
+        <div className="flex items-center justify-center gap-3">
+          <button onClick={() => refetch()} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
+            Retry
+          </button>
+          <Link href="/deals" className="inline-flex items-center gap-2 border-2 border-[var(--user-border)] text-[var(--user-text-muted)] px-6 py-3 rounded-xl text-sm font-bold hover:border-[var(--user-accent)]/40 transition">
+            <ArrowLeft size={16} /> Back to Deals
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!deal) {
     return (
       <div className="max-w-[600px] mx-auto px-4 py-20 text-center">
@@ -98,7 +119,10 @@ export default function DealDetailPage({ params }) {
 
   const rawProducts = deal.resolvedProducts || deal.productIds || [];
   const allProductsById = new Map(allProducts.map((p) => [p._id, p]));
-  const products = rawProducts.map((p) => allProductsById.get(p._id) || p);
+  const products = rawProducts.map((p) => {
+    const id = typeof p === 'string' ? p : p?._id;
+    return (id && allProductsById.get(id)) || p;
+  });
   const totalPages = deal.totalPages || 1;
   const badgeText = deal.type === "percentage" ? `${deal.discountValue}% OFF` : `Rs. ${deal.discountValue} OFF`;
 
@@ -198,7 +222,7 @@ export default function DealDetailPage({ params }) {
     key={product._id} 
     product={product} 
     deal={deal} 
-    dealId={deal._id}
+    dealId={String(deal._id)}
     showDealPricing
   />
 ))}

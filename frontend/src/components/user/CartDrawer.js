@@ -15,7 +15,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
   import { useCart } from "./CartContext";
   import { useDiscounts } from "./DiscountContext";
   import DealInfoDropdown from "./DealInfoDropdown";
-  import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
+  import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule, sanitizeDealBadge } from "@/utils/dealCalculator";
 
   const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
   const SHIPPING_FEE = 200;
@@ -37,7 +37,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const val = deal.discountValue || 0;
     const buyQty = deal.buyQuantity || 0;
     const getQty = deal.getQuantity || 0;
-    
+
     if (type === "percentage") return { text: `${val}% OFF`, color: "from-green-500 to-emerald-600", icon: Tag };
     if (type === "fixed_amount") return { text: `Rs. ${val} OFF`, color: "from-blue-500 to-cyan-600", icon: Tag };
     if (type === "buy_x_get_y") return { text: buyQty > 0 && getQty > 0 ? `Buy ${buyQty} Get ${getQty}` : "Buy X Get Y", color: "from-purple-500 to-pink-600", icon: PackageOpen };
@@ -181,7 +181,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
               dealId: raw.dealId,
               dealType: raw.dealType,
               dealName: raw.dealName || "Deal",
-              dealBadge: raw.dealBadge || getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text,
+              // ✅ discountValue = actual deal value (percent/fixed) — dealSavings rupees hai jo "0% OFF" banata tha
+              dealBadge: sanitizeDealBadge(raw.dealBadge) || sanitizeDealBadge(getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealDiscountValue ?? raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text),
               items: [],
               totalSavings: 0,
             });
@@ -577,7 +578,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
   function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
     const { applyDealToItem } = useCart();
     return (
-      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
+      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${openDealPicker ? "min-h-[240px] border-purple-500/40" : ""} ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
         {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
         <button
           type="button"

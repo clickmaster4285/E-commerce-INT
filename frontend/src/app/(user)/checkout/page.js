@@ -180,6 +180,7 @@ function CheckoutContent() {
   const [mobileAddressSheet, setMobileAddressSheet] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [shippingMethod, setShippingMethod] = useState(() => getDefaultShippingMethod(null));
+  const [userSelectedShipping, setUserSelectedShipping] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
    const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "", cvv: "" });
   const [bankForm, setBankForm] = useState({ senderName: "", transactionRef: "" });
@@ -335,15 +336,13 @@ function CheckoutContent() {
     [freeShippingByActiveItems, dealsList]
   );
 
-  // ✅ Sync `shippingMethod` to the deal-derived default when the active deal
-  //    changes. This pre-selects express for express-only deals on entry, and
-  //    falls back to standard when no deal or no covered method exists.
-  //    The user can still manually switch methods — subsequent useEffect runs
-  //    only re-sync when the active deal itself changes.
+  // ✅ Sync `shippingMethod` to the deal-derived default on initial load only.
+  //    Once the user has manually selected a method, don't override their choice.
   useEffect(() => {
+    if (userSelectedShipping) return;
     const next = getDefaultShippingMethod(activeFreeShippingDeal);
     setShippingMethod((prev) => (prev !== next ? next : prev));
-  }, [activeFreeShippingDeal]);
+  }, [activeFreeShippingDeal, userSelectedShipping]);
 
   const itemsWithDiscounts = activeItems.map((i) => {
     const qty = Number(i.qty) || 1;
@@ -356,8 +355,8 @@ function CheckoutContent() {
     if (!dealActive) {
       const fakeProduct = {
         _id: i.productId || i.id,
-        category_id: i.categoryId || null,
-        brand_id: i.brandId || null,
+        category_id: i.categoryId ? String(i.categoryId) : null,
+        brand_id: i.brandId ? String(i.brandId) : null,
         discount: i.productDiscountPct || 0,
       };
       // ✅ Regular checkout line: includeDeals=false so any active deal
@@ -374,7 +373,7 @@ function CheckoutContent() {
     if (dealActive && i.dealType === "buy_x_get_y" && i.dealBuyQuantity && i.dealGetQuantity) {
       freeItems = calculateFreeItems(qty, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
       payableItems = calculatePayableItems(qty, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
-      dealSavings = calculateBuyXGetYSavings(qty, price, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
+      dealSavings = calculateBuyXGetYSavings(qty, regularPrice, Number(i.dealBuyQuantity), Number(i.dealGetQuantity));
       effectiveDealSavings = dealSavings;
     } else if (dealActive && (i.dealType === "percentage" || i.dealType === "fixed_amount")) {
       effectiveDealSavings = Math.max(0, (regularPrice - price) * qty);
@@ -916,7 +915,7 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} onClick={() => setShippingMethod(m.id)} className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                        <button key={m.id} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
                           {m.badge && (
                             <span className={`absolute top-2 right-2 text-[8px] font-black px-2 py-0.5 rounded-full ${m.id === "express" ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "bg-[var(--user-border)] text-[var(--user-text-muted)]"}`}>{m.badge}</span>
                           )}
@@ -1336,7 +1335,7 @@ function CheckoutContent() {
                         type="radio"
                         name="shipping-method-mobile"
                         checked={active}
-                        onChange={() => setShippingMethod(m.id)}
+                        onChange={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }}
                         className="w-4 h-4 shrink-0"
                         style={{ accentColor: "var(--user-accent)" }}
                       />

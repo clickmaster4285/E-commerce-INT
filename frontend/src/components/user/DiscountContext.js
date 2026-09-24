@@ -200,29 +200,7 @@ export function useDiscounts() {
         return false;
       };
 
-      // ✅ STEP 2: FIRST check for Buy X Get Y deals (special handling)
-      if (includeDeals && deals && Array.isArray(deals)) {
-        for (const deal of deals) {
-          if (!deal.isActive) continue;
-          if (deal.type !== "buy_x_get_y") continue; // Sirf buy_x_get_y pehle check karo
-          
-          const startDate = new Date(deal.startDate);
-          const endDate = new Date(deal.endDate);
-          if (startDate > now || endDate < now) continue;
-
-          if (checkApplies(deal)) {
-            // ✅ Buy X Get Y deal matched! Isko priority do
-            matchedDeal = deal;
-            bestName = deal.name || `Buy ${deal.buyQuantity || 2} Get ${deal.getQuantity || 1}`;
-            bestType = "buy_x_get_y";
-            bestValue = deal.discountValue || 0;
-            // Price same rahega, lekin badge dikhayega
-            break;
-          }
-        }
-      }
-
-      // ✅ STEP 3: Check regular discounts (percentage/fixed)
+      // ✅ STEP 2: Check regular discounts (percentage/fixed) — only when no deal matched
       if (!matchedDeal && discounts && Array.isArray(discounts)) {
         for (const disc of discounts) {
           if (!disc.isActive) continue;
@@ -240,36 +218,6 @@ export function useDiscounts() {
             bestName = disc.name || "Discount";
             bestType = disc.type;
             bestValue = disc.value || disc.discountValue;
-          }
-        }
-      }
-
-      // ✅ STEP 4: Check other deals (percentage/fixed/free_shipping)
-      if (includeDeals && !matchedDeal && deals && Array.isArray(deals)) {
-        for (const deal of deals) {
-          if (!deal.isActive) continue;
-          if (deal.type === "buy_x_get_y") continue; // Already check kar liya
-          
-          const startDate = new Date(deal.startDate);
-          const endDate = new Date(deal.endDate);
-          if (startDate > now || endDate < now) continue;
-
-          if (!checkApplies(deal)) continue;
-
-          let finalPrice = originalPrice;
-          if (deal.type === "percentage") {
-            finalPrice = originalPrice * (1 - Number(deal.discountValue) / 100);
-          } else if (deal.type === "fixed_amount") {
-            finalPrice = Math.max(0, originalPrice - Number(deal.discountValue));
-          }
-          // free_shipping ka price same rahega
-
-          if (finalPrice < bestPrice || deal.type === "free_shipping") {
-            bestPrice = finalPrice;
-            bestName = deal.name || `${deal.discountValue}${deal.type === "percentage" ? "%" : " Rs"} OFF`;
-            bestType = deal.type;
-            bestValue = deal.discountValue;
-            matchedDeal = deal;
           }
         }
       }

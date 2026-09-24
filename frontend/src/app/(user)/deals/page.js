@@ -16,10 +16,11 @@ function calcTime(endDate) {
 }
 
 export default function AllDealsPage() {
-  const { data: allDeals = [], isLoading } = useQuery({
+  const { data: allDeals = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["activeDeals"],
     queryFn: dealApi.getActive,
     staleTime: 60 * 1000,
+    retry: 2,
   });
 
   if (isLoading) {
@@ -33,6 +34,21 @@ export default function AllDealsPage() {
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-[600px] mx-auto px-4 py-20 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+          <Flame size={32} className="text-red-500" />
+        </div>
+        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Failed to Load Deals</h1>
+        <p className="text-sm text-[var(--user-text-muted)] mb-6">Something went wrong. Please try again.</p>
+        <button onClick={() => refetch()} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
+          Retry
+        </button>
       </div>
     );
   }

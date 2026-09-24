@@ -11,6 +11,18 @@
  *
  * Buy X Get Y below the threshold behaves as a regular line.
  */
+/**
+ * ✅ "0% OFF" / "Rs. 0 OFF" jaise zero-value badges hide karo —
+ * off ho tabhi OFF text show karo, warna null (badge render hi mat karo).
+ */
+export function sanitizeDealBadge(text) {
+  if (!text) return null;
+  const t = String(text).trim();
+  if (/^0\s*%\s*off$/i.test(t)) return null;
+  if (/^rs\.?\s*0\s*off$/i.test(t)) return null;
+  return t;
+}
+
 export function isDealActive(item) {
   if (!item || !item.dealId) return false;
   if (item.dealType === "buy_x_get_y") {

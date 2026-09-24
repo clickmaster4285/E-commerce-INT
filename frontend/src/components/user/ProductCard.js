@@ -33,6 +33,9 @@ function getDealBadgeConfig(deal) {
   const buyQty = deal.buyQuantity || 0;
   const getQty = deal.getQuantity || 0;
 
+  // ✅ 0% / Rs. 0 OFF — off ho tabhi OFF badge dikhao, warna hide
+  if ((type === "percentage" || type === "fixed_amount") && val <= 0) return null;
+
   if (type === "percentage")
     return {
       text: `${val}% OFF`,
