@@ -36,8 +36,9 @@ const toNum = (val) => (isNaN(Number(val)) ? 0 : Number(val));
 
 const getDealBadgeText = (deal) => {
   if (!deal?.type) return deal?.name || "Deal";
-  if (deal.type === "percentage") return `${deal.discountValue}% OFF`;
-  if (deal.type === "fixed_amount") return `Rs. ${deal.discountValue} OFF`;
+  // ✅ 0% / Rs. 0 OFF — off ho tabhi OFF text dikhao
+  if (deal.type === "percentage") return Number(deal.discountValue) > 0 ? `${deal.discountValue}% OFF` : null;
+  if (deal.type === "fixed_amount") return Number(deal.discountValue) > 0 ? `Rs. ${deal.discountValue} OFF` : null;
   if (deal.type === "buy_x_get_y") {
     const b = deal.buyQuantity || 0, g = deal.getQuantity || 0;
     return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
@@ -499,7 +500,7 @@ function ProductDetailContent({ params }) {
     if (!matchedDeal) return null;
     const info = {
       dealId: matchedDeal._id, dealType: matchedDeal.type, dealName: matchedDeal.name,
-      dealBadge: getDealBadgeText(matchedDeal),
+      dealBadge: getDealBadgeText(matchedDeal) || null,
       savings: Math.max(0, dealOriginalPrice - dealPrice), originalPrice: dealOriginalPrice,
       dealDiscountValue: Number(matchedDeal.discountValue) || 0,
       minQuantity: Number(matchedDeal.minQuantity) || 1,
@@ -599,7 +600,7 @@ function ProductDetailContent({ params }) {
                     const sel = String(d._id) === String(selectedDealId);
                     const dd = calculateProductDiscount(product, variantPrice, true, d);
                     const saveAmt = dd && dd.hasDiscount ? (dd.originalPrice - dd.discountedPrice) : 0;
-                    const badge = getDealBadgeText(d);
+                    const badge = getDealBadgeText(d) || d.name || "Deal";
                     return (
                       <button
                         key={d._id}

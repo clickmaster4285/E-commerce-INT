@@ -8,13 +8,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, ShoppingBag, Package, Tag, Check, Plus, Minus,
   Trash2, Sparkles, Zap, Truck, PackageOpen, ChevronDown, ShieldCheck, Lock,
-  Gift, CreditCard, Percent, TrendingUp, Box
+  Gift, CreditCard, Percent, TrendingUp, Box, BadgePercent
 } from "lucide-react";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import DealInfoDropdown from "@/components/user/DealInfoDropdown";
 import { shippingApi } from "@/apis/user/shippingApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
+import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule, sanitizeDealBadge } from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -33,7 +33,7 @@ function getDealBadgeConfig(deal) {
   const val = deal.discountValue || 0;
   const buyQty = deal.buyQuantity || 0;
   const getQty = deal.getQuantity || 0;
-  
+
   if (type === "percentage") return { text: `${val}% OFF`, color: "from-green-500 to-emerald-600", icon: Tag };
   if (type === "fixed_amount") return { text: `Rs. ${val} OFF`, color: "from-blue-500 to-cyan-600", icon: Tag };
   if (type === "buy_x_get_y") return { text: buyQty > 0 && getQty > 0 ? `Buy ${buyQty} Get ${getQty}` : "Buy X Get Y", color: "from-purple-500 to-pink-600", icon: PackageOpen };
@@ -160,7 +160,8 @@ export default function CartPage() {
             dealId: raw.dealId,
             dealType: raw.dealType,
             dealName: raw.dealName || "Deal",
-            dealBadge: raw.dealBadge || getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text,
+            // ✅ discountValue = actual deal value (percent/fixed) — dealSavings rupees hai jo "0% OFF" banata tha
+            dealBadge: sanitizeDealBadge(raw.dealBadge) || sanitizeDealBadge(getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealDiscountValue ?? raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text),
             items: [],
             totalSavings: 0,
           });
@@ -264,10 +265,12 @@ export default function CartPage() {
     toast.success("Item removed", { action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
   };
 
-  const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => (
+  const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => {
+    const dealOpen = openDealCardKey === row.key;
+    return (
     <div
       onClick={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
-      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
+      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${dealOpen ? "min-h-[260px] border-purple-500/40" : ""} ${
       !isSelected ? "opacity-60" : ""
     } ${
       isDeal
@@ -317,7 +320,9 @@ export default function CartPage() {
           {row.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>}
           
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            {isDeal && dealBadge && (
+            {/* ✅ Discount sirf EK dafa row pe: price-drop pill (-X%) already deal discount
+                dikha raha hai, to same "2% OFF" badge dubara mat render karo */}
+            {isDeal && dealBadge && !(row.hasDiscount && row.originalPrice > row.displayPrice) && (
               <span className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r ${getDealBadgeConfig(row.raw)?.color || "from-purple-500 to-pink-600"} text-white px-2 py-0.5 text-[10px] font-black shadow-sm`}>
                 <Sparkles size={10} /> {dealBadge}
               </span>
@@ -332,6 +337,17 @@ export default function CartPage() {
                 <TrendingUp size={10} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
               </span>
             )}
+            {/* ✅ DEALS BUTTON — drawer jaisa explicit deal picker toggle */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpenDealCardKey((prev) => (prev === row.key ? null : row.key)); }}
+              aria-label="View available deals"
+              aria-expanded={dealOpen}
+              className="inline-flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+            >
+              <BadgePercent size={11} />
+              <span>Deals</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2 mt-auto pt-2">
@@ -395,7 +411,8 @@ export default function CartPage() {
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   // ✅ Daraz-style mobile rendering — kept identical state/handlers/queries.
   return (
@@ -800,7 +817,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
   return (
     <div
       onClick={() => onToggleDealPicker?.()}
-      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border border-[var(--user-border)] p-3 mb-2 flex items-start gap-2 ${!isSelected ? "opacity-60" : ""}`}>
+      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border p-3 mb-2 flex items-start gap-2 transition-all duration-200 ${openDealPicker ? "min-h-[240px] border-purple-500/40" : "border-[var(--user-border)]"} ${!isSelected ? "opacity-60" : ""}`}>
       {/* ✅ Selection checkbox (unchanged) */}
       <button
         type="button"
@@ -849,7 +866,9 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
 
         {(isDeal && dealBadge) || row.freeItems > 0 || row.hasDiscount ? (
           <div className="flex flex-wrap items-center gap-1 mt-1">
-            {isDeal && dealBadge && (
+            {/* ✅ Discount sirf EK dafa row pe: price-drop pill (-X%) already deal discount
+                dikha raha hai, to same badge dubara mat render karo */}
+            {isDeal && dealBadge && !(row.hasDiscount && row.originalPrice > row.displayPrice) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white px-1.5 py-0.5 text-[9px] font-black">
                 <Sparkles size={8} /> {dealBadge}
               </span>
@@ -866,6 +885,18 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
             )}
           </div>
         ) : null}
+
+        {/* ✅ DEALS BUTTON — mobile card pe explicit deal picker toggle (drawer jaisa) */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
+          aria-label="View available deals"
+          aria-expanded={openDealPicker}
+          className="inline-flex w-fit items-center gap-1 mt-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+        >
+          <BadgePercent size={10} />
+          <span>Deals</span>
+        </button>
 
         <DealInfoDropdown
           cartItem={row.raw}

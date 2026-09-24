@@ -30,8 +30,8 @@ function getDealBadgeText(deal) {
   const val = deal.discountValue || 0;
   const buyQty = deal.buyQuantity || 0;
   const getQty = deal.getQuantity || 0;
-  if (deal.type === "percentage") return `${val}% OFF`;
-  if (deal.type === "fixed_amount") return `Rs. ${val} OFF`;
+  if (deal.type === "percentage") return val > 0 ? `${val}% OFF` : "";
+  if (deal.type === "fixed_amount") return val > 0 ? `Rs. ${val} OFF` : "";
   if (deal.type === "buy_x_get_y") return buyQty > 0 && getQty > 0 ? `Buy ${buyQty} Get ${getQty}` : "Buy X Get Y";
   if (deal.type === "bundle") return "Bundle Deal";
   if (deal.type === "free_shipping") return "Free Shipping";
@@ -125,7 +125,13 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
   useEffect(() => {
     if (!open) return undefined;
     const onMouseDown = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) onClose?.();
+      const root = rootRef.current;
+      if (!root) return;
+      // ✅ Hidden twin tree (desktop/mobile dono trees render this panel, ek CSS se
+      // display:none hota hai) ka listener close-na kar-de — warna woh hamesha
+      // "outside" click samajh kar panel band kar deta hai aur deal kabhi select nahi hoti.
+      if (root.getClientRects().length === 0) return;
+      if (!root.contains(e.target)) onClose?.();
     };
     const onKey = (e) => {
       if (e.key === "Escape") onClose?.();
@@ -161,7 +167,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
       aria-label="Available deals for this item"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between border-b border-purple-500/15 bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-2.5 py-1.5">
+      <div className="flex shrink-0 items-center justify-between border-b border-purple-500/15 bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-2.5 py-1.5">
         <div className="flex items-center gap-1.5">
           <Sparkles size={11} className="text-purple-600" />
           <span className="text-[10px] font-black uppercase tracking-wider text-purple-600">Available Offers</span>
@@ -192,7 +198,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
 
       <div
         ref={scrollRef}
-        className="flex flex-1 snap-x snap-mandatory gap-2 overflow-x-auto overscroll-contain px-2 py-2"
+        className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2 overflow-x-auto overflow-y-hidden overscroll-contain px-2 py-2"
         style={{ scrollSnapType: "x mandatory" }}
       >
         {availableDeals.map((deal) => {
@@ -203,6 +209,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
           const gap = Math.max(0, minQty - currentQty);
           const isSelected = activeDealId === deal._id;
           const savingsText = getDealSavingsPreview(deal, regularPrice);
+          const badgeText = getDealBadgeText(deal);
 
           return (
             <button
@@ -224,12 +231,14 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
               >
                 {isSelected ? <Check size={13} strokeWidth={3} className="text-white" /> : <Icon size={13} className="text-white" />}
               </span>
-              <span className={`text-[10px] font-bold leading-tight ${isSelected ? "text-[var(--user-accent)]" : "text-[var(--user-text)]"}`}>
+              <span className={`line-clamp-2 text-[10px] font-bold leading-tight ${isSelected ? "text-[var(--user-accent)]" : "text-[var(--user-text)]"}`}>
                 {deal.name}
               </span>
-              <span className={`rounded-full bg-gradient-to-r px-1.5 py-px text-[8px] font-black text-white ${color}`}>
-                {getDealBadgeText(deal)}
-              </span>
+              {badgeText ? (
+                <span className={`rounded-full bg-gradient-to-r px-1.5 py-px text-[8px] font-black text-white ${color}`}>
+                  {badgeText}
+                </span>
+              ) : null}
               {savingsText && (
                 <span className="text-[8px] font-bold text-[var(--user-success)]">{savingsText}</span>
               )}
@@ -248,7 +257,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
         <button
           type="button"
           onClick={() => { onApplyDeal?.(null); onClose?.(); }}
-          className="w-full border-t border-[var(--user-border)] px-2.5 py-1.5 text-center text-[10px] font-bold text-red-500 transition hover:bg-red-500/10"
+          className="w-full shrink-0 border-t border-[var(--user-border)] px-2.5 py-1.5 text-center text-[10px] font-bold text-red-500 transition hover:bg-red-500/10"
         >
           Remove Deal
         </button>
