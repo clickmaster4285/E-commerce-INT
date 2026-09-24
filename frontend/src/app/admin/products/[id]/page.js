@@ -225,6 +225,51 @@ const attrValueOf = (raw) => {
   return String(raw);
 };
 
+// ==================== ACTIVITY TIMELINE ====================
+// Every entry is derived from persistent audit data (Product / Variant
+// createdby + updatedby, Tag createdAt + createdby), so the history survives
+// page reloads. Live socket events are merged on top as a "LIVE" overlay.
+const ACTIVITY_TYPES = {
+  "product-created": { group: "product", label: "Product Created", icon: Plus, bg: "var(--success-soft)", fg: "var(--success)", avatar: "emerald" },
+  "product-updated": { group: "product", label: "Product Updated", icon: Pencil, bg: "var(--info-soft)", fg: "var(--info)", avatar: "blue" },
+  "variant-created": { group: "variant", label: "Variant Created", icon: Layers3, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
+  "variant-updated": { group: "variant", label: "Variant Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
+  "tag-created": { group: "tag", label: "Tag Created", icon: TagIcon, bg: "var(--accent-soft)", fg: "var(--accent)", avatar: "emerald" },
+  "tag-updated": { group: "tag", label: "Tag Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
+};
+
+const activityMetaOf = (type) => ACTIVITY_TYPES[type] || ACTIVITY_TYPES["product-updated"];
+
+// Audit users arrive either populated ({ name, email }) or as a raw id / null.
+const actorName = (user) => {
+  if (!user) return "";
+  if (typeof user === "string") return user;
+  return user.name || user.email || "";
+};
+const actorEmail = (user) => (user && typeof user === "object" ? user.email || "" : "");
+
+// A product / variant / tag is only reported as "updated" when its audit
+// timestamp is measurably later than creation (not the creation itself).
+const hasRealUpdate = (createdAt, updatedAt) =>
+  !!createdAt && !!updatedAt &&
+  new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+
+// Sockets can echo the same change the refetched document already contains,
+// so events of the same type from the same minute are treated as duplicates.
+const activityBucket = (type, date) => `${type}|${Math.floor(new Date(date).getTime() / 60000)}`;
+
+const variantLabelOf = (variant) => {
+  const attrValues = Object.values(variant?.attributes || {}).map(attrValueOf).filter(Boolean);
+  return variant?.title || attrValues.join(" / ") || variant?.sku || "Variant";
+};
+
+const variantAttrSummary = (variant) =>
+  Object.entries(variant?.attributes || {})
+    .map(([name, raw]) => { const value = attrValueOf(raw); return value ? `${name}: ${value}` : ""; })
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" · ");
+
 // ==================== COMPACT 3-DOT MENU ====================
 
 function MoreMenu({ actions }) {
@@ -440,6 +485,7 @@ export default function ProductDetailPage() {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showAllAttributes, setShowAllAttributes] = useState(false);
+  const [activityFilter, setActivityFilter] = useState("all");
 
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams?.get("tab");
@@ -524,24 +570,10 @@ export default function ProductDetailPage() {
     enabled: !!productCategoryId, retry: false,
   });
 
-  // Initialize live events from database state so pre-existing updates are shown
-  useEffect(() => {
-    if (!product) return;
-    setLiveEvents((prev) => {
-      // Only seed once: if prev already has events, keep them.
-      if (prev.length > 0) return prev;
-      const initial = [];
-      if (product?.updatedby && product?.updated_at) {
-        initial.push({
-          key: `live-u-init-${product._id || id}`,
-          type: "updated",
-          user: product.updatedby || null,
-          date: product.updated_at || new Date().toISOString(),
-        });
-      }
-      return initial;
-    });
-  }, [product?._id, id]);
+  // NOTE: live events are only kept as a real-time overlay. The persisted
+  // Activity Timeline is built from the fetched product/variant/tag audit
+  // fields, so nothing is lost on reload and no duplicate "Update" row is
+  // seeded here anymore.
 
   const ATTRIBUTE_PRESETS = useMemo(() => {
     const source = (categoryAttributes && categoryAttributes.length) ? categoryAttributes : rawAttributes;
@@ -1022,8 +1054,7 @@ export default function ProductDetailPage() {
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
-  const liveUpdatedEvents = liveEvents.filter((e) => e.type === "updated");
-  const latestLiveUpdate = liveUpdatedEvents[liveUpdatedEvents.length - 1] || null;
+
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
   (variants || []).forEach(v => { (v.tags || []).forEach(tag => { const n = tagNameOf(tag); if (n) assignedTagNames.add(String(n).trim()); }); });
@@ -1095,6 +1126,160 @@ export default function ProductDetailPage() {
   })();
   const attributeCount = attributeSummary.length;
   const tagCount = allAssignedTags.length;
+
+  // ==================== PERSISTED ACTIVITY TIMELINE ====================
+  // Merges every audit trail available for this product:
+  //   • Product   → created_at / updated_at  (+ createdby / updatedby)
+  //   • Variants  → created_at / updated_at  (+ createdby / updatedby)
+  //   • Tags      → createdAt / updatedAt    (+ createdby / updatedby)
+  // plus a live socket overlay for changes that arrive before the refetch.
+  const activityTimeline = (() => {
+    const events = [];
+    const push = (event) => {
+      const meta = activityMetaOf(event?.type);
+      if (!event?.date || !meta) return;
+      events.push({ ...event, group: meta.group });
+    };
+
+    /* ---------------- Product ---------------- */
+    push({
+      key: `product-created-${product._id}`,
+      type: "product-created",
+      actor: product.createdby || null,
+      actionLabel: "Created",
+      description: "Product was added to the catalog",
+      date: product.created_at,
+    });
+
+    if (hasRealUpdate(product.created_at, product.updated_at)) {
+      push({
+        key: `product-updated-${product._id}`,
+        type: "product-updated",
+        actor: product.updatedby || null,
+        actionLabel: "Updated",
+        description: "Product details were modified",
+        date: product.updated_at,
+        meta: [
+          { label: "Name", value: product.name || "—" },
+          { label: "Status", value: product.status === "inactive" ? "Inactive" : "Active" },
+        ],
+      });
+    }
+
+    /* ---------------- Variants ---------------- */
+    (variants || []).forEach((variant, index) => {
+      const variantKey = String(variant._id || index);
+      const label = variantLabelOf(variant);
+      const attrSummary = variantAttrSummary(variant);
+      const baseMeta = [
+        { label: "SKU", value: variant.sku || "—", mono: true },
+        ...(attrSummary ? [{ label: "Attributes", value: attrSummary }] : []),
+      ];
+
+      push({
+        key: `variant-created-${variantKey}`,
+        type: "variant-created",
+        actor: variant.createdby || null,
+        actionLabel: "Created",
+        description: `Variant "${label}" was added to this product`,
+        date: variant.created_at,
+        meta: baseMeta,
+      });
+
+      if (hasRealUpdate(variant.created_at, variant.updated_at)) {
+        push({
+          key: `variant-updated-${variantKey}`,
+          type: "variant-updated",
+          actor: variant.updatedby || null,
+          actionLabel: "Updated",
+          description: `Variant "${label}" details were modified`,
+          date: variant.updated_at,
+          meta: [
+            ...baseMeta,
+            { label: "Price", value: `Rs. ${Number(variant.selling_price || 0).toLocaleString()}` },
+            { label: "Stock", value: `${Number(variant.quantity || 0)} units` },
+            { label: "Status", value: variant.status === "inactive" ? "Inactive" : "Active" },
+          ],
+        });
+      }
+    });
+
+    /* ---------------- Tags (assigned to product or its variants) ---------------- */
+    (allAssignedTags || []).forEach((tag, index) => {
+      const name = String(tagNameOf(tag) || "").trim();
+      if (!name) return;
+
+      const lowerName = name.toLowerCase();
+      const record =
+        tagRecordLookup[lowerName] ||
+        (tag?._id ? tagRecordLookup[String(tag._id).trim().toLowerCase()] : null) ||
+        tag;
+
+      const createdAt = record?.createdAt || record?.created_at;
+      const updatedAt = record?.updatedAt || record?.updated_at;
+
+      push({
+        key: `tag-created-${lowerName}-${index}`,
+        type: "tag-created",
+        actor: record?.createdby || null,
+        actionLabel: "Created",
+        description: `Tag "${name}" was created and assigned to this product`,
+        date: createdAt,
+        meta: [{ label: "Tag", value: name }],
+      });
+
+      if (hasRealUpdate(createdAt, updatedAt)) {
+        push({
+          key: `tag-updated-${lowerName}-${index}`,
+          type: "tag-updated",
+          actor: record?.updatedby || null,
+          actionLabel: "Updated",
+          description: `Tag "${name}" was renamed or modified`,
+          date: updatedAt,
+          meta: [{ label: "Tag", value: name }],
+        });
+      }
+    });
+
+    /* ---------------- Live socket overlay (deduped against DB entries) ---------------- */
+    const persistedBuckets = new Set(events.map((e) => activityBucket(e.type, e.date)));
+    (liveEvents || []).forEach((liveEvent) => {
+      const type = liveEvent.type === "created" ? "product-created" : "product-updated";
+      if (persistedBuckets.has(activityBucket(type, liveEvent.date))) return;
+      push({
+        key: liveEvent.key,
+        type,
+        actor: liveEvent.user || null,
+        actionLabel: liveEvent.type === "created" ? "Created" : "Updated",
+        description: liveEvent.type === "created"
+          ? "Product was added to the catalog"
+          : "Product details were modified",
+        date: liveEvent.date,
+        live: true,
+      });
+    });
+
+    // Newest first: the most recent action always sits on top.
+    return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  })();
+
+  const activitySummary = [
+    { id: "product-events", label: "Product Events", icon: Package, soft: "var(--success-soft)", color: "var(--success)", value: activityTimeline.filter((e) => e.group === "product").length, hint: "Created & updated" },
+    { id: "variants-added", label: "Variants Added", icon: Layers3, soft: "var(--purple-soft)", color: "var(--purple)", value: activityTimeline.filter((e) => e.type === "variant-created").length, hint: `${totalVariants} variant${totalVariants === 1 ? "" : "s"} live` },
+    { id: "variant-updates", label: "Variant Updates", icon: Pencil, soft: "var(--warning-soft)", color: "var(--warning)", value: activityTimeline.filter((e) => e.type === "variant-updated").length, hint: "Edits recorded" },
+    { id: "tag-events", label: "Tag Events", icon: TagIcon, soft: "var(--accent-soft)", color: "var(--accent)", value: activityTimeline.filter((e) => e.group === "tag").length, hint: `${tagCount} tag${tagCount === 1 ? "" : "s"} assigned` },
+  ];
+
+  const activityFilters = [
+    { id: "all", label: "All Activity", count: activityTimeline.length },
+    { id: "product", label: "Product", count: activityTimeline.filter((e) => e.group === "product").length },
+    { id: "variant", label: "Variants", count: activityTimeline.filter((e) => e.group === "variant").length },
+    { id: "tag", label: "Tags", count: activityTimeline.filter((e) => e.group === "tag").length },
+  ];
+
+  const filteredActivity = activityFilter === "all"
+    ? activityTimeline
+    : activityTimeline.filter((e) => e.group === activityFilter);
 
   // Helper to open gallery
   const openGallery = (index) => {
@@ -1698,27 +1883,30 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
 
-                    {latestLiveUpdate && (
+                    {/* Updated By — shown only when the product carries a real
+                        update (audit timestamp later than creation), using the
+                        persisted audit user so it survives a page reload. */}
+                    {hasRealUpdate(product.created_at, product.updated_at) && (
                       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                         <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
                           <h3 className="text-sm font-bold text-[var(--text-primary)]">Updated By</h3>
                         </div>
                         <div className="p-3">
-                          {latestLiveUpdate.user ? (
+                          {product.updatedby ? (
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-3">
-                                <Avatar user={latestLiveUpdate.user} size="md" color="blue" />
+                                <Avatar user={product.updatedby} size="md" color="blue" />
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{latestLiveUpdate.user.name || latestLiveUpdate.user.email}</p>
-                                  <p className="text-[11px] text-[var(--text-muted)]">{latestLiveUpdate.user.email || "—"}</p>
+                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{actorName(product.updatedby) || "Not recorded"}</p>
+                                  <p className="text-[11px] text-[var(--text-muted)]">{actorEmail(product.updatedby) || "—"}</p>
                                 </div>
                               </div>
-                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
+                              <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
-                              <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
-                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(latestLiveUpdate.date)}</span></p>
+                              <p className="text-[13px] font-semibold text-[var(--text-primary)]">Not recorded</p>
+                              <p className="text-[11px] text-[var(--text-muted)]">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
                             </div>
                           )}
                         </div>
@@ -1870,80 +2058,138 @@ export default function ProductDetailPage() {
             {/* ACTIVITY TAB */}
             {activeTab === "activity" && (
               <InfoCard icon={Activity} title="Activity Timeline" action={
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
-                  style={{ backgroundColor: isConnected ? "var(--success-soft)" : "var(--bg-tertiary)", color: isConnected ? "var(--success)" : "var(--text-muted)" }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "var(--success)" : "var(--text-muted)" }} />
-                  {isConnected ? "Live" : "Offline"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+                    {activityTimeline.length} {activityTimeline.length === 1 ? "Event" : "Events"}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: isConnected ? "var(--success-soft)" : "var(--bg-tertiary)", color: isConnected ? "var(--success)" : "var(--text-muted)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isConnected ? "var(--success)" : "var(--text-muted)" }} />
+                    {isConnected ? "Live" : "Offline"}
+                  </span>
+                </div>
               }>
-                <div className="space-y-6">
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)" }}>
-                        <Plus className="w-5 h-5" style={{ color: "var(--success)" }} />
-                      </div>
-                      {latestLiveUpdate && (
-                        <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-6">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div>
-                          <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Product Created</h4>
-                          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                            Created by <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{product.createdby?.name || "—"}</span>
-                          </p>
+                <div className="space-y-5">
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {activitySummary.map((stat) => {
+                      const StatIcon = stat.icon;
+                      return (
+                        <div key={stat.id} className="rounded-lg p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: stat.soft, color: stat.color }}>
+                              <StatIcon className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--text-muted)" }}>{stat.label}</span>
+                          </div>
+                          <p className="text-[17px] font-bold leading-none mt-2.5" style={{ color: "var(--text-primary)" }}>{stat.value}</p>
+                          <p className="text-[10px] mt-1 truncate" style={{ color: "var(--text-muted)" }}>{stat.hint}</p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(product.created_at)}</p>
-                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(product.created_at)}</p>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {liveEvents.map((ev, i) => (
-                    <div key={ev.key} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: ev.type === "created" ? "var(--success-soft)" : "var(--info-soft)" }}>
-                          {ev.type === "created" ? <Plus className="w-5 h-5" style={{ color: "var(--success)" }} /> : <Pencil className="w-5 h-5" style={{ color: "var(--info)" }} />}
-                        </div>
-                        {i < liveEvents.length - 1 && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
-                      </div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-                              {ev.type === "created" ? "Product Created" : "Product Updated"} <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
-                            </h4>
-                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                              {ev.type === "created" ? "Added to the system" : "Details were modified"}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(ev.date)}</p>
-                            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date)}</p>
-                          </div>
-                        </div>
-                        {ev.user && (
-                          <div className="flex items-center gap-2.5 p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                            <Avatar user={ev.user} size="sm" color={ev.type === "created" ? "emerald" : "blue"} />
-                            <div className="min-w-0">
-                              <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{ev.user.name || ev.user.email}</p>
-                              <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{ev.user.email}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  {/* Type filters */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {activityFilters.map((f) => {
+                      const active = activityFilter === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setActivityFilter(f.id)}
+                          className="h-8 px-3.5 rounded-full text-[11px] font-semibold transition-colors"
+                          style={{
+                            backgroundColor: active ? "var(--accent)" : "var(--bg-tertiary)",
+                            color: active ? "var(--accent-text)" : "var(--text-secondary)",
+                            border: `1px solid ${active ? "var(--accent)" : "var(--border-color)"}`,
+                          }}
+                        >
+                          {f.label} ({f.count})
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                  {liveEvents.length === 0 && (
+                  {/* Timeline */}
+                  {filteredActivity.length === 0 ? (
                     <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                       <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet. Product has not been modified since creation.</span>
+                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                        {activityTimeline.length === 0
+                          ? "No activity recorded yet for this product."
+                          : "No activity matches the selected filter."}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      {filteredActivity.map((ev, i) => {
+                      const meta = activityMetaOf(ev.type);
+                      const EventIcon = meta.icon;
+                      const actor = actorName(ev.actor);
+                      const email = actorEmail(ev.actor);
+                      return (
+                        <div key={ev.key} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: meta.bg, color: meta.fg }}>
+                              <EventIcon className="w-4 h-4" />
+                            </div>
+                            {i < filteredActivity.length - 1 && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
+                          </div>
+                          <div className="flex-1 min-w-0 pb-6">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{meta.label}</h4>
+                                  <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+                                    style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+                                    {meta.group}
+                                  </span>
+                                  {ev.live && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{ev.description}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(ev.date)}</p>
+                                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date)}</p>
+                              </div>
+                            </div>
+
+                            {ev.meta && ev.meta.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {ev.meta.map((m, mi) => (
+                                  <span key={`${ev.key}-meta-${mi}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px]"
+                                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                                    <span style={{ color: "var(--text-muted)" }}>{m.label}</span>
+                                    <span className={m.mono ? "font-mono font-semibold" : "font-semibold"} style={{ color: "var(--text-primary)" }}>{m.value}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-2.5 flex items-center gap-2.5 p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                              {ev.actor && typeof ev.actor === "object" ? (
+                                <Avatar user={ev.actor} size="sm" color={meta.avatar} />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
+                                  <User className="w-3.5 h-3.5" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{actor || "Not recorded"}</p>
+                                <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{email || `${ev.actionLabel} — no user on record`}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                     </div>
                   )}
+
                 </div>
               </InfoCard>
             )}

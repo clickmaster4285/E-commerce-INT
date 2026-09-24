@@ -499,7 +499,9 @@ export default function BannerDetailPage() {
               <SectionCard id="banner-buttons-section" icon={Link2} title="Buttons">
                 <div className="space-y-3">
                   <ButtonCard label="Primary Button" tone="accent" button={banner.primaryButton} />
-                  <ButtonCard label="Secondary Button" tone="neutral" button={banner.secondaryButton} />
+                  {banner.secondaryButton?.text && (
+                    <ButtonCard label="Secondary Button" tone="neutral" button={banner.secondaryButton} />
+                  )}
                 </div>
               </SectionCard>
             </div>
@@ -511,8 +513,12 @@ export default function BannerDetailPage() {
             <SectionCard icon={User} title="Banner Information">
               <RailRow icon={User} label="Created By" value={resolveUser(createdBy)} />
               <RailRow icon={Calendar} label="Created At" value={formatDate(banner.createdAt, true)} />
-              <RailRow icon={Pencil} label="Updated By" value={resolveUser(updatedBy)} />
-              <RailRow icon={Clock} label="Updated At" value={formatDate(banner.updatedAt, true)} />
+              {wasUpdated && (
+                <>
+                  <RailRow icon={Pencil} label="Updated By" value={resolveUser(updatedBy)} />
+                  <RailRow icon={Clock} label="Updated At" value={formatDate(banner.updatedAt, true)} />
+                </>
+              )}
             </SectionCard>
 
             <SectionCard id="banner-history-section" icon={History} title="History">

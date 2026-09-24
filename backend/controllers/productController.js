@@ -381,11 +381,15 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    // ⭐ Populate audit users so the Activity tab can show WHO created /
+    // updated each variant by name (instead of a raw ObjectId).
     const variants = await Variant.find({
       product_id: product._id,
       is_deleted: { $ne: true },
     })
       .sort({ created_at: 1 })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
       .lean();
 
     // ⭐ LEGACY TAG HEALING: variant tags used to be saved as plain strings
@@ -394,11 +398,18 @@ const getProductById = async (req, res) => {
     // updated the variant (most plausible assigner).
     try {
       const tagCreatorByName = new Map();
+      // Audit users are populated objects now, so unwrap the id before it is
+      // stored as a Tag's createdby (otherwise Mongoose casting fails).
+      const auditUserId = (user) =>
+        (user && typeof user === "object" ? user._id : user) || null;
       variants.forEach(v => {
         (Array.isArray(v.tags) ? v.tags : []).forEach(t => {
           const name = String(t || "").trim().toLowerCase();
           if (name && !tagCreatorByName.has(name)) {
-            tagCreatorByName.set(name, v.updatedby || v.createdby || null);
+            tagCreatorByName.set(
+              name,
+              auditUserId(v.updatedby) || auditUserId(v.createdby)
+            );
           }
         });
       });
