@@ -1,0 +1,1045 @@
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import {
+  Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2, AlertTriangle, X,
+  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical, Info
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { employeeApi } from "@/apis/admin/employeeApi";
+import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
+
+const ITEMS_PER_PAGE = 20;
+const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
+
+const normalizeArrayResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.employees)) return response.employees;
+  return [];
+};
+
+// ==========================================
+// DEPARTMENT DROPDOWN COMPONENT (UPDATED)
+// ==========================================
+function DepartmentDropdown({ value, onChange, disabled }) {
+  const [inputValue, setInputValue] = useState(value || "");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Sync external value changes
+  useEffect(() => { if (value !== undefined) setInputValue(value || ""); }, [value]);
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    onChange(val); // Update parent state immediately
+    setIsOpen(true);
+  };
+
+  const handleSelectOption = (option) => {
+    setInputValue(option);
+    onChange(option);
+    setIsOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && inputValue.trim()) {
+        // If user hits enter, we accept current input (even if custom)
+        setIsOpen(false);
+    }
+    if (e.key === "Escape") setIsOpen(false);
+    if (e.key === "ArrowDown") { e.preventDefault(); setIsOpen(true); }
+  };
+
+  // Check if current input matches any existing department
+  const exactMatch = PREDEFINED_DEPARTMENTS.some(d => d.toLowerCase() === inputValue.trim().toLowerCase());
+  const hasInput = inputValue.trim().length > 0;
+
+  const inputStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    color: "var(--text-primary)",
+    borderRadius: "6px",
+    height: "32px",
+    fontSize: "13px",
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type or select..."
+          disabled={disabled}
+          className="w-full h-8 pl-3 pr-7 rounded-md text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
+          style={inputStyle}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          disabled={disabled}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {isOpen && !disabled && (
+        <div
+          className="absolute z-50 w-full mb-1 rounded-md shadow-lg overflow-hidden py-1"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+            boxShadow: "0 -10px 40px rgba(0,0,0,0.3)",
+            bottom: "100%",
+          }}
+        >
+          {/* LOGIC: Show "No matching" ONLY if user typed something AND it's not an exact match */}
+          {hasInput && !exactMatch && (
+            <div className="px-3 py-2 text-xs font-medium flex items-center gap-2 opacity-60 cursor-default select-none border-b border-dashed" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+              <Info className="w-3 h-3" /> No matching departments
+            </div>
+          )}
+
+          {/* Filtered List of Existing Departments */}
+          {PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(inputValue.toLowerCase())).map((dept) => (
+            <button
+              key={dept}
+              type="button"
+              onClick={() => handleSelectOption(dept)}
+              className="w-full text-left px-3 py-2 text-[13px] transition hover:bg-white/5"
+              style={{
+                color: "var(--text-primary)",
+                backgroundColor: inputValue === dept ? "var(--success-soft)" : "transparent",
+              }}
+            >
+              {dept}
+            </button>
+          ))}
+
+          {/* Custom Create Option */}
+          {hasInput && !exactMatch && (
+            <div
+              className="px-3 py-2 text-[12px] font-medium border-t mt-1 flex items-center gap-2"
+              style={{ borderColor: "var(--border-color)", color: "var(--success-text)" }}
+            >
+              <Plus className="w-3 h-3" /> Creating new: "{inputValue.trim()}"
+            </div>
+          )}
+          
+          {/* Empty State if no filter matches and no custom input */}
+          {!hasInput && PREDEFINED_DEPARTMENTS.length === 0 && (
+             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No departments available</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ==================== DROPDOWN MENU ITEM ==================== */
+const MenuItem = ({ icon, label, onClick, danger }) => (
+  <button
+    role="menuitem"
+    type="button"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : ""}`}
+    style={{ color: danger ? undefined : "var(--text-primary)" }}
+  >
+    {icon} {label}
+  </button>
+);
+
+// ==========================================
+// MAIN EMPLOYEE PAGE COMPONENT
+// ==========================================
+export default function EmployeesPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  useEmployeeSocketSync();
+  
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [actionMenu, setActionMenu] = useState(null); 
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Phone validation state for tooltip
+  const [phoneError, setPhoneError] = useState("");
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    department: "",
+    status: "active",
+    password: "",
+    confirmPassword: "",
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // ✅ Server-side pagination for employees
+  const { data: paginatedEmployeesData, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["employees", "paginated", currentPage, debouncedSearch, filterStatus],
+    queryFn: () => employeeApi.getAllPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: debouncedSearch, status: filterStatus === "all" ? "" : filterStatus, department: "" }),
+    staleTime: 60 * 1000,
+    retry: 2,
+  });
+  const employees = paginatedEmployeesData?.items || paginatedEmployeesData || normalizeArrayResponse(paginatedEmployeesData);
+  const pagination = paginatedEmployeesData?.pagination || { total: employees.length, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+
+  const staffEmployees = useMemo(() => {
+    return employees.filter((emp) => {
+      const role = emp.userId?.role || emp.role;
+      return role === "staff" || !emp.userId;
+    });
+  }, [employees]);
+
+  const createMutation = useMutation({
+    mutationFn: employeeSocketApi.create,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee created successfully");
+      closeModal();
+    },
+    onError: (err) => toast.error(err.message || "Creation failed"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: employeeSocketApi.update,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee updated successfully");
+      closeModal();
+    },
+    onError: (err) => toast.error(err.message || "Update failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: employeeSocketApi.delete,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Employee deleted");
+      setShowDeleteModal(false);
+      setEmployeeToDelete(null);
+      setSelectedIds([]);
+    },
+    onError: (err) => toast.error(err.message || "Delete failed"),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success(`${selectedIds.length} employees deleted`);
+      setSelectedIds([]);
+      setShowBulkDeleteModal(false);
+    },
+    onError: (err) => toast.error(err.message || "Bulk delete failed"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: employeeSocketApi.toggleStatus,
+    onSuccess: async (updatedEmployee) => {
+      queryClient.setQueryData(["employees"], (oldData) => {
+        if (!Array.isArray(oldData)) return oldData;
+        return oldData.map((emp) => emp._id === updatedEmployee._id ? updatedEmployee : emp);
+      });
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Status updated successfully");
+    },
+    onError: (err) => {
+      console.error("❌ Toggle Status Error:", err);
+      toast.error(err.message || "Status update failed");
+    },
+  });
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingEmployee(null);
+    setFormData({
+      name: "",
+      username: "",
+      email: "",
+      phone: "",
+      department: "",
+      status: "active",
+      password: "",
+      confirmPassword: "",
+    });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPhoneError("");
+  };
+
+  const openAddModal = () => {
+    setEditingEmployee(null);
+    setFormData({
+      name: "",
+      username: "",
+      email: "",
+      phone: "",
+      department: "",
+      status: "active",
+      password: "",
+      confirmPassword: "",
+    });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPhoneError("");
+    setShowModal(true);
+  };
+
+  const openEditModal = (emp) => {
+    setEditingEmployee(emp);
+    setFormData({
+      name: emp.userId?.name || emp.name || "",
+      username: emp.username || "",
+      email: emp.userId?.email || emp.email || "",
+      phone: emp.userId?.phone || emp.phone || "",
+      department: emp.department || "",
+      status: emp.userId?.status || emp.status || "active",
+      password: "",
+      confirmPassword: "",
+    });
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPhoneError("");
+    setShowModal(true);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) return toast.error("Name is required");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    const username = formData.username.trim().toLowerCase();
+    if (username.length < 3) return toast.error("Username must be at least 3 characters");
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return toast.error("Username can only contain letters, numbers, and underscores");
+    if (!formData.email.trim()) return toast.error("Email is required");
+    if (!formData.department.trim()) return toast.error("Department is required");
+
+    const phoneDigits = formData.phone.replace(/\D/g, "");
+    if (phoneDigits && phoneDigits.length < 6) return toast.error("Phone number must be at least 6 digits");
+    if (phoneDigits.length > 15) return toast.error("Phone number must be at most 15 digits");
+
+    if (!editingEmployee) {
+      if (!formData.password) return toast.error("Password is required");
+      if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+      if (formData.password !== formData.confirmPassword) {
+        return toast.error("Passwords do not match");
+      }
+    } else if (formData.password || formData.confirmPassword) {
+      if (!formData.password) return toast.error("Password is required");
+      if (!formData.confirmPassword) return toast.error("Confirm Password is required");
+      if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+      if (formData.password !== formData.confirmPassword) {
+        return toast.error("Passwords do not match");
+      }
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      username,
+      email: formData.email.trim(),
+      phone: formData.phone || "",
+      department: formData.department.trim(),
+      status: formData.status,
+      role: "staff",
+    };
+
+    if (formData.password) {
+      payload.password = formData.password;
+    }
+
+    if (editingEmployee) {
+      updateMutation.mutate({ id: editingEmployee._id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleToggleStatus = (employee) => {
+    toggleStatusMutation.mutate(employee._id);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    setShowBulkDeleteModal(true);
+  };
+
+  const confirmBulkDelete = () => {
+    bulkDeleteMutation.mutate(selectedIds);
+  };
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === "asc" ? (
+      <SortAsc className="w-3 h-3 inline ml-1" />
+    ) : (
+      <SortDesc className="w-3 h-3 inline ml-1" />
+    );
+  };
+
+  const paginatedEmployees = employees; 
+  const totalPages = pagination.pages || 1;
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (!actionMenu) return;
+    const close = () => setActionMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
+
+  const allSelected =
+    paginatedEmployees.length > 0 &&
+    paginatedEmployees.every((emp) => selectedIds.includes(emp._id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(selectedIds.filter((id) => !paginatedEmployees.some((e) => e._id === id)));
+    } else {
+      const newIds = paginatedEmployees.map((e) => e._id);
+      setSelectedIds([...new Set([...selectedIds, ...newIds])]);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const cardStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    borderRadius: "12px",
+  };
+  const inputStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color)",
+    color: "var(--text-primary)",
+    borderRadius: "8px",
+  };
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  /* ===== PROFESSIONAL ACTION BUTTONS WITH 3-DOT MENU ===== */
+  const ActionButtons = ({ employee }) => {
+    const id = employee._id;
+    const open = actionMenu?.id === id;
+
+    const toggleMenu = (e) => {
+      e.stopPropagation();
+      if (open) { setActionMenu(null); return; }
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuHeight = 160; 
+      const menuWidth = 176;
+      const top = rect.bottom + 6 + menuHeight > window.innerHeight
+        ? rect.top - 6 - menuHeight
+        : rect.bottom + 6;
+      const left = Math.max(8, rect.right - menuWidth);
+      setActionMenu({ id, top, left });
+    };
+
+    return (
+      <div className="flex items-center justify-end">
+        <button
+          onClick={toggleMenu}
+          aria-label={`Actions for ${employee.userId?.name || employee.name}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
+          style={{ color: "var(--text-secondary)" }}
+          title="Actions"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setActionMenu(null); }} />
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-50 w-44 rounded-lg shadow-xl border py-1"
+              style={{
+                top: actionMenu.top,
+                left: actionMenu.left,
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <MenuItem
+                icon={<Eye className="w-4 h-4" />}
+                label="View Details"
+                onClick={() => { setActionMenu(null); router.push(`/admin/employees/${id}`); }}
+              />
+              <MenuItem
+                icon={<Pencil className="w-4 h-4" />}
+                label="Edit Employee"
+                onClick={() => { setActionMenu(null); openEditModal(employee); }}
+              />
+              <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
+              <MenuItem
+                icon={<Trash2 className="w-4 h-4" />}
+                label="Delete"
+                danger
+                onClick={() => { setActionMenu(null); setEmployeeToDelete(employee); setShowDeleteModal(true); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+            style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+          />
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+            Loading employees...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+        <AlertTriangle className="h-10 w-10 text-red-500 opacity-60" />
+        <p className="text-[14px] text-center" style={{ color: "var(--text-muted)" }}>
+          Failed to load employees.
+          <br />
+          <span className="text-[12px]">{error?.message}</span>
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="h-10 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold"
+          style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
+      
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-[24px] font-bold tracking-tight">Employee Management</h1>
+          <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
+            Manage your team members and their departments
+          </p>
+        </div>
+        <button
+          onClick={openAddModal}
+          className="h-9 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
+          style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+        >
+          <Plus className="w-4 h-4" /> Add Employee
+        </button>
+      </div>
+
+      {/* STAT CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {[
+          { label: "Total", value: staffEmployees.length, color: "var(--text-primary)" },
+          { label: "Active", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "var(--success-text)" },
+          { label: "Inactive", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "var(--danger-text)" },
+        ].map((stat, idx) => (
+          <div key={idx} className="rounded-lg px-4 py-3" style={cardStyle}>
+            <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              {stat.label}
+            </p>
+            <p className="text-[20px] font-bold mt-0.5" style={{ color: stat.color }}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="relative w-full md:w-[400px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+            <Search className="w-4 h-4" />
+          </span>
+          <input 
+            type="text" 
+            placeholder="Search by name or email..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+            style={inputStyle} 
+          />
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="appearance-none h-9 w-full sm:w-[160px] px-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
+            style={inputStyle}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      {selectedIds.length > 0 && (
+        <div
+          className="flex items-center justify-between rounded-lg px-4 h-10"
+          style={{
+            backgroundColor: "var(--success-soft)",
+            border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
+          }}
+        >
+          <p className="text-sm font-medium" style={{ color: "var(--success-text)" }}>
+            {selectedIds.length} selected
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="text-xs font-medium transition hover:opacity-70"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="h-9 min-w-[44px] min-h-[44px] px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: "var(--danger)" }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg overflow-hidden" style={cardStyle}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] min-w-[600px]">
+            <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+              <tr>
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded cursor-pointer"
+                    style={{ accentColor: "var(--accent)" }}
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("name")}>
+                  Employee {getSortIcon("name")}
+                </th>
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("email")}>
+                  Email {getSortIcon("email")}
+                </th>
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("department")}>
+                  Department {getSortIcon("department")}
+                </th>
+                <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("status")}>
+                  Status {getSortIcon("status")}
+                </th>
+                <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+                    <Users className="mx-auto mb-3 h-8 w-8 opacity-30" />
+                    No employees found
+                  </td>
+                </tr>
+              ) : (
+                paginatedEmployees.map((emp) => {
+                  const isSelected = selectedIds.includes(emp._id);
+                  const empName = emp.userId?.name || emp.name || "Unknown";
+                  const empEmail = emp.userId?.email || emp.email || "N/A";
+                  const empStatus = emp.userId?.status || emp.status || "active";
+                  const empAvatar = emp.userId?.avatar;
+
+                  return (
+                    <tr
+                      key={emp._id}
+                      className="transition cursor-pointer"
+                      style={{
+                        borderBottom: "1px solid var(--border-color)",
+                        backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)",
+                      }}
+                      onClick={(e) => {
+                        if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+                        router.push(`/admin/employees/${emp._id}`);
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)";
+                      }}
+                    >
+                      <td className="px-4 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(emp._id)}
+                          className="w-4 h-4 rounded cursor-pointer"
+                          style={{ accentColor: "var(--accent)" }}
+                        />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          {empAvatar ? (
+                            <img
+                              src={empAvatar}
+                              alt={empName}
+                              className="h-8 w-8 rounded-full object-cover shrink-0 border"
+                              style={{ borderColor: "var(--border-color)" }}
+                            />
+                          ) : (
+                            <div
+                              className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                              style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+                            >
+                              {empName?.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-medium text-[13px] truncate max-w-[140px]">
+                            {empName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                        {empEmail}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                          style={{
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
+                            color: "var(--text-secondary)",
+                            border: "1px solid var(--border-color)",
+                          }}
+                        >
+                          {emp.department || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                         <span
+                          className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide"
+                          style={
+                            empStatus === "active"
+                              ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }
+                              : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }
+                          }
+                        >
+                          {empStatus === "active" ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap w-1">
+                        <ActionButtons employee={emp} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {pagination.total > ITEMS_PER_PAGE && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
+          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
+            {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)} of {pagination.total || employees.length}{" "}
+            employees
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="h-8 w-8 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="hidden sm:inline-flex px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="h-8 w-8 min-w-[44px] min-h-[44px] rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADD/EDIT MODAL ===== */}
+      {showModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden" style={cardStyle}>
+            <div className="px-5 py-4 flex items-center justify-between rounded-t-xl shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+              <div>
+                <h3 className="text-base font-semibold">{editingEmployee ? "Edit Employee" : "Add New Employee"}</h3>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  {editingEmployee ? "Update employee details" : "Create a new team member"}
+                </p>
+              </div>
+              <button onClick={closeModal} disabled={isSubmitting} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-3 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Full Name *</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Username *</label>
+                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john_doe" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
+                  <input type="tel" inputMode="numeric" maxLength={15} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 15) })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="03001234567" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password {editingEmployee ? "" : "*"}</label>
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Leave blank to keep current" : "Min 6 chars"} minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password {editingEmployee ? "" : "*"}</label>
+                  <div className="relative">
+                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Confirm new password" : "Confirm"} minLength={6} />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Status</label>
+                  <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Department *</label>
+                  <DepartmentDropdown value={formData.department} onChange={(val) => setFormData({ ...formData, department: val })} disabled={isSubmitting} />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : editingEmployee ? "Update Employee" : "Create Employee"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SINGLE DELETE CONFIRMATION MODAL ===== */}
+      {showDeleteModal && employeeToDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div
+            className="w-full max-w-sm rounded-xl p-5"
+            style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}
+          >
+            <style>
+              {`@keyframes modalScaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}`}
+            </style>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold">
+                  Delete "{employeeToDelete.userId?.name || employeeToDelete.name}"?
+                </h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  This action cannot be undone. All employee data will be permanently removed.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setEmployeeToDelete(null);
+                }}
+                disabled={deleteMutation.isPending}
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate(employeeToDelete._id)}
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger)" }}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== BULK DELETE CONFIRMATION MODAL ===== */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div
+            className="w-full max-w-sm rounded-xl p-5"
+            style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold">
+                  Delete {selectedIds.length} employees?
+                </h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  This action cannot be undone. All selected employees will be permanently removed.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={bulkDeleteMutation.isPending}
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={bulkDeleteMutation.isPending}
+                onClick={confirmBulkDelete}
+                className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger)" }}
+              >
+                {bulkDeleteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `Delete ${selectedIds.length}`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
