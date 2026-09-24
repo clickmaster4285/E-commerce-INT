@@ -1237,11 +1237,7 @@ export default function BannersPage() {
                       preview={getImagePreview(form.desktopImage)}
                     />
                   </div>
-                  <div className="mt-4">
-                    <FormField label="Alt Text" helpText="For SEO and accessibility">
-                      <Input type="text" value={form.altText} onChange={(e) => updateForm("altText", e.target.value)} placeholder="Describe the banner image" />
-                    </FormField>
-                  </div>
+               
                 </FormSection>
 
                 {/* 3. Banner Content */}

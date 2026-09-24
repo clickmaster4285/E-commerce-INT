@@ -8,7 +8,6 @@ import {
   ArrowLeft, Tag, Activity, Clock, User, Percent, Layers, Target,
   Edit3, Trash2, Plus, Pencil, AlertTriangle, DollarSign, Calendar,
   TrendingUp, Hash, Box, CheckCircle2, ShoppingCart, Package, Globe,
-  Copy
 } from "lucide-react";
 import { discountApi } from "../../../../apis/admin/discountApi";
 import { productApi } from "../../../../apis/admin/productApi";
@@ -236,15 +235,6 @@ export default function DiscountDetailPage() {
     },
   });
 
-  const handleCopy = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Copied to clipboard!");
-    } catch {
-      toast.error("Failed to copy");
-    }
-  };
-
   const isActive = getDiscountStatus(discount) === "active";
   // "Updated" entry sirf tab jab discount really edit/save hua ho:
   // updateDiscount updatedBy set karta hai; create par wo null rehta hai.
@@ -454,7 +444,7 @@ export default function DiscountDetailPage() {
       <div id="d-overview" className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start scroll-mt-4">
         <div className="space-y-3">
           <InfoCard icon={Tag} title="Basic Information" action={<button type="button" onClick={openEdit} className="text-[9px] font-semibold" style={{ color: "var(--accent)" }}><Edit3 className="w-3 h-3 inline mr-1" /> Edit</button>}>
-            <DataRow icon={Hash} label="Code" value={discount.code} mono action={<button type="button" title="Copy code" onClick={() => handleCopy(discount.code)} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><Copy className="w-3 h-3" /></button>} />
+            <DataRow icon={Hash} label="Code" value={discount.code} mono />
             <DataRow icon={Tag} label="Name" value={discount.name} />
             <DataRow icon={Activity} label="Description" value={discount.description || "—"} />
             <DataRow icon={Percent} label="Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
