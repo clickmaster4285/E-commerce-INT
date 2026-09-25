@@ -28,7 +28,7 @@ const { getNextSku } = require("../utils/skuHelper");
 const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
 
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity } = require("../utils/activityHelper");
+const { pushGlobalActivity, isSameValue, isSameList } = require("../utils/activityHelper");
 
 // ======================================================
 // SOCKET HELPER
@@ -574,9 +574,6 @@ const createProduct = async (req, res) => {
         images: imagesByVariant[index] || [],
         createdby: req.user?._id || null,
         updatedby: req.user?._id || null,
-        is_deleted: false,
-        deleted_at: null,
-        deletedby: null,
       });
 
       createdVariants.push(variant);
@@ -681,7 +678,11 @@ const updateProduct = async (req, res) => {
     if (req.body.tag_names !== undefined) {
       const tagNames = parseJSON(req.body.tag_names, []);
       const tagIds = await resolveTags(tagNames, req.user?._id);
-      product.tag_ids = tagIds;
+      // ✅ FIX: Tags wahi hain to product ko "modified" mark na karo, warna
+      // sirf Save dabane par bhi "Product Updated" event ban jata tha.
+      if (!isSameList(product.tag_ids, tagIds)) {
+        product.tag_ids = tagIds;
+      }
     }
 
     // ✅ Update specifications
@@ -691,11 +692,15 @@ const updateProduct = async (req, res) => {
           ? JSON.parse(req.body.specifications) 
           : req.body.specifications;
         
-        product.specifications = await validateSpecifications(
+        const nextSpecifications = await validateSpecifications(
           product.category_id,
           rawSpecs,
           req.user?.tenant_id
         );
+        // ✅ FIX: Specifications same hain to "modified" mark na karo
+        if (!isSameValue(product.specifications, nextSpecifications)) {
+          product.specifications = nextSpecifications;
+        }
       } catch (error) {
         return res.status(400).json({ message: error.message || "Invalid specifications" });
       }
@@ -713,10 +718,23 @@ const updateProduct = async (req, res) => {
       product.status = req.body.status === "inactive" ? "inactive" : "active";
     }
 
-    product.updatedby = req.user?._id || null;
-    await product.save();
+    // ✅ FIX (ROOT CAUSE): Product ke audit fields (updated_at / updatedby) sirf
+    // tab update hote hain jab product-level field waqai badla ho. Pehle ye
+    // unconditional tha, is liye "Add variant" / "Edit variant" page (jo
+    // PUT /products/:id call karta hai) product ka updated_at + updatedby bump kar
+    // deta tha aur Activity timeline mein ghalat "Product Updated" event +
+    // Overview tab mein "Updated By" card aa jata tha, halanke product mein kuch
+    // bhi nahi badla hota tha.
+    const productActuallyChanged = product.isModified();
+
+    if (productActuallyChanged) {
+      product.updatedby = req.user?._id || null;
+      await product.save();
+    }
 
     const variants = parseJSON(req.body.variants, null);
+    let addedVariantCount = 0;
+    let updatedVariantCount = 0;
 
     if (Array.isArray(variants)) {
       const imageVariantIndexes = parseJSON(req.body.image_variant_indexes, []);
@@ -740,8 +758,6 @@ const updateProduct = async (req, res) => {
         existingVariantMap.set(String(variant._id), variant);
       });
 
-      const receivedVariantIds = new Set();
-
       for (let index = 0; index < variants.length; index++) {
         const item = variants[index] || {};
 
@@ -754,8 +770,6 @@ const updateProduct = async (req, res) => {
               message: "Invalid variant or variant does not belong to this product",
             });
           }
-
-          receivedVariantIds.add(variantId);
 
           if (item.sku !== undefined) {
             const sku = normalizeSku(item.sku);
@@ -803,7 +817,12 @@ const updateProduct = async (req, res) => {
           }
 
           if (item.option_values !== undefined || item.attributes !== undefined) {
-            variant.attributes = item.option_values || item.attributes || {};
+            const nextAttributes = item.option_values || item.attributes || {};
+            // ✅ FIX: same attributes dobara assign karne se variant "modified" ho
+            // jata tha -> ghalat "Variant Updated" event
+            if (!isSameValue(variant.attributes ?? {}, nextAttributes)) {
+              variant.attributes = nextAttributes;
+            }
           }
 
           if (item.tags !== undefined) {
@@ -812,7 +831,10 @@ const updateProduct = async (req, res) => {
               // Ensure Tag docs exist so Created By is tracked for variant tags too
               await resolveTags(variantTagList, req.user?._id);
             }
-            variant.tags = variantTagList;
+            // ✅ FIX: tags waqai badle hon to hi assign karo
+            if (!isSameList(variant.tags, variantTagList)) {
+              variant.tags = variantTagList;
+            }
           }
 
           if (item.status !== undefined) {
@@ -834,16 +856,32 @@ const updateProduct = async (req, res) => {
             );
             const oldImages = Array.isArray(variant.images) ? variant.images : [];
             const remaining = oldImages.filter((img) => keptUrls.has(String(img?.img_url)));
-            variant.images = imagesByVariant[index]
+            const nextImages = imagesByVariant[index]
               ? [...remaining, ...imagesByVariant[index]]
               : remaining;
+            // ✅ FIX: image list same hai to naya array assign na karo (warna
+            // variant "modified" ho kar ghalat "Variant Updated" event ban jata tha)
+            if (
+              !isSameValue(
+                oldImages.map((img) => String(img?.img_url)),
+                nextImages.map((img) => String(img?.img_url))
+              )
+            ) {
+              variant.images = nextImages;
+            }
           } else if (imagesByVariant[index]) {
             const oldImages = Array.isArray(variant.images) ? variant.images : [];
             variant.images = [...oldImages, ...imagesByVariant[index]];
           }
 
-          variant.updatedby = req.user?._id || null;
-          await variant.save();
+          // ✅ FIX: Variant ke audit fields sirf tab update karo jab kuch waqai
+          // badla ho — warna "Edit variant" page khol kar bina kuch badle Save
+          // karne par bhi Activity timeline mein "Variant Updated" aa jata tha.
+          if (variant.isModified()) {
+            variant.updatedby = req.user?._id || null;
+            await variant.save();
+            updatedVariantCount += 1;
+          }
         } else {
           let sku = normalizeSku(item.sku);
           if (!sku) {
@@ -880,22 +918,28 @@ const updateProduct = async (req, res) => {
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
             updatedby: req.user?._id || null,
-            is_deleted: false,
-            deleted_at: null,
-            deletedby: null,
           });
+          addedVariantCount += 1;
         }
       }
 
-      for (const oldVariant of existingVariants) {
-        const oldId = String(oldVariant._id);
-        if (!receivedVariantIds.has(oldId)) {
-          oldVariant.is_deleted = true;
-          oldVariant.deleted_at = new Date();
-          oldVariant.deletedby = req.user?._id || null;
-          await oldVariant.save();
-        }
-      }
+      // ⚠️ REMOVED (bug fix): Pehle yahan "jo variants payload mein nahi aaye unhe
+      // is_deleted = true karke save kar do" wala soft-delete loop tha. Variant
+      // model mein `is_deleted` / `deleted_at` fields maujood hi nahi hain, is liye:
+      //   • variant delete hota kuch bhi nahi tha (is_deleted silently ignore),
+      //   • magar `deletedby` (jo schema mein hai) mark modified ho jata tha aur
+      //     save() har bache hue variant ka `updated_at` bump kar deta tha —
+      //     nateeja: Activity timeline mein un variants ka ghalat "Variant Updated"
+      //     event, aur live variant par dangling `deletedby` audit value.
+      // (Add/Edit variant page sirf apna variant bhejta hai, is liye ye loop har
+      // baar baaki sab variants ko "delete" karne ki koshish karta tha.)
+      // Variant delete karne ka official rasta: DELETE /variants/:id
+      // (frontend: variantApi.delete) — wo hard delete karta hai aur images bhi
+      // remove karta hai.
+      // NOTE: Future mein agar soft-delete chahiye to pehle Variant schema mein
+      // is_deleted/deleted_at add karo aur add-variant page ko saare variants
+      // (purane + naya) bhejne ke liye update karo, warna baaki variants delete
+      // ho jayenge.
     }
 
     const updatedVariants = await Variant.find({
@@ -909,16 +953,36 @@ const updateProduct = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
+    // ✅ FIX: Activity feed ka message sach bole. Sirf variant change par
+    // "updated product" likhna misleading tha (aur audit trail bhi ghalat lagta tha).
+    const variantChangeSummary = [
+      addedVariantCount > 0
+        ? `${addedVariantCount} variant${addedVariantCount > 1 ? "s" : ""} added`
+        : "",
+      updatedVariantCount > 0
+        ? `${updatedVariantCount} variant${updatedVariantCount > 1 ? "s" : ""} updated`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" & ");
+
+    const actionMessage =
+      !productActuallyChanged && variantChangeSummary
+        ? `${performerName} ${variantChangeSummary} in product "${product.name}"`
+        : `${performerName} updated product "${product.name}"`;
+
     await pushGlobalActivity(
       io,
       {
-        action: `${performerName} updated product "${product.name}"`,
+        action: actionMessage,
         category: "Product Management",
         performedBy: performerId,
         performedByName: performerName,
         details: {
           productId: product._id,
           variantCount: updatedVariants.length,
+          addedVariants: addedVariantCount,
+          changedVariants: updatedVariantCount,
           tagCount: product.tag_ids ? product.tag_ids.length : 0,
         },
       },

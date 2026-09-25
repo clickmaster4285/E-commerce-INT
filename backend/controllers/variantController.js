@@ -2,6 +2,7 @@ const Variant = require("../models/Variant");
 const Tag = require("../models/Tag");
 const { getNextSku } = require("../utils/skuHelper");
 const { deleteImageFile } = require("../utils/uploadHelpers");
+const { isSameValue, isSameList } = require("../utils/activityHelper");
 
 // ⭐ TAG RESOLVER (Find or Create): ensures each tag name has a Tag document
 // (with createdby tracked) so the Tags tab can show who created it.
@@ -146,9 +147,14 @@ const updateVariant = async (req, res) => {
     if (req.body.max_qnt !== undefined) variant.max_qnt = Number(req.body.max_qnt);
 
     if (req.body.attributes !== undefined) {
-      variant.attributes = typeof req.body.attributes === "string"
+      const nextAttributes = typeof req.body.attributes === "string"
         ? JSON.parse(req.body.attributes)
         : req.body.attributes;
+      // ✅ FIX: same attributes dobara assign karne se variant "modified" ho jata
+      // tha -> ghalat "Variant Updated" audit event
+      if (!isSameValue(variant.attributes ?? {}, nextAttributes)) {
+        variant.attributes = nextAttributes;
+      }
     }
 
     if (req.body.status !== undefined) {
@@ -165,7 +171,10 @@ const updateVariant = async (req, res) => {
       if (variantTagList.length > 0) {
         await resolveTags(variantTagList, req.user?._id);
       }
-      variant.tags = variantTagList;
+      // ✅ FIX: tags waqai badle hon to hi assign karo
+      if (!isSameList(variant.tags, variantTagList)) {
+        variant.tags = variantTagList;
+      }
     }
 
     // Agar new images upload hui hain
@@ -176,8 +185,13 @@ const updateVariant = async (req, res) => {
       variant.images = req.savedImages;
     }
 
-    variant.updatedby = req.user?._id || null;
-    await variant.save();
+    // ✅ FIX: Variant ke audit fields (updated_at / updatedby) sirf tab update karo
+    // jab kuch waqai badla ho — warna bina change save karne par bhi Activity
+    // timeline mein ghalat "Variant Updated" event ban jata tha.
+    if (variant.isModified()) {
+      variant.updatedby = req.user?._id || null;
+      await variant.save();
+    }
 
     res.status(200).json({
       message: "Variant updated successfully",

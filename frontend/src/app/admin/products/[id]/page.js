@@ -1072,6 +1072,12 @@ export default function ProductDetailPage() {
   const syntheticTags = missingTagNames.map(name => ({ name, _id: name }));
   const allAssignedTags = [...assignedTags, ...syntheticTags];
 
+  // ✅ FIX: Overview ka Tags block sirf product.tag_ids parhta tha, jabke naye
+  // products mein tags variant-level assign hote hain (Variant Tags field /
+  // "Add Tag" action) — isliye Overview hamesha "No tags assigned" dikhata tha.
+  // Tags tab ki tarah product + variants ka union dikhao.
+  const overviewTagNames = allAssignedTags.map(tagNameOf).filter(Boolean);
+
   // Build lookup from existing global tag records (with resolved createdby) by lowercase name and by id
   const tagRecordLookup = {};
   (globalTags || []).forEach((gt) => {
@@ -1667,7 +1673,7 @@ export default function ProductDetailPage() {
             {[
               { id: "overview", label: "Overview" },
               { id: "variants", label: "Variants", count: totalVariants > 0 ? totalVariants : null },
-              { id: "tags", label: "Tags", count: displayTagNames.length > 0 ? displayTagNames.length : null },
+              { id: "tags", label: "Tags", count: allAssignedTags.length > 0 ? allAssignedTags.length : null },
               { id: "category", label: "Category" },
               { id: "brand", label: "Brand" },
               { id: "activity", label: "History" },
@@ -1765,20 +1771,20 @@ export default function ProductDetailPage() {
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Tags</p>
-                            {displayTagNames.length > 0 && (
+                            {overviewTagNames.length > 0 && (
                               <button type="button" onClick={() => setActiveTab("tags")} className="text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
                                 Manage
                               </button>
                             )}
                           </div>
-                          {displayTagNames.length > 0 ? (
+                          {overviewTagNames.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
-                              {(displayTagNames || []).map((tag) => (
+                              {(overviewTagNames || []).map((tag) => (
                                 <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[12px] text-[var(--text-muted)]">No tags assigned to this product yet.</p>
+                            <p className="text-[12px] text-[var(--text-muted)]">No tags assigned to this product or its variants yet.</p>
                           )}
                         </div>
                       </div>

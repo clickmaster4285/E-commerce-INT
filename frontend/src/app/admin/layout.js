@@ -638,7 +638,6 @@ export default function AdminLayout({ children }) {
         <Sidebar
           onNavigate={closeSidebar}
           storeName={storeData?.store_name || storeData?.storeName || undefined}
-          primaryColor={storeData?.primary_color || storeData?.primaryColor || undefined}
           userData={userData}
         />
       </div>

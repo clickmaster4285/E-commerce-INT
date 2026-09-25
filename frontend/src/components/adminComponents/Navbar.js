@@ -233,18 +233,31 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                 e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {/* Avatar */}
-            <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white transition-shadow duration-200"
-              style={{
-                background: avatarGradient,
-                boxShadow: isOpen || isProfileActive
-                  ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
-                  : '0 1px 3px rgba(0,0,0,0.2)',
-              }}
-            >
-              {firstLetter}
-            </div>
+            {/* Avatar — logged-in employee/admin ki apni picture, warna initial */}
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={displayName}
+                className="h-7 w-7 shrink-0 rounded-full object-cover transition-shadow duration-200"
+                style={{
+                  boxShadow: isOpen || isProfileActive
+                    ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
+                    : '0 1px 3px rgba(0,0,0,0.2)',
+                }}
+              />
+            ) : (
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white transition-shadow duration-200"
+                style={{
+                  background: avatarGradient,
+                  boxShadow: isOpen || isProfileActive
+                    ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
+                    : '0 1px 3px rgba(0,0,0,0.2)',
+                }}
+              >
+                {firstLetter}
+              </div>
+            )}
 
             {/* ✅ Display Name — Sirf asli naam */}
             <div className="hidden sm:flex flex-col items-start leading-none">
@@ -287,15 +300,26 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                   style={{ borderBottom: '1px solid var(--border-color)' }}
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                      style={{
-                        background: avatarGradient,
-                        boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                      }}
-                    >
-                      {firstLetter}
-                    </div>
+                    {currentUser.avatar ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={displayName}
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
+                        style={{
+                          boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                        style={{
+                          background: avatarGradient,
+                          boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                        }}
+                      >
+                        {firstLetter}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-[13px] font-semibold truncate"

@@ -183,7 +183,6 @@ export default function ProfilePage() {
       storeName: store.store_name || user.store_name || "My Store",
       address: user.address || store.address || "",
       storeStatus: store.store_status || "Active",
-      primaryColor: store.primary_color || "var(--accent)",
       // ✅ CHANGE 1 continued: Extract permissions
       permissions: user.permissions || {},
     };
@@ -263,7 +262,6 @@ export default function ProfilePage() {
           email: storeData.email || prev.email,
           phone: storeData.phone || prev.phone,
           storeStatus: storeData.store_status || prev.storeStatus,
-          primaryColor: storeData.primary_color || prev.primaryColor,
         };
       });
       setEditForm((prev) => {

@@ -28,6 +28,7 @@ import {
   MapPinned,
   Tag,
   ArrowLeft,
+  Trash2,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
@@ -77,7 +78,6 @@ const EMPTY_FORM = {
   year_established: "",
   store_status: "open",
   maintenance_message: "",
-  primary_color: "var(--success)",
   meta_title: "",
   meta_description: "",
   meta_keywords: "",
@@ -201,6 +201,7 @@ export default function StoreInfoPage() {
   const [logoPreview, setLogoPreview] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoError, setLogoError] = useState(false);
+  const [isLogoDragOver, setIsLogoDragOver] = useState(false);
 
   // ====================================================
   // LOCATION / CURRENCY DATA
@@ -289,6 +290,8 @@ export default function StoreInfoPage() {
       if (url) {
         setLogoPreview(url);
         setLogoError(false);
+      } else {
+        setLogoPreview("");
       }
     };
 
@@ -344,6 +347,12 @@ export default function StoreInfoPage() {
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    processLogoFile(file);
+    if (e.target) e.target.value = "";
+  };
+
+  const processLogoFile = (file) => {
+    if (!file) return;
     
     const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
     if (!validTypes.includes(file.type)) {
@@ -361,6 +370,62 @@ export default function StoreInfoPage() {
     setLogoPreview(previewUrl);
     setLogoError(false);
     toast.success("Logo selected successfully");
+  };
+
+  const handleLogoDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLogoDragOver(true);
+  };
+
+  const handleLogoDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLogoDragOver(false);
+  };
+
+  const handleLogoDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLogoDragOver(true);
+  };
+
+  const handleLogoDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsLogoDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processLogoFile(file);
+  };
+
+  const handleRemoveLogo = () => {
+    // Case 1: bas nayi file select ki hai (save nahi hui) — selection wapas le lo
+    if (logoFile) {
+      setLogoFile(null);
+      const url = getLogoUrl(formData);
+      setLogoPreview(url || "");
+      setLogoError(false);
+      toast.info("Selected file cleared");
+      return;
+    }
+
+    // Case 2: saved logo server par hai — confirm kar ke delete karo
+    const serverUrl = getLogoUrl(formData);
+    if (!serverUrl && !logoPreview) return;
+    if (!window.confirm("Remove store logo?")) return;
+
+    socket.emit("deleteStoreLogo", null, (resp) => {
+      if (resp?.success) {
+        setLogoFile(null);
+        setLogoPreview("");
+        setLogoError(false);
+        setFormData((p) => ({ ...p, logo: { img_url: "", public_id: "" } }));
+        if (resp.data) dispatch(setStoreInfo(resp.data));
+        toast.success("Store logo removed");
+      } else {
+        toast.error(resp?.message || "Failed to remove logo");
+      }
+    });
   };
 
   const handleEdit = () => setIsEditing(true);
@@ -605,10 +670,10 @@ export default function StoreInfoPage() {
         `}</style>
 
         <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-          <div className="w-full space-y-5">
+          <div className="w-full space-y-4">
 
             {/* ── HEADER  */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleCancel}
@@ -656,12 +721,12 @@ export default function StoreInfoPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
 
               {/* ── ROW 1: BASIC + LOGO ── */}
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="rounded-lg overflow-hidden lg:col-span-2" style={cardStyle}>
-                  <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--success-soft)" }}>
                       <Store size={16} style={{ color: "var(--success-text)" }} />
                     </div>
@@ -670,7 +735,7 @@ export default function StoreInfoPage() {
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Your store identity</p>
                     </div>
                   </div>
-                  <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Store Name</label>
                       <input type="text" name="store_name" value={formData.store_name} onChange={handleChange}
@@ -683,24 +748,12 @@ export default function StoreInfoPage() {
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="Enter store tagline" />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Primary Brand Color</label>
-                      <div className="flex items-center gap-2">
-                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border-color)" }}>
-                          <input type="color" name="primary_color" value={formData.primary_color || "var(--success)"} onChange={handleChange}
-                            className="absolute -left-1 -top-1 h-12 w-12 cursor-pointer" />
-                        </div>
-                        <input type="text" name="primary_color" value={formData.primary_color} onChange={handleChange}
-                          className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] flex-1 outline-none font-mono uppercase transition focus:ring-1 focus:ring-emerald-500/40"
-                          style={inputStyle} />
-                      </div>
-                    </div>
                   </div>
                 </div>
 
                 {/* Logo Card */}
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                  <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--warning-soft)" }}>
                       <ImageIcon size={16} style={{ color: "var(--warning-text)" }} />
                     </div>
@@ -709,15 +762,24 @@ export default function StoreInfoPage() {
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Brand image</p>
                     </div>
                   </div>
-                  <div className="flex flex-col items-center px-5 py-6">
-                    <div className="relative">
+                  <div className="flex flex-col items-center px-4 py-5">
+                    <div
+                      className={`w-full rounded-xl border-2 border-dashed p-4 text-center transition-all duration-200 ${isLogoDragOver ? "border-[var(--accent)] bg-[var(--accent-soft)]/10 scale-[1.01]" : "border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"}`}
+                      onDragEnter={handleLogoDragEnter}
+                      onDragOver={handleLogoDragOver}
+                      onDragLeave={handleLogoDragLeave}
+                      onDrop={handleLogoDrop}
+                    >
+                    <label className="flex flex-col items-center cursor-pointer">
+                      <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="hidden" />
+                      <div className="relative">
                       <div className="w-28 h-28 rounded-xl flex items-center justify-center overflow-hidden"
-                        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                        style={{ backgroundColor: logoPreview && !logoError ? "#ffffff" : "var(--bg-tertiary)", border: "1px dashed var(--border-color)", boxShadow: logoPreview && !logoError ? "var(--shadow-sm)" : "none" }}>
                         {logoPreview && !logoError ? (
                           <img 
                             src={logoPreview} 
                             alt="Logo" 
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain p-1.5"
                             onError={(e) => { 
                               e.target.style.display = "none"; 
                               if (e.target.nextSibling) {
@@ -739,27 +801,51 @@ export default function StoreInfoPage() {
                           <span className="text-[10px]">No Logo</span>
                         </div>
                       </div>
-                      <label className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition hover:opacity-90"
+                      <span className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center transition"
                         style={{ backgroundColor: "var(--accent)", border: "2px solid var(--bg-card)" }}>
                         <UploadCloud size={14} style={{ color: "var(--accent-text)" }} />
-                        <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="hidden" />
-                      </label>
+                      </span>
                     </div>
-                    <p className="mt-4 text-center text-[11px] leading-4" style={{ color: "var(--text-muted)" }}>
-                      PNG, JPG, SVG or WEBP · Max 2MB
-                    </p>
+                      <div className="space-y-0.5 mt-4">
+                        <p className="text-sm font-semibold" style={{ color: isLogoDragOver ? "var(--accent)" : "var(--text-secondary)" }}>
+                          {isLogoDragOver ? "Drop logo here" : "Drag & drop your logo here"}
+                        </p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          or click to browse
+                        </p>
+                      </div>
+                      <p className="mt-2 text-[11px] leading-4 text-center" style={{ color: "var(--text-muted)" }}>
+                        PNG, JPG, SVG or WEBP · Max 2MB · Square recommended
+                      </p>
+                    </label>
+                    {logoPreview && !logoError && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition hover:opacity-80"
+                        style={{
+                          borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
+                          color: "var(--danger-text)",
+                          backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+                        }}
+                      >
+                        <Trash2 size={13} />
+                        {logoFile ? "Clear selected file" : "Remove logo"}
+                      </button>
+                    )}
                     {logoFile && (
                       <p className="mt-2 text-[11px] text-emerald-500">
                         ✓ New logo selected: {logoFile.name}
                       </p>
                     )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* ── ROW 2: CONTACT ── */}
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--purple-soft)" }}>
                     <Mail size={16} style={{ color: "var(--purple-text)" }} />
                   </div>
@@ -768,7 +854,7 @@ export default function StoreInfoPage() {
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store & support contacts</p>
                   </div>
                 </div>
-                <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Email Address</label>
                     <input type="email" name="email" value={formData.email} onChange={handleChange}
@@ -803,9 +889,9 @@ export default function StoreInfoPage() {
               </div>
 
               {/* ── ROW 3: LOCATION + BUSINESS ── */}
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                  <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(244,63,94,0.1)" }}>
                       <MapPin size={16} style={{ color: "var(--rose)" }} />
                     </div>
@@ -814,7 +900,7 @@ export default function StoreInfoPage() {
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Physical address</p>
                     </div>
                   </div>
-                  <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
                       <Select name="country" options={countryOptions}
@@ -849,7 +935,7 @@ export default function StoreInfoPage() {
                 </div>
 
                 <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                  <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                  <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(249,115,22,0.1)" }}>
                       <Briefcase size={16} style={{ color: "var(--orange)" }} />
                     </div>
@@ -858,7 +944,7 @@ export default function StoreInfoPage() {
                       <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Operational settings</p>
                     </div>
                   </div>
-                  <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Business Type</label>
                       <input type="text" name="business_type" value={formData.business_type} onChange={handleChange}
@@ -905,7 +991,7 @@ export default function StoreInfoPage() {
 
               {/* ── ROW 4: SOCIAL ── */}
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--info-soft)" }}>
                     <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
                   </div>
@@ -914,7 +1000,7 @@ export default function StoreInfoPage() {
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Connected platforms</p>
                   </div>
                 </div>
-                <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
                   {[
                     { key: "facebook", label: "Facebook", Icon: IconFacebook },
                     { key: "instagram", label: "Instagram", Icon: IconInstagram },
@@ -937,7 +1023,7 @@ export default function StoreInfoPage() {
 
               {/* ── ROW 5: SEO ── */}
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+                <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(20,184,166,0.1)" }}>
                     <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
                   </div>
@@ -946,7 +1032,7 @@ export default function StoreInfoPage() {
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Search engine & legal info</p>
                   </div>
                 </div>
-                <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                   {[
                     { name: "meta_title", label: "Meta Title", placeholder: "Store meta title", type: "input" },
                     { name: "meta_keywords", label: "Meta Keywords", placeholder: "fashion, ecommerce, online store", type: "input" },
@@ -992,10 +1078,10 @@ export default function StoreInfoPage() {
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-5">
+      <div className="w-full space-y-4">
 
         {/* ── HEADER ─ */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
               Store Information
@@ -1025,15 +1111,15 @@ export default function StoreInfoPage() {
 
         {/* ── HERO CARD ── */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
-          <div className="p-5 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+              <div className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
+                style={{ backgroundColor: logoPreview && !logoError ? "#ffffff" : "var(--bg-tertiary)", border: "1px solid var(--border-color)", boxShadow: logoPreview && !logoError ? "var(--shadow-sm)" : "none" }}>
                 {logoPreview && !logoError ? (
                   <img 
                     src={logoPreview} 
                     alt="Logo" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain p-1.5"
                     onError={(e) => { 
                       e.target.style.display = "none"; 
                       if (e.target.nextSibling) {
@@ -1089,9 +1175,9 @@ export default function StoreInfoPage() {
         </div>
 
         {/* ── CONTACT + LOCATION ── */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--purple-soft)" }}>
                 <Mail size={16} style={{ color: "var(--purple-text)" }} />
               </div>
@@ -1100,7 +1186,7 @@ export default function StoreInfoPage() {
                 <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store contact details</p>
               </div>
             </div>
-            <div className="p-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <InfoItem icon={Mail} label="Email Address" value={dv(formData.email)} />
               <InfoItem icon={Phone} label="Phone Number" value={dv(formData.phone)} />
               <InfoItem icon={Mail} label="Support Email" value={dv(formData.support_email)} />
@@ -1109,7 +1195,7 @@ export default function StoreInfoPage() {
           </div>
 
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(244,63,94,0.1)" }}>
                 <MapPin size={16} style={{ color: "var(--rose)" }} />
               </div>
@@ -1118,7 +1204,7 @@ export default function StoreInfoPage() {
                 <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store location information</p>
               </div>
             </div>
-            <div className="p-5 grid grid-cols-2 gap-5">
+            <div className="p-4 grid grid-cols-2 gap-4">
               <InfoItem icon={Globe} label="Country" value={getCountryName(formData.country)} />
               <InfoItem icon={MapPinned} label="State / Province" value={getStateName(formData.state)} />
               <InfoItem icon={Building2} label="City" value={dv(formData.city)} />
@@ -1131,9 +1217,9 @@ export default function StoreInfoPage() {
         </div>
 
         {/* ── BUSINESS + SETTINGS ── */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(249,115,22,0.1)" }}>
                 <Briefcase size={16} style={{ color: "var(--orange)" }} />
               </div>
@@ -1142,7 +1228,7 @@ export default function StoreInfoPage() {
                 <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Business information</p>
               </div>
             </div>
-            <div className="p-5 grid grid-cols-2 gap-5">
+            <div className="p-4 grid grid-cols-2 gap-4">
               <InfoItem icon={Briefcase} label="Business Type" value={dv(formData.business_type)} />
               <InfoItem icon={Users} label="Employees" value={dv(formData.total_employees)} />
               <InfoItem icon={CalendarDays} label="Year Established" value={dv(formData.year_established)} />
@@ -1153,7 +1239,7 @@ export default function StoreInfoPage() {
           </div>
 
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
-            <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--success-soft)" }}>
                 <Store size={16} style={{ color: "var(--success-text)" }} />
               </div>
@@ -1162,7 +1248,7 @@ export default function StoreInfoPage() {
                 <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Current configuration</p>
               </div>
             </div>
-            <div className="p-5">
+            <div className="p-4">
               <div className="flex items-center justify-between rounded-lg px-4 py-3.5"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <div className="flex items-center gap-3">
@@ -1194,7 +1280,7 @@ export default function StoreInfoPage() {
 
         {/* ── SOCIAL ── */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
-          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--info-soft)" }}>
               <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
             </div>
@@ -1203,7 +1289,7 @@ export default function StoreInfoPage() {
               <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Connected social platforms</p>
             </div>
           </div>
-          <div className="p-5 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div className="p-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
             {socialProfiles.map(({ key, label, Icon, color, bg }) => {
               const url = formData.social_links?.[key];
               return (
@@ -1231,7 +1317,7 @@ export default function StoreInfoPage() {
 
         {/* ── SEO ─ */}
         <div className="rounded-lg overflow-hidden" style={cardStyle}>
-          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(20,184,166,0.1)" }}>
               <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
             </div>
@@ -1240,7 +1326,7 @@ export default function StoreInfoPage() {
               <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Search engine & legal information</p>
             </div>
           </div>
-          <div className="p-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <DetailBlock label="Meta Title" value={formData.meta_title} />
             <DetailBlock label="Meta Keywords" value={formData.meta_keywords} />
             <DetailBlock label="Meta Description" value={formData.meta_description} large />

@@ -41,26 +41,65 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: `uploads/store/${finalName}` };
   }
 
-  const finalName = `store-logo-${Date.now()}-${safeName}.jpg`;
+  // ⚠️ WEBP (alpha support) — JPEG me alpha channel nahi hota, is liye transparent
+  // PNG / WEBP logos save hote waqt BLACK background par flatten ho jate the.
+  const finalName = `store-logo-${Date.now()}-${safeName}.webp`;
   const filePath = path.join(storeDir, finalName);
 
   try {
     const sharp = require("sharp");
     await sharp(rawBuffer)
+      .rotate() // EXIF orientation pehle
       .resize(600, 600, { fit: "inside", withoutEnlargement: true })
-      .rotate()
-      .jpeg({ quality: 78, mozjpeg: true, progressive: true })
+      .webp({ quality: 88, alphaQuality: 100, effort: 4 })
       .toFile(filePath);
-    const savedSize = verifyFile(filePath, "JPEG");
-    return { path: filePath, filename: finalName, mimetype: "image/jpeg", size: savedSize, relativePath: `uploads/store/${finalName}` };
+    const savedSize = verifyFile(filePath, "WebP");
+    return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: `uploads/store/${finalName}` };
   } catch (err) {
     console.warn("⚠️ Sharp compression failed, saving raw:", err.message);
-    const fallbackName = `store-logo-${Date.now()}-${safeName}-raw.jpg`;
+    const fallbackExt = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+    const fallbackName = `store-logo-${Date.now()}-${safeName}-raw.${fallbackExt}`;
     const fallbackPath = path.join(storeDir, fallbackName);
     fs.writeFileSync(fallbackPath, rawBuffer);
     const savedSize = verifyFile(fallbackPath, "Raw fallback");
     return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: `uploads/store/${fallbackName}` };
   }
+};
+
+// ==========================================
+// HELPER: PROCESS EMPLOYEE AVATAR
+// (base64 -> 320x320 webp data URL, DB me store hota hai)
+// ==========================================
+const AVATAR_MIME_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/avif", "image/gif"];
+
+const processEmployeeAvatar = async (base64Data) => {
+  if (!base64Data || typeof base64Data !== "string") return null;
+
+  const mimeMatch = base64Data.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
+  if (!mimeMatch) throw new Error("invalid image format");
+
+  const mimeType = mimeMatch[1].toLowerCase();
+  if (!AVATAR_MIME_TYPES.includes(mimeType)) {
+    throw new Error("unsupported type (use PNG, JPG or WEBP)");
+  }
+
+  const rawBuffer = Buffer.from(mimeMatch[2], "base64");
+  if (!rawBuffer.length) throw new Error("empty image data");
+
+  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB || "8", 10) * 1024 * 1024;
+  if (rawBuffer.length > maxSize) throw new Error(`too large (max ${process.env.MAX_UPLOAD_SIZE_MB || 8}MB)`);
+
+  const sharp = require("sharp");
+  const optimized = await sharp(rawBuffer)
+    .rotate()
+    .resize(320, 320, { fit: "cover", position: "centre" })
+    .webp({ quality: 82, alphaQuality: 100, effort: 4 })
+    .toBuffer();
+
+  const MAX_STORED = 600 * 1024;
+  if (optimized.length > MAX_STORED) throw new Error("image is too detailed, please pick a smaller photo");
+
+  return `data:image/webp;base64,${optimized.toString("base64")}`;
 };
 
 const deleteOldLogo = async () => {
@@ -438,7 +477,7 @@ const initSocket = (server) => {
           avatar: user.avatar || null, created_at: user.created_at || user.createdAt,
           address: user.address || store.address || "", twoFactorEnabled: user.twoFactorEnabled || false,
           permissions, preferences: user.preferences || {}, store,
-          store_name: store.store_name || "", primary_color: store.primary_color || "#10b981",
+          store_name: store.store_name || "",
           stats: { logins: user.loginCount || 0, roles: 1, sessions: user.sessionCount || 0 },
         };
         socket.emit("profileData", { success: true, data: profileData, user: profileData });
@@ -509,7 +548,17 @@ const initSocket = (server) => {
       if (!requireRole(socket, ["admin"], callback)) return;
       try {
         const { createEmployee } = require("../controllers/employeeController");
-        const req = createReq(socket, payload);
+        const { avatarBase64, avatarFileName, ...data } = payload || {};
+        // Avatar drag & drop se aayi base64 image ko optimize kar ke store karo
+        if (avatarBase64) {
+          try {
+            data.avatar = await processEmployeeAvatar(avatarBase64);
+          } catch (e) {
+            if (callback) callback({ success: false, message: `Profile picture: ${e.message}` });
+            return;
+          }
+        }
+        const req = createReq(socket, data);
         const res = createRes(socket, "employeeCreated", callback);
         await createEmployee(req, res);
       } catch (e) {
@@ -522,7 +571,15 @@ const initSocket = (server) => {
       if (!requireRole(socket, ["admin"], callback)) return;
       try {
         const { updateEmployee } = require("../controllers/employeeController");
-        const { id, ...data } = payload || {};
+        const { id, avatarBase64, avatarFileName, ...data } = payload || {};
+        if (avatarBase64) {
+          try {
+            data.avatar = await processEmployeeAvatar(avatarBase64);
+          } catch (e) {
+            if (callback) callback({ success: false, message: `Profile picture: ${e.message}` });
+            return;
+          }
+        }
         const req = createReq(socket, data, { id });
         const res = createRes(socket, "employeeUpdated", callback);
         await updateEmployee(req, res);
@@ -723,4 +780,4 @@ const getIO = () => {
   return io;
 };
 
-module.exports = { initSocket, getIO };
+module.exports = { initSocket, getIO, compressAndSaveLogo, processEmployeeAvatar };

@@ -38,7 +38,6 @@ const updateStoreInfo = async (req, res) => {
       currency, tax_rate, weight_unit,
       business_type, total_employees, year_established,
       store_status, maintenance_message,
-      primary_color,
       meta_title, meta_description, meta_keywords,
       return_policy, privacy_policy, terms_conditions,
       social_links,
@@ -75,7 +74,6 @@ const updateStoreInfo = async (req, res) => {
     if (year_established !== undefined) store.year_established = year_established;
     if (store_status !== undefined) store.store_status = store_status;
     if (maintenance_message !== undefined) store.maintenance_message = maintenance_message;
-    if (primary_color !== undefined) store.primary_color = primary_color;
     if (meta_title !== undefined) store.meta_title = meta_title;
     if (meta_description !== undefined) store.meta_description = meta_description;
     if (meta_keywords !== undefined) store.meta_keywords = meta_keywords;
@@ -101,7 +99,7 @@ const updateStoreInfo = async (req, res) => {
     const updatedStore = await store.save();
 
     // ✅ LOG ACTIVITY
-    const trackedFields = ["store_name", "tagline", "email", "phone", "address", "currency", "store_status", "primary_color"];
+    const trackedFields = ["store_name", "tagline", "email", "phone", "address", "currency", "store_status"];
     const changes = getChanges(oldData, updatedStore.toObject(), trackedFields);
     if (logoChanged) changes.push({ field: "logo", oldValue: "(old)", newValue: "(new)" });
 

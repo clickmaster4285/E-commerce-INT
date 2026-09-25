@@ -31,6 +31,82 @@ const pushActivity = async (employeeDocId, activityData) => {
 };
 
 // =====================================================
+// ACTIVITY PERFORMER HEALING (legacy rows)
+// =====================================================
+// Purani activity rows me performer ka naam placeholder ke tor par save ho
+// gaya tha (jaise "Employee account created by User"), is liye timeline par
+// asli admin/employee ke bajaye "User" dikhta tha. Aise rows ko read karte
+// waqt performedBy (Employee / User id) se asli naam resolve kar ke dikhate
+// hain — koi DB migration chahiye hi nahi.
+
+const PLACEHOLDER_PERFORMER_NAMES = new Set([
+  "user",
+  "admin",
+  "system",
+  "unknown",
+  "n/a",
+]);
+
+const isObjectIdLike = (value) => /^[a-f\d]{24}$/i.test(String(value || ""));
+
+const isPlaceholderPerformer = (name) =>
+  !name || PLACEHOLDER_PERFORMER_NAMES.has(String(name).trim().toLowerCase());
+
+const healActivityPerformers = async (activities) => {
+  if (!Array.isArray(activities) || activities.length === 0) {
+    return Array.isArray(activities) ? activities : [];
+  }
+
+  const idsToResolve = [
+    ...new Set(
+      activities
+        .filter(
+          (activity) =>
+            isObjectIdLike(activity?.performedBy) &&
+            isPlaceholderPerformer(activity?.performedByName)
+        )
+        .map((activity) => String(activity.performedBy))
+    ),
+  ];
+
+  if (idsToResolve.length === 0) return activities;
+
+  // createdby/performedBy kabhi Employee ho sakta hai, kabhi User
+  const [employees, users] = await Promise.all([
+    Employee.find({ _id: { $in: idsToResolve } }).select("name email").lean(),
+    User.find({ _id: { $in: idsToResolve } }).select("name email").lean(),
+  ]);
+
+  const nameById = new Map();
+  for (const person of [...employees, ...users]) {
+    const realName = person?.name || person?.email;
+    if (realName) nameById.set(String(person._id), realName);
+  }
+
+  return activities.map((activity) => {
+    if (
+      !isObjectIdLike(activity?.performedBy) ||
+      !isPlaceholderPerformer(activity?.performedByName)
+    ) {
+      return activity;
+    }
+
+    const realName = nameById.get(String(activity.performedBy));
+    if (!realName) return activity;
+
+    const placeholder = String(activity.performedByName || "").trim();
+
+    return {
+      ...activity,
+      performedByName: realName,
+      action: placeholder
+        ? String(activity.action || "").split(placeholder).join(realName)
+        : activity.action,
+    };
+  });
+};
+
+// =====================================================
 // PERMISSION HELPER
 // =====================================================
 
@@ -234,6 +310,9 @@ exports.getEmployeeById = async (req, res) => {
     if (!Array.isArray(employee.activities)) {
       employee.activities = [];
     }
+
+    // ✅ Legacy rows ka placeholder performer naam (jaise "User") asli naam se badlo
+    employee.activities = await healActivityPerformers(employee.activities);
 
     return res.json({
       success: true,
@@ -471,7 +550,7 @@ exports.updateEmployee = async (req, res) => {
       updates.username = nextUsername;
     }
 
-    const userFields = ["name", "username", "email", "phone", "status", "role"];
+    const userFields = ["name", "username", "email", "phone", "status", "role", "avatar"];
     const directUpdates = {};
 
     for (const field of userFields) {
@@ -490,6 +569,14 @@ exports.updateEmployee = async (req, res) => {
             newValue: phoneResult.sanitized || "(empty)",
           });
           directUpdates[field] = phoneResult.sanitized;
+        } else if (field === "avatar") {
+          // Avatar ek lamba optimized data URL hota hai — activity log me compact rakho
+          changes.push({
+            field,
+            oldValue: employee[field] ? "(previous picture)" : "(empty)",
+            newValue: updates[field] ? "(new picture)" : "(empty)",
+          });
+          directUpdates[field] = updates[field] || "";
         } else {
           changes.push({
             field,

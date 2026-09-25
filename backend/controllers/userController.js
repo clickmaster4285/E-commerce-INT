@@ -475,7 +475,6 @@ const getProfileInfo = async (req, res) => {
       },
       store,
       store_name: store.store_name || "",
-      primary_color: store.primary_color || "#10b981",
       stats: {
         logins: user.loginCount || 0,
         roles: 1,
@@ -498,7 +497,7 @@ const updateProfileInfo = async (req, res) => {
     const Model = userType === 'employee' ? Employee : User;
     const {
       name, email, phone, website, address,
-      store_name, tagline, primary_color, currency, country, city, state, zip_code, store_status
+      store_name, tagline, currency, country, city, state, zip_code, store_status
     } = req.body;
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
@@ -522,8 +521,6 @@ const updateProfileInfo = async (req, res) => {
     const storeUpdateFields = {};
     if (store_name !== undefined) storeUpdateFields.store_name = store_name;
     if (tagline !== undefined) storeUpdateFields.tagline = tagline;
-    if (primary_color !== undefined)
-      storeUpdateFields.primary_color = primary_color;
     if (currency !== undefined) storeUpdateFields.currency = currency;
     if (country !== undefined) storeUpdateFields.country = country;
     if (city !== undefined) storeUpdateFields.city = city;
