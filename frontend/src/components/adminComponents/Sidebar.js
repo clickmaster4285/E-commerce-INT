@@ -37,6 +37,59 @@ import {
 } from "lucide-react";
 
 // ============================================================
+// STORE LOGO / MARK
+// ============================================================
+// Store logo upload ho chuka ho to wahi image dikhti hai — safe white card par
+// object-contain ke sath (is liye wide/tall logo crop nahi hota aur transparent
+// PNG bhi dark sidebar par saaf nazar aati hai).
+// Logo na ho (ya image load fail ho jaye) to store ke primary color ka
+// professional gradient mark + store name ka pehla letter show hota hai.
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+
+function StoreMark({
+  logoUrl,
+  name,
+  letter,
+  color,
+  sizeClass = "h-8 w-8",
+  letterClass = "text-sm",
+  roundedClass = "rounded-lg",
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  if (logoUrl && !logoFailed) {
+    return (
+      <span
+        className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden bg-white shadow-sm ring-1 ring-black/10`}
+      >
+        <img
+          src={logoUrl}
+          alt={name}
+          onError={() => setLogoFailed(true)}
+          className="h-full w-full object-contain p-[3px]"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center shadow-sm ring-1 ring-white/15`}
+      style={{
+        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${color} 82%, #ffffff), color-mix(in srgb, ${color} 72%, #000000))`,
+      }}
+    >
+      <span
+        className={`font-bold uppercase tracking-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] ${letterClass}`}
+      >
+        {letter}
+      </span>
+    </span>
+  );
+}
+
+// ============================================================
 // SIDEBAR SECTIONS (logical grouping for UI)
 // ============================================================
 
@@ -181,7 +234,7 @@ export default function Sidebar({ onNavigate, userData }) {
   const queryClient = useQueryClient();
 
   const storeName = useSelector((state) => state.storeInfo.storeName);
-  const primaryColor = useSelector((state) => state.storeInfo.primaryColor);
+  const storeLogo = useSelector((state) => state.storeInfo.logo);
   const isLoaded = useSelector((state) => state.storeInfo.isLoaded);
 
   const isSelfDispatching = useRef(false);
@@ -474,8 +527,13 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const displayName = storeName || "My Store";
-  const displayColor = primaryColor || "var(--accent)";
+  const displayColor = "var(--accent)";
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || "S";
+  const logoUrl = storeLogo?.img_url
+    ? storeLogo.img_url.startsWith("http")
+      ? storeLogo.img_url
+      : `${API_ORIGIN}/${storeLogo.img_url}`
+    : null;
 
   // ============================================================
   // MOBILE CLOSE
@@ -565,15 +623,20 @@ export default function Sidebar({ onNavigate, userData }) {
             title={iconOnly ? displayName : undefined}
             aria-label={iconOnly ? displayName : undefined}
           >
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm ring-1 ring-white/20"
-              style={{ backgroundColor: displayColor }}
-            >
-              <span className="text-sm font-bold text-white">{firstLetter}</span>
-            </div>
+            <StoreMark
+              logoUrl={logoUrl}
+              name={displayName}
+              letter={firstLetter}
+              color={displayColor}
+            />
             {!iconOnly && (
-              <span className="truncate text-sm font-semibold tracking-tight text-[var(--text-sidebar)]">
-                {displayName}
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate text-[13.5px] font-semibold tracking-tight text-[var(--text-sidebar)]">
+                  {displayName}
+                </span>
+                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                  Admin Panel
+                </span>
               </span>
             )}
           </Link>

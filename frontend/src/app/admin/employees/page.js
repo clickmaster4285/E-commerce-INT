@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, ChevronLeft, ChevronRight, Pencil, Trash2, AlertTriangle, X,
-  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical, Info
+  Users, Loader2, SortAsc, SortDesc, Eye, EyeOff, ChevronDown, MoreVertical, Info,
+  UploadCloud, ImagePlus
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,6 +15,27 @@ import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSoc
 
 const ITEMS_PER_PAGE = 20;
 const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
+
+// ==========================================
+// AVATAR HELPERS
+// ==========================================
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const AVATAR_ACCEPT = "image/png,image/jpeg,image/jpg,image/webp";
+const AVATAR_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
+// Server par relative path ho to absolute URL bana do
+// (data URL / http URL / Google picture as-is chalti hai)
+const resolveAvatarUrl = (value) => {
+  if (!value || typeof value !== "string") return "";
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  const serverUrl =
+    process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    "";
+  return `${serverUrl}/${value.replace(/^\//, "")}`;
+};
+
+const avatarInitial = (name) => (name || "?").trim().charAt(0).toUpperCase() || "?";
 
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
@@ -209,6 +231,22 @@ export default function EmployeesPage() {
     confirmPassword: "",
   });
 
+  // ===== AVATAR / PROFILE PICTURE (drag & drop) =====
+  const avatarInputRef = useRef(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [isAvatarDragOver, setIsAvatarDragOver] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
+
+  const resetAvatarState = (preview = "") => {
+    setAvatarFile(null);
+    setAvatarPreview(preview);
+    setAvatarRemoved(false);
+    setAvatarError("");
+    setIsAvatarDragOver(false);
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -309,6 +347,7 @@ export default function EmployeesPage() {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPhoneError("");
+    resetAvatarState();
   };
 
   const openAddModal = () => {
@@ -326,6 +365,7 @@ export default function EmployeesPage() {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPhoneError("");
+    resetAvatarState();
     setShowModal(true);
   };
 
@@ -344,6 +384,7 @@ export default function EmployeesPage() {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPhoneError("");
+    resetAvatarState(resolveAvatarUrl(emp.userId?.avatar || emp.avatar));
     setShowModal(true);
   };
 
@@ -388,6 +429,14 @@ export default function EmployeesPage() {
 
     if (formData.password) {
       payload.password = formData.password;
+    }
+
+    // Avatar: nayi picture drag/drop hui hai → base64 bhejo, warna purani waise hi rahegi
+    if (avatarFile) {
+      payload.avatarBase64 = avatarPreview;
+      payload.avatarFileName = avatarFile.name;
+    } else if (avatarRemoved) {
+      payload.avatar = "";
     }
 
     if (editingEmployee) {
@@ -475,6 +524,75 @@ export default function EmployeesPage() {
     borderRadius: "8px",
   };
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  // ==========================================
+  // AVATAR HANDLERS (drag & drop / browse)
+  // ==========================================
+  const pickAvatarFile = (file) => {
+    if (!file) return;
+
+    const type = String(file.type || "").toLowerCase();
+    if (!AVATAR_ALLOWED_TYPES.includes(type)) {
+      setAvatarError("Only PNG, JPG or WEBP images are allowed");
+      toast.error("Only PNG, JPG or WEBP images are allowed");
+      return;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarError("Image is too large — max 2 MB allowed");
+      toast.error("Image is too large — max 2 MB allowed");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarFile(file);
+      setAvatarPreview(typeof reader.result === "string" ? reader.result : "");
+      setAvatarRemoved(false);
+      setAvatarError("");
+    };
+    reader.onerror = () => {
+      setAvatarError("Could not read that image, please try another one");
+      toast.error("Could not read that image, please try another one");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarInputChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // same file dobara select kar sakein
+    pickAvatarFile(file);
+  };
+
+  const handleAvatarDragOver = (e) => {
+    e.preventDefault();
+    if (!isSubmitting) setIsAvatarDragOver(true);
+  };
+
+  const handleAvatarDragLeave = (e) => {
+    e.preventDefault();
+    setIsAvatarDragOver(false);
+  };
+
+  const handleAvatarDrop = (e) => {
+    e.preventDefault();
+    setIsAvatarDragOver(false);
+    if (isSubmitting) return;
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) {
+      setAvatarError("No image detected in the dropped item");
+      return;
+    }
+    pickAvatarFile(file);
+  };
+
+  const handleAvatarRemove = () => {
+    if (isSubmitting) return;
+    setAvatarFile(null);
+    setAvatarPreview("");
+    setAvatarRemoved(true);
+    setAvatarError("");
+    toast.info("Profile picture will be removed on save");
+  };
 
   /* ===== PROFESSIONAL ACTION BUTTONS WITH 3-DOT MENU ===== */
   const ActionButtons = ({ employee }) => {
@@ -728,7 +846,7 @@ export default function EmployeesPage() {
                   const empName = emp.userId?.name || emp.name || "Unknown";
                   const empEmail = emp.userId?.email || emp.email || "N/A";
                   const empStatus = emp.userId?.status || emp.status || "active";
-                  const empAvatar = emp.userId?.avatar;
+                  const empAvatar = resolveAvatarUrl(emp.userId?.avatar || emp.avatar);
 
                   return (
                     <tr
@@ -867,6 +985,130 @@ export default function EmployeesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-5 space-y-3 overflow-y-auto flex-1">
+              {/* ── PROFILE PICTURE (drag & drop) ── */}
+              <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <ImagePlus className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                    <span className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Profile Picture</span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
+                    >
+                      Optional
+                    </span>
+                  </div>
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={handleAvatarRemove}
+                      disabled={isSubmitting}
+                      className="text-[11px] font-medium transition disabled:opacity-50 hover:opacity-80"
+                      style={{ color: "var(--danger-text)" }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3.5">
+                  {/* Live preview */}
+                  <div className="relative shrink-0">
+                    <div
+                      className="h-[72px] w-[72px] rounded-full overflow-hidden flex items-center justify-center"
+                      style={{
+                        backgroundColor: "var(--bg-card)",
+                        border: isAvatarDragOver
+                          ? "2px dashed var(--accent)"
+                          : avatarPreview
+                            ? "2px solid var(--accent)"
+                            : "2px dashed var(--border-color)",
+                      }}
+                    >
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Profile picture preview"
+                          className="h-full w-full object-cover"
+                          onError={() => {
+                            setAvatarPreview("");
+                            setAvatarFile(null);
+                            setAvatarError("That image could not be previewed, please try another one");
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[24px] font-bold" style={{ color: "var(--text-muted)" }}>
+                          {avatarInitial(formData.name)}
+                        </span>
+                      )}
+                    </div>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        onClick={handleAvatarRemove}
+                        disabled={isSubmitting}
+                        title="Remove picture"
+                        aria-label="Remove profile picture"
+                        className="absolute -bottom-0.5 -right-0.5 h-6 w-6 rounded-full flex items-center justify-center shadow-md transition disabled:opacity-50 hover:opacity-90"
+                        style={{ backgroundColor: "var(--danger)", color: "#fff", border: "2px solid var(--bg-tertiary)" }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropzone */}
+                  <div className="flex-1 min-w-0">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Upload profile picture"
+                      onClick={() => { if (!isSubmitting) avatarInputRef.current?.click(); }}
+                      onKeyDown={(e) => {
+                        if ((e.key === "Enter" || e.key === " ") && !isSubmitting) {
+                          e.preventDefault();
+                          avatarInputRef.current?.click();
+                        }
+                      }}
+                      onDragEnter={handleAvatarDragOver}
+                      onDragOver={handleAvatarDragOver}
+                      onDragLeave={handleAvatarDragLeave}
+                      onDrop={handleAvatarDrop}
+                      className={`rounded-lg border-2 border-dashed px-3 py-3 text-center transition-all duration-200 ${isSubmitting ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                      style={{
+                        borderColor: isAvatarDragOver ? "var(--accent)" : "var(--border-color)",
+                        backgroundColor: isAvatarDragOver ? "var(--accent-soft)" : "var(--bg-card)",
+                      }}
+                    >
+                      <UploadCloud
+                        className={`mx-auto h-4 w-4 mb-1 transition-transform duration-200 ${isAvatarDragOver ? "scale-110" : ""}`}
+                        style={{ color: isAvatarDragOver ? "var(--accent)" : "var(--text-muted)" }}
+                      />
+                      <p className="text-[11.5px] leading-4" style={{ color: "var(--text-secondary)" }}>
+                        <span className="font-semibold" style={{ color: "var(--accent)" }}>Drag &amp; drop</span> a photo here, or{" "}
+                        <span className="font-semibold underline" style={{ color: "var(--text-primary)" }}>browse</span>
+                      </p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        PNG, JPG or WEBP · up to 2 MB · square photo works best
+                      </p>
+                    </div>
+                    {avatarError && (
+                      <p className="text-[10.5px] mt-1.5 flex items-center gap-1" style={{ color: "var(--danger-text)" }}>
+                        <AlertTriangle className="h-3 w-3 shrink-0" /> {avatarError}
+                      </p>
+                    )}
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept={AVATAR_ACCEPT}
+                      onChange={handleAvatarInputChange}
+                      disabled={isSubmitting}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Full Name *</label>

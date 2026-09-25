@@ -410,7 +410,7 @@ export default function BannersPage() {
     desktopImage: null,
     altText: "", backgroundColor: "#ffffff",
     eyebrow: "", heading: "", description: "",
-    primaryButton: { text: "", linkType: "custom_url", link: "", dealId: "" },
+    primaryButton: { text: "", linkType: "custom_url", link: "", dealId: "", productId: "", categoryId: "", brandId: "" },
     startDate: "", endDate: "",
   };
 
@@ -718,6 +718,20 @@ export default function BannersPage() {
       return;
     }
 
+    // Entity link types ke liye selection required
+    if (form.primaryButton.linkType === "product" && !String(form.primaryButton.productId || "").trim()) {
+      toast.error("Please select a product for the banner button");
+      return;
+    }
+    if (form.primaryButton.linkType === "category" && !String(form.primaryButton.categoryId || "").trim()) {
+      toast.error("Please select a category for the banner button");
+      return;
+    }
+    if (form.primaryButton.linkType === "brand" && !String(form.primaryButton.brandId || "").trim()) {
+      toast.error("Please select a brand for the banner button");
+      return;
+    }
+
     const fd = new FormData();
     // ✅ Dates ko proper ISO string mein convert karo
     if (form.startDate) {
@@ -728,7 +742,11 @@ export default function BannersPage() {
     }
     Object.entries(form).forEach(([key, value]) => {
       // Skip fields that should never be sent from the frontend
-      if (['_id', '__v', 'createdAt', 'updatedAt', 'createdby', 'updatedby'].includes(key)) {
+      // FIX: status ko loop mein skip karo — wo neeche auto-status block mein exactly
+      // ek baar append hota hai. Pehle dono jagah append hone se multipart mein
+      // status ["active","active"] array ban jata tha aur Mongoose cast error deta tha
+      // ("Cast to string failed ... (type Array) at path "status"") — edit fail hoti thi.
+      if (['_id', '__v', 'createdAt', 'updatedAt', 'createdby', 'updatedby', 'status'].includes(key)) {
         return;
       }
 
@@ -737,11 +755,22 @@ export default function BannersPage() {
         return;
       }
 
-      // 2. FIX: Handle nested primaryButton object to remove empty dealId (Prevents MongoDB ObjectId cast error)
+      // 2. FIX: Handle nested primaryButton object — empty ID fields remove karo
+      // (Prevents MongoDB ObjectId cast error) aur entity selection se link banao,
+      // taake storefront ButtonLink (jo button.link use karta hai) sahi page par le jaye.
       if (key === 'primaryButton' && typeof value === 'object' && value !== null) {
         const cleanPrimaryButton = { ...value };
-        if (!cleanPrimaryButton.dealId || String(cleanPrimaryButton.dealId).trim() === '') {
-          delete cleanPrimaryButton.dealId;
+        ['dealId', 'productId', 'categoryId', 'brandId'].forEach((idKey) => {
+          if (!cleanPrimaryButton[idKey] || String(cleanPrimaryButton[idKey]).trim() === '') {
+            delete cleanPrimaryButton[idKey];
+          }
+        });
+        if (cleanPrimaryButton.linkType === 'product' && cleanPrimaryButton.productId) {
+          cleanPrimaryButton.link = `/product/${cleanPrimaryButton.productId}`;
+        } else if (cleanPrimaryButton.linkType === 'category' && cleanPrimaryButton.categoryId) {
+          cleanPrimaryButton.link = `/category/${cleanPrimaryButton.categoryId}`;
+        } else if (cleanPrimaryButton.linkType === 'brand' && cleanPrimaryButton.brandId) {
+          cleanPrimaryButton.link = `/brand/${cleanPrimaryButton.brandId}`;
         }
         fd.append(key, JSON.stringify(cleanPrimaryButton));
         return;
@@ -793,6 +822,12 @@ export default function BannersPage() {
       const minutes = String(date.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     };
+    // Populated object ya plain id — dono ko string id mein convert karo
+    const toId = (v) => {
+      if (!v) return "";
+      if (typeof v === "object" && v._id) return String(v._id);
+      return String(v);
+    };
     setForm({
       ...banner,
       startDate: formatDateInput(banner.startDate),
@@ -806,7 +841,10 @@ export default function BannersPage() {
           if (!d) return "";
           if (typeof d === "object" && d._id) return String(d._id);
           return String(d);
-        })()
+        })(),
+        productId: toId(banner.primaryButton?.productId),
+        categoryId: toId(banner.primaryButton?.categoryId),
+        brandId: toId(banner.primaryButton?.brandId),
       },
      });
     setShowModal(true);
@@ -1267,10 +1305,56 @@ export default function BannersPage() {
                           <option value="custom_url">Custom URL</option>
                           <option value="product">Product Page</option>
                           <option value="category">Category Page</option>
+                          <option value="brand">Brand Page</option>
                           <option value="deal">Deal Page</option>
                           <option value="none">No Link</option>
                         </Select>
                       </FormField>
+                      {form.primaryButton.linkType === "product" && (
+                        <FormField label="Select Product" required helpText="Banner button opens this product on the storefront">
+                          <Select
+                            value={form.primaryButton.productId || ""}
+                            onChange={(e) => updateNested("primaryButton", "productId", e.target.value)}
+                          >
+                            <option value="">— Choose a product —</option>
+                            {products.map((p) => (
+                              <option key={p._id || p.id} value={p._id || p.id}>
+                                {p.name || p.title}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      )}
+                      {form.primaryButton.linkType === "category" && (
+                        <FormField label="Select Category" required helpText="Banner button opens this category on the storefront">
+                          <Select
+                            value={form.primaryButton.categoryId || ""}
+                            onChange={(e) => updateNested("primaryButton", "categoryId", e.target.value)}
+                          >
+                            <option value="">— Choose a category —</option>
+                            {categories.map((c) => (
+                              <option key={c._id || c.id} value={c._id || c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      )}
+                      {form.primaryButton.linkType === "brand" && (
+                        <FormField label="Select Brand" required helpText="Banner button opens this brand on the storefront">
+                          <Select
+                            value={form.primaryButton.brandId || ""}
+                            onChange={(e) => updateNested("primaryButton", "brandId", e.target.value)}
+                          >
+                            <option value="">— Choose a brand —</option>
+                            {brands.map((b) => (
+                              <option key={b._id || b.id} value={b._id || b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      )}
                       {form.primaryButton.linkType === "deal" && (
                         <FormField label="Select Deal" required helpText="Banner button opens this deal on the storefront">
                           <Select

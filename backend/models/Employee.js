@@ -23,6 +23,8 @@ const employeeSchema = new mongoose.Schema(
       enum: ["user", "admin", "staff", "manager"],
     },
     status: { type: String, default: "active", enum: ["active", "inactive"] },
+    // Profile picture — optimized data URL (Employees form se set hoti hai)
+    avatar: { type: String, default: "" },
   
 
     // --- Permissions (same structure as User) ---

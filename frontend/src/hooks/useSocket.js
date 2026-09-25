@@ -13,10 +13,20 @@ const getSocketURL = () => {
       null
     );
   }
-  return (
-    process.env.NEXT_PUBLIC_SOCKET_URL ||
-    `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT || 5000}`
-  );
+  // Client: axios ke dynamic baseURL (getBaseURL) jaisa hi socket ka host decide karo.
+  // Auth cookie httpOnly + sameSite=lax hai — agar socket ka host page ke host se
+  // alag site ho (jaise page localhost:3000 par ho aur socket env ki wajah se
+  // 192.168.88.64:5000 par) to cookie nahi jaata, socket "guest" reh jaata hai aur
+  // role-gated events (updateStoreInfo / deleteStoreLogo) "Unauthorized" dete hain.
+  const envUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (envUrl) {
+    try {
+      if (new URL(envUrl).hostname === window.location.hostname) return envUrl;
+    } catch (e) {
+      // env URL galat hai to neeche wala dynamic URL use hoga
+    }
+  }
+  return `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT || 5000}`;
 };
 
 function cleanupOldSocket() {

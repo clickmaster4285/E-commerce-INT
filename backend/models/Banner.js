@@ -38,7 +38,6 @@ const bannerSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     
     primaryButton: { type: buttonSchema, default: () => ({}) },
-    secondaryButton: { type: buttonSchema, default: () => ({}) },
 
     startDate: { type: Date },
     endDate: { type: Date },
