@@ -1,98 +1,1162 @@
-  const Product = require("../models/Product");
+const mongoose = require("mongoose");
 
-  const createProduct = async (req, res) => {
+const Product = require("../models/Product");
+const Variant = require("../models/Variant");
+const Tag = require("../models/Tag");
+const Category = require("../models/Category");
+const Attribute = require("../models/Attribute");
+// ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
+const loadBrandModel = () => {
+  const paths = [
+    "../models/Brand",
+    "../models/brand",
+    "../models/Brands",
+    "../models/brands",
+  ];
+  for (const p of paths) {
     try {
-      const product = await Product.create(req.body);
-
-      res.status(201).json(product);
-    } catch (error) {
-      res.status(400).json({
-        message: error.message,
-      });
+      return require(p);
+    } catch (e) {
+      // agla path try karo
     }
-  };
-  const getProducts = async (req, res) => {
-    try {
-      const products = await Product.find()
-        .select("-__v")
-        .populate("category_id", "category_code name")
-        .populate("brand_id", "brand_code name");
+  }
+  return null;
+};
+const Brand = loadBrandModel();
 
-      res.status(200).json(products);
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
-      });
+const { getNextSku } = require("../utils/skuHelper");
+const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
+
+const { getIO } = require("../utils/socket");
+const { pushGlobalActivity, isSameValue, isSameList } = require("../utils/activityHelper");
+
+// ======================================================
+// SOCKET HELPER
+// ======================================================
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) {
+      io.emit(event, data);
     }
-  };
-  const getProductById = async (req, res) => {
-    try {
-      const product = await Product.findById(req.params.id)
-        .select("-__v")
-        .populate("category_id", "category_code name")
-        .populate("brand_id", "brand_code name");
+  } catch (error) {
+    console.warn("⚠️ Socket emit failed:", error.message);
+  }
+};
 
-      if (!product) {
-        return res.status(404).json({
-          message: "Product not found",
-        });
+// ======================================================
+// JSON PARSER
+// ======================================================
+const parseJSON = (value, fallback = []) => {
+  try {
+    if (value === undefined || value === null || value === "") {
+      return fallback;
+    }
+    if (typeof value === "string") {
+      return JSON.parse(value);
+    }
+    return value;
+  } catch (error) {
+    return fallback;
+  }
+};
+
+// ======================================================
+// NUMBER HELPER
+// ======================================================
+const toNumber = (value, fallback = 0) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+// ======================================================
+// SKU NORMALIZER
+// ======================================================
+const normalizeSku = (sku) => {
+  return String(sku || "").trim();
+};
+
+// ======================================================
+// REGEX ESCAPER
+// ======================================================
+const escapeRegex = (value) => {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
+// ======================================================
+// ⭐ SHARED TAG RESOLVER (Find or Create)
+// Ensures every tag name exists as a Tag document (with
+// createdby tracked) so the Tags tab can show who created it.
+// ======================================================
+const resolveTags = async (tagNames, userId) => {
+  if (!Array.isArray(tagNames) || tagNames.length === 0) return [];
+
+  const cleanNames = [...new Set(
+    tagNames
+      .map(n => String(n).trim().toLowerCase())
+      .filter(Boolean)
+  )];
+
+  if (cleanNames.length === 0) return [];
+
+  // ✅ Look up by name regardless of soft-delete: re-creating a soft-deleted
+  // name hits the unique `name` index (E11000), so restore that doc instead.
+  const existingTags = await Tag.find({
+    name: { $in: cleanNames }
+  }).lean();
+
+  const existingMap = new Map(existingTags.map(t => [t.name, t]));
+  const finalTagIds = [];
+
+  for (const name of cleanNames) {
+    const found = existingMap.get(name);
+    if (found) {
+      if (found.is_deleted) {
+        // Restore the soft-deleted tag so the unique index is not violated
+        await Tag.updateOne({ _id: found._id }, { $set: { is_deleted: false } });
       }
+      finalTagIds.push(found._id);
+    } else {
+      const newTag = await Tag.create({
+        name,
+        createdby: userId,
+        updatedby: userId
+      });
+      finalTagIds.push(newTag._id);
+    }
+  }
 
-      res.status(200).json(product);
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
+  return finalTagIds;
+};
+
+// ======================================================
+// ⭐ VALIDATE SPECIFICATIONS AGAINST CATEGORY ATTRIBUTES
+// ======================================================
+const validateSpecifications = async (categoryId, specifications, tenantId) => {
+  if (!specifications || typeof specifications !== 'object') {
+    return {};
+  }
+
+  const category = await Category.findOne({
+    _id: categoryId,
+    is_deleted: false,
+  }).lean();
+
+  if (!category) {
+    throw new Error("Invalid category");
+  }
+
+  const attributeIds = (category.attributes || []).map(attr => attr.attribute_id);
+  
+  if (attributeIds.length === 0) {
+    return specifications;
+  }
+
+  const attributes = await Attribute.find({
+    _id: { $in: attributeIds },
+    tenant_id: tenantId,
+    is_deleted: false,
+    is_active: true,
+  }).lean();
+
+  const attributeMap = new Map(attributes.map(attr => [attr.code, attr]));
+  const validatedSpecs = {};
+
+  for (const [code, value] of Object.entries(specifications)) {
+    const attr = attributeMap.get(code);
+    
+    if (!attr) {
+      continue;
+    }
+
+    const config = category.attributes.find(a => String(a.attribute_id) === String(attr._id));
+    
+    if (config?.is_required && (!value || value === '')) {
+      throw new Error(`Specification "${attr.name}" is required`);
+    }
+
+    if (attr.data_type === 'select' || attr.data_type === 'multi_select') {
+      const validValues = (attr.values || []).map(v => v.value);
+      if (value && !validValues.includes(value)) {
+        throw new Error(`Invalid value for "${attr.name}"`);
+      }
+    }
+
+    if (attr.data_type === 'number' || attr.data_type === 'decimal') {
+      const numValue = Number(value);
+      if (value && !Number.isFinite(numValue)) {
+        throw new Error(`"${attr.name}" must be a valid number`);
+      }
+    }
+
+    validatedSpecs[code] = value;
+  }
+
+  return validatedSpecs;
+};
+
+// ======================================================
+// GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
+// ======================================================
+// ======================================================
+// GET ALL PRODUCTS (OPTIONAL SERVER-SIDE PAGINATION)
+// ✅ Non-breaking: agar ?limit= nahi bheja gaya to purana full-array response hi milega
+// ======================================================
+const getProducts = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const search = String(req.query.search || req.query.q || "").trim();
+    const sort = String(req.query.sort || "newest");
+    const brandId = req.query.brand_id;
+
+    // ---- Filter build ----
+    const filter = { is_deleted: { $ne: true } };
+    if (brandId) filter.brand_id = brandId;
+
+    if (search) {
+      const rx = { $regex: escapeRegex(search), $options: "i" };
+      const [brandDocs, catDocs, variantDocs] = await Promise.all([
+Brand
+  ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
+  : Promise.resolve([]),
+          Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
+        Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
+      ]);
+      filter.$or = [
+        { name: rx },
+        { brand_id: { $in: brandDocs.map((b) => b._id) } },
+        { category_id: { $in: catDocs.map((c) => c._id) } },
+        { _id: { $in: variantDocs.map((v) => v.product_id) } },
+      ];
+    }
+
+    const isPriceSort = sort === "price-asc" || sort === "price-desc";
+
+    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    if (!limit) {
+      const products = await Product.find(filter)
+        .populate("category_id", "name")
+        .populate("brand_id", "name")
+        .populate("tag_ids", "name")
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email")
+        .sort({ created_at: -1 })
+        .lean();
+
+      if (!products.length) return res.status(200).json([]);
+
+      const variants = await Variant.find({
+        product_id: { $in: products.map((p) => p._id) },
+        is_deleted: { $ne: true },
+      }).sort({ created_at: 1 }).lean();
+
+      const variantsMap = {};
+      variants.forEach((v) => {
+        const pid = String(v.product_id);
+        (variantsMap[pid] = variantsMap[pid] || []).push(v);
+      });
+
+      const result = products.map((p) => ({
+        ...p,
+        variants: variantsMap[String(p._id)] || [],
+        price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
+      }));
+
+      return res.status(200).json(result);
+    }
+
+    // ---- PAGINATED MODE ----
+    const total = await Product.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+    const skip = (safePage - 1) * limit;
+
+    let pageIds = [];
+
+    if (isPriceSort) {
+      const idDocs = await Product.find(filter).select("_id").lean();
+      const ids = idDocs.map((d) => d._id);
+      if (ids.length) {
+        const priceDocs = await Variant.aggregate([
+          { $match: { is_deleted: { $ne: true }, product_id: { $in: ids } } },
+          { $sort: { created_at: 1 } },
+          { $group: { _id: "$product_id", p: { $first: "$selling_price" } } },
+        ]);
+        const priceMap = new Map(priceDocs.map((d) => [String(d._id), Number(d.p) || 0]));
+        ids.sort((a, b) => {
+          const pa = priceMap.get(String(a)) || 0;
+          const pb = priceMap.get(String(b)) || 0;
+          return sort === "price-asc" ? pa - pb : pb - pa;
+        });
+        pageIds = ids.slice(skip, skip + limit);
+      }
+    } else {
+      const idDocs = await Product.find(filter)
+        .select("_id")
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+      pageIds = idDocs.map((d) => d._id);
+    }
+
+    if (!pageIds.length) {
+      return res.status(200).json({
+        products: [],
+        pagination: { total, page: safePage, limit, pages, hasNext: false, hasPrev: safePage > 1 },
       });
     }
-  };
-  const updateProduct = async (req, res) => {
+
+    const products = await Product.find({ _id: { $in: pageIds } })
+      .populate("category_id", "name")
+      .populate("brand_id", "name")
+      .populate("tag_ids", "name")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    // page order preserve karo
+    const orderMap = new Map(pageIds.map((id, i) => [String(id), i]));
+    products.sort((a, b) => orderMap.get(String(a._id)) - orderMap.get(String(b._id)));
+
+    const variants = await Variant.find({
+      product_id: { $in: pageIds },
+      is_deleted: { $ne: true },
+    }).sort({ created_at: 1 }).lean();
+
+    const variantsMap = {};
+    variants.forEach((v) => {
+      const pid = String(v.product_id);
+      (variantsMap[pid] = variantsMap[pid] || []).push(v);
+    });
+
+    const result = products.map((p) => ({
+      ...p,
+      variants: variantsMap[String(p._id)] || [],
+      price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
+    }));
+
+    return res.status(200).json({
+      products: result,
+      pagination: {
+        total,
+        page: safePage,
+        limit,
+        pages,
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
+      },
+    });
+  } catch (error) {
+    console.error(" [getProducts] Error:", error);
+    return res.status(500).json({ message: error.message || "Failed to fetch products" });
+  }
+};
+// ======================================================
+// GET PRODUCT BY ID
+// ======================================================
+const getProductById = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    })
+      .populate("category_id", "name category_code description is_active")
+      .populate("brand_id", "name brand_code description country is_active logo")
+      .populate("tag_ids", "name")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // ⭐ Populate audit users so the Activity tab can show WHO created /
+    // updated each variant by name (instead of a raw ObjectId).
+    const variants = await Variant.find({
+      product_id: product._id,
+      is_deleted: { $ne: true },
+    })
+      .sort({ created_at: 1 })
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    // ⭐ LEGACY TAG HEALING: variant tags used to be saved as plain strings
+    // without a Tag document, so the Tags tab showed "—" for Created By.
+    // Create any missing Tag docs, attributing them to the user who last
+    // updated the variant (most plausible assigner).
     try {
-      const product = await Product.findByIdAndUpdate(
-        req.params.id,
-        req.body,
-        {
-          new: true,
-          runValidators: true,
+      const tagCreatorByName = new Map();
+      // Audit users are populated objects now, so unwrap the id before it is
+      // stored as a Tag's createdby (otherwise Mongoose casting fails).
+      const auditUserId = (user) =>
+        (user && typeof user === "object" ? user._id : user) || null;
+      variants.forEach(v => {
+        (Array.isArray(v.tags) ? v.tags : []).forEach(t => {
+          const name = String(t || "").trim().toLowerCase();
+          if (name && !tagCreatorByName.has(name)) {
+            tagCreatorByName.set(
+              name,
+              auditUserId(v.updatedby) || auditUserId(v.createdby)
+            );
+          }
+        });
+      });
+
+      if (tagCreatorByName.size > 0) {
+        const nameRegexes = [...tagCreatorByName.keys()].map(n => new RegExp(`^${escapeRegex(n)}$`, "i"));
+        const existingTagDocs = await Tag.find({ name: { $in: nameRegexes } }).select("name").lean();
+        const existingLowerNames = new Set(existingTagDocs.map(t => String(t.name).trim().toLowerCase()));
+
+        for (const [lowerName, creator] of tagCreatorByName) {
+          if (existingLowerNames.has(lowerName)) continue;
+          try {
+            await Tag.create({ name: lowerName, createdby: creator, updatedby: creator });
+          } catch (createErr) {
+            // Unique index race (tag created concurrently) — safe to ignore
+          }
         }
-      )
-        .select("-__v")
-        .populate("category_id", "category_code name")
-        .populate("brand_id", "brand_code name");
+      }
+    } catch (healErr) {
+      console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
+    }
 
-      if (!product) {
-        return res.status(404).json({
-          message: "Product not found",
-        });
+    return res.status(200).json({
+      ...product,
+      variants,
+    });
+  } catch (error) {
+    console.error("❌ [getProductById] Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to fetch product",
+    });
+  }
+};
+
+// ======================================================
+// CREATE PRODUCT
+// ======================================================
+const createProduct = async (req, res) => {
+  let createdProduct = null;
+
+  try {
+    const productName = String(req.body.name || "").trim();
+
+    if (!productName) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    if (!req.body.category_id) {
+      return res.status(400).json({ message: "Category is required" });
+    }
+
+    if (!req.body.brand_id) {
+      return res.status(400).json({ message: "Brand is required" });
+    }
+
+    const variants = parseJSON(req.body.variants, []);
+
+    // Variants are optional — can be empty (will be created later from Product Detail)
+    // if (!Array.isArray(variants) || !variants.length) {
+    //   return res.status(400).json({ message: "At least one variant is required" });
+    // }
+
+    const tagNames = parseJSON(req.body.tag_names, []);
+    const tagIds = await resolveTags(tagNames, req.user?._id);
+
+    // ✅ Validate and process specifications
+    let specifications = {};
+    if (req.body.specifications) {
+      try {
+        const rawSpecs = typeof req.body.specifications === 'string' 
+          ? JSON.parse(req.body.specifications) 
+          : req.body.specifications;
+        
+        specifications = await validateSpecifications(
+          req.body.category_id,
+          rawSpecs,
+          req.user?.tenant_id
+        );
+      } catch (error) {
+        return res.status(400).json({ message: error.message || "Invalid specifications" });
+      }
+    }
+
+    const productData = {
+      name: productName,
+      category_id: req.body.category_id,
+      brand_id: req.body.brand_id,
+      tag_ids: tagIds,
+      specifications,
+      description: String(req.body.description || "").trim(),
+      tax: toNumber(req.body.tax, 0),
+      status: req.body.status === "inactive" ? "inactive" : "active",
+      createdby: req.user?._id || null,
+      updatedby: null,
+      is_deleted: false,
+      deleted_at: null,
+      deletedby: null,
+    };
+
+    if (req.productId) {
+      productData._id = req.productId;
+    }
+
+    createdProduct = await Product.create(productData);
+
+    const imageVariantIndexes = parseJSON(req.body.image_variant_indexes, []);
+    const imagesByVariant = {};
+
+    (req.savedImages || []).forEach((image, fileIndex) => {
+      const variantIndex = Number(imageVariantIndexes[fileIndex]) || 0;
+      if (!imagesByVariant[variantIndex]) {
+        imagesByVariant[variantIndex] = [];
+      }
+      imagesByVariant[variantIndex].push(image);
+    });
+
+    const createdVariants = [];
+    const usedSkus = new Set();
+
+    for (let index = 0; index < variants.length; index++) {
+      const item = variants[index] || {};
+      let sku = normalizeSku(item.sku);
+
+      if (!sku) {
+        sku = await getNextSku();
       }
 
-      res.status(200).json(product);
-    } catch (error) {
-      res.status(400).json({
-        message: error.message,
-      });
-    }
-  };
-  const deleteProduct = async (req, res) => {
-    try {
-      const product = await Product.findByIdAndDelete(req.params.id);
+      const skuKey = sku.toLowerCase();
 
-      if (!product) {
-        return res.status(404).json({
-          message: "Product not found",
-        });
+      if (usedSkus.has(skuKey)) {
+        throw new Error(`Duplicate SKU in request: ${sku}`);
       }
 
-      res.status(200).json({
-        message: "Product deleted successfully",
+      const existingSku = await Variant.findOne({
+        sku: { $regex: `^${escapeRegex(sku)}$`, $options: "i" },
+      }).lean();
+
+      if (existingSku) {
+        throw new Error(`SKU ${sku} already exists`);
+      }
+
+      usedSkus.add(skuKey);
+
+      const variantTags = Array.isArray(item.tags) ? item.tags : [];
+      if (variantTags.length > 0) {
+        // Ensure Tag docs exist so Created By is tracked for variant tags too
+        await resolveTags(variantTags, req.user?._id);
+      }
+
+      const variant = await Variant.create({
+        product_id: createdProduct._id,
+        sku,
+        title: item.title || item.variant_title || sku,
+        description: item.description || "",
+        cost_price: toNumber(item.cost_price, 0),
+        selling_price: toNumber(item.selling_price, 0),
+        quantity: toNumber(item.quantity, 0),
+        min_qnt: toNumber(item.min_qnt, 0),
+        max_qnt: toNumber(item.max_qnt, 0),
+        attributes: item.option_values || item.attributes || {},
+        tags: variantTags,
+        images: imagesByVariant[index] || [],
+        createdby: req.user?._id || null,
+        updatedby: req.user?._id || null,
       });
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
-      });
+
+      createdVariants.push(variant);
     }
-  };
-  module.exports = {
-    createProduct,getProducts,getProductById,updateProduct,  deleteProduct,
 
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
 
-  };
+    await pushGlobalActivity(
+      io,
+      {
+        action: `${performerName} created product "${createdProduct.name}"`,
+        category: "Product Management",
+        performedBy: performerId,
+        performedByName: performerName,
+        details: {
+          productId: createdProduct._id,
+          variantCount: createdVariants.length,
+          tagCount: tagIds.length,
+        },
+      },
+      performerId
+    );
+
+    const populatedProduct = await Product.findById(createdProduct._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    emitSocketEvent("productCreated", {
+      _id: createdProduct._id,
+      name: createdProduct.name,
+      tag_ids: createdProduct.tag_ids,
+      variants: createdVariants,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at || createdProduct.created_at,
+      updated_at: populatedProduct?.updated_at || createdProduct.updated_at,
+    });
+
+    return res.status(201).json({
+      message: "Product created successfully",
+      product: createdProduct,
+      variants: createdVariants,
+    });
+  } catch (error) {
+    console.error("❌ [createProduct] Error:", error);
+
+    if (createdProduct) {
+      await Variant.deleteMany({ product_id: createdProduct._id }).catch(() => {});
+      await Product.findByIdAndDelete(createdProduct._id).catch(() => {});
+      await deleteProductUploadFolder(createdProduct._id).catch(() => {});
+    }
+
+    return res.status(400).json({
+      message: error.message || "Failed to create product",
+    });
+  }
+};
+
+// ======================================================
+// UPDATE PRODUCT
+// ======================================================
+const updateProduct = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (req.body.name !== undefined) {
+      const name = String(req.body.name).trim();
+      if (!name) {
+        return res.status(400).json({ message: "Product name is required" });
+      }
+      product.name = name;
+    }
+
+    if (req.body.category_id !== undefined) {
+      if (!req.body.category_id) {
+        return res.status(400).json({ message: "Category is required" });
+      }
+      product.category_id = req.body.category_id;
+    }
+
+    if (req.body.brand_id !== undefined) {
+      if (!req.body.brand_id) {
+        return res.status(400).json({ message: "Brand is required" });
+      }
+      product.brand_id = req.body.brand_id;
+    }
+
+    if (req.body.tag_names !== undefined) {
+      const tagNames = parseJSON(req.body.tag_names, []);
+      const tagIds = await resolveTags(tagNames, req.user?._id);
+      // ✅ FIX: Tags wahi hain to product ko "modified" mark na karo, warna
+      // sirf Save dabane par bhi "Product Updated" event ban jata tha.
+      if (!isSameList(product.tag_ids, tagIds)) {
+        product.tag_ids = tagIds;
+      }
+    }
+
+    // ✅ Update specifications
+    if (req.body.specifications !== undefined) {
+      try {
+        const rawSpecs = typeof req.body.specifications === 'string' 
+          ? JSON.parse(req.body.specifications) 
+          : req.body.specifications;
+        
+        const nextSpecifications = await validateSpecifications(
+          product.category_id,
+          rawSpecs,
+          req.user?.tenant_id
+        );
+        // ✅ FIX: Specifications same hain to "modified" mark na karo
+        if (!isSameValue(product.specifications, nextSpecifications)) {
+          product.specifications = nextSpecifications;
+        }
+      } catch (error) {
+        return res.status(400).json({ message: error.message || "Invalid specifications" });
+      }
+    }
+
+    if (req.body.description !== undefined) {
+      product.description = String(req.body.description || "").trim();
+    }
+
+    if (req.body.tax !== undefined) {
+      product.tax = toNumber(req.body.tax, 0);
+    }
+
+    if (req.body.status !== undefined) {
+      product.status = req.body.status === "inactive" ? "inactive" : "active";
+    }
+
+    // ✅ FIX (ROOT CAUSE): Product ke audit fields (updated_at / updatedby) sirf
+    // tab update hote hain jab product-level field waqai badla ho. Pehle ye
+    // unconditional tha, is liye "Add variant" / "Edit variant" page (jo
+    // PUT /products/:id call karta hai) product ka updated_at + updatedby bump kar
+    // deta tha aur Activity timeline mein ghalat "Product Updated" event +
+    // Overview tab mein "Updated By" card aa jata tha, halanke product mein kuch
+    // bhi nahi badla hota tha.
+    const productActuallyChanged = product.isModified();
+
+    if (productActuallyChanged) {
+      product.updatedby = req.user?._id || null;
+      await product.save();
+    }
+
+    const variants = parseJSON(req.body.variants, null);
+    let addedVariantCount = 0;
+    let updatedVariantCount = 0;
+
+    if (Array.isArray(variants)) {
+      const imageVariantIndexes = parseJSON(req.body.image_variant_indexes, []);
+      const imagesByVariant = {};
+
+      (req.savedImages || []).forEach((image, fileIndex) => {
+        const variantIndex = Number(imageVariantIndexes[fileIndex]) || 0;
+        if (!imagesByVariant[variantIndex]) {
+          imagesByVariant[variantIndex] = [];
+        }
+        imagesByVariant[variantIndex].push(image);
+      });
+
+      const existingVariants = await Variant.find({
+        product_id: product._id,
+        is_deleted: { $ne: true },
+      });
+
+      const existingVariantMap = new Map();
+      existingVariants.forEach((variant) => {
+        existingVariantMap.set(String(variant._id), variant);
+      });
+
+      for (let index = 0; index < variants.length; index++) {
+        const item = variants[index] || {};
+
+        if (item._id) {
+          const variantId = String(item._id);
+          const variant = existingVariantMap.get(variantId);
+
+          if (!variant) {
+            return res.status(400).json({
+              message: "Invalid variant or variant does not belong to this product",
+            });
+          }
+
+          if (item.sku !== undefined) {
+            const sku = normalizeSku(item.sku);
+            if (!sku) {
+              return res.status(400).json({ message: "Variant SKU is required" });
+            }
+
+            const duplicateSku = await Variant.findOne({
+              _id: { $ne: variant._id },
+              sku: { $regex: `^${escapeRegex(sku)}$`, $options: "i" },
+            }).lean();
+
+            if (duplicateSku) {
+              return res.status(400).json({ message: `SKU ${sku} already exists` });
+            }
+            variant.sku = sku;
+          }
+
+          if (item.title !== undefined || item.variant_title !== undefined) {
+            variant.title = item.title || item.variant_title || variant.sku;
+          }
+
+          if (item.description !== undefined) {
+            variant.description = item.description;
+          }
+
+          if (item.cost_price !== undefined) {
+            variant.cost_price = toNumber(item.cost_price, 0);
+          }
+
+          if (item.selling_price !== undefined) {
+            variant.selling_price = toNumber(item.selling_price, 0);
+          }
+
+          if (item.quantity !== undefined) {
+            variant.quantity = toNumber(item.quantity, 0);
+          }
+
+          if (item.min_qnt !== undefined) {
+            variant.min_qnt = toNumber(item.min_qnt, 0);
+          }
+
+          if (item.max_qnt !== undefined) {
+            variant.max_qnt = toNumber(item.max_qnt, 0);
+          }
+
+          if (item.option_values !== undefined || item.attributes !== undefined) {
+            const nextAttributes = item.option_values || item.attributes || {};
+            // ✅ FIX: same attributes dobara assign karne se variant "modified" ho
+            // jata tha -> ghalat "Variant Updated" event
+            if (!isSameValue(variant.attributes ?? {}, nextAttributes)) {
+              variant.attributes = nextAttributes;
+            }
+          }
+
+          if (item.tags !== undefined) {
+            const variantTagList = Array.isArray(item.tags) ? item.tags : [];
+            if (variantTagList.length > 0) {
+              // Ensure Tag docs exist so Created By is tracked for variant tags too
+              await resolveTags(variantTagList, req.user?._id);
+            }
+            // ✅ FIX: tags waqai badle hon to hi assign karo
+            if (!isSameList(variant.tags, variantTagList)) {
+              variant.tags = variantTagList;
+            }
+          }
+
+          if (item.status !== undefined) {
+            variant.status = item.status === "inactive" ? "inactive" : "active";
+          }
+
+          // ✅ FIX: Variant image removal ab save par persist hoti hai.
+          // Frontend existing_images (bachi hui images ke objects) bhejta hai —
+          // purani images jo is list mein NAHI hain = user ne remove ki hui, unhe hatao.
+          // Nayi uploaded files (imagesByVariant[index]) remaining ke saath append karo.
+          // NOTE: Agar existing_images field hi na bheji ho (e.g. tag-only updates),
+          // to purana append behavior rakha gaya hai — koi accidental image loss nahi.
+          if (Array.isArray(item.existing_images)) {
+            const keptUrls = new Set(
+              item.existing_images
+                .map((img) => (typeof img === "string" ? img : img?.img_url))
+                .filter(Boolean)
+                .map(String)
+            );
+            const oldImages = Array.isArray(variant.images) ? variant.images : [];
+            const remaining = oldImages.filter((img) => keptUrls.has(String(img?.img_url)));
+            const nextImages = imagesByVariant[index]
+              ? [...remaining, ...imagesByVariant[index]]
+              : remaining;
+            // ✅ FIX: image list same hai to naya array assign na karo (warna
+            // variant "modified" ho kar ghalat "Variant Updated" event ban jata tha)
+            if (
+              !isSameValue(
+                oldImages.map((img) => String(img?.img_url)),
+                nextImages.map((img) => String(img?.img_url))
+              )
+            ) {
+              variant.images = nextImages;
+            }
+          } else if (imagesByVariant[index]) {
+            const oldImages = Array.isArray(variant.images) ? variant.images : [];
+            variant.images = [...oldImages, ...imagesByVariant[index]];
+          }
+
+          // ✅ FIX: Variant ke audit fields sirf tab update karo jab kuch waqai
+          // badla ho — warna "Edit variant" page khol kar bina kuch badle Save
+          // karne par bhi Activity timeline mein "Variant Updated" aa jata tha.
+          if (variant.isModified()) {
+            variant.updatedby = req.user?._id || null;
+            await variant.save();
+            updatedVariantCount += 1;
+          }
+        } else {
+          let sku = normalizeSku(item.sku);
+          if (!sku) {
+            sku = await getNextSku();
+          }
+
+          const duplicateSku = await Variant.findOne({
+            sku: { $regex: `^${escapeRegex(sku)}$`, $options: "i" },
+          }).lean();
+
+          if (duplicateSku) {
+            return res.status(400).json({ message: `SKU ${sku} already exists` });
+          }
+
+          const newVariantTags = Array.isArray(item.tags) ? item.tags : [];
+          if (newVariantTags.length > 0) {
+            // Ensure Tag docs exist so Created By is tracked for variant tags too
+            await resolveTags(newVariantTags, req.user?._id);
+          }
+
+          await Variant.create({
+            product_id: product._id,
+            sku,
+            title: item.title || item.variant_title || sku,
+            description: item.description || "",
+            cost_price: toNumber(item.cost_price, 0),
+            selling_price: toNumber(item.selling_price, 0),
+            quantity: toNumber(item.quantity, 0),
+            min_qnt: toNumber(item.min_qnt, 0),
+            max_qnt: toNumber(item.max_qnt, 0),
+            attributes: item.option_values || item.attributes || {},
+            tags: newVariantTags,
+            status: item.status === "inactive" ? "inactive" : "active",
+            images: imagesByVariant[index] || [],
+            createdby: req.user?._id || null,
+            updatedby: req.user?._id || null,
+          });
+          addedVariantCount += 1;
+        }
+      }
+
+      // ⚠️ REMOVED (bug fix): Pehle yahan "jo variants payload mein nahi aaye unhe
+      // is_deleted = true karke save kar do" wala soft-delete loop tha. Variant
+      // model mein `is_deleted` / `deleted_at` fields maujood hi nahi hain, is liye:
+      //   • variant delete hota kuch bhi nahi tha (is_deleted silently ignore),
+      //   • magar `deletedby` (jo schema mein hai) mark modified ho jata tha aur
+      //     save() har bache hue variant ka `updated_at` bump kar deta tha —
+      //     nateeja: Activity timeline mein un variants ka ghalat "Variant Updated"
+      //     event, aur live variant par dangling `deletedby` audit value.
+      // (Add/Edit variant page sirf apna variant bhejta hai, is liye ye loop har
+      // baar baaki sab variants ko "delete" karne ki koshish karta tha.)
+      // Variant delete karne ka official rasta: DELETE /variants/:id
+      // (frontend: variantApi.delete) — wo hard delete karta hai aur images bhi
+      // remove karta hai.
+      // NOTE: Future mein agar soft-delete chahiye to pehle Variant schema mein
+      // is_deleted/deleted_at add karo aur add-variant page ko saare variants
+      // (purane + naya) bhejne ke liye update karo, warna baaki variants delete
+      // ho jayenge.
+    }
+
+    const updatedVariants = await Variant.find({
+      product_id: product._id,
+      is_deleted: { $ne: true },
+    })
+      .sort({ created_at: 1 })
+      .lean();
+
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    // ✅ FIX: Activity feed ka message sach bole. Sirf variant change par
+    // "updated product" likhna misleading tha (aur audit trail bhi ghalat lagta tha).
+    const variantChangeSummary = [
+      addedVariantCount > 0
+        ? `${addedVariantCount} variant${addedVariantCount > 1 ? "s" : ""} added`
+        : "",
+      updatedVariantCount > 0
+        ? `${updatedVariantCount} variant${updatedVariantCount > 1 ? "s" : ""} updated`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" & ");
+
+    const actionMessage =
+      !productActuallyChanged && variantChangeSummary
+        ? `${performerName} ${variantChangeSummary} in product "${product.name}"`
+        : `${performerName} updated product "${product.name}"`;
+
+    await pushGlobalActivity(
+      io,
+      {
+        action: actionMessage,
+        category: "Product Management",
+        performedBy: performerId,
+        performedByName: performerName,
+        details: {
+          productId: product._id,
+          variantCount: updatedVariants.length,
+          addedVariants: addedVariantCount,
+          changedVariants: updatedVariantCount,
+          tagCount: product.tag_ids ? product.tag_ids.length : 0,
+        },
+      },
+      performerId
+    );
+
+    const populatedProduct = await Product.findById(product._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    emitSocketEvent("productUpdated", {
+      _id: product._id,
+      name: product.name,
+      status: product.status,
+      tag_ids: product.tag_ids,
+      variants: updatedVariants,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at,
+      updated_at: populatedProduct?.updated_at,
+    });
+
+    return res.status(200).json({
+      message: "Product updated successfully",
+      product,
+      variants: updatedVariants,
+    });
+  } catch (error) {
+    console.error("❌ [updateProduct] Error:", error);
+    return res.status(400).json({
+      message: error.message || "Failed to update product",
+    });
+  }
+};
+
+// ======================================================
+// DELETE PRODUCT
+// ======================================================
+const deleteProduct = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    product.is_deleted = true;
+    product.deleted_at = new Date();
+    product.deletedby = req.user?._id || null;
+    await product.save();
+
+    await Variant.updateMany(
+      {
+        product_id: product._id,
+        is_deleted: { $ne: true },
+      },
+      {
+        $set: {
+          is_deleted: true,
+          deleted_at: new Date(),
+          deletedby: req.user?._id || null,
+        },
+      }
+    );
+
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    await pushGlobalActivity(
+      io,
+      {
+        action: `${performerName} deleted product "${product.name}"`,
+        category: "Product Management",
+        performedBy: performerId,
+        performedByName: performerName,
+        details: { productId: product._id },
+      },
+      performerId
+    );
+
+    emitSocketEvent("productDeleted", product._id);
+
+    return res.status(200).json({ message: "Product deleted successfully" });
+  } catch (error) {
+    console.error("❌ [deleteProduct] Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to delete product",
+    });
+  }
+};
+
+// ======================================================
+// TOGGLE PRODUCT STATUS
+// ======================================================
+const toggleProductStatus = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    const product = await Product.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    product.status = product.status === "active" ? "inactive" : "active";
+    product.updatedby = req.user?._id || null;
+    await product.save();
+
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+
+    await pushGlobalActivity(
+      io,
+      {
+        action: `${performerName} ${product.status === "active" ? "activated" : "deactivated"} product "${product.name}"`,
+        category: "Product Management",
+        performedBy: performerId,
+        performedByName: performerName,
+        details: { productId: product._id, status: product.status },
+      },
+      performerId
+    );
+
+    const populatedProduct = await Product.findById(product._id)
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
+
+    emitSocketEvent("productUpdated", {
+      _id: product._id,
+      name: product.name,
+      status: product.status,
+      tag_ids: product.tag_ids,
+      createdby: populatedProduct?.createdby || null,
+      updatedby: populatedProduct?.updatedby || null,
+      created_at: populatedProduct?.created_at,
+      updated_at: populatedProduct?.updated_at,
+    });
+
+    return res.status(200).json({
+      message: `Product status updated to ${product.status}`,
+      product,
+    });
+  } catch (error) {
+    console.error("❌ [toggleProductStatus] Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to update product status",
+    });
+  }
+};
+
+// ======================================================
+// EXPORTS
+// ======================================================
+module.exports = {
+  createProduct,
+  getProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  toggleProductStatus,
+};

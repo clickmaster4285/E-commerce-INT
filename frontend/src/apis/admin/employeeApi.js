@@ -1,0 +1,129 @@
+import axiosInstance from "../axiosInstance";
+
+// ============================================================
+// HELPER: UNWRAP API RESPONSE
+// Backend response: { success: true, data: {...} }
+// ============================================================
+const unwrap = (response) => {
+  if (!response) return null;
+  if (response.success !== undefined && response.data !== undefined) {
+    return response.data;
+  }
+  return response;
+};
+
+// ============================================================
+// EMPLOYEE API
+// ============================================================
+const paginated = (res, fallbackLimit) => {
+  const d = res?.data;
+  if (Array.isArray(d)) {
+    return {
+      items: d,
+      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
+    };
+  }
+  return {
+    items: Array.isArray(d?.data) ? d.data : [],
+    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+  };
+};
+
+export const employeeApi = {
+  // ==========================================================
+  // GET ALL EMPLOYEES
+  // ==========================================================
+  getAll: async () => {
+    try {
+      const response = await axiosInstance.get("/employees", { timeout: 10000 });
+      return unwrap(response.data);
+    } catch (error) {
+      console.error("❌ getAllEmployees error:", error);
+      if (error.code === 'ECONNABORTED') throw new Error("Request timed out. Backend respond nahi kar raha.");
+      throw new Error(error.response?.data?.message || "Failed to fetch employees");
+    }
+  },
+
+  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", department = "all" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (status && status !== "all") params.status = status;
+    if (department && department !== "all") params.department = department;
+    const response = await axiosInstance.get("/employees", { params, timeout: 10000 });
+    return paginated(response, limit);
+  },
+
+  // ==========================================================
+  // GET EMPLOYEE BY ID
+  // ==========================================================
+  getById: async (id) => {
+    if (!id) throw new Error("Employee ID is required");
+
+    try {
+      const response = await axiosInstance.get(`/employees/${id}`, { timeout: 10000 }); // ✅ 10s Timeout Added
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(`❌ getEmployeeById (${id}) error:`, error);
+      if (error.code === 'ECONNABORTED') throw new Error("Request timed out. Backend respond nahi kar raha.");
+      throw new Error(error.response?.data?.message || error.message || "Failed to fetch employee details");
+    }
+  },
+
+  // ==========================================================
+  // CREATE EMPLOYEE
+  // ==========================================================
+  create: async (data) => {
+    if (!data?.name || !data?.email || !data?.password) {
+      throw new Error("Name, email and password are required");
+    }
+    try {
+      const response = await axiosInstance.post("/employees", data, { timeout: 10000 });
+      return unwrap(response.data);
+    } catch (error) {
+      console.error("❌ createEmployee error:", error);
+      throw new Error(error.response?.data?.message || "Failed to create employee");
+    }
+  },
+
+  // ==========================================================
+  // UPDATE EMPLOYEE
+  // ==========================================================
+  update: async (id, data) => {
+    if (!id) throw new Error("Employee ID is required");
+    try {
+      const response = await axiosInstance.put(`/employees/${id}`, data, { timeout: 10000 });
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(`❌ updateEmployee (${id}) error:`, error);
+      throw new Error(error.response?.data?.message || error.message || "Failed to update employee");
+    }
+  },
+
+  // ==========================================================
+  // DELETE EMPLOYEE
+  // ==========================================================
+  delete: async (id) => {
+    if (!id) throw new Error("Employee ID is required");
+    try {
+      const response = await axiosInstance.delete(`/employees/${id}`, { timeout: 10000 });
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(`❌ deleteEmployee (${id}) error:`, error);
+      throw new Error(error.response?.data?.message || "Failed to delete employee");
+    }
+  },
+
+  // ==========================================================
+  // TOGGLE EMPLOYEE STATUS
+  // ==========================================================
+  toggleStatus: async (id) => {
+    if (!id) throw new Error("Employee ID is required");
+    try {
+      const response = await axiosInstance.patch(`/employees/${id}/toggle-status`, { timeout: 10000 });
+      return unwrap(response.data);
+    } catch (error) {
+      console.error(`❌ toggleStatus (${id}) error:`, error);
+      throw new Error(error.response?.data?.message || "Failed to toggle employee status");
+    }
+  },
+};
