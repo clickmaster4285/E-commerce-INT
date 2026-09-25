@@ -39,6 +39,7 @@ const employeeSchema = new mongoose.Schema(
       employees: { type: Boolean, default: true },
       discounts: { type: Boolean, default: true },
       deals: { type: Boolean, default: true },
+      bundles: { type: Boolean, default: true },
       store: { type: Boolean, default: false },
       banners: { type: Boolean, default: true },
       manageStock: { type: Boolean, default: false },

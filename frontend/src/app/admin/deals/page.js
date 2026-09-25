@@ -37,6 +37,8 @@ const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} f
 const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
+const UploadIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M16 8l-4-4m0 0L8 8m4-4v12" /></svg>);
+const ImageIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" /><circle cx="8.5" cy="8.5" r="1.5" /></svg>);
 
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
@@ -90,7 +92,20 @@ const formatDealValue = (deal) => {
       return `Buy ${buy} Get ${get} (${disc === 100 ? "Free" : `${disc}% Off`})`;
     }
     case "free_shipping": return "Free Shipping";
-    case "bundle": return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
+    case "bundle": {
+      const rule = deal?.bundleRule || deal?.bundle_rule || null;
+      if (!rule) return "Bundle Deal";
+      const buy = rule.buyQuantity || rule.buy_quantity || 1;
+      if (rule.rewardType === "free_product" || rule.reward_type === "free_product") {
+        const gift = rule.freeProductName || rule.freeProduct?.name || "Gift";
+        const qty = rule.freeQuantity || rule.free_quantity || 1;
+        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} FREE`;
+      }
+      if (rule.rewardType === "percentage" || rule.reward_type === "percentage") {
+        return `Buy ${buy} → ${rule.value || 0}% OFF`;
+      }
+      return `Buy ${buy} → Rs. ${rule.value || 0} OFF`;
+    }
     default: return value > 0 ? `${value}` : "-";
   }
 };
@@ -238,7 +253,15 @@ export default function DealsPage() {
     buy_quantity: "",
     get_quantity: "",
     get_discount_value: "",
-    bundle_price: "",
+    bundle_rule: {
+      mode: "all", // "all" = all selected products | "limit" = custom quantity
+      buy_quantity: "",
+      reward_type: "percentage",
+      value: "",
+      gift_product_id: "",
+      gift_quantity: 1,
+    },
+    bundle_rules: [{ buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
     has_min_quantity: false, // New field for checkbox
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -278,7 +301,16 @@ export default function DealsPage() {
       name: "", code: "", description: "", target_type: "all",
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
-      buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
+      buy_quantity: "", get_quantity: "", get_discount_value: "",
+      bundle_rule: {
+        mode: "all",
+        buy_quantity: "",
+        reward_type: "percentage",
+        value: "",
+        gift_product_id: "",
+        gift_quantity: 1,
+      },
+    bundle_rules: [{ mode: "limit", buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
       has_min_quantity: false,
       min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -367,7 +399,26 @@ export default function DealsPage() {
       buy_quantity: deal?.buyQuantity ?? "",
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
-      bundle_price: deal?.bundlePrice ?? "",
+      // ✅ Single offer condition (bundle deal)
+      bundle_rule: {
+        mode: deal?.bundleRule?.mode === "limit" ? "limit" : "all",
+        buy_quantity: deal?.bundleRule?.buyQuantity ?? "",
+        reward_type: deal?.bundleRule?.rewardType || "percentage",
+        value: deal?.bundleRule?.value ?? "",
+        gift_product_id: String(
+          deal?.bundleRule?.freeProduct?._id || deal?.bundleRule?.freeProduct || ""
+        ),
+        gift_quantity: deal?.bundleRule?.freeQuantity ?? 1,
+      },
+      bundle_rules: deal?.bundleRule ? [{
+        buy_quantity: deal?.bundleRule?.buyQuantity ?? 2,
+        reward_type: deal?.bundleRule?.rewardType || "percentage",
+        value: deal?.bundleRule?.value ?? "",
+        gift_product_id: String(
+          deal?.bundleRule?.freeProduct?._id || deal?.bundleRule?.freeProduct || ""
+        ),
+        gift_quantity: deal?.bundleRule?.freeQuantity ?? 1,
+      }] : [{ buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
       
       has_min_quantity: hasMinQty,
       min_quantity: hasMinQty ? rawMinQty : "",
@@ -399,6 +450,32 @@ export default function DealsPage() {
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
     }
 
+    // ✅ Bundle deal — single offer condition validation
+    if (formData.value_type === "bundle") {
+      const rule = formData.bundle_rule || {};
+
+      if (rule.mode === "limit") {
+        const buyQty = Number(rule.buy_quantity);
+        if (!buyQty || buyQty <= 0) {
+          return toast.error("Bundle offer: enter the required quantity");
+        }
+      }
+
+      if (rule.reward_type === "free_product") {
+        if (!rule.gift_product_id) {
+          return toast.error("Bundle offer: select the free gift product");
+        }
+      } else {
+        const val = Number(rule.value);
+        if (!val || val <= 0) {
+          return toast.error("Bundle offer: enter a discount value greater than 0");
+        }
+        if (rule.reward_type === "percentage" && val > 100) {
+          return toast.error("Bundle offer: percentage cannot be more than 100%");
+        }
+      }
+    }
+
     if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
     if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
     if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
@@ -428,7 +505,28 @@ export default function DealsPage() {
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
-      bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
+      // ✅ Single bundle offer condition (bundle deal only)
+      // ✅ Single bundle offer condition (bundle deal only)
+      bundleRule:
+        formData.value_type === "bundle" && formData.bundle_rule
+          ? {
+              mode: formData.bundle_rule.mode === "limit" ? "limit" : "all",
+              buyQuantity: Math.max(0, Number(formData.bundle_rule.buy_quantity) || 0),
+              rewardType: formData.bundle_rule.reward_type || "percentage",
+              value:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? 0
+                  : Number(formData.bundle_rule.value) || 0,
+              freeProduct:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? formData.bundle_rule.gift_product_id || null
+                  : null,
+              freeQuantity:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? Math.max(1, Number(formData.bundle_rule.gift_quantity) || 1)
+                  : 1,
+            }
+          : null,
       minQuantity: finalMinQuantity, // Send null if unchecked
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
@@ -799,6 +897,126 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
   />
 );
 
+/* ==================== BUNDLE IMAGE UPLOADER ==================== */
+function BundleImageUploader({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const preview = value
+    ? value.startsWith("http") || value.startsWith("blob:") || value.startsWith("data:")
+      ? value
+      : `${API_ORIGIN}${value.startsWith("/") ? "" : "/"}${value}`
+    : null;
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    if (!file.type?.startsWith("image/")) return toast.error("Please select a valid image file");
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image size must be less than 5MB");
+
+    setUploading(true);
+    try {
+      const url = await dealApi.uploadImage(file);
+      if (!url) throw new Error("Image upload failed");
+      onChange(url);
+      toast.success("Bundle image uploaded");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to upload bundle image");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = (e) => {
+    e.stopPropagation();
+    onChange("");
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <label className="block text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+          Bundle Image <span className="text-red-500">*</span>
+        </label>
+        {preview && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="text-[11px] font-semibold transition hover:opacity-70"
+            style={{ color: "var(--danger)" }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+
+      <div
+        onClick={() => !uploading && !preview && inputRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!preview && !uploading) setIsDragging(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+          if (!preview && !uploading) uploadFile(e.dataTransfer.files?.[0]);
+        }}
+        className={`relative w-full rounded-lg border-2 border-dashed p-3 transition ${preview ? "cursor-default" : "cursor-pointer"}`}
+        style={{
+          borderColor: isDragging || preview ? "var(--accent)" : "var(--border-color)",
+          backgroundColor: isDragging ? "var(--accent-soft)" : "var(--bg-tertiary)",
+        }}
+      >
+        {preview ? (
+          <img
+            src={preview}
+            alt="Bundle"
+            className="w-full h-40 object-cover rounded-md"
+            style={{ border: "1px solid var(--border-color)" }}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <span
+              className="flex h-11 w-11 items-center justify-center rounded-full mb-2"
+              style={{ backgroundColor: "var(--bg-secondary)", color: isDragging ? "var(--accent)" : "var(--text-muted)" }}
+            >
+              {uploading ? <Spinner className="h-5 w-5" /> : <UploadIcon className="h-5 w-5" />}
+            </span>
+            <p className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
+              {uploading ? "Uploading image..." : isDragging ? "Drop image here" : "Click to upload or drag & drop"}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>PNG, JPG or WEBP — max 5MB</p>
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) uploadFile(f);
+          }}
+        />
+      </div>
+
+      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+        Ye image bundle deal card aur storefront par dikhayi jayegi.
+      </p>
+    </div>
+  );
+}
+
 /* ==================== DEAL FORM MODAL (WITH OUTSIDE CLICK CLOSE & UPDATED SETTINGS) ==================== */
 const DEAL_TYPE_LABELS = { all: "All Products Deal", product: "Product Deal", category: "Category Deal", brand: "Brand Deal" };
 const DEAL_TYPE_SUBTITLES = { 
@@ -939,6 +1157,27 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
     }));
   };
 
+  // ✅ Bundle deal SIRF Product Deal me — All / Category / Brand deal me nahi
+  const isBundleMode = formType === "product" && formData.value_type === "bundle";
+
+  // ✅ Discount type options — "Bundle Deal" product deal ke ilawa kahin nahi dikhta
+  const discountTypeOptions = useMemo(() => {
+    const options = [
+      { value: "percentage", label: "Percentage Discount (%)" },
+      { value: "fixed_amount", label: "Fixed Amount (Rs.)" },
+      { value: "buy_x_get_y", label: "Buy X Get Y" },
+    ];
+    // product deal me bundle option; purane bundle deals ko edit karte waqt bhi value visible rahe
+    if (formType === "product" || formData.value_type === "bundle") {
+      options.push({ value: "bundle", label: "Bundle Deal" });
+    }
+    options.push({ value: "free_shipping", label: "Free Shipping" });
+    return options;
+  }, [formType, formData.value_type]);
+
+  // Bundle deal: no fixed bundle price — savings come from the single offer rule only
+  const bundleSavings = 0;
+
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
   return (
@@ -1011,7 +1250,8 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
             </section>
 
             {/* ===== SECTION: TARGET SELECTION ===== */}
-            {sel && (
+            {/* ✅ Bundle deal me products bundle section ke andar select hote hain */}
+            {sel && !isBundleMode && (
               <section>
                 <SectionHeader
                   icon={TargetIconFor(formType)}
@@ -1140,13 +1380,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   <CustomModalSelect
                     value={formData.value_type}
                     onChange={(val) => setFormData({ ...formData, value_type: val })}
-                    options={[
-                      { value: "percentage", label: "Percentage Discount (%)" },
-                      { value: "fixed_amount", label: "Fixed Amount (Rs.)" },
-                      { value: "buy_x_get_y", label: "Buy X Get Y" },
-                      { value: "bundle", label: "Bundle Price" },
-                      { value: "free_shipping", label: "Free Shipping" },
-                    ]}
+                    options={discountTypeOptions}
                     placeholder="Select discount type"
                   />
                 </FormField>
@@ -1178,17 +1412,93 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                     </>
                   )}
 
-                  {formData.value_type === "bundle" && (
-                    <>
-                      <FormField label="Bundle Fixed Price (Rs.)" fullWidth>
-                        <TextInput type="number" value={formData.bundle_price} onChange={(v) => setFormData({ ...formData, bundle_price: v })} placeholder="e.g., 1500" style={inputStyle} />
-                      </FormField>
-                      {formType === 'product' && totalSelectedValue > 0 && (
-                        <p className="md:col-span-2 text-[10px] text-right" style={{ color: "var(--text-muted)" }}>
-                          Original Total: <span className="line-through">{formatCurrency(totalSelectedValue)}</span>
-                        </p>
-                      )}
-                    </>
+                  {/* ========================================== */}
+                  {/* BUNDLE DEAL SETUP                          */}
+                  {/* 1) Image → 2) Products → 3) Total → 4) Price */}
+                  {/* ========================================== */}
+                  {isBundleMode && (
+                    <div
+                      className="md:col-span-2 rounded-lg p-3.5 space-y-4"
+                      style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                          style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+                        >
+                          <ImageIcon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold">Bundle Setup</p>
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            Image, products, total aur bundle price set karein
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* STEP 1 — BUNDLE PRODUCTS */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <label className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                            Bundle Products <span className="text-red-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={openSelection}
+                            className="shrink-0 h-9 px-3.5 rounded-md text-[12px] font-semibold flex items-center gap-1.5 transition hover:brightness-110"
+                            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+                          >
+                            <PlusIcon className="w-3.5 h-3.5" />
+                            Select Products
+                          </button>
+                        </div>
+
+                        <div className="rounded-lg overflow-hidden" style={cardStyle}>
+                          {selectedItemsDetails.length > 0 && (
+                            <div className="p-3 space-y-2">
+                              {selectedItemsDetails.map((product) => {
+                                const id = getId(product);
+                                return (
+                                  <SelectedProductRow
+                                    key={id}
+                                    product={product}
+                                    price={getProductPrice(product)}
+                                    image={getProductImage(product)}
+                                    onView={() => setViewingProduct(product)}
+                                    onRemove={() => removeSelectedItem(id)}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* STEP 2 — TOTAL PRICE */}
+                      <div
+                        className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5"
+                        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}
+                      >
+                        <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                          Total Price ({selectedItemsDetails.length} {selectedItemsDetails.length === 1 ? "product" : "products"})
+                        </span>
+                        <span className="text-[14px] font-bold" style={{ color: "var(--text-primary)" }}>
+                          {formatCurrency(totalSelectedValue)}
+                        </span>
+                      </div>
+
+                      {/* STEP 3 — QUANTITY RULES (Buy N bundles → discount / free gift) */}
+                      <BundleRulesEditor
+                        rules={formData.bundle_rules || []}
+                        onChange={(next) => {
+                          const single = Array.isArray(next) && next.length > 0 ? next[0] : { buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 };
+                          setFormData((prev) => ({ ...prev, bundle_rules: next, bundle_rule: single }));
+                        }}
+                        products={products}
+                        inputStyle={inputStyle}
+                        cardStyle={cardStyle}
+                      />
+                    </div>
                   )}
 
                   {formData.value_type === "free_shipping" && (
@@ -1581,6 +1891,137 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
 }
 
 /* ==================== SELECTED PRODUCT ROW (INSIDE TARGET SELECTION) ==================== */
+/* ==================== BUNDLE QUANTITY RULES EDITOR ==================== */
+/* "Buy N bundles → discount / free gift" builder — single rule only */
+const bundleRulePreviewText = (rule, giftProduct) => {
+  const buy = Number(rule.buy_quantity) || 2;
+
+  if (rule.reward_type === "free_product") {
+    const qty = Math.max(1, Number(rule.gift_quantity) || 1);
+    return `Buy ${buy} → ${qty > 1 ? `${qty}× ` : ""}${giftProduct?.name || "gift product"} FREE`;
+  }
+  if (rule.reward_type === "fixed_amount") {
+    return `Buy ${buy} → Rs. ${Number(rule.value) || 0} OFF (per bundle)`;
+  }
+  return `Buy ${buy} → ${Number(rule.value) || 0}% OFF`;
+};
+
+function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, cardStyle }) {
+  // Enforce single rule only
+  const singleRule = Array.isArray(rules) && rules.length > 0 ? rules[0] : { mode: "limit", buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 };
+  const labelStyle = { color: "var(--text-secondary)" };
+
+  const update = (patch) => onChange([ { ...singleRule, ...patch } ]);
+  const maxBuyQty = Math.max(1, products.length || 1);
+
+  return (
+    <div className="pt-3 space-y-2.5 border-t" style={{ borderColor: "var(--border-color)" }}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-bold">Offer Rule (Single Condition)</p>
+          <p className="text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
+            Set one offer condition only. Buy N bundles → get discount or free gift. The condition applies automatically.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md p-2.5 space-y-2" style={cardStyle}>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-[104px]">
+            <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+              Buy (bundles)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={maxBuyQty}
+              value={singleRule.buy_quantity || 1}
+              onChange={(e) => {
+                const val = Math.min(maxBuyQty, Math.max(1, Number(e.target.value) || 1));
+                update({ buy_quantity: val });
+              }}
+              className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="w-[184px]">
+            <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+              Reward Type
+            </label>
+            <select
+              value={singleRule.reward_type || "percentage"}
+              onChange={(e) => update({ reward_type: e.target.value, value: e.target.value === "free_product" ? "" : singleRule.value })}
+              className="appearance-none h-9 w-full px-2.5 rounded-md text-[13px] outline-none cursor-pointer"
+              style={inputStyle}
+            >
+              <option value="percentage">Discount (%)</option>
+              <option value="fixed_amount">Discount (Rs.)</option>
+              <option value="free_product">Free Product (Gift)</option>
+            </select>
+          </div>
+
+          {(singleRule.reward_type !== "free_product") ? (
+            <div className="w-[132px]">
+              <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                {singleRule.reward_type === "percentage" ? "Discount (%)" : "Discount (Rs.)"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={singleRule.value || ""}
+                onChange={(e) => update({ value: e.target.value })}
+                placeholder={singleRule.reward_type === "percentage" ? "e.g., 10" : "e.g., 200"}
+                className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+                style={inputStyle}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 min-w-[170px]" style={{ position: "relative" }}>
+                <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                  Free Gift Product
+                </label>
+                <select
+                  value={singleRule.gift_product_id || ""}
+                  onChange={(e) => update({ gift_product_id: e.target.value })}
+                  className="appearance-none h-9 w-full px-2.5 rounded-md text-[13px] outline-none cursor-pointer"
+                  style={{ ...inputStyle, maxHeight: "36px" }}
+                >
+                  <option value="">Select gift product...</option>
+                  {products.map((p) => (
+                    <option key={getId(p)} value={getId(p)}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="w-[92px]">
+                <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                  Gift Qty
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={singleRule.gift_quantity || 1}
+                  onChange={(e) => update({ gift_quantity: Math.max(1, Number(e.target.value) || 1) })}
+                  className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+                  style={inputStyle}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <p className="text-[11px] font-semibold" style={{ color: "var(--success-text)" }}>
+          {bundleRulePreviewText(singleRule, products.find((p) => getId(p) === String(singleRule.gift_product_id || "")))}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SelectedProductRow({ product, price, image, onView, onRemove }) {
   const name = getName(product, "product");
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;

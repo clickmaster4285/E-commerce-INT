@@ -7,6 +7,7 @@ import CategoryBar from "../../components/user/CategoryBar";
 import BrandSection from "../../components/user/BrandSection";
 import BannerSlider from "../../components/user/BannerSlider";
 import DealsSection from "../../components/user/DealsSection";
+import BundlesSection from "../../components/user/BundlesSection";
 import { categoryApi } from "@/apis/user/categoryApi";
 import {
   Smartphone, Laptop, Watch, Headphones, Camera, Percent,
@@ -70,6 +71,9 @@ export default function Home() {
 
       {/* ✅ DEALS SECTION */}
       <DealsSection />
+
+      {/* ✅ BUNDLE DEALS (combo packs) */}
+      <BundlesSection />
 
       {/* ✅ TOP 3 CATEGORIES */}
       <CategoryShowcase />

@@ -351,8 +351,9 @@ function CheckoutContent() {
     const dealActive = isDealActive({ ...i, qty });
     let regularDiscountSavings = 0;
 
-    // ✅ Apply admin-applied regular discount on non-deal lines
-    if (!dealActive) {
+    // ✅ Apply admin-applied regular discount on non-deal lines.
+    //    Bundle lines SKIP this — unka price pehle se bundle deal ka split hai.
+    if (!dealActive && !i.bundleId) {
       const fakeProduct = {
         _id: i.productId || i.id,
         category_id: i.categoryId ? String(i.categoryId) : null,

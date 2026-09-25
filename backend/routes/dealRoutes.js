@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
+const uploadDealImageFile = require("../middleware/dealImageMiddleware");
 
 const {
   createDeal,
@@ -11,6 +12,7 @@ const {
   updateDeal,
   deleteDeal,
   toggleDealStatus,
+  uploadDealImage,
 } = require("../controllers/dealController");
 
 const router = express.Router();
@@ -24,6 +26,15 @@ router.get("/active/:id", getActiveDealById); // ✅ NEW: Single deal detail pub
 // ==========================================
 // 🛡️ ADMIN ROUTES — login + permission
 // ==========================================
+// ⚠️ Ye route "/:id" se pehle hai — warna "upload-image" ko id samajh liya jata
+router.post(
+  "/upload-image",
+  authMiddleware,
+  checkPermission("deals"),
+  uploadDealImageFile,
+  uploadDealImage
+);
+
 router.get("/", authMiddleware, checkPermission("deals"), getDeals);
 router.get("/:id", authMiddleware, checkPermission("deals"), getDealById);
 router.post("/", authMiddleware, checkPermission("deals"), createDeal);

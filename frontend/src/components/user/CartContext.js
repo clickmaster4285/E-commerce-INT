@@ -5,6 +5,16 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, maxPayableQty } from "@/utils/dealCalculator";
+import {
+  bundleOriginalTotal,
+  round2,
+  round6,
+  normalizeBundleRule,
+  bundleMultiplierFromLines,
+  computeBundlePricing,
+  repriceBundleGroup,
+  bundleRuleLabel,
+} from "@/utils/bundleCalculator";
 const CartContext = createContext(null);
 
 const CART_KEY = "cm_cart";
@@ -71,6 +81,107 @@ const getStock = (product, variant) => {
   const raw = variant?.quantity ?? variant?.stock ?? product?.quantity ?? product?.stock;
   const n = Number(raw);
   return Number.isFinite(n) && raw !== undefined && raw !== null ? n : null;
+};
+
+/* ============================================================
+   BUNDLE GROUP PRICING (offer condition + free gift)
+   ============================================================
+   Cart lines of a bundle each hold the regular price and the single offer
+   rule. Pricing steps:
+     1) count how many bundle items are in the cart
+     2) check the condition (all products / limited quantity)
+     3) condition met  → apply the reward, re-split the discounted total
+        condition not met → lines keep their regular price (deal not applied)
+     4) free-product rule → keep a price 0 gift line in sync
+   ============================================================ */
+const priceBundleGroup = (allLines, bundleId) => {
+  const lines = Array.isArray(allLines) ? allLines : [];
+  const id = String(bundleId || "");
+  if (!id) return { lines, pricing: null };
+
+  const group = lines.filter((i) => String(i.bundleId) === id && !i.isBundleGift);
+  if (!group.length) {
+    // Whole group removed → drop its gift line as well
+    return { lines: lines.filter((i) => String(i.bundleId) !== id), pricing: null };
+  }
+
+  const others = lines.filter((i) => String(i.bundleId) !== id);
+  const existingGift = lines.find((i) => String(i.bundleId) === id && i.isBundleGift) || null;
+
+  const rule = normalizeBundleRule(group[0].bundleRule);
+  const productCount = group.length;
+  const groupUnits = group.reduce((s, l) => s + Math.max(0, Number(l.qty) || 0), 0);
+  const groupSubtotal = round2(
+    group.reduce(
+      (s, l) => s + (Number(l.regularPrice) || 0) * Math.max(0, Number(l.qty) || 0),
+      0
+    )
+  );
+
+  const pricing = computeBundlePricing({
+    rule,
+    groupUnits,
+    groupSubtotal,
+    productCount,
+    legacyBundlePrice: Number(group[0].bundlePrice) || 0,
+    multiplier: bundleMultiplierFromLines(group),
+  });
+
+  // ---- Re-price the lines with the (possibly discounted) group total ----
+  const repriced = new Map(
+    repriceBundleGroup(group, pricing.effectiveTotal).map((p) => [p.key, p])
+  );
+
+  const appliedLabel = pricing.appliedLabel || "";
+
+  const pricedGroup = group.map((line) => {
+    const hit = repriced.get(line.key);
+    const unit = hit ? Number(hit.price) : Number(line.price) || 0;
+    const qty = Math.max(0, Number(line.qty) || 0);
+
+    return {
+      ...line,
+      price: round6(unit),
+      bundleRule: rule,
+      bundleUnits: groupUnits,
+      bundleProductCount: productCount,
+      bundleAppliedRule: appliedLabel,
+      bundleProgress: pricing.progress || "",
+      bundleDiscount: pricing.discountAmount,
+      bundleSavings: round2(((Number(line.regularPrice) || 0) - unit) * qty),
+    };
+  });
+
+  // ---- Keep the free gift line in sync ----
+  let gift = null;
+  if (pricing.giftRule && pricing.giftQty > 0) {
+    gift = {
+      key: `gift_${pricing.giftRule.freeProductId}__bundle_${id}`,
+      id: pricing.giftRule.freeProductId,
+      productId: String(pricing.giftRule.freeProductId),
+      variant_id: existingGift?.variant_id || pricing.giftRule.freeProductVariantId || null,
+      name: pricing.giftRule.freeProductName || "Free Gift",
+      brand: "FREE GIFT",
+      price: 0,
+      regularPrice: Number(pricing.giftRule.freeProductPrice) || 0,
+      image: pricing.giftRule.freeProductImage || "",
+      variantTitle: "",
+      qty: pricing.giftQty,
+      stock: existingGift?.stock ?? null,
+      tax: 0,
+      categoryId: existingGift?.categoryId || "",
+      brandId: existingGift?.brandId || "",
+      bundleId: id,
+      bundleName: group[0].bundleName || "Bundle",
+      bundleQuantity: pricing.giftQty,
+      bundlePrice: 0,
+      bundleSavings: round2((Number(pricing.giftRule.freeProductPrice) || 0) * pricing.giftQty),
+      isBundleGift: true,
+      bundleGiftFrom: bundleRuleLabel(pricing.giftRule, productCount),
+    };
+  }
+
+  return { lines: [...others, ...pricedGroup, ...(gift ? [gift] : [])], pricing };
 };
 
 export function CartProvider({ children }) {
@@ -265,11 +376,214 @@ export function CartProvider({ children }) {
     }
   };
 
+  // ✅ ADD BUNDLE TO CART
+  //    Saare individual products ADD hote hain (har ek apni line me), lekin un sab ka
+  //    total EXACTLY bundlePrice hota hai — is liye bundle price ko products par
+  //    proportionally split kar ke har line ki `price` set karte hain (same % discount).
+  //    Har line par bundleId/bundlePrice tags lagte hain taake cart, checkout aur
+  //    order sab bundle ko pehchan sakein. Stock har individual product par deduct hota hai.
+  const addBundleToCart = (bundle, resolvedItems = []) => {
+    if (!bundle) return;
+
+    const bundleId = String(bundle._id || bundle.id || "");
+    const entries = (resolvedItems || []).filter((e) => e?.product);
+
+    if (!bundleId || entries.length < 2) {
+      toast.error("Bundle products are not available right now");
+      return;
+    }
+
+    // ---------- STOCK CHECK (all-or-nothing) ----------
+    const prepared = [];
+    for (const entry of entries) {
+      const product = entry.product;
+      const variant = entry.variant || null;
+      const quantity = Math.max(1, Number(entry.quantity) || 1);
+
+      const productId = product._id || product.id;
+      const variantKey = variant?._id
+        ? `id:${variant._id}`
+        : variant?.title
+          ? `title:${variant.title}`
+          : "no-variant";
+      const key = `${productId}__${variantKey}__bundle_${bundleId}`;
+
+      const stock = getStock(product, variant);
+      const existingQty = cartRef.current.find((i) => i.key === key)?.qty || 0;
+
+      if (stock !== null && existingQty + quantity > stock) {
+        toast.error(
+          `Only ${stock} in stock for "${product.name}" — bundle could not be added`
+        );
+        return;
+      }
+
+      prepared.push({
+        product,
+        variant,
+        quantity,
+        stock,
+        key,
+        productId,
+        regularPrice: Number(variant?.selling_price || product.price || 0),
+      });
+    }
+
+    // ---------- BASE LINES (the offer rule decides the final price) ----------
+    const originalTotal = bundleOriginalTotal(
+      prepared.map((p) => ({ regularPrice: p.regularPrice, quantity: p.quantity }))
+    );
+
+    // ✅ Single offer condition: buy all products / limited quantity → reward
+    const bundleRule = normalizeBundleRule(bundle.bundleRule);
+
+    const lines = prepared.map((p) => {
+      const regularPrice = Number(p.regularPrice) || 0;
+
+      return {
+        key: p.key,
+        id: p.productId,
+        variant_id: p.variant?._id || null,
+        name: p.product.name,
+        brand: p.product.brand_id?.name || p.product.brand || "",
+        price: regularPrice, // deal applies only when the condition is met
+        regularPrice,
+        image: p.variant?.images?.[0]?.img_url || "",
+        variantTitle: p.variant?.title || "",
+        qty: p.quantity,
+        stock: p.stock,
+        tax: Number(p.product.tax || 0),
+        productId: String(p.productId),
+        categoryId: String(p.product.category_id?._id || p.product.category_id || ""),
+        brandId: String(p.product.brand_id?._id || p.product.brand_id || ""),
+        productDiscountPct: Number(p.product.discount || 0),
+        // ✅ Bundle tracking (cart + checkout + order)
+        bundleId,
+        bundleName: bundle.name || "Bundle",
+        bundleImage: bundle.imageUrl || bundle.image || "",
+        bundlePrice: Number(bundle.bundlePrice) || 0, // legacy combo price (optional)
+        bundleOriginalPrice: originalTotal,
+        bundleQuantity: p.quantity,
+        bundleItemCount: prepared.length,
+        bundleSavings: 0,
+        bundleRule,
+      };
+    });
+
+    // ---------- MERGE ----------
+    const existingGroup = cartRef.current.filter(
+      (i) => String(i.bundleId) === bundleId
+    );
+    const existingProductLines = existingGroup.filter((i) => !i.isBundleGift);
+    const others = cartRef.current.filter((i) => String(i.bundleId) !== bundleId);
+
+    if (existingProductLines.length === lines.length) {
+      // Already in cart → add one more set (increase the quantities)
+      const bumped = lines.map((line) => {
+        const ex = existingProductLines.find((i) => i.key === line.key);
+        return ex
+          ? {
+              ...ex,
+              qty: (Number(ex.qty) || 0) + line.bundleQuantity,
+              stock: line.stock ?? ex.stock,
+            }
+          : line;
+      });
+
+      const { lines: pricedGroup, pricing } = priceBundleGroup([...others, ...bumped], bundleId);
+      save(pricedGroup);
+
+      const note = pricing?.appliedLabel
+        ? ` — ${pricing.appliedLabel} applied`
+        : pricing?.progress
+        ? ` — ${pricing.progress}`
+        : "";
+      toast.success(`"${lines[0].bundleName}" quantity updated${note}`);
+      return;
+    }
+
+    const { lines: pricedGroup, pricing } = priceBundleGroup([...others, ...lines], bundleId);
+    save(pricedGroup);
+
+    const message = `"${lines[0].bundleName}" added — ${lines.length} products in your cart`;
+    const savings = pricing ? pricing.totalSavings : 0;
+
+    if (savings > 0) {
+      toast.success(message, {
+        description: `You save Rs. ${savings.toLocaleString()}`,
+      });
+    } else if (pricing?.progress) {
+      toast.info(message, { description: pricing.progress });
+    } else {
+      toast.success(message);
+    }
+  };
+
   // ✅ UPDATE QTY — with STOCK CHECK + MIN QUANTITY CHECK
     const updateQty = (key, qty) => {
+    const lineItem = cartRef.current.find((i) => i.key === key);
+
+    // ✅ BUNDLE LINE → quantity applies to the whole bundle group
+    //    (otherwise a partial discounted price would stay on some lines)
+    if (lineItem?.bundleId) {
+      const bundleId = String(lineItem.bundleId);
+
+      if (qty <= 0) {
+        save(cartRef.current.filter((i) => String(i.bundleId) !== bundleId));
+        return;
+      }
+
+      const group = cartRef.current.filter(
+        (i) => String(i.bundleId) === bundleId && !i.isBundleGift
+      );
+
+      // Pressing ± on the gift line should still use a real bundle line
+      const anchor = lineItem.isBundleGift ? group[0] : lineItem;
+      const perBundle = Math.max(1, Number(anchor?.bundleQuantity) || 1);
+      let multiplier = Math.max(1, Math.round(qty / perBundle));
+
+      // Lowest stock across the group decides the limit
+      let maxMultiplier = Infinity;
+      group.forEach((line) => {
+        const stock = line.stock != null ? Number(line.stock) : null;
+        const per = Math.max(1, Number(line.bundleQuantity) || 1);
+        if (stock !== null) maxMultiplier = Math.min(maxMultiplier, Math.floor(stock / per));
+      });
+
+      if (Number.isFinite(maxMultiplier) && multiplier > maxMultiplier) {
+        multiplier = Math.max(1, maxMultiplier);
+        toast.error(
+          `Only ${multiplier} bundle${multiplier > 1 ? "s" : ""} available in stock`
+        );
+      }
+
+      // ✅ Re-apply the offer condition after the quantity change
+      const bumped = cartRef.current.map((i) =>
+        String(i.bundleId) === bundleId && !i.isBundleGift
+          ? { ...i, qty: Math.max(1, Number(i.bundleQuantity) || 1) * multiplier }
+          : i
+      );
+
+      const { lines: pricedGroup, pricing } = priceBundleGroup(bumped, bundleId);
+      save(pricedGroup);
+
+      if (pricing?.appliedLabel) {
+        toast.success(`Offer applied — ${pricing.appliedLabel}`);
+      } else if (pricing?.progress) {
+        toast.info(pricing.progress);
+      }
+
+      if (pricing?.giftRule && pricing?.giftQty > 0) {
+        toast.success(
+          `Free gift added — ${pricing.giftRule.freeProductName || "Gift"} (${pricing.giftQty})`
+        );
+      }
+      return;
+    }
+
     if (qty <= 0) return save(cartRef.current.filter((i) => i.key !== key));
 
-    const item = cartRef.current.find((i) => i.key === key);
+    const item = lineItem;
     let max = item?.stock != null ? Number(item.stock) : null;
     if (max !== null && item?.dealType === "buy_x_get_y" && item.dealBuyQuantity && item.dealGetQuantity) {
       max = maxPayableQty(max, item.dealBuyQuantity, item.dealGetQuantity);
@@ -311,7 +625,72 @@ export function CartProvider({ children }) {
     save(cartRef.current.map((i) => (i.key === key ? { ...i, qty } : i)));
   };
 
-  const removeFromCart = (key) => save(cartRef.current.filter((i) => i.key !== key));
+  const removeFromCart = (key) => {
+    const item = cartRef.current.find((i) => i.key === key);
+
+    // ✅ Bundle: ek line hataane par poora bundle hatega
+    if (item?.bundleId) {
+      const bundleId = String(item.bundleId);
+      const removed = cartRef.current.filter((i) => String(i.bundleId) === bundleId);
+      save(cartRef.current.filter((i) => String(i.bundleId) !== bundleId));
+      return removed;
+    }
+
+    const removed = cartRef.current.filter((i) => i.key === key);
+    save(cartRef.current.filter((i) => i.key !== key));
+    return removed;
+  };
+
+  // ✅ Kisi bhi cart line ke saath uska poora bundle group lo
+  const getBundleGroup = (key) => {
+    const item = cartRef.current.find((i) => i.key === key);
+    if (!item) return [];
+    if (!item.bundleId) return [item];
+    return cartRef.current.filter(
+      (i) => String(i.bundleId) === String(item.bundleId)
+    );
+  };
+
+  // ✅ Live pricing info of a bundle group (cart / drawer / checkout UI)
+  const getBundleGroupInfo = (bundleId) => {
+    const id = String(bundleId || "");
+    if (!id) return null;
+
+    const group = cartRef.current.filter(
+      (i) => String(i.bundleId) === id && !i.isBundleGift
+    );
+    if (!group.length) return null;
+
+    const rule = normalizeBundleRule(group[0].bundleRule);
+    const productCount = group.length;
+    const groupUnits = group.reduce((s, l) => s + Math.max(0, Number(l.qty) || 0), 0);
+    const groupSubtotal = round2(
+      group.reduce(
+        (s, l) => s + (Number(l.regularPrice) || 0) * Math.max(0, Number(l.qty) || 0),
+        0
+      )
+    );
+
+    const pricing = computeBundlePricing({
+      rule,
+      groupUnits,
+      groupSubtotal,
+      productCount,
+      legacyBundlePrice: Number(group[0].bundlePrice) || 0,
+      multiplier: bundleMultiplierFromLines(group),
+    });
+
+    return {
+      ...pricing,
+      bundleId: id,
+      bundleName: group[0].bundleName || "Bundle",
+      productCount,
+      ruleLabel: rule ? bundleRuleLabel(rule, productCount) : "",
+      giftLines: cartRef.current.filter(
+        (i) => String(i.bundleId) === id && i.isBundleGift
+      ),
+    };
+  };
 
   const removeItems = (keys) => save(cartRef.current.filter((i) => !keys.includes(i.key)));
 
@@ -472,8 +851,11 @@ export function CartProvider({ children }) {
       value={{
         cart,
         addToCart,
+        addBundleToCart,
         updateQty,
         removeFromCart,
+        getBundleGroup,
+        getBundleGroupInfo,
         removeItems,
         restoreItems,
         clearCart,

@@ -121,7 +121,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
         let originalPrice = Number(raw.regularPrice ?? raw.price ?? 0);
         let regularDiscountSavings = 0;
 
-        if (!dealActive) {
+        if (!dealActive && !raw.bundleId) {
           const fakeProduct = {
             _id: raw.productId || raw.id,
             category_id: raw.categoryId || null,
@@ -173,6 +173,12 @@ import { shippingApi } from "@/apis/user/shippingApi";
           payableItems: dealActive ? payableItems : qty,
           lineTotal,
           dealActive,
+          // ✅ Bundle (combo deal) rules info
+          isGift: Boolean(raw.isBundleGift),
+          bundleId: raw.bundleId || null,
+          bundleName: raw.bundleName || "",
+          bundleAppliedRule: raw.bundleAppliedRule || "",
+          bundleProgress: raw.bundleProgress || "",
         };
 
         if (dealActive && raw.dealId) {
@@ -624,6 +630,27 @@ import { shippingApi } from "@/apis/user/shippingApi";
             </div>
           )}
 
+          {/* ✅ Bundle deal rules — auto FREE gift line + applied tier */}
+          {(row.isGift || row.bundleAppliedRule || (!row.isGift && row.bundleProgress)) && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {row.isGift && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
+                  🎁 FREE GIFT
+                </span>
+              )}
+              {!row.isGift && row.bundleAppliedRule && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-500">
+                  🔥 {row.bundleAppliedRule}
+                </span>
+              )}
+              {!row.isGift && !row.bundleAppliedRule && row.bundleProgress && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--user-text-muted)]">
+                  {row.bundleProgress}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
             <div className={`flex items-center gap-0 transition-opacity ${isCommitting ? "opacity-60" : ""}`}>
               <button type="button" onClick={() => onQtyChange(row.key, row.qty - 1)} disabled={row.qty <= 1} aria-label="Decrease quantity" className="flex h-7 px-2 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-all hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-90 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]">
@@ -637,7 +664,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
             <div className="text-right leading-tight relative">
               <p className="text-[13px] font-bold text-[var(--user-accent)]">
-                {fmt(row.lineTotal)}
+                {row.isGift ? "FREE" : fmt(row.lineTotal)}
                 {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
                   <span className="ml-1.5 text-[10px] font-medium text-[var(--user-text-muted)] line-through align-middle">
                     {fmt(row.originalPrice * row.qty)}

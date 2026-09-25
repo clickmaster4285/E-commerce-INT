@@ -118,6 +118,71 @@ const dealSchema = new mongoose.Schema(
     },
 
     // ==========================================
+    // BUNDLE OFFER CONDITION (single rule)
+    // ==========================================
+    // A bundle deal can have exactly ONE offer condition:
+    //   mode "all"   → customer must buy ALL selected products
+    //                  (required quantity = number of selected products)
+    //   mode "limit" → customer must buy `buyQuantity` items
+    //
+    // Until the condition is met the bundle deal does not apply.
+    bundleRule: {
+      mode: {
+        type: String,
+        enum: ["all", "limit"],
+        default: "all",
+      },
+
+      // Only used when mode === "limit"
+      buyQuantity: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+
+      rewardType: {
+        type: String,
+        enum: ["percentage", "fixed_amount", "free_product"],
+        default: "percentage",
+      },
+
+      // percentage = %, fixed_amount = Rs. (free_product keeps 0)
+      value: {
+        type: Number,
+        default: 0,
+        min: 0,
+        validate: {
+          validator: function (v) {
+            if (this.rewardType === "percentage") return Number(v) <= 100;
+            return true;
+          },
+          message: "Percentage reward cannot exceed 100%",
+        },
+      },
+
+      // Free gift product (only for rewardType "free_product")
+      freeProduct: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        default: null,
+      },
+
+      freeQuantity: {
+        type: Number,
+        default: 1,
+        min: 1,
+      },
+    },
+
+    // ✅ Bundle deal ki main image (admin panel se upload hoti hai)
+    // Storefront par deal card / deal detail me ye image dikhayi jati hai
+    image: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // ==========================================
     // SCHEDULE (REQUIRED)
     // ==========================================
     startDate: {

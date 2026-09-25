@@ -130,7 +130,7 @@ const getDefaultPermissions = () => {
   } catch (e) {}
   return {
     employees: true, products: true, brands: true, categories: true,
-    profile: true, store: false, discounts: true, deals: true, banners: true,
+    profile: true, store: false, discounts: true, deals: true, bundles: true, banners: true,
     manageStock: false, shipping: false, order: true, attribute: true
   };
 };
@@ -146,6 +146,7 @@ const fixPermissions = (oldPerms) => {
     store: oldPerms?.store ?? defaults.store,
     discounts: oldPerms?.discounts ?? defaults.discounts,
     deals: oldPerms?.deals ?? defaults.deals,
+    bundles: oldPerms?.bundles ?? defaults.bundles,
     banners: oldPerms?.banners ?? defaults.banners,
     manageStock: oldPerms?.manageStock ?? defaults.manageStock,
     shipping: oldPerms?.shipping ?? defaults.shipping,

@@ -99,8 +99,9 @@ export default function CartPage() {
       const originalPrice = Number(raw.regularPrice ?? raw.price ?? 0);
       let regularDiscountSavings = 0;
 
-      // ✅ Apply admin-applied regular discount on non-deal lines
-      if (!dealActive) {
+      // ✅ Apply admin-applied regular discount on non-deal lines.
+      //    Bundle lines SKIP this — unka price pehle se bundle deal ka split hai.
+      if (!dealActive && !raw.bundleId) {
         const fakeProduct = {
           _id: raw.productId || raw.id,
           category_id: raw.categoryId || null,
@@ -152,6 +153,12 @@ export default function CartPage() {
         payableItems: dealActive ? payableItems : qty,
         lineTotal,
         dealActive,
+        // ✅ Bundle (combo deal) rules info
+        isGift: Boolean(raw.isBundleGift),
+        bundleId: raw.bundleId || null,
+        bundleName: raw.bundleName || "",
+        bundleAppliedRule: raw.bundleAppliedRule || "",
+        bundleProgress: raw.bundleProgress || "",
       };
 
       if (dealActive && raw.dealId) {
@@ -332,6 +339,22 @@ export default function CartPage() {
                 <Check size={10} /> {row.freeItems} FREE
               </span>
             )}
+            {/* ✅ Bundle rules — auto-added FREE gift line */}
+            {row.isGift && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30 px-2 py-0.5 text-[10px] font-black">
+                🎁 FREE GIFT
+              </span>
+            )}
+            {!row.isGift && row.bundleAppliedRule && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 text-[10px] font-black">
+                🔥 {row.bundleAppliedRule}
+              </span>
+            )}
+            {!row.isGift && row.bundleProgress && !row.bundleAppliedRule && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] border border-[var(--user-border)] px-2 py-0.5 text-[10px] font-bold">
+                {row.bundleProgress}
+              </span>
+            )}
             {row.hasDiscount && row.originalPrice > row.displayPrice && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/20 px-2 py-0.5 text-[10px] font-black">
                 <TrendingUp size={10} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
@@ -351,7 +374,9 @@ export default function CartPage() {
           </div>
 
           <div className="flex items-center gap-2 mt-auto pt-2">
-            <p className="text-base font-black text-[var(--user-text)]">{fmt(row.displayPrice)}</p>
+            <p className="text-base font-black text-[var(--user-text)]">
+              {row.isGift ? "FREE" : fmt(row.displayPrice)}
+            </p>
             {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
               <p className="text-xs text-[var(--user-text-subtle)] line-through">{fmt(row.originalPrice * row.qty)}</p>
             )}
