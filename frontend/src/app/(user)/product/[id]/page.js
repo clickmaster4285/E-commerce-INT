@@ -34,6 +34,31 @@ const extractId = (ref) => (ref && typeof ref === "object" ? ref._id : ref);
 const extractName = (ref) => (ref && typeof ref === "object" ? ref.name : ref || "");
 const toNum = (val) => (isNaN(Number(val)) ? 0 : Number(val));
 
+// ✅ Variant attribute values are not always plain strings — the attribute
+// configuration can store them as nested objects such as
+// { Brand: { Brand: "NIKE" } }, { label, value } or [{ label, value }].
+// Always resolve a readable string so the storefront never prints
+// "[object Object]" in the specs table or the highlight chips.
+const attrValueOf = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return String(raw).trim();
+  if (Array.isArray(raw)) return raw.map(attrValueOf).filter(Boolean).join(", ");
+  if (typeof raw === "object") {
+    const direct = raw.value ?? raw.label ?? raw.name ?? raw.display ?? raw.title ?? raw.text;
+    if (direct !== undefined && direct !== null && direct !== raw) return attrValueOf(direct);
+    return Object.values(raw).map(attrValueOf).filter(Boolean).join(", ");
+  }
+  return String(raw);
+};
+
+// ✅ [name, readableValue] pairs from a variant.attributes map — empties dropped
+const attrEntries = (attributes, limit) => {
+  const list = Object.entries(attributes || {})
+    .map(([name, raw]) => [String(name || "").trim(), attrValueOf(raw)])
+    .filter(([name, value]) => name && value && value !== "[object Object]");
+  return typeof limit === "number" ? list.slice(0, limit) : list;
+};
+
 const getDealBadgeText = (deal) => {
   if (!deal?.type) return deal?.name || "Deal";
   // ✅ 0% / Rs. 0 OFF — off ho tabhi OFF text dikhao
@@ -264,7 +289,7 @@ const DescriptionCard = memo(({ shortDescription, fullDescription, variantTitle,
 DescriptionCard.displayName = "DescriptionCard";
 
 const SpecsCard = memo(({ attributes }) => {
-  const entries = Object.entries(attributes || {});
+  const entries = attrEntries(attributes);
   if (!entries.length) return null;
   return (
     <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden">
@@ -275,7 +300,7 @@ const SpecsCard = memo(({ attributes }) => {
             {entries.map(([key, value], i) => (
               <tr key={key} className={i % 2 === 1 ? "bg-[var(--user-bg-hover)]/40" : ""}>
                 <td className={`w-2/5 px-4 sm:px-6 py-3 sm:py-3.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[var(--user-text-muted)] align-top ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{key}</td>
-                <td className={`px-4 sm:px-6 py-3 sm:py-3.5 text-[13px] sm:text-sm font-medium text-[var(--user-text)] break-words ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{String(value)}</td>
+                <td className={`px-4 sm:px-6 py-3 sm:py-3.5 text-[13px] sm:text-sm font-medium text-[var(--user-text)] break-words ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{value}</td>
               </tr>
             ))}
           </tbody>
@@ -535,7 +560,7 @@ function ProductDetailContent({ params }) {
 
   const fullDescription = product?.description || "";
   const shortDescription = product?.short_description || "";
-  const highlightEntries = Object.entries(currentVariant?.attributes || {}).slice(0, 3);
+  const highlightEntries = attrEntries(currentVariant?.attributes, 3);
 
   const related = useMemo(() => {
     if (!product || !allProducts.length) return [];
@@ -656,7 +681,7 @@ function ProductDetailContent({ params }) {
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {highlightEntries.map(([k, v]) => (
                 <span key={k} className="text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-1 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-secondary)]">
-                  <span className="font-semibold text-[var(--user-text)] capitalize">{k}:</span> {String(v)}
+                  <span className="font-semibold text-[var(--user-text)] capitalize">{k}:</span> {v}
                 </span>
               ))}
             </div>
