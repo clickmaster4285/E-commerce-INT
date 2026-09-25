@@ -33,6 +33,12 @@ const orderSchema = new mongoose.Schema(
         free_items: { type: Number, default: 0 },
         payable_items: { type: Number, default: 0 },
         deal_savings: { type: Number, default: 0 },
+
+        // ✅ NEW: Bundle deal fields (combo deal)
+        bundle_id: { type: mongoose.Schema.Types.ObjectId, ref: "Bundle", default: null },
+        bundle_name: { type: String, default: "" },
+        bundle_price: { type: Number, default: 0 },
+        bundle_savings: { type: Number, default: 0 },
       },
     ],
 
@@ -74,6 +80,18 @@ const orderSchema = new mongoose.Schema(
       ref: "Deal",
     }],
     total_deal_savings: {
+      type: Number,
+      default: 0,
+    },
+
+    // ✅ NEW: Root level bundle tracking
+    bundle_ids: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Bundle",
+      },
+    ],
+    total_bundle_savings: {
       type: Number,
       default: 0,
     },

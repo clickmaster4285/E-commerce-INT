@@ -211,8 +211,7 @@ export default function DealDetailPage() {
     target_type: "all",
     selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
     value_type: "percentage", value: "", min_order_value: "",
-    buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
-    bundle_image: "",
+    buy_quantity: "", get_quantity: "", get_discount_value: "",
     has_min_quantity: false,
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -282,8 +281,7 @@ export default function DealDetailPage() {
       name: "", code: "", description: "", target_type: "all",
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
-      buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
-      bundle_image: "",
+      buy_quantity: "", get_quantity: "", get_discount_value: "",
       has_min_quantity: false,
       min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -309,8 +307,6 @@ export default function DealDetailPage() {
       buy_quantity: d?.buyQuantity ?? "",
       get_quantity: d?.getQuantity ?? "",
       get_discount_value: d?.getDiscountValue ?? "",
-      bundle_price: d?.bundlePrice ?? "",
-      bundle_image: d?.image || "",
       has_min_quantity: hasMinQty,
       min_quantity: hasMinQty ? rawMinQty : "",
       start_at: toDateInput(d?.startDate),
@@ -340,11 +336,6 @@ export default function DealDetailPage() {
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
     }
 
-    // ✅ Bundle deal ke liye bundle price zaroori hai
-    if (formData.value_type === "bundle" && (!formData.bundle_price || Number(formData.bundle_price) <= 0)) {
-      return toast.error("Please enter a valid Bundle Price");
-    }
-
     if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
     if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
     if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
@@ -372,9 +363,6 @@ export default function DealDetailPage() {
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
-      bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
-      // ✅ Bundle image — sirf bundle deal par save hoti hai, warna clear
-      image: formData.value_type === "bundle" ? String(formData.bundle_image || "") : "",
       minQuantity: finalMinQuantity,
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
@@ -637,12 +625,49 @@ export default function DealDetailPage() {
               </div>
             )}
             {deal.type === "bundle" && (
-              <div className="p-4 rounded-lg mt-5 flex items-center justify-between" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                <div className="flex items-center gap-2.5">
-                  <Gift className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                  <span className="text-[11px] font-bold" style={{ color: "var(--text-muted)" }}>Bundle Price</span>
+              <div className="p-5 rounded-2xl mt-5 space-y-4" style={{ backgroundColor: "var(--bg-card)", border: "2px solid var(--accent-soft)", boxShadow: "0 4px 20px rgba(16,185,129,0.06)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "var(--accent-soft)", border: "1px solid var(--accent-soft)" }}>
+                    <Package className="w-5 h-5" style={{ color: "var(--accent)" }} />
+                  </div>
+                  <div>
+                    <h4 className="text-[14px] font-black" style={{ color: "var(--text-primary)", letterSpacing: "0.02em" }}>Bundle Offer Condition</h4>
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Single offer rule — applies when quantity is met</p>
+                  </div>
                 </div>
-                <span className="text-[16px] font-bold" style={{ color: "var(--success)" }}>Rs. {deal.bundlePrice ?? 0}</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Requirement</p>
+                    <p className="text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
+                      {deal.bundleRule ? (
+                        deal.bundleRule.mode === "limit"
+                          ? `Buy ${deal.bundleRule.buyQuantity || 1} bundle${Number(deal.bundleRule.buyQuantity || 1) > 1 ? "s" : ""}`
+                          : `Buy all selected bundle products`
+                      ) : "Buy bundles to unlock offer"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Reward</p>
+                    <p className="text-[15px] font-black" style={{ color: "var(--success)" }}>
+                      {!deal.bundleRule ? (
+                        "—"
+                      ) : deal.bundleRule.rewardType === "free_product" ? (
+                        <>Free Gift: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{deal.bundleRule.freeProduct?.name || "Gift"}</span> ({deal.bundleRule.freeQuantity || 1})</>
+                      ) : deal.bundleRule.rewardType === "percentage" ? (
+                        <>{deal.bundleRule.value || 0}% OFF</>
+                      ) : (
+                        <>Rs. {deal.bundleRule.value || 0} OFF</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {deal.bundleRule?.mode === "limit" && deal.bundleRule?.buyQuantity > 0 && (
+                  <div className="rounded-lg px-3.5 py-2.5 text-[11px] font-semibold text-center" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)", border: "1px solid color-mix(in srgb, var(--info) 25%, transparent)" }}>
+                    Customer must add at least {deal.bundleRule.buyQuantity} item{Number(deal.bundleRule.buyQuantity) > 1 ? "s" : ""} to unlock this offer
+                  </div>
+                )}
               </div>
             )}
             {deal.type === "free_shipping" && (

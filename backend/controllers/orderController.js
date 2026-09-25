@@ -4,6 +4,7 @@ const Variant = require("../models/Variant");
 const Address = require("../models/Address");
 const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
+const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
@@ -40,6 +41,7 @@ const placeOrder = async (req, res) => {
     let taxTotal = 0;
     const orderItems = [];
     const uniqueDealIds = new Set();
+    const uniqueBundleIds = new Set();
 
     for (const item of items) {
       const keyParts = String(item.key || "").split("__");
@@ -96,6 +98,15 @@ const placeOrder = async (req, res) => {
       const dealBuyQuantity = Number(item.dealBuyQuantity || 0);
       const dealGetQuantity = Number(item.dealGetQuantity || 0);
 
+      // ✅ Bundle info (frontend se) — combo deal ki lines
+      const bundleId =
+        item.bundleId && /^[a-f\d]{24}$/i.test(String(item.bundleId))
+          ? String(item.bundleId)
+          : null;
+      const bundleName = item.bundleName || "";
+      const bundlePrice = Number(item.bundlePrice || 0);
+      const bundleSavings = Number(item.bundleSavings || 0);
+
       // ✅ MIN QUANTITY CHECK — server-side validation
       if (dealId) {
         const dealDoc = await Deal.findById(dealId).select("minQuantity type buyQuantity isActive").lean();
@@ -124,6 +135,24 @@ const placeOrder = async (req, res) => {
       // Discount name (frontend se ya product se fallback)
       const discountName = item.discountName || "";
 
+      // ✅ Bundle validation — bundle delete ho chuka ho to order block kar do
+      //    Bundle do tarah ke ho sakte hain:
+      //      1) Legacy Bundle collection (Bundle model)
+      //      2) Deals form ka "Bundle Deal" (Deal model, type: "bundle")
+      if (bundleId) {
+        const [bundleDoc, bundleDealDoc] = await Promise.all([
+          Bundle.findById(bundleId).select("_id").lean(),
+          Deal.findById(bundleId).select("_id").lean(),
+        ]);
+
+        if (!bundleDoc && !bundleDealDoc) {
+          return res.status(400).json({
+            success: false,
+            message: `"${item.name}" was part of a bundle that is no longer available`,
+          });
+        }
+      }
+
       // ✅ Stock check TOTAL (paid + free) par
       if (Number(variant.quantity) < totalItems) {
         return res.status(400).json({
@@ -137,6 +166,7 @@ const placeOrder = async (req, res) => {
       taxTotal += displayPrice * payableItems * (Number(product.tax || 0) / 100);
 
       if (dealId) uniqueDealIds.add(dealId);
+      if (bundleId) uniqueBundleIds.add(bundleId);
 
       orderItems.push({
         product_id: product._id,
@@ -158,6 +188,10 @@ const placeOrder = async (req, res) => {
         free_items: freeItems,         // ✅ FREE items (frontend calculated)
         payable_items: payableItems,   // ✅ PAID qty
         deal_savings: dealSavings,     // ✅ DEAL SAVINGS (frontend calculated)
+        bundle_id: bundleId,           // ✅ Bundle (combo) line
+        bundle_name: bundleName,
+        bundle_price: bundlePrice,
+        bundle_savings: bundleSavings,
       });
     }
 
@@ -260,6 +294,8 @@ const placeOrder = async (req, res) => {
           notes: notes || "",
           deal_ids: Array.from(uniqueDealIds),
           total_deal_savings: orderItems.reduce((sum, i) => sum + (i.deal_savings || 0), 0),
+          bundle_ids: Array.from(uniqueBundleIds),
+          total_bundle_savings: orderItems.reduce((sum, i) => sum + (i.bundle_savings || 0), 0),
         });
         break;
       } catch (err) {

@@ -9,13 +9,88 @@ const emitSocketEvent = (event, data) => {
 };
 
 // ==========================================
+// BUNDLE OFFER CONDITION — SANITIZE / VALIDATE
+// ==========================================
+// A bundle deal stores exactly ONE rule. Invalid input is dropped so a broken
+// rule can never half-apply at checkout.
+const BUNDLE_REWARD_TYPES = ["percentage", "fixed_amount", "free_product"];
+
+const sanitizeBundleRule = (raw) => {
+  let input = raw;
+
+  if (typeof input === "string") {
+    try {
+      input = JSON.parse(input);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Legacy payload: array of rules (only the first one is kept now)
+  if (Array.isArray(input)) input = input[0];
+  if (!input || typeof input !== "object") return null;
+
+  const mode = input.mode === "limit" || input.limit === true ? "limit" : "all";
+  const buyQuantity = Math.max(0, Math.floor(Number(input.buyQuantity ?? input.buy_quantity) || 0));
+
+  const rewardType = BUNDLE_REWARD_TYPES.includes(input.rewardType)
+    ? input.rewardType
+    : BUNDLE_REWARD_TYPES.includes(input.reward_type)
+    ? input.reward_type
+    : "percentage";
+
+  let value = Math.max(0, Number(input.value) || 0);
+  if (rewardType === "percentage") value = Math.min(100, value);
+  if (rewardType === "free_product") value = 0;
+
+  const freeProduct =
+    input.freeProduct && typeof input.freeProduct === "object"
+      ? input.freeProduct._id || input.freeProduct.id || null
+      : input.freeProduct || input.free_product || input.freeProductId || null;
+
+  if (rewardType === "free_product" && !freeProduct) return null;
+  if (rewardType !== "free_product" && value <= 0) return null;
+  if (mode === "limit" && buyQuantity <= 0) return null;
+
+  return {
+    mode,
+    buyQuantity,
+    rewardType,
+    value,
+    freeProduct: freeProduct || null,
+    freeQuantity: Math.max(1, Math.floor(Number(input.freeQuantity ?? input.free_quantity) || 1)),
+  };
+};
+
+// Non-bundle deals never keep a rule; legacy `bundleRules` key is migrated.
+const applyBundleRule = (payload) => {
+  if (!payload || typeof payload !== "object") return payload;
+
+  if (!Object.prototype.hasOwnProperty.call(payload, "bundleRule")) {
+    if (!Object.prototype.hasOwnProperty.call(payload, "bundleRules")) return payload;
+    payload.bundleRule = payload.bundleRules;
+  }
+
+  delete payload.bundleRules;
+
+  payload.bundleRule =
+    payload.type === "bundle" ? sanitizeBundleRule(payload.bundleRule) : null;
+
+  return payload;
+};
+
+const BUNDLE_FREE_PRODUCT_FIELDS = "name sku images selling_price price variants";
+
+// ==========================================
 // CREATE DEAL
 // ==========================================
 
 const createDeal = async (req, res) => {
   try {
+    const payload = applyBundleRule({ ...req.body });
+
     const deal = await Deal.create({
-      ...req.body,
+      ...payload,
       createdBy: req.user?._id || req.user?.id || null,
       updatedBy: req.user?._id || req.user?.id || null,
     });
@@ -132,6 +207,7 @@ const getDeals = async (req, res) => {
     const [deals, total] = await Promise.all([
       Deal.find(query)
         .populate("productIds", "name sku images selling_price")
+        .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
         .populate("categoryIds", "name code")
         .populate("brandIds", "name logo")
         .populate("createdBy", "name email role")
@@ -182,6 +258,7 @@ const getDealById = async (req, res) => {
       .populate("categoryIds", "name code")
       .populate("brandIds", "name logo")
       .populate("bundleProducts.product", "name sku images selling_price")
+      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
@@ -223,7 +300,7 @@ const updateDeal = async (req, res) => {
       });
     }
 
-    Object.assign(deal, req.body);
+    Object.assign(deal, applyBundleRule({ ...req.body }));
 
     deal.updatedBy =
       req.user?._id ||
@@ -238,6 +315,7 @@ const updateDeal = async (req, res) => {
       .populate("categoryIds", "name code")
       .populate("brandIds", "name logo")
       .populate("bundleProducts.product", "name sku images selling_price")
+      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
@@ -366,6 +444,7 @@ const getActiveDeals = async (req, res) => {
         .populate("categoryIds", "name code")
         .populate("brandIds", "name")
         .populate("bundleProducts.product", "name sku images selling_price")
+        .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
         .sort({ priority: -1, createdAt: -1 })
         .lean();
 
@@ -383,6 +462,7 @@ const getActiveDeals = async (req, res) => {
       .populate("categoryIds", "name code")
       .populate("brandIds", "name")
       .populate("bundleProducts.product", "name sku images selling_price")
+      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
       .sort({ priority: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -419,7 +499,8 @@ const getActiveDealById = async (req, res) => {
     const deal = await Deal.findById(id)
       .populate("productIds", "name sku images selling_price variants brand_id category_id price discount")
       .populate("categoryIds", "name code")
-      .populate("brandIds", "name");
+      .populate("brandIds", "name")
+      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS);
 
     if (!deal) {
       console.log("❌ Deal not found in database");

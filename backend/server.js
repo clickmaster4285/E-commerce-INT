@@ -31,6 +31,7 @@ const storeRoutes = require("./routes/storeRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const discountRoutes = require("./routes/discountRoutes");
 const dealRoutes = require("./routes/dealRoutes");
+const bundleRoutes = require("./routes/bundleRoutes");
 const tagRoutes = require("./routes/tagRoutes");
 const addressRoutes = require("./routes/addressRoutes");
 const bannerRoutes = require("./routes/bannerRoutes");
@@ -124,6 +125,7 @@ app.use(`${API_PREFIX}/store`, storeRoutes);
 app.use(`${API_PREFIX}/employees`, employeeRoutes);
 app.use(`${API_PREFIX}/discounts`, discountRoutes);
 app.use(`${API_PREFIX}/deals`, dealRoutes);
+app.use(`${API_PREFIX}/bundles`, bundleRoutes);
 app.use(`${API_PREFIX}/tags`, tagRoutes);
 app.use(`${API_PREFIX}/addresses`, addressRoutes);
 app.use(`${API_PREFIX}/banners`, bannerRoutes);
@@ -148,6 +150,9 @@ app.use((req, res) => {
 const createUploadDirectories = () => {
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
+  // ✅ Bundle cover images
+  const bundleUploadDir = path.join(uploadDir, "bundles");
+  if (!fs.existsSync(bundleUploadDir)) fs.mkdirSync(bundleUploadDir, { recursive: true });
 };
 
 const seedDefaultData = async () => {
@@ -197,7 +202,7 @@ const seedDefaultData = async () => {
               products: true, brands: true, categories: true,
               users: true, orders: true, settings: true,
               profile: true, employees: true, discounts: true,
-              deals: true, store: true, banners: true,
+              deals: true, bundles: true, store: true, banners: true,
               manageStock: true, shipping: true, order: true, attribute: true,
             },
           });

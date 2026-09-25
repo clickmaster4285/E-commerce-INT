@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Flame, Tag, Package, Zap, ChevronLeft, ChevronRight }
 import { dealApi } from "@/apis/user/dealApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
+import { BundleDealPanel } from "@/components/user/DealsSection";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -123,6 +124,14 @@ export default function DealDetailPage({ params }) {
     const id = typeof p === 'string' ? p : p?._id;
     return (id && allProductsById.get(id)) || p;
   });
+
+  // ✅ Bundle deal ke liye poore combo products (pagination se independent)
+  const bundleProducts = (Array.isArray(deal.productIds) ? deal.productIds : [])
+    .map((p) => {
+      const pid = String(typeof p === "object" ? p?._id || p?.id : p);
+      return allProductsById.get(pid) || p;
+    })
+    .filter((p) => p && (p._id || p.id));
   const totalPages = deal.totalPages || 1;
   const badgeText = deal.type === "percentage" ? `${deal.discountValue}% OFF` : `Rs. ${deal.discountValue} OFF`;
 
@@ -204,6 +213,18 @@ export default function DealDetailPage({ params }) {
           </div>
         </div>
       </div>
+
+      {/* ✅ Bundle Deal — rules ke sath poora combo ek click me cart me */}
+      {deal.type === "bundle" && bundleProducts.length > 0 && (
+        <div className="mb-6 lg:mb-10">
+          <BundleDealPanel
+            deal={deal}
+            products={bundleProducts}
+            allProducts={allProducts}
+            variant="light"
+          />
+        </div>
+      )}
 
       {/* Products Grid with Pagination */}
       <div>

@@ -92,7 +92,20 @@ const formatDealValue = (deal) => {
       return `Buy ${buy} Get ${get} (${disc === 100 ? "Free" : `${disc}% Off`})`;
     }
     case "free_shipping": return "Free Shipping";
-    case "bundle": return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
+    case "bundle": {
+      const rule = deal?.bundleRule || deal?.bundle_rule || null;
+      if (!rule) return "Bundle Deal";
+      const buy = rule.buyQuantity || rule.buy_quantity || 1;
+      if (rule.rewardType === "free_product" || rule.reward_type === "free_product") {
+        const gift = rule.freeProductName || rule.freeProduct?.name || "Gift";
+        const qty = rule.freeQuantity || rule.free_quantity || 1;
+        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} FREE`;
+      }
+      if (rule.rewardType === "percentage" || rule.reward_type === "percentage") {
+        return `Buy ${buy} → ${rule.value || 0}% OFF`;
+      }
+      return `Buy ${buy} → Rs. ${rule.value || 0} OFF`;
+    }
     default: return value > 0 ? `${value}` : "-";
   }
 };
@@ -240,8 +253,15 @@ export default function DealsPage() {
     buy_quantity: "",
     get_quantity: "",
     get_discount_value: "",
-    bundle_price: "",
-    bundle_image: "", // ✅ Bundle deal image (uploaded URL)
+    bundle_rule: {
+      mode: "all", // "all" = all selected products | "limit" = custom quantity
+      buy_quantity: "",
+      reward_type: "percentage",
+      value: "",
+      gift_product_id: "",
+      gift_quantity: 1,
+    },
+    bundle_rules: [{ buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
     has_min_quantity: false, // New field for checkbox
     min_quantity: "",
     start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -281,8 +301,16 @@ export default function DealsPage() {
       name: "", code: "", description: "", target_type: "all",
       selected_product_ids: [], selected_category_ids: [], selected_brand_ids: [],
       value_type: "percentage", value: "", min_order_value: "",
-      buy_quantity: "", get_quantity: "", get_discount_value: "", bundle_price: "",
-      bundle_image: "",
+      buy_quantity: "", get_quantity: "", get_discount_value: "",
+      bundle_rule: {
+        mode: "all",
+        buy_quantity: "",
+        reward_type: "percentage",
+        value: "",
+        gift_product_id: "",
+        gift_quantity: 1,
+      },
+    bundle_rules: [{ mode: "limit", buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
       has_min_quantity: false,
       min_quantity: "",
       start_at: "", end_at: "", usage_limit: "", per_user_limit: "",
@@ -371,8 +399,26 @@ export default function DealsPage() {
       buy_quantity: deal?.buyQuantity ?? "",
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
-      bundle_price: deal?.bundlePrice ?? "",
-      bundle_image: deal?.image || "",
+      // ✅ Single offer condition (bundle deal)
+      bundle_rule: {
+        mode: deal?.bundleRule?.mode === "limit" ? "limit" : "all",
+        buy_quantity: deal?.bundleRule?.buyQuantity ?? "",
+        reward_type: deal?.bundleRule?.rewardType || "percentage",
+        value: deal?.bundleRule?.value ?? "",
+        gift_product_id: String(
+          deal?.bundleRule?.freeProduct?._id || deal?.bundleRule?.freeProduct || ""
+        ),
+        gift_quantity: deal?.bundleRule?.freeQuantity ?? 1,
+      },
+      bundle_rules: deal?.bundleRule ? [{
+        buy_quantity: deal?.bundleRule?.buyQuantity ?? 2,
+        reward_type: deal?.bundleRule?.rewardType || "percentage",
+        value: deal?.bundleRule?.value ?? "",
+        gift_product_id: String(
+          deal?.bundleRule?.freeProduct?._id || deal?.bundleRule?.freeProduct || ""
+        ),
+        gift_quantity: deal?.bundleRule?.freeQuantity ?? 1,
+      }] : [{ buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 }],
       
       has_min_quantity: hasMinQty,
       min_quantity: hasMinQty ? rawMinQty : "",
@@ -404,9 +450,30 @@ export default function DealsPage() {
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
     }
 
-    // ✅ Bundle deal ke liye bundle price zaroori hai
-    if (formData.value_type === "bundle" && (!formData.bundle_price || Number(formData.bundle_price) <= 0)) {
-      return toast.error("Please enter a valid Bundle Price");
+    // ✅ Bundle deal — single offer condition validation
+    if (formData.value_type === "bundle") {
+      const rule = formData.bundle_rule || {};
+
+      if (rule.mode === "limit") {
+        const buyQty = Number(rule.buy_quantity);
+        if (!buyQty || buyQty <= 0) {
+          return toast.error("Bundle offer: enter the required quantity");
+        }
+      }
+
+      if (rule.reward_type === "free_product") {
+        if (!rule.gift_product_id) {
+          return toast.error("Bundle offer: select the free gift product");
+        }
+      } else {
+        const val = Number(rule.value);
+        if (!val || val <= 0) {
+          return toast.error("Bundle offer: enter a discount value greater than 0");
+        }
+        if (rule.reward_type === "percentage" && val > 100) {
+          return toast.error("Bundle offer: percentage cannot be more than 100%");
+        }
+      }
     }
 
     if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
@@ -438,9 +505,28 @@ export default function DealsPage() {
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
-      bundlePrice: formData.bundle_price ? Number(formData.bundle_price) : 0,
-      // ✅ Bundle image — sirf bundle deal par save hoti hai, warna clear
-      image: formData.value_type === "bundle" ? String(formData.bundle_image || "") : "",
+      // ✅ Single bundle offer condition (bundle deal only)
+      // ✅ Single bundle offer condition (bundle deal only)
+      bundleRule:
+        formData.value_type === "bundle" && formData.bundle_rule
+          ? {
+              mode: formData.bundle_rule.mode === "limit" ? "limit" : "all",
+              buyQuantity: Math.max(0, Number(formData.bundle_rule.buy_quantity) || 0),
+              rewardType: formData.bundle_rule.reward_type || "percentage",
+              value:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? 0
+                  : Number(formData.bundle_rule.value) || 0,
+              freeProduct:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? formData.bundle_rule.gift_product_id || null
+                  : null,
+              freeQuantity:
+                formData.bundle_rule.reward_type === "free_product"
+                  ? Math.max(1, Number(formData.bundle_rule.gift_quantity) || 1)
+                  : 1,
+            }
+          : null,
       minQuantity: finalMinQuantity, // Send null if unchecked
       startDate, endDate,
       usageLimit: formData.usage_limit !== "" ? Number(formData.usage_limit) : null,
@@ -1089,11 +1175,8 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
     return options;
   }, [formType, formData.value_type]);
 
-  // ✅ Customer kitna bacha raha hai (original total − bundle price)
-  const bundleSavings =
-    isBundleMode && Number(formData.bundle_price) > 0
-      ? Math.max(0, totalSelectedValue - Number(formData.bundle_price))
-      : 0;
+  // Bundle deal: no fixed bundle price — savings come from the single offer rule only
+  const bundleSavings = 0;
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
@@ -1353,13 +1436,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         </div>
                       </div>
 
-                      {/* STEP 1 — BUNDLE IMAGE */}
-                      <BundleImageUploader
-                        value={formData.bundle_image}
-                        onChange={(url) => setFormData((prev) => ({ ...prev, bundle_image: url }))}
-                      />
-
-                      {/* STEP 2 — BUNDLE PRODUCTS */}
+                      {/* STEP 1 — BUNDLE PRODUCTS */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <label className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
@@ -1377,7 +1454,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         </div>
 
                         <div className="rounded-lg overflow-hidden" style={cardStyle}>
-                          
+                          {selectedItemsDetails.length > 0 && (
                             <div className="p-3 space-y-2">
                               {selectedItemsDetails.map((product) => {
                                 const id = getId(product);
@@ -1397,7 +1474,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         </div>
                       </div>
 
-                      {/* STEP 3 — TOTAL PRICE */}
+                      {/* STEP 2 — TOTAL PRICE */}
                       <div
                         className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5"
                         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}
@@ -1410,22 +1487,17 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         </span>
                       </div>
 
-                      {/* STEP 4 — BUNDLE PRICE */}
-                      <FormField label="Bundle Price (Rs.)" hint="Customer poore bundle ke liye itna pay karega" fullWidth>
-                        <TextInput
-                          type="number"
-                          value={formData.bundle_price}
-                          onChange={(v) => setFormData({ ...formData, bundle_price: v })}
-                          placeholder="e.g., 1500"
-                          style={inputStyle}
-                        />
-                      </FormField>
-
-                      {bundleSavings > 0 && (
-                        <p className="text-[11px] text-right" style={{ color: "var(--success-text)" }}>
-                          Customer saves {formatCurrency(bundleSavings)}
-                        </p>
-                      )}
+                      {/* STEP 3 — QUANTITY RULES (Buy N bundles → discount / free gift) */}
+                      <BundleRulesEditor
+                        rules={formData.bundle_rules || []}
+                        onChange={(next) => {
+                          const single = Array.isArray(next) && next.length > 0 ? next[0] : { buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 };
+                          setFormData((prev) => ({ ...prev, bundle_rules: next, bundle_rule: single }));
+                        }}
+                        products={products}
+                        inputStyle={inputStyle}
+                        cardStyle={cardStyle}
+                      />
                     </div>
                   )}
 
@@ -1819,6 +1891,137 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
 }
 
 /* ==================== SELECTED PRODUCT ROW (INSIDE TARGET SELECTION) ==================== */
+/* ==================== BUNDLE QUANTITY RULES EDITOR ==================== */
+/* "Buy N bundles → discount / free gift" builder — single rule only */
+const bundleRulePreviewText = (rule, giftProduct) => {
+  const buy = Number(rule.buy_quantity) || 2;
+
+  if (rule.reward_type === "free_product") {
+    const qty = Math.max(1, Number(rule.gift_quantity) || 1);
+    return `Buy ${buy} → ${qty > 1 ? `${qty}× ` : ""}${giftProduct?.name || "gift product"} FREE`;
+  }
+  if (rule.reward_type === "fixed_amount") {
+    return `Buy ${buy} → Rs. ${Number(rule.value) || 0} OFF (per bundle)`;
+  }
+  return `Buy ${buy} → ${Number(rule.value) || 0}% OFF`;
+};
+
+function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, cardStyle }) {
+  // Enforce single rule only
+  const singleRule = Array.isArray(rules) && rules.length > 0 ? rules[0] : { mode: "limit", buy_quantity: 2, reward_type: "percentage", value: "", gift_product_id: "", gift_quantity: 1 };
+  const labelStyle = { color: "var(--text-secondary)" };
+
+  const update = (patch) => onChange([ { ...singleRule, ...patch } ]);
+  const maxBuyQty = Math.max(1, products.length || 1);
+
+  return (
+    <div className="pt-3 space-y-2.5 border-t" style={{ borderColor: "var(--border-color)" }}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-bold">Offer Rule (Single Condition)</p>
+          <p className="text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
+            Set one offer condition only. Buy N bundles → get discount or free gift. The condition applies automatically.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md p-2.5 space-y-2" style={cardStyle}>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-[104px]">
+            <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+              Buy (bundles)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={maxBuyQty}
+              value={singleRule.buy_quantity || 1}
+              onChange={(e) => {
+                const val = Math.min(maxBuyQty, Math.max(1, Number(e.target.value) || 1));
+                update({ buy_quantity: val });
+              }}
+              className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="w-[184px]">
+            <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+              Reward Type
+            </label>
+            <select
+              value={singleRule.reward_type || "percentage"}
+              onChange={(e) => update({ reward_type: e.target.value, value: e.target.value === "free_product" ? "" : singleRule.value })}
+              className="appearance-none h-9 w-full px-2.5 rounded-md text-[13px] outline-none cursor-pointer"
+              style={inputStyle}
+            >
+              <option value="percentage">Discount (%)</option>
+              <option value="fixed_amount">Discount (Rs.)</option>
+              <option value="free_product">Free Product (Gift)</option>
+            </select>
+          </div>
+
+          {(singleRule.reward_type !== "free_product") ? (
+            <div className="w-[132px]">
+              <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                {singleRule.reward_type === "percentage" ? "Discount (%)" : "Discount (Rs.)"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={singleRule.value || ""}
+                onChange={(e) => update({ value: e.target.value })}
+                placeholder={singleRule.reward_type === "percentage" ? "e.g., 10" : "e.g., 200"}
+                className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+                style={inputStyle}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 min-w-[170px]" style={{ position: "relative" }}>
+                <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                  Free Gift Product
+                </label>
+                <select
+                  value={singleRule.gift_product_id || ""}
+                  onChange={(e) => update({ gift_product_id: e.target.value })}
+                  className="appearance-none h-9 w-full px-2.5 rounded-md text-[13px] outline-none cursor-pointer"
+                  style={{ ...inputStyle, maxHeight: "36px" }}
+                >
+                  <option value="">Select gift product...</option>
+                  {products.map((p) => (
+                    <option key={getId(p)} value={getId(p)}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="w-[92px]">
+                <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
+                  Gift Qty
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={singleRule.gift_quantity || 1}
+                  onChange={(e) => update({ gift_quantity: Math.max(1, Number(e.target.value) || 1) })}
+                  className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
+                  style={inputStyle}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <p className="text-[11px] font-semibold" style={{ color: "var(--success-text)" }}>
+          {bundleRulePreviewText(singleRule, products.find((p) => getId(p) === String(singleRule.gift_product_id || "")))}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SelectedProductRow({ product, price, image, onView, onRemove }) {
   const name = getName(product, "product");
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
