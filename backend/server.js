@@ -178,7 +178,6 @@ const seedDefaultData = async () => {
           tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE) || 0,
           weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
           store_status: process.env.DEFAULT_STORE_STATUS,
-          primary_color: process.env.DEFAULT_STORE_PRIMARY_COLOR,
         });
         console.log("✅ Default Store Created");
       }

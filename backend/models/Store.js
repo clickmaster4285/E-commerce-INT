@@ -23,7 +23,6 @@ const storeSchema = new mongoose.Schema({
   maintenance_message: { type: String, default: "" },
   
   // Branding
-  primary_color: { type: String, default: "#10b981" },
   logo: { 
     img_url: { type: String, default: "" },
     public_id: { type: String, default: "" } // Cloudinary use kar rahe hain toh

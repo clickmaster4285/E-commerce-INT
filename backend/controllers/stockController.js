@@ -25,6 +25,45 @@ const emitSocketEvent = (event, data) => {
   }
 };
 
+
+const escapeRegExp = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const getStockStatusExpression = (status) => {
+  if (status === "out") return { $eq: ["$quantity", 0] };
+  if (status === "low") {
+    return { $and: [{ $gt: ["$quantity", 0] }, { $lte: ["$quantity", { $ifNull: ["$min_qnt", 0] }] }] };
+  }
+  if (status === "in") {
+    return { $gt: ["$quantity", { $ifNull: ["$min_qnt", 0] }] };
+  }
+  return null;
+};
+
+const toStockItem = (variant) => {
+  const product = variant.product_id && typeof variant.product_id === "object"
+    ? variant.product_id
+    : null;
+
+  return {
+    _id: variant._id,
+    sku: variant.sku || "",
+    title: variant.title || "",
+    quantity: variant.quantity ?? 0,
+    min_qnt: variant.min_qnt ?? 0,
+    max_qnt: variant.max_qnt ?? 0,
+    image: variant.images?.[0]?.img_url || "",
+    product_id: product?._id || variant.product_id || null,
+    product_name: product?.name || "Unknown Product",
+    product_is_deleted: Boolean(product?.is_deleted),
+    category_id: product?.category_id?._id || product?.category_id || null,
+    category_name: product?.category_id?.name || "Uncategorized",
+    brand_id: product?.brand_id?._id || product?.brand_id || null,
+    brand_name: product?.brand_id?.name || "No brand",
+    brand_logo: product?.brand_id?.logo?.img_url || "",
+  };
+};
+
 /* =========================================================
    GET STOCK OVERVIEW
    ✅ FIX: Sirf wo products show honge jin ka is_deleted = false
@@ -36,104 +75,132 @@ const getStockOverview = async (req, res) => {
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const search = String(req.query.search || "").trim();
-    const statusFilter = String(req.query.status || "all").trim();
+    const statusFilter = ["all", "in", "low", "out"].includes(String(req.query.status || "all"))
+      ? String(req.query.status || "all")
+      : "all";
 
-    // ✅ STEP A: Pehle active products ke IDs nikalo
-    const activeProducts = await Product.find(
-      { is_deleted: { $ne: true } },
-      "_id"
-    ).lean();
-    const activeProductIds = activeProducts.map((p) => p._id);
-
-    // ✅ STEP B: Base filter banayo
-    const baseFilter = {
+    // Only non-deleted products are eligible for stock management.
+    const activeProducts = await Product.find({ is_deleted: { $ne: true } }, "_id").lean();
+    const activeProductIds = activeProducts.map((product) => product._id);
+    const inventoryBaseFilter = {
       is_deleted: { $ne: true },
       product_id: { $in: activeProductIds },
     };
+    const baseFilter = { ...inventoryBaseFilter };
 
-    // ✅ STEP C: Search filter add karo agar search hai
     if (search) {
+      const safeSearch = escapeRegExp(search);
+      const matchingProducts = await Product.find(
+        {
+          is_deleted: { $ne: true },
+          name: { $regex: safeSearch, $options: "i" },
+        },
+        "_id"
+      ).lean();
+
       baseFilter.$or = [
-        { sku: { $regex: search, $options: "i" } },
-        { title: { $regex: search, $options: "i" } },
+        { sku: { $regex: safeSearch, $options: "i" } },
+        { title: { $regex: safeSearch, $options: "i" } },
+        { product_id: { $in: matchingProducts.map((product) => product._id) } },
       ];
     }
 
+    const withStatus = (filter, status) => {
+      const expression = getStockStatusExpression(status);
+      return expression ? { ...filter, $expr: expression } : filter;
+    };
+
+    const listFilter = withStatus(baseFilter, statusFilter);
+    const countForStatus = (filter, status) =>
+      Variant.countDocuments(withStatus(filter, status));
+
+    // Dashboard cards describe the entire inventory, not only the current page.
+    const [
+      globalTotalVariants,
+      globalInStock,
+      globalLowStock,
+      globalOutOfStock,
+      globalProductIds,
+      unitsResult,
+      searchTotal,
+      searchInStock,
+      searchLowStock,
+      searchOutOfStock,
+    ] = await Promise.all([
+      Variant.countDocuments(inventoryBaseFilter),
+      countForStatus(inventoryBaseFilter, "in"),
+      countForStatus(inventoryBaseFilter, "low"),
+      countForStatus(inventoryBaseFilter, "out"),
+      Variant.distinct("product_id", inventoryBaseFilter),
+      Variant.aggregate([
+        { $match: inventoryBaseFilter },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$quantity", 0] } } } },
+      ]),
+      Variant.countDocuments(baseFilter),
+      countForStatus(baseFilter, "in"),
+      countForStatus(baseFilter, "low"),
+      countForStatus(baseFilter, "out"),
+    ]);
+
+    const summary = {
+      totalVariants: globalTotalVariants,
+      totalProducts: globalProductIds.length,
+      totalUnits: unitsResult[0]?.total || 0,
+      inStock: globalInStock,
+      lowStock: globalLowStock,
+      outOfStock: globalOutOfStock,
+    };
+    const counts = {
+      all: searchTotal,
+      in: searchInStock,
+      low: searchLowStock,
+      out: searchOutOfStock,
+    };
+
+    const populateProduct = [
+      { path: "product_id", select: "name is_deleted category_id brand_id" },
+      { path: "product_id.category_id", select: "name" },
+      { path: "product_id.brand_id", select: "name logo" },
+    ];
+    const variantSelect = "sku title quantity min_qnt max_qnt product_id images";
+
     // ---- LEGACY MODE (no limit) ----
     if (!limit) {
-      const variants = await Variant.find(baseFilter)
-        .populate({
-          path: "product_id",
-          select: "name",
-        })
-        .select("sku title quantity min_qnt max_qnt product_id")
+      const variants = await Variant.find(listFilter)
+        .populate(populateProduct)
+        .select(variantSelect)
         .sort({ created_at: -1 })
         .lean();
 
-      // ✅ STEP D: Search by product name (populate ke baad)
-      let items = variants.map((v) => ({
-        _id: v._id,
-        sku: v.sku || "",
-        title: v.title || "",
-        quantity: v.quantity ?? 0,
-        min_qnt: v.min_qnt ?? 0,
-        max_qnt: v.max_qnt ?? 0,
-        product_id: v.product_id?._id || null,
-        product_name: v.product_id?.name || "Unknown Product",
-      }));
-
-      // Product name se filter karo agar search hai
-      if (search) {
-        const searchLower = search.toLowerCase();
-        items = items.filter((item) => 
-          item.product_name.toLowerCase().includes(searchLower) ||
-          item.sku.toLowerCase().includes(searchLower) ||
-          item.title.toLowerCase().includes(searchLower)
-        );
-      }
-
-      return res.status(200).json({ success: true, data: items });
+      return res.status(200).json({
+        success: true,
+        data: variants.map(toStockItem),
+        summary,
+        counts,
+      });
     }
 
     // ---- PAGINATED MODE ----
-    const totalVariants = await Variant.countDocuments(baseFilter);
-    const totalItems = totalVariants;
+    const totalItems = await Variant.countDocuments(listFilter);
     const pages = Math.max(1, Math.ceil(totalItems / limit));
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const variants = await Variant.find(baseFilter)
-      .populate({
-        path: "product_id",
-        select: "name",
-      })
-      .select("sku title quantity min_qnt max_qnt product_id")
+    const variants = await Variant.find(listFilter)
+      .populate(populateProduct)
+      .select(variantSelect)
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const items = variants.map((v) => ({
-      _id: v._id,
-      sku: v.sku || "",
-      title: v.title || "",
-      quantity: v.quantity ?? 0,
-      min_qnt: v.min_qnt ?? 0,
-      max_qnt: v.max_qnt ?? 0,
-      product_id: v.product_id?._id || null,
-      product_name: v.product_id?.name || "Unknown Product",
-    }));
-
-      // ✅ Total unique products across ALL variants (saare pages, current page nahi)
-    const distinctProductIds = await Variant.distinct("product_id", baseFilter);
-    const totalProducts = distinctProductIds.length;
-
     return res.status(200).json({
       success: true,
-      data: items,
-          pagination: {
+      data: variants.map(toStockItem),
+      summary,
+      counts,
+      pagination: {
         total: totalItems,
-        totalProducts: totalProducts,
         page: safePage,
         limit,
         pages,

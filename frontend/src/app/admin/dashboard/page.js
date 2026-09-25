@@ -436,7 +436,7 @@ function RecentOrders({ data }) {
   const orders = data?.recentOrders || [];
 
   return (
-    <div className="card flex h-full flex-col p-4 sm:p-5">
+    <div className="card flex flex-col p-4 sm:p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Recent Orders</h3>
         <Link href="/admin/orders" className="text-xs font-semibold text-blue-500 hover:underline">

@@ -20,8 +20,7 @@ const deleteFile = (filePath) => {
 exports.getBanner = async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id)
-      .populate("primaryButton.dealId", "name isActive startDate endDate")
-      .populate("secondaryButton.dealId", "name isActive startDate endDate");
+      .populate("primaryButton.dealId", "name isActive startDate endDate");
     if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
     res.json({ success: true, data: banner });
   } catch (err) {
@@ -145,6 +144,13 @@ exports.updateBanner = async (req, res) => {
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
 
     const data = { ...req.body };
+
+    // FIX: Multipart mein koi field 2 baar append ho to uska array ban jata hai
+    // (e.g. status -> ["active","active"]). Mongoose String path par array cast
+    // fail hone se edit crash hoti tha — last value rakh lo.
+    Object.keys(data).forEach((k) => {
+      if (Array.isArray(data[k])) data[k] = data[k][data[k].length - 1];
+    });
 
     // Never allow overwriting createdby during update
     delete data.createdby;

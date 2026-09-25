@@ -847,7 +847,7 @@ export default function DealDetailPage() {
                 <td className="py-2.5 pr-4">
                   <div className="flex items-center gap-2">
                     {creator ? <Avatar user={creator} size="sm" color="emerald" /> : null}
-                    <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{creator ? getUserLabel(creator) : "System"}</span>
+                    <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{getUserLabel(creator)}</span>
                   </div>
                 </td>
                 <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>Deal created</td>

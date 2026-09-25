@@ -14,21 +14,19 @@ const list = (res) => {
 
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
-  if (!d) return { items: [], pagination: { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false } };
+  if (!d) return { items: [], summary: {}, counts: { all: 0, in: 0, low: 0, out: 0 }, pagination: { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false } };
   if (Array.isArray(d)) {
     return {
       items: d,
+      summary: {},
+      counts: { all: d.length, in: 0, low: 0, out: 0 },
       pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
     };
   }
-  if (d?.success !== undefined && Array.isArray(d?.data)) {
-    return {
-      items: d.data,
-      pagination: d.pagination || { total: d.data.length, page: 1, limit: d.data.length || 1, pages: 1, hasNext: false, hasPrev: false },
-    };
-  }
   return {
-    items: Array.isArray(d?.items) ? d.items : Array.isArray(d?.data) ? d.data : [],
+    items: Array.isArray(d?.data) ? d.data : Array.isArray(d?.items) ? d.items : [],
+    summary: d?.summary || {},
+    counts: d?.counts || { all: 0, in: 0, low: 0, out: 0 },
     pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
   };
 };

@@ -3,7 +3,6 @@ import { createSlice } from "@reduxjs/toolkit";
 const initialState = {
   storeName: "My Store",
   tagline: "Welcome to our store",
-  primaryColor: "#10b981",
   logo: null,
   storeStatus: "open",
   currency: "PKR",
@@ -46,7 +45,6 @@ const storeInfoSlice = createSlice({
 
       if (d.store_name !== undefined && d.store_name !== null) state.storeName = d.store_name;
       if (d.tagline !== undefined && d.tagline !== null) state.tagline = d.tagline;
-      if (d.primary_color !== undefined && d.primary_color !== null) state.primaryColor = d.primary_color;
       if (d.logo !== undefined && d.logo !== null) state.logo = d.logo;
       if (d.store_status !== undefined && d.store_status !== null) state.storeStatus = d.store_status;
       if (d.currency !== undefined && d.currency !== null) state.currency = d.currency;

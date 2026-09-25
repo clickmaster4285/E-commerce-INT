@@ -6,6 +6,14 @@ import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
 import { useStockSocketSync } from "@/hooks/useStockSocketSync";
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const getImageUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) return url;
+  if (!API_ORIGIN) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}`;
+};
+
 /* ================= Icons ================= */
 const SearchIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,6 +82,16 @@ const EyeIcon = ({ className = "w-4 h-4" }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
   </svg>
 );
+const CheckIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+  </svg>
+);
+const AlertIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.3 3.8L2.2 18a2 2 0 001.7 3h16.2a2 2 0 001.7-3L13.7 3.8a2 2 0 00-3.4 0z" />
+  </svg>
+);
 
 /* ================= Helpers ================= */
 const getInitials = (name) => {
@@ -106,6 +124,26 @@ const formatDateTime = (date) => {
 };
 
 /* ================= Small Components ================= */
+const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
+  const image = getImageUrl(item?.image);
+  return image ? (
+    <img
+      src={image}
+      alt={item?.product_name || "Product"}
+      className={`${size} shrink-0 rounded-lg object-cover`}
+      style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
+    />
+  ) : (
+    <div
+      className={`${size} shrink-0 rounded-lg flex items-center justify-center`}
+      style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
+      aria-label="No product image"
+    >
+      <BoxIcon className="h-5 w-5" />
+    </div>
+  );
+};
+
 const Avatar = ({ name, size = "w-8 h-8" }) => (
   <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
     {getInitials(name)}
@@ -151,11 +189,12 @@ export default function ManageStockPage() {
 
   const [tab, setTab] = useState("stock");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
   const [adjustTarget, setAdjustTarget] = useState(null);
-  
+
   const [adjustForm, setAdjustForm] = useState({
     type: "add",
     quantity: "",
@@ -180,12 +219,24 @@ export default function ManageStockPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const { data: paginatedStockData, isLoading: loading, isError, error } = useQuery({
-    queryKey: ["stock", "paginated", currentPage, search, statusFilter],
-    queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search, status: statusFilter }),
+    queryKey: ["stock", "paginated", currentPage, debouncedSearch, statusFilter],
+    queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter }),
     retry: false,
   });
-  const stockItems = paginatedStockData?.items || paginatedStockData || [];
+  const stockItems = Array.isArray(paginatedStockData?.items)
+    ? paginatedStockData.items
+    : Array.isArray(paginatedStockData)
+      ? paginatedStockData
+      : [];
   const stockPagination = paginatedStockData?.pagination || { total: stockItems.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
 
   const { data: paginatedHistoryData, isLoading: historyLoading } = useQuery({
@@ -193,7 +244,11 @@ export default function ManageStockPage() {
     queryFn: () => stockApi.getHistoryPaginated({ page: historyPage, limit: itemsPerPage }),
     enabled: tab === "history",
   });
-  const historyItems = paginatedHistoryData?.items || paginatedHistoryData || [];
+  const historyItems = Array.isArray(paginatedHistoryData?.items)
+    ? paginatedHistoryData.items
+    : Array.isArray(paginatedHistoryData)
+      ? paginatedHistoryData
+      : [];
   const historyPagination = paginatedHistoryData?.pagination || { total: historyItems.length, page: historyPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
 
   const adjustMutation = useMutation({
@@ -217,63 +272,31 @@ export default function ManageStockPage() {
     queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 50, variantId: detailsTarget._id }),
     enabled: !!detailsTarget?._id,
   });
-  const detailsHistory = detailsHistoryData?.items || detailsHistoryData || [];
+  const detailsHistory = Array.isArray(detailsHistoryData?.items)
+    ? detailsHistoryData.items
+    : Array.isArray(detailsHistoryData)
+      ? detailsHistoryData
+      : [];
 
   const openDetails = (item) => setDetailsTarget(item);
   const closeDetails = () => setDetailsTarget(null);
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape" && detailsTarget) closeDetails(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [detailsTarget]);
-
-    const summary = useMemo(() => {
-    // Current page counts
-    let pageInStock = 0, pageLowStock = 0, pageOutOfStock = 0;
-    stockItems.forEach((item) => {
-      const s = getStockStatus(item);
-      if (s === "in") pageInStock++; else if (s === "low") pageLowStock++; else pageOutOfStock++;
-    });
-    
-    // Use server pagination total for accurate counts
-    const totalVariants = stockPagination?.total || stockItems.length;
-    const totalProducts = stockPagination?.totalProducts || new Set(stockItems.map((i) => String(i.product_id))).size;
-    
-    return {
-      totalVariants,
-      totalProducts,
-      // These are current page counts (backend should return totals for accurate stats)
-      inStock: pageInStock,
-      lowStock: pageLowStock,
-      outOfStock: pageOutOfStock,
-      isPageSpecific: true, // Flag to show note
-    };
-  }, [stockItems, stockPagination]);
-
-  const searchedItems = useMemo(() => {
-    const text = search.toLowerCase().trim();
-    if (!text) return stockItems;
-    return stockItems.filter((item) => 
-      item.product_name?.toLowerCase().includes(text) || 
-      item.sku?.toLowerCase().includes(text) || 
-      item.title?.toLowerCase().includes(text)
-    );
-  }, [stockItems, search]);
-
-  const filteredItems = useMemo(() => {
-    if (statusFilter === "all") return searchedItems;
-    return searchedItems.filter((item) => getStockStatus(item) === statusFilter);
-  }, [searchedItems, statusFilter]);
-
-  const filterCounts = useMemo(() => {
-    let inStock = 0, lowStock = 0, outOfStock = 0;
-    searchedItems.forEach((item) => {
-      const s = getStockStatus(item);
-      if (s === "in") inStock++; else if (s === "low") lowStock++; else outOfStock++;
-    });
-    return { all: searchedItems.length, in: inStock, low: lowStock, out: outOfStock };
-  }, [searchedItems]);
+  const summary = paginatedStockData?.summary || {
+    totalVariants: stockPagination?.total || stockItems.length,
+    totalProducts: new Set(stockItems.map((item) => String(item.product_id))).size,
+    totalUnits: stockItems.reduce((total, item) => total + Number(item.quantity || 0), 0),
+    inStock: 0,
+    lowStock: 0,
+    outOfStock: 0,
+  };
+  const filterCounts = paginatedStockData?.counts || {
+    all: stockPagination?.total || stockItems.length,
+    in: 0,
+    low: 0,
+    out: 0,
+  };
+  // The API has already applied search and status filters before pagination.
+  const filteredItems = stockItems;
 
   const computedNewStock = useMemo(() => {
     if (!adjustTarget) return null;
@@ -290,11 +313,7 @@ export default function ManageStockPage() {
 
   // Pagination variables (use server pagination data)
   const stockTotalPages = stockPagination?.pages || 1;
-  const stockSafePage = Math.min(currentPage, Math.max(1, stockTotalPages));
-  const stockTotalItems = stockPagination?.total || stockItems.length;
   const historyTotalPages = historyPagination?.pages || 1;
-  const historySafePage = Math.min(historyPage, Math.max(1, historyTotalPages));
-  const historyTotalItems = historyPagination?.total || historyItems.length;
 
   const paginationStart = (currentPage - 1) * itemsPerPage + 1;
   const paginationEnd = Math.min(currentPage * itemsPerPage, stockPagination?.total || stockItems.length);
@@ -311,6 +330,23 @@ export default function ManageStockPage() {
   };
 
   const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setIsReasonOpen(false); };
+
+  useEffect(() => {
+    if (!detailsTarget && !adjustTarget) return;
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      if (detailsTarget) closeDetails();
+      else if (!adjustMutation.isPending) closeAdjustModal();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [detailsTarget, adjustTarget, adjustMutation.isPending]);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    if (detailsTarget || adjustTarget) document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = originalOverflow; };
+  }, [detailsTarget, adjustTarget]);
 
   const validateAdjust = () => {
     const qtyRaw = adjustForm.quantity.trim();
@@ -393,16 +429,18 @@ export default function ManageStockPage() {
                {/* ✅ UPDATED STAT CARDS - Mobile optimized */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {[
-            { label: "Total Variants", value: summary.totalVariants, sub: `Across ${summary.totalProducts} products` },
-            { label: "In Stock", value: summary.inStock, color: "var(--success-text)", isCurrentPage: summary.isPageSpecific },
-            { label: "Low Stock", value: summary.lowStock, color: "var(--warning)", isCurrentPage: summary.isPageSpecific },
-            { label: "Out of Stock", value: summary.outOfStock, color: "var(--danger)", isCurrentPage: summary.isPageSpecific },
-          ].map((card, idx) => (
-            <div key={idx} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
-              <p className="text-[11px] sm:text-[12px] font-medium leading-tight mb-1" style={{ color: "var(--text-muted)" }}>{card.label}</p>
-              <p className="text-[20px] sm:text-[20px] font-bold" style={{ color: card.color || "var(--text-primary)" }}>{card.value}</p>
-              {card.sub && <p className="text-[10px] sm:text-[11px] mt-1 truncate" style={{ color: "var(--text-muted)" }}>{card.sub}</p>}
-              {card.isCurrentPage && <p className="text-[9px] mt-1 italic" style={{ color: "var(--text-muted)" }}>Current page only</p>}
+            { label: "Total Units", value: summary.totalUnits, sub: `${summary.totalVariants} variants`, icon: <BoxIcon className="h-5 w-5" />, color: "var(--accent)", backgroundColor: "var(--accent-soft)" },
+            { label: "In Stock", value: summary.inStock, sub: "Healthy inventory", icon: <CheckIcon className="h-5 w-5" />, color: "var(--success-text)", backgroundColor: "var(--success-soft)" },
+            { label: "Total Products", value: summary.totalProducts, sub: "Unique products", icon: <ListIcon className="h-5 w-5" />, color: "var(--purple-text)", backgroundColor: "var(--purple-soft)" },
+            { label: "Out of Stock", value: summary.outOfStock, sub: "Restock required", icon: <BoxIcon className="h-5 w-5" />, color: "var(--danger-text)", backgroundColor: "var(--danger-soft)" },
+          ].map((card) => (
+            <div key={card.label} className="rounded-xl p-4 flex items-start gap-3" style={cardStyle}>
+              <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center" style={{ backgroundColor: card.backgroundColor, color: card.color }}>{card.icon}</div>
+              <div className="min-w-0">
+                <p className="text-[11px] sm:text-xs font-medium" style={{ color: "var(--text-muted)" }}>{card.label}</p>
+                <p className="text-xl font-bold mt-0.5" style={{ color: card.color }}>{card.value}</p>
+                <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{card.sub}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -421,7 +459,7 @@ export default function ManageStockPage() {
                   placeholder="Search by product name, SKU or variant..." 
                   value={search} 
                   onChange={(e) => handleSearchChange(e.target.value)} 
-                  className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+                  className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]" 
                   style={inputStyle} 
                 />
               </div>
@@ -452,8 +490,6 @@ export default function ManageStockPage() {
                           <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">SKU</th>
                           <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Variant</th>
                           <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Current Stock</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Min Stock</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Max Stock</th>
                           <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider">Action</th>
                         </tr>
@@ -465,9 +501,10 @@ export default function ManageStockPage() {
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
   <div className="flex items-center gap-2.5">
-    <Avatar name={item.product_name} />
+    <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="font-medium text-[13px] truncate max-w-[160px]">{item.product_name}</span>
+      <span className="font-medium text-[13px] truncate max-w-[160px] block">{item.product_name}</span>
+       <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{item.category_name} · {item.brand_name}</span>
       {item.product_is_deleted && (
         <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
           Deleted
@@ -479,8 +516,6 @@ export default function ManageStockPage() {
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{item.quantity} units</span></td>
-                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{item.min_qnt}</span></td>
-                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{item.max_qnt}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-right">
                                 <div className="flex items-center justify-end gap-1.5">
@@ -543,7 +578,7 @@ export default function ManageStockPage() {
                           <button
                             onClick={() => openAdjustModal(item)}
                             disabled={adjustMutation.isPending}
-                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center text-[12px] font-semibold gap-1.5"
+                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
                             <EditIcon className="w-4 h-4" /> Adjust
@@ -640,12 +675,7 @@ export default function ManageStockPage() {
       {/* ================= STOCK DETAILS DRAWER ================= */}
       {detailsTarget && (() => {
         const status = getStockStatus(detailsTarget);
-        const meta = STATUS_META[status];
         const qty = Number(detailsTarget.quantity ?? 0);
-        const min = Number(detailsTarget.min_qnt ?? 0);
-        const max = Number(detailsTarget.max_qnt ?? 0);
-        const hasMax = max > 0;
-        const pct = hasMax ? Math.min(100, Math.max(0, (qty / max) * 100)) : 0;
         const latest = detailsHistory[0] || null;
         const changeColor = (c) => (c > 0 ? "var(--success-text)" : c < 0 ? "var(--danger)" : "var(--warning)");
 
@@ -659,7 +689,7 @@ export default function ManageStockPage() {
               {/* HEADER */}
               <div className="px-5 py-4 shrink-0 flex items-start justify-between gap-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
                 <div className="flex items-center gap-3 min-w-0">
-                  <Avatar name={detailsTarget.product_name} size="w-10 h-10" />
+                  <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>Stock Details</h3>
                     <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
@@ -684,7 +714,7 @@ export default function ManageStockPage() {
                   </div>
                   <div className="p-4 space-y-3">
                     <div className="flex items-center gap-3">
-                      <Avatar name={detailsTarget.product_name} size="w-10 h-10" />
+                      <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                       <div className="min-w-0">
                         <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</p>
@@ -839,7 +869,7 @@ export default function ManageStockPage() {
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Product Information</p>
                   <div className="flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <Avatar name={adjustTarget.product_name} size="w-10 h-10" />
+                    <ProductThumbnail item={adjustTarget} size="h-12 w-12" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{adjustTarget.product_name}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -949,7 +979,7 @@ export default function ManageStockPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>=</span>
-                        <span className="text-[15px] font-bold" style={{ color: computedNewStock === 0 ? "var(--danger)" : computedNewStock <= (adjustTarget.min_qnt ?? 0) ? "var(--warning)" : "var(--success-text)" }}>{computedNewStock}</span>
+                        <span className="text-[15px] font-bold" style={{ color: computedNewStock === 0 ? "var(--danger)" : "var(--success-text)" }}>{computedNewStock}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>units</span>
                       </div>
                     </div>
@@ -990,13 +1020,13 @@ export default function ManageStockPage() {
                                 setAdjustForm({ ...adjustForm, reason: r, customReason: r === "__OTHER__" ? adjustForm.customReason : "" });
                                 setIsReasonOpen(false);
                               }}
-                              className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-black/5 dark:hover:bg-white/5"
+                              className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-[var(--bg-tertiary)]"
                               style={{ 
                                 backgroundColor: adjustForm.reason === r ? "var(--bg-tertiary)" : "transparent",
                                 color: "var(--text-primary)"
                               }}
                             >
-                              {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                              {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-[var(--success-text)] shrink-0" />}
                               <span className={adjustForm.reason === r ? "font-medium" : ""}>
                                 {r === "__OTHER__" ? "Other (Specify below)" : r}
                               </span>

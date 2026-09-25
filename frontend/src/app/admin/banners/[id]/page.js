@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -12,7 +12,6 @@ import {
   Clock,
   Copy,
   Eye,
-  Globe,
   Hash,
   History,
   Image as ImageIcon,
@@ -26,7 +25,6 @@ import {
   User,
 } from "lucide-react";
 import bannerAPI from "@/apis/admin/bannerApi";
-import { categoryApi } from "@/apis/admin/categoryApi";
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -227,7 +225,6 @@ function ButtonCard({ label, tone, button }) {
 const TABS = [
   { key: "content", label: "Content", target: "banner-content-section", icon: Type },
   { key: "buttons", label: "Buttons", target: "banner-buttons-section", icon: Link2 },
-  { key: "rules", label: "Display Rules", target: "banner-rules-section", icon: Globe },
   { key: "timeline", label: "Timeline", target: "banner-history-section", icon: History },
 ];
 
@@ -250,19 +247,6 @@ export default function BannerDetailPage() {
     enabled: !!bannerId,
     retry: false,
   });
-
-  // Resolve display-rule category ids → names (same source as Banners list page)
-  const { data: categoriesRaw } = useQuery({
-    queryKey: ["admin-categories-list"],
-    queryFn: categoryApi.getAll,
-    staleTime: 60000,
-  });
-  const allCategories = useMemo(() => {
-    if (Array.isArray(categoriesRaw)) return categoriesRaw;
-    if (Array.isArray(categoriesRaw?.data)) return categoriesRaw.data;
-    if (Array.isArray(categoriesRaw?.items)) return categoriesRaw.items;
-    return [];
-  }, [categoriesRaw]);
 
   const deleteMutation = useMutation({
     mutationFn: () => bannerAPI.delete(bannerId),
@@ -312,14 +296,7 @@ export default function BannerDetailPage() {
     );
   }
 
-  const pages = banner.displayRules?.pages || [];
-  const categoryIds = banner.displayRules?.categories || [];
   const desktopImage = imageUrl(banner.desktopImage);
-
-  const categoryName = (id) => {
-    const match = allCategories.find((c) => String(c?._id || c?.id || "") === String(id));
-    return match?.name || match?.title || null;
-  };
 
   const createdBy = banner.createdby ?? banner.createdBy;
   const updatedBy = banner.updatedby ?? banner.updatedBy;
@@ -444,16 +421,6 @@ export default function BannerDetailPage() {
               </InfoRow>
               <InfoRow label="Status"><StatusPill status={banner.status} /></InfoRow>
               <InfoRow label="Position">{String(banner.position ?? 0)}</InfoRow>
-              <InfoRow label="Background Color">
-                <span className="inline-flex items-center gap-2">
-                  <span
-                    className="inline-block rounded-md"
-                    style={{ width: 18, height: 18, backgroundColor: banner.backgroundColor || "#ffffff", border: "1px solid var(--border-color)" }}
-                  />
-                  <span className="font-mono text-[11.5px] uppercase">{banner.backgroundColor || "—"}</span>
-                </span>
-              </InfoRow>
-              <InfoRow label="Alt Text">{banner.altText}</InfoRow>
             </SectionCard>
 
             {/* Section tabs */}
@@ -499,7 +466,9 @@ export default function BannerDetailPage() {
               <SectionCard id="banner-buttons-section" icon={Link2} title="Buttons">
                 <div className="space-y-3">
                   <ButtonCard label="Primary Button" tone="accent" button={banner.primaryButton} />
-                  <ButtonCard label="Secondary Button" tone="neutral" button={banner.secondaryButton} />
+                  {banner.secondaryButton?.text && (
+                    <ButtonCard label="Secondary Button" tone="neutral" button={banner.secondaryButton} />
+                  )}
                 </div>
               </SectionCard>
             </div>
@@ -511,8 +480,12 @@ export default function BannerDetailPage() {
             <SectionCard icon={User} title="Banner Information">
               <RailRow icon={User} label="Created By" value={resolveUser(createdBy)} />
               <RailRow icon={Calendar} label="Created At" value={formatDate(banner.createdAt, true)} />
-              <RailRow icon={Pencil} label="Updated By" value={resolveUser(updatedBy)} />
-              <RailRow icon={Clock} label="Updated At" value={formatDate(banner.updatedAt, true)} />
+              {wasUpdated && (
+                <>
+                  <RailRow icon={Pencil} label="Updated By" value={resolveUser(updatedBy)} />
+                  <RailRow icon={Clock} label="Updated At" value={formatDate(banner.updatedAt, true)} />
+                </>
+              )}
             </SectionCard>
 
             <SectionCard id="banner-history-section" icon={History} title="History">
@@ -554,38 +527,6 @@ export default function BannerDetailPage() {
           </aside>
         </div>
 
-        {/* ============ DISPLAY RULES (full width) ============ */}
-        <SectionCard id="banner-rules-section" icon={Globe} title="Display Rules">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            <div>
-              <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                Pages
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {pages.length
-                  ? pages.map((page) => <Chip key={page} tone="accent">{formatType(page)}</Chip>)
-                  : <span className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No pages configured</span>}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                Categories
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {categoryIds.length
-                  ? categoryIds.map((id) => {
-                      const name = categoryName(id);
-                      return (
-                        <Chip key={String(id)} tone="purple">
-                          {name || `#${String(id).slice(-6)}`}
-                        </Chip>
-                      );
-                    })
-                  : <span className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No categories configured</span>}
-              </div>
-            </div>
-          </div>
-        </SectionCard>
       </div>
 
       {/* ============ DELETE CONFIRM ============ */}

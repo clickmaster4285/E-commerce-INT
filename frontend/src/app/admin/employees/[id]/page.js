@@ -277,7 +277,6 @@ function EmployeeOverview({
   status,
   avatar,
   department,
-  address,
   empId,
   joinDate,
   ordersHandled,
@@ -563,15 +562,6 @@ function EmployeeOverview({
                 </p>
               </div>
             ))}
-          </div>
-
-          <div className="mt-3 border-t pt-2.5" style={{ borderColor: "var(--border-color)" }}>
-            <p className="text-[9.5px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-              Address
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              {address || "Not provided"}
-            </p>
           </div>
         </section>
 
@@ -1699,6 +1689,7 @@ export default function EmployeeDetailPage() {
 
     avatar =
       userData.avatar ||
+      employee.avatar ||
       null,
 
     created_at =
@@ -1711,10 +1702,6 @@ export default function EmployeeDetailPage() {
 
     dateOfBirth =
       employee.dateOfBirth ||
-      "Not provided",
-
-    address =
-      employee.address ||
       "Not provided",
 
     employeeId: empId =
@@ -1888,7 +1875,6 @@ export default function EmployeeDetailPage() {
         status={status}
         avatar={avatar}
         department={department}
-        address={address}
         empId={empId}
         joinDate={joinDate}
         ordersHandled={ordersHandled}

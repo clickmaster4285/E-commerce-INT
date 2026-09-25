@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/apis/axiosInstance';
-import { useRouter } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { storeApi } from '@/apis/admin/storeApi';
+import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
 import {
   Mail,
   Lock,
@@ -50,9 +52,91 @@ const PANEL_FEATURES = [
 // CHANGE THIS PATH TO YOUR DESIRED BACKGROUND IMAGE LATER
 const LOGIN_BACKGROUND_IMAGE_SRC = '/images/admin-login-bg.jpg';
 
+// Store logo ki img_url relative hoti hai (e.g. "uploads/xyz.png") — is liye API origin sath lagate hain
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, '');
+
+// ✅ Store ka logo — bilkul wahi treatment jo Sidebar ke top par hai:
+// logo upload ho chuka ho to safe white card par wahi image (object-contain, koi
+// crop nahi), warna store ke primary color ka gradient mark + naam ka pehla
+// letter. Image load fail ho jaye to bhi gradient mark par fall back ho jata hai.
+function StoreLogo({
+  alt,
+  logoUrl,
+  letter,
+  color,
+  sizeClass = 'h-10 w-10',
+  letterClass = 'text-[17px]',
+  extraClass = '',
+  ringClass = 'ring-white/15',
+  shadowClass = 'shadow-sm',
+}) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
+  if (logoUrl && !logoFailed) {
+    return (
+      <span
+        className={`${sizeClass} flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-black/10 ${shadowClass} ${extraClass}`}
+      >
+        <img
+          src={logoUrl}
+          alt={alt || 'Store'}
+          onError={() => setLogoFailed(true)}
+          className="h-full w-full object-contain p-1"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`${sizeClass} flex shrink-0 items-center justify-center rounded-xl ring-1 ${ringClass} ${shadowClass} ${extraClass}`}
+      style={{
+        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${color} 82%, #ffffff), color-mix(in srgb, ${color} 72%, #000000))`,
+      }}
+    >
+      <span
+        className={`font-bold uppercase tracking-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] ${letterClass}`}
+      >
+        {letter}
+      </span>
+    </span>
+  );
+}
+
 export default function AdminLoginPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
+  const dispatch = useDispatch();
+
+  // ==========================================
+  // STORE NAME / LOGO (Redux)
+  // ==========================================
+  // Sidebar ke top par jo store name dikhta hai wo isi Redux slice se aata hai.
+  // Login page par sidebar/socket nahi hota, is liye wahi public store endpoint
+  // call kar ke usi slice mein daal dete hain — dono jagah same name/logo aata hai.
+  const storeName = useSelector((state) => state.storeInfo.storeName);
+  const storeLogo = useSelector((state) => state.storeInfo.logo);
+  const isStoreLoaded = useSelector((state) => state.storeInfo.isLoaded);
+
+  const { data: storeData } = useQuery({
+    queryKey: ['storeInfo'],
+    queryFn: storeApi.getPublic,
+    staleTime: 5 * 60 * 1000,
+    enabled: !isStoreLoaded,
+  });
+
+  useEffect(() => {
+    if (storeData) dispatch(setStoreInfo(storeData));
+  }, [storeData, dispatch]);
+
+  const displayName = storeName || 'My Store';
+  const displayColor = 'var(--accent)';
+  const firstLetter = displayName.charAt(0).toUpperCase() || 'S';
+  const logoUrl = storeLogo?.img_url
+    ? storeLogo.img_url.startsWith('http')
+      ? storeLogo.img_url
+      : `${API_ORIGIN}/${storeLogo.img_url}`
+    : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +174,12 @@ export default function AdminLoginPage() {
       }
 
       queryClient.removeQueries();
-      router.replace('/admin/dashboard');
+
+      // ✅ Full page load — is se wo sab socket connections band ho jate hain jo
+      // pichhle user ke cookie ke sath handshake hue the. Warna naye login
+      // (jaise employee) ke baad bhi profile page / Navbar purane user ka data
+      // dikhate rehte hain, kyunke socket ki identity handshake par fix ho jati hai.
+      window.location.replace('/admin/dashboard');
     },
 
     onError: (err) => {
@@ -171,21 +260,26 @@ export default function AdminLoginPage() {
           
           {/* Top Section: Logo, Text, Features */}
           <div className="space-y-8">
-            {/* Brand Logo */}
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl shadow-lg shadow-blue-500/20"
-                style={{
-                  background: 'linear-gradient(135deg, var(--info, #3b82f6), var(--accent, #2563eb))',
-                }}
-              >
-                <ShoppingCart size={22} strokeWidth={2.5} className="text-white" aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-[17px] font-bold tracking-tight text-white">
-                  Ecom<span className="text-blue-400">Admin</span>
+            {/* Brand Logo — store name/logo Redux (storeInfo slice) se, bilkul Sidebar jaisa */}
+            <div className="flex items-center gap-3.5">
+              <StoreLogo
+                alt={displayName}
+                logoUrl={logoUrl}
+                letter={firstLetter}
+                color={displayColor}
+                sizeClass="h-12 w-12"
+                letterClass="text-[20px]"
+                ringClass="ring-white/25"
+                shadowClass="shadow-xl shadow-black/30"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-[18px] font-bold tracking-tight text-white">
+                  {displayName}
                 </p>
-                <p className="text-[10px] text-indigo-200/75">E-commerce Admin Panel</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-300/90">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                  E-commerce Admin Panel
+                </p>
               </div>
             </div>
 
@@ -245,15 +339,21 @@ export default function AdminLoginPage() {
           {/* Brand */}
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent-soft)' }}>
-                <ShoppingCart size={20} strokeWidth={2.5} style={{ color: 'var(--accent)' }} aria-hidden="true" />
-              </span>
+              <StoreLogo
+                alt={displayName}
+                logoUrl={logoUrl}
+                letter={firstLetter}
+                color={displayColor}
+                ringClass="ring-black/10"
+              />
               <span className="text-left">
-                <span className="block text-[19px] font-extrabold leading-tight tracking-tight">
-                  <span style={{ color: 'var(--accent-hover)' }}>Ecom</span>
-                  <span style={{ color: 'var(--info)' }}>Admin</span>
+                <span className="block text-[19px] font-extrabold leading-tight tracking-tight text-[var(--text-primary)]">
+                  {displayName}
                 </span>
-                <span className="block text-[10.5px] font-medium text-[var(--text-muted)]">E-commerce Admin Panel</span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--accent)" }} />
+                  E-commerce Admin Panel
+                </span>
               </span>
             </div>
 
