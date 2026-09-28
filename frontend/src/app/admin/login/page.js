@@ -6,13 +6,13 @@ import axiosInstance from '@/apis/axiosInstance';
 import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
+import { toast } from 'sonner';
 import {
   Mail,
   Lock,
   Eye,
   EyeOff,
   AlertCircle,
-  X,
   LogIn,
   Loader2,
   ArrowRight,
@@ -145,7 +145,6 @@ export default function AdminLoginPage() {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
   const [hasBgImage, setHasBgImage] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -167,7 +166,7 @@ export default function AdminLoginPage() {
         !['admin', 'staff', 'manager'].includes(role)
       ) {
         axiosInstance.post('/users/logout').catch(() => {});
-        setError(
+        toast.error(
           'Access denied. Only administrators, managers and staff members can log in.'
         );
         return;
@@ -184,16 +183,16 @@ export default function AdminLoginPage() {
 
     onError: (err) => {
       if (err.response?.data?.message) {
-        setError(err.response.data.message);
+        toast.error(err.response.data.message);
         return;
       }
       if (!err.response) {
-        setError(
+        toast.error(
           'Unable to reach the server. Please check your connection and try again.'
         );
         return;
       }
-      setError('Login failed. Please try again.');
+      toast.error('Login failed. Please try again.');
     },
   });
 
@@ -213,8 +212,6 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleDismissError = () => setError('');
-
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -227,7 +224,6 @@ export default function AdminLoginPage() {
     setFieldErrors(errors);
     if (errors.email || errors.password) return;
 
-    setError('');
     loginMutation.mutate({ email: email.trim(), password });
   };
 
@@ -361,17 +357,6 @@ export default function AdminLoginPage() {
             <p className="mt-1.5 text-[13.5px] text-[var(--text-muted)]">Sign in to your admin account</p>
           </div>
 
-          {/* Error Banner */}
-          {error && (
-            <div role="alert" className="mt-5 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[12.5px] font-medium" style={{ background: 'var(--danger-soft)', borderColor: 'color-mix(in srgb, var(--danger) 30%, transparent)', color: 'var(--danger-text)' }}>
-              <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 flex-1">{error}</span>
-              <button type="button" onClick={handleDismissError} aria-label="Dismiss error" className="shrink-0 rounded p-0.5 transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--danger)]">
-                <X size={14} aria-hidden="true" />
-              </button>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-3.5">
             {/* Email Input */}
             <div>
@@ -443,7 +428,7 @@ export default function AdminLoginPage() {
                 />
                 Remember me
               </label>
-              <button type="button" className="font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline" onClick={() => setError('Password resets are handled by your store administrator. Please contact them to reset your password.')}>
+              <button type="button" className="font-semibold text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline" onClick={() => toast.info('Password resets are handled by your store administrator. Please contact them to reset your password.')}>
                 Forgot password?
               </button>
             </div>

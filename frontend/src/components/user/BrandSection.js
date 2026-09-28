@@ -9,7 +9,7 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 export default function BrandSection() {
   // ✅ Real brands database se
-  // ✅ Client-side slice for display only; endpoint has no server pagination yet
+  // ✅ Client-side slice for display only; endpoint has no server pagination ye
   const { data: brandsRaw = [], isLoading, isError } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
