@@ -95,7 +95,7 @@ const loginUser = async (req, res) => {
     if (!user)
       return res
         .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+        .json({ success: false, message: "User not found" });
     if (user.role !== "user")
       return res
         .status(403)
@@ -114,7 +114,7 @@ const loginUser = async (req, res) => {
     if (!isValid)
       return res
         .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+        .json({ success: false, message: "Password incorrect" });
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
@@ -167,11 +167,11 @@ const loginAdmin = async (req, res) => {
     if (!employee)
       return res
         .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+        .json({ success: false, message: "User not found" });
     if (!employee.password)
       return res
         .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+        .json({ success: false, message: "Password incorrect" });
     if (!["admin", "staff", "manager"].includes(employee.role))
       return res
         .status(403)
@@ -190,7 +190,7 @@ const loginAdmin = async (req, res) => {
     if (!isValid)
       return res
         .status(401)
-        .json({ success: false, message: "Invalid credentials" });
+        .json({ success: false, message: "Password incorrect" });
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
