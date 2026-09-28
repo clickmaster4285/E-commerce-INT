@@ -1208,7 +1208,7 @@ const [viewMode, setViewMode] = useState(() => {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <SelectFilter value={filterParent} onChange={(e) => setFilterParent(e.target.value)}>
+            <SelectFilter value={filterParent} onChange={(e) => { setFilterParent(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
               <option value="all">All Categories</option>
               <option value="root">Root Categories</option>
               <option value="child">Child Categories</option>
@@ -1254,7 +1254,7 @@ const [viewMode, setViewMode] = useState(() => {
                 <tbody>
                   {paginatedCategories.map((category, index) => {
                     const isSelected = selectedIds.includes(category._id);
-                    const parentName = getCategoryName(category.parent_category_id, categories);
+                    const parentName = getCategoryName(category.parent_category_id, categoryOptions);
                     const isActive = category.is_active !== false;
                     return (
                       <tr key={category._id} className="transition cursor-pointer" style={{ borderBottom: index < paginatedCategories.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
@@ -1292,7 +1292,7 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="md:hidden space-y-2.5">
             {paginatedCategories.map((category) => {
               const isMobileSelected = selectedIds.includes(category._id);
-              const parentName = getCategoryName(category.parent_category_id, categories);
+              const parentName = getCategoryName(category.parent_category_id, categoryOptions);
               const isMobileActive = category.is_active !== false;
               return (
                 <div key={category._id} onClick={() => handleViewDetail(category)} className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
@@ -1320,7 +1320,7 @@ const [viewMode, setViewMode] = useState(() => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedCategories.map((category) => {
-              const parentName = getCategoryName(category.parent_category_id, categories);
+              const parentName = getCategoryName(category.parent_category_id, categoryOptions);
               return (
                 <div key={category._id} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
                   <div className="flex items-start justify-between">
@@ -1340,27 +1340,35 @@ const [viewMode, setViewMode] = useState(() => {
           </div>
         )}
 
-        {/* ===== Pagination ===== */}
+        {/* ===== Pagination (server side) ===== */}
         {totalCategories > 20 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {startIndex + 1}-{Math.min(endIndex, totalCategories)} of {totalCategories} categories</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Showing {startIndex + 1}-{Math.min(endIndex, totalCategories)} of {totalCategories} categories
+              {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+            </p>
             <div className="flex items-center gap-2">
               <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {currentPage} of {totalPages}</span>
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => goToPage(page)} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => goToPage(page)} disabled={categoriesFetching && currentPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
                     )}
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-        {paginatedCategories.length > 0 && totalCategories <= 20 && <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Showing {paginatedCategories.length} of {allCategories} categories</p>}
+        {paginatedCategories.length > 0 && totalCategories <= 20 && (
+          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            Showing {paginatedCategories.length} of {totalCategories} categories
+            {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+          </p>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

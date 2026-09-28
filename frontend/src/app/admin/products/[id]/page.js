@@ -1051,9 +1051,13 @@ export default function ProductDetailPage() {
   const totalStock = variants.reduce((t, v) => t + Number(v.quantity || 0), 0);
   const totalVariants = variants.length;
   const totalValue = variants.reduce((t, v) => t + (Number(v.selling_price || 0) * Number(v.quantity || 0)), 0);
+  // ✅ Product-level price: min/max variant price (existing variant data hi use hota hai).
+  // Sab variants ka same price → single price, warna price range "MIN – MAX".
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
-  const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
+  const priceRange = lowestPrice === highestPrice
+    ? `Rs. ${lowestPrice.toLocaleString()}`
+    : `Rs. ${lowestPrice.toLocaleString()} – Rs. ${highestPrice.toLocaleString()}`;
 
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
@@ -1545,12 +1549,12 @@ export default function ProductDetailPage() {
               {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
             </p>
             <div className="flex items-baseline gap-3">
+              {/* ✅ Product price — sirf variant price data se:
+                  sab variants same price → single price; alag price → "Rs. MIN – Rs. MAX".
+                  Alag variant prices ko original/sale (crossed-out) treat NAHI karte. */}
               <span className="text-2xl font-extrabold" style={{ color: "var(--text-primary)" }}>
-                Rs. {Number(firstVariant?.selling_price || product.variants?.[0]?.selling_price || 0).toLocaleString()}
+                {priceRange}
               </span>
-              {lowestPrice !== highestPrice ? (
-                <span className="text-base line-through" style={{ color: "var(--text-muted)" }}>{priceRange}</span>
-              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "var(--success)" : "var(--danger)" }} />
