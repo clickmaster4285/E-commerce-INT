@@ -61,6 +61,14 @@ const stockHistorySchema = new mongoose.Schema(
       default: "",
     },
 
+    // ✅ Adjust form ka "Explanation" (notes) — reason ke sath alag save hota hai
+    // taake Stock History section mein bhi dikhaya ja sake.
+    explanation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     performed_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

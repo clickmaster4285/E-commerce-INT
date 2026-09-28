@@ -18,6 +18,28 @@ const getObject = (response) => {
   return response?.data?.data || response?.data;
 };
 
+// ✅ Server-side pagination response unwrap — baaki modules (brands/stock) ke
+// same pattern ke mutabiq { items, counts, options, pagination }
+const getPaginated = (response, fallbackLimit) => {
+  const payload = response?.data;
+
+  if (Array.isArray(payload)) {
+    return {
+      items: payload,
+      counts: { total: payload.length, root: 0, child: 0, withAttributes: 0 },
+      options: [],
+      pagination: { total: payload.length, page: 1, limit: payload.length || 1, pages: 1, hasNext: false, hasPrev: false },
+    };
+  }
+
+  return {
+    items: Array.isArray(payload?.data) ? payload.data : [],
+    counts: payload?.counts || { total: 0, root: 0, child: 0, withAttributes: 0 },
+    options: Array.isArray(payload?.options) ? payload.options : [],
+    pagination: payload?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+  };
+};
+
 export const adminCategoryApi = {
   getAll: () =>
     axiosInstance
@@ -28,6 +50,20 @@ export const adminCategoryApi = {
     axiosInstance
       .get("/categories/admin/all")
       .then(getList),
+
+  // ✅ Server side pagination — page/limit/search/parent + sorting
+  getAllPaginated: ({ page = 1, limit = 20, search = "", parent = "all", sort = "", order = "" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (parent && parent !== "all") params.parent = parent;
+    if (sort) {
+      params.sort = sort;
+      params.order = order || "asc";
+    }
+    return axiosInstance
+      .get("/categories/admin/all", { params })
+      .then((response) => getPaginated(response, limit));
+  },
 
   getById: (id) =>
     axiosInstance

@@ -116,6 +116,16 @@ const STATUS_META = {
 const ADD_REASONS = ["New Purchase", "Customer Return", "Inventory Correction", "Supplier Bonus"];
 const REMOVE_REASONS = ["Sale / Order Fulfillment", "Damaged / Defective", "Expired", "Lost / Stolen", "Internal Use / Sample"];
 
+// ✅ Stock history ka "Explanation" text:
+// 1) Naya `explanation` field (adjust form ka notes) — agar mojood ho to wahi.
+// 2) Warna purane records ke liye `reason` (custom "Other" reason wahi tha).
+const explanationOf = (h) => {
+  const explanation = String(h?.explanation || "").trim();
+  if (explanation) return explanation;
+  const reason = String(h?.reason || "").trim();
+  return reason || "—";
+};
+
 const formatDateTime = (date) => {
   if (!date) return "—";
   return new Date(date).toLocaleString("en-US", {
@@ -362,6 +372,11 @@ export default function ManageStockPage() {
     if (adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim()) {
       return "Please specify the custom reason";
     }
+    // ✅ Explanation ab OPTIONAL nahi — required hai (har adjustment ka clear
+    // justification Stock History mein record hona zaroori hai).
+    if (!adjustForm.customReason.trim()) {
+      return "Please add an explanation for this stock adjustment";
+    }
     return "";
   };
 
@@ -375,11 +390,17 @@ export default function ManageStockPage() {
       ? adjustForm.customReason.trim() 
       : adjustForm.reason;
 
+    // ✅ "Explanation" required hai aur hamesha bheji jati hai — pehle preset
+    // reason ke sath ye notes drop ho jate the, is liye Stock History mein show
+    // nahi hote the. ("Other" case mein wahi text reason bhi ban jata hai.)
+    const explanationText = adjustForm.customReason.trim();
+
     adjustMutation.mutate({
       variant_id: adjustTarget._id,
       type: adjustForm.type,
       quantity: Number(adjustForm.quantity.trim()),
       reason: finalReason,
+      explanation: explanationText,
     });
   };
 
@@ -789,6 +810,11 @@ export default function ManageStockPage() {
                                 <span className="truncate" style={{ color: "var(--text-muted)" }}>Updated By: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name || "—"}</span></span>
                                 <span style={{ color: "var(--text-muted)" }}>Date: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatDateTime(h.created_at)}</span></span>
                               </div>
+                              {/* ✅ Explanation — adjust form ka notes (full text, wrap ke sath) */}
+                              <div className="mt-2.5 pt-2" style={{ borderTop: "1px dashed var(--border-color)" }}>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Explanation</span>
+                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{explanationOf(h)}</p>
+                              </div>
                             </div>
                           );
                         })}
@@ -1039,9 +1065,7 @@ export default function ManageStockPage() {
 
                   <div className="mt-3">
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-                      Explanation <span style={{ color: adjustForm.reason === "__OTHER__" ? "var(--danger)" : "var(--text-muted)" }}>
-                        {adjustForm.reason === "__OTHER__" ? "*" : "(Optional)"}
-                      </span>
+                      Explanation <span style={{ color: "var(--danger)" }}>*</span>
                     </label>
                     <textarea
                       value={adjustForm.customReason}
@@ -1051,13 +1075,18 @@ export default function ManageStockPage() {
                       className="w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition disabled:opacity-50 resize-none"
                       style={{ 
                         backgroundColor: "var(--bg-card)", 
-                        border: `1px solid ${adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}`, 
+                        border: `1px solid ${!adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}`, 
                         color: "var(--text-primary)" 
                       }}
                       onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                      onBlur={(e) => e.target.style.borderColor = adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}
-                      placeholder={adjustForm.reason === "__OTHER__" ? "Please specify the custom reason..." : "Add any additional notes or context (optional)"}
+                      onBlur={(e) => e.target.style.borderColor = !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}
+                      placeholder={adjustForm.reason === "__OTHER__" ? "Please specify the custom reason..." : "Explain why this stock is being adjusted..."}
                     />
+                    {!adjustForm.customReason.trim() && (
+                      <p className="text-[11px] mt-1.5" style={{ color: adjustError ? "var(--danger)" : "var(--text-muted)" }}>
+                        {adjustError ? "Explanation is required." : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
 

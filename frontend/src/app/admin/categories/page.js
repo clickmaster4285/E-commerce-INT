@@ -84,6 +84,7 @@ export default function CategoriesPage() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterParent, setFilterParent] = useState("all");
 const [viewMode, setViewMode] = useState(() => {
   if (typeof window !== 'undefined') {
@@ -137,11 +138,21 @@ const [viewMode, setViewMode] = useState(() => {
   const [loadingCode, setLoadingCode] = useState(false);
 
   // Queries
-  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
-    queryKey: ["admin-categories"],
-    queryFn: categoryApi.getAllAdmin,
+  const { data: paginatedCategoriesData, isLoading: categoriesLoading, isFetching: categoriesFetching } = useQuery({
+    // ✅ Server-side pagination — search/filter/sort/page sab backend par jate hain
+    queryKey: ["admin-categories", "paginated", currentPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction],
+    queryFn: () => categoryApi.getAllPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      parent: filterParent,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction,
+    }),
     retry: false,
     staleTime: 0,
+    // ✅ Page change par purana page visible rehta hai (flicker nahi)
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: allAttributes = [] } = useQuery({
@@ -506,40 +517,32 @@ const [viewMode, setViewMode] = useState(() => {
 
 
 
-  /* ---------- Derived data ---------- */
-  const filteredCategories = useMemo(() => categories.filter((c) => {
-    const matchSearch = c.name?.toLowerCase().includes(search.toLowerCase()) || c.category_code?.toLowerCase().includes(search.toLowerCase());
-    const matchParent = filterParent === "all" || (filterParent === "root" && !c.parent_category_id) || (filterParent === "child" && c.parent_category_id);
-    return matchSearch && matchParent;
-  }), [categories, search, filterParent]);
+  /* ---------- Derived data (server side paginated) ---------- */
+  // ✅ Backend se sirf current page ki categories aati hain
+  const categories = Array.isArray(paginatedCategoriesData?.items) ? paginatedCategoriesData.items : [];
+  // ✅ Poori list (lightweight) — parent dropdown + parent name ke liye
+  const categoryOptions = Array.isArray(paginatedCategoriesData?.options) ? paginatedCategoriesData.options : [];
+  const categoryCounts = paginatedCategoriesData?.counts || { total: 0, root: 0, child: 0, withAttributes: 0 };
+  const pagination = paginatedCategoriesData?.pagination || {
+    total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false,
+  };
 
-  const sortedCategories = useMemo(() => {
-    const arr = [...filteredCategories];
-    if (!sortConfig.key) {
-      arr.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-      return arr;
-    }
-    arr.sort((a, b) => {
-      let va, vb;
-      switch (sortConfig.key) {
-        case "code": va = a.category_code?.toLowerCase() || ""; vb = b.category_code?.toLowerCase() || ""; break;
-        case "name": va = a.name?.toLowerCase() || ""; vb = b.name?.toLowerCase() || ""; break;
-        default: return 0;
-      }
-      if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
-      if (va > vb) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return arr;
-  }, [filteredCategories, sortConfig]);
-
-  const totalCategories = sortedCategories.length;
-  const totalPages = Math.ceil(totalCategories / itemsPerPage);
+  const paginatedCategories = categories;                          // current page (server se)
+  const totalCategories = pagination.total || 0;                   // filtered total
+  const totalPages = pagination.pages || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedCategories = sortedCategories.slice(startIndex, endIndex);
 
-  useEffect(() => setCurrentPage(1), [search, filterParent]);
+  // ✅ Search debounce (300ms) + page reset + selection clear
+  // (setState setTimeout callback ke andar — effect body mein sync setState nahi)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+      setSelectedIds([]);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   // Close parent category dropdown on scroll inside the modal body
   useEffect(() => {
@@ -586,20 +589,40 @@ const [viewMode, setViewMode] = useState(() => {
 
   // Auto-open edit modal when navigated from detail page with ?edit=<id>
   const searchParams = useSearchParams();
+  const editOpenedRef = useRef("");
   useEffect(() => {
     const editId = searchParams.get("edit");
-    if (!editId || categoriesLoading || categories.length === 0) return;
-    const target = categories.find((c) => String(c._id) === String(editId));
-    if (target) {
-      handleOpenEdit(target);
+    if (!editId) { editOpenedRef.current = ""; return; }
+    if (categoriesLoading || editOpenedRef.current === String(editId)) return;
+
+    const openWith = (record) => {
+      if (!record?._id) return;
+      editOpenedRef.current = String(editId);
+      handleOpenEdit(record);
       router.replace("/admin/categories", { scroll: false });
-    }
+    };
+
+    // ✅ Current page par mile to wahi use karo — warna server se poori detail
+    // fetch karo (server-side pagination ke baad target kisi aur page par ho sakta hai)
+    const target = categories.find((c) => String(c._id) === String(editId));
+    if (target) { openWith(target); return; }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const record = await categoryApi.getById(editId);
+        if (!cancelled) openWith(record);
+      } catch {
+        // category mila hi nahi — chup chaap chhod do
+      }
+    })();
+    return () => { cancelled = true; };
   }, [searchParams, categories, categoriesLoading]);
 
-  const allCategories = categories.length;
-  const rootCategoriesCount = categories.filter((c) => !c.parent_category_id).length;
-  const childCategoriesCount = allCategories - rootCategoriesCount;
-  const categoriesWithAttributes = categories.filter((c) => c.attributes && c.attributes.length > 0).length;
+  const allCategories = categoryCounts.total || 0;
+  const rootCategoriesCount = categoryCounts.root || 0;
+  const childCategoriesCount = categoryCounts.child || 0;
+  const categoriesWithAttributes = categoryCounts.withAttributes || 0;
 
   const allSelected = paginatedCategories.length > 0 && paginatedCategories.every((c) => selectedIds.includes(c._id));
   const toggleSelectAll = () => setSelectedIds(allSelected ? [] : paginatedCategories.map((c) => c._id));
@@ -625,8 +648,18 @@ const [viewMode, setViewMode] = useState(() => {
     deleteMutation.mutate(ids, { onSettled: () => setDeleteTarget(null) });
   };
 
-  const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
-  const goToPage = (page) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
+  const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas
+    setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setCurrentPage(1);
+    setSelectedIds([]);
+  };
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+      setSelectedIds([]); // ✅ cross-page selection clear
+    }
+  };
 
   const renderPageNumbers = () => {
     const pages = []; const maxVisiblePages = 5;
@@ -801,9 +834,9 @@ const [viewMode, setViewMode] = useState(() => {
       }
       return result;
     };
-    const hierarchicalCategories = buildHierarchy(categories);
+    const hierarchicalCategories = buildHierarchy(categoryOptions);
     const selectedParentName = formData.parent_category_id
-      ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+      ? categoryOptions.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
       : "None";
 
     return createPortal(

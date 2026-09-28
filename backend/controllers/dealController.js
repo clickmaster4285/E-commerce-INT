@@ -1,4 +1,6 @@
 const Deal = require("../models/Deal");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
 
 const emitSocketEvent = (event, data) => {
@@ -6,6 +8,51 @@ const emitSocketEvent = (event, data) => {
     const io = getIO();
     if (io) io.emit(event, data);
   } catch (_) {}
+};
+
+// ==========================================
+// ✅ CREATEDBY / UPDATEDBY RESOLUTION
+// ==========================================
+// Deal model mein createdBy/updatedBy ka ref sirf "User" hai, lekin admin panel
+// se login karne wale accounts Employee collection mein hote hain. Aise case
+// mein .populate(...) null return karta hai — is wajah se detail page par
+// "Updated by" (aur history table ka editor) hamesha blank reh jata tha,
+// page refresh karne ke baad bhi. RAW id ko User -> Employee fallback ke sath
+// resolve karo (Discount/Product controllers ka wahi pattern).
+const ACTOR_FIELDS = "name email role";
+
+const resolveActor = async (rawId) => {
+  if (!rawId) return null;
+  // Pehle se populated (User/Employee document) → waisa hi return karo
+  if (typeof rawId === "object" && (rawId.name || rawId.email)) return rawId;
+  // ObjectId / string id → DB lookup (ObjectId ka toString() hex id deta hai)
+  const id = String(rawId?._id || rawId);
+  try {
+    const user = await User.findById(id).select(ACTOR_FIELDS).lean();
+    if (user) return user;
+    return await Employee.findById(id).select(ACTOR_FIELDS).lean();
+  } catch (_) {
+    return null;
+  }
+};
+
+// Populated document par original (raw) id doc.populated(path) se milti hai —
+// populate fail hone par wahi id bachati hai, isliye fallback usi par chalta hai.
+const rawPopulatedId = (doc, path) => {
+  try {
+    const v = typeof doc?.populated === "function" ? doc.populated(path) : null;
+    return Array.isArray(v) ? v[0] : v;
+  } catch (_) {
+    return null;
+  }
+};
+
+const resolveDealActors = async (deal) => {
+  if (!deal) return deal;
+  const obj = typeof deal.toObject === "function" ? deal.toObject() : { ...deal };
+  if (!obj.createdBy) obj.createdBy = await resolveActor(rawPopulatedId(deal, "createdBy"));
+  if (!obj.updatedBy) obj.updatedBy = await resolveActor(rawPopulatedId(deal, "updatedBy"));
+  return obj;
 };
 
 // ==========================================
@@ -269,9 +316,11 @@ const getDealById = async (req, res) => {
       });
     }
 
+    const data = await resolveDealActors(deal);
+
     res.status(200).json({
       success: true,
-      data: deal,
+      data,
     });
   } catch (error) {
     console.error("Get Deal By ID Error:", error);
@@ -319,13 +368,17 @@ const updateDeal = async (req, res) => {
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
-    emitSocketEvent("deal:updated", { success: true, data: updatedDeal });
-    emitSocketEvent("dealUpdated", { success: true, data: updatedDeal });
+    // ✅ Save ke baad wahi resolved payload emit/return karo jo GET deta hai —
+    // warna frontend ko "Updated by" dikhane ke liye page refresh karna padta tha.
+    const dealPayload = await resolveDealActors(updatedDeal);
+
+    emitSocketEvent("deal:updated", { success: true, data: dealPayload });
+    emitSocketEvent("dealUpdated", { success: true, data: dealPayload });
 
     res.status(200).json({
       success: true,
       message: "Deal updated successfully",
-      data: updatedDeal,
+      data: dealPayload,
     });
   } catch (error) {
     console.error("Update Deal Error:", error);

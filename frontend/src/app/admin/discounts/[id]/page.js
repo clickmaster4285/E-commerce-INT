@@ -13,7 +13,7 @@ import { discountApi } from "../../../../apis/admin/discountApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
-import { DiscountFormModal, SelectionModal } from "../../discounts/page";
+import { DiscountFormModal, SelectionModal, validateNonNegative } from "../../discounts/page";
 import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
 
 /* =========================================================
@@ -186,9 +186,13 @@ export default function DiscountDetailPage() {
   const pathname = usePathname();
   const params = useParams();
   const queryClient = useQueryClient();
-  const { markSelfAction } = useDiscountSocketSync();
 
   const discountId = params.id;
+  // ✅ discountId hook ko pass karo — socket update event par sirf isi discount ka
+  // detail cache invalidate hota hai, isliye "Updated By" bina refresh ke
+  // update ho jata hai.
+  const { markSelfAction } = useDiscountSocketSync(discountId);
+
   const backPath = pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/discounts";
 
   const [showDelete, setShowDelete] = useState(false);
@@ -306,8 +310,19 @@ export default function DiscountDetailPage() {
       setFormErrors({ code: "Discount code is required." });
       return;
     }
-    if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
+    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
     if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+
+    // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
+    const nonNegativeError = validateNonNegative([
+      ["Discount value", formData.value],
+      ["Minimum order amount", formData.min_order_amount],
+      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
+      ["Total usage limit", formData.usage_limit],
+      ["Per customer limit", formData.usage_per_customer],
+    ]);
+    if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
     let applyTo = "all";

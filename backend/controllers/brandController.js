@@ -363,24 +363,119 @@ const getBrandsPublic = async (req, res) => {
 };
 
 // ==========================================
-// 🛡️ GET BRANDS — ADMIN (full with products)
+// 🛡️ GET BRANDS — ADMIN
 // ==========================================
+// ✅ Server-side pagination: jab `page` ya `limit` query param bheja jata hai
+// to sirf usi page ke brands return hote hain (+ counts / countries /
+// pagination meta). Bina param ke purana FULL list response hi milta hai,
+// kyunke products / deals / banners / discounts pages aur user GUI isi
+// `brandApi.getAll` par depend karte hain.
+const BRAND_SORT_FIELDS = {
+  code: "brand_code",
+  name: "name",
+  country: "country",
+  status: "is_active",
+  created: "created_at",
+};
+
+// ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const getBrandsAdmin = async (req, res) => {
   try {
-    const brands = await Brand.find({ is_deleted: false })
-      .sort({ created_at: -1 })
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email");
+    const wantsPagination =
+      req.query.page !== undefined || req.query.limit !== undefined;
 
-    const brandsWithProducts = await Promise.all(
-      brands.map(async (brand) => {
-        const products = await Product.find({ brand_id: brand._id })
-          .populate("category_id", "name")
-          .select("name brand_id category_id status created_at");
-        return { ...brand.toObject(), products };
-      })
-    );
-    res.status(200).json({ success: true, data: brandsWithProducts });
+    /* ---------- LEGACY: full list (with products) ---------- */
+    if (!wantsPagination) {
+      const brands = await Brand.find({ is_deleted: false })
+        .sort({ created_at: -1 })
+        .populate("createdby", "name email")
+        .populate("updatedby", "name email");
+
+      const brandsWithProducts = await Promise.all(
+        brands.map(async (brand) => {
+          const products = await Product.find({ brand_id: brand._id })
+            .populate("category_id", "name")
+            .select("name brand_id category_id status created_at");
+          return { ...brand.toObject(), products };
+        })
+      );
+      return res.status(200).json({ success: true, data: brandsWithProducts });
+    }
+
+    /* ---------- SERVER SIDE PAGINATION ---------- */
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "all").trim().toLowerCase();
+    const country = String(req.query.country || "").trim();
+
+    const filter = { is_deleted: false };
+
+    // ✅ Search: brand name ya brand code
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      filter.$or = [{ name: rx }, { brand_code: rx }];
+    }
+
+    if (status === "active") filter.is_active = true;
+    else if (status === "inactive") filter.is_active = false;
+
+    if (country && country.toLowerCase() !== "all") filter.country = country;
+
+    // ✅ Sorting bhi server par hoti hai
+    const sortKeyRaw = String(req.query.sort || "").trim();
+    const hasSort = Boolean(BRAND_SORT_FIELDS[sortKeyRaw]);
+    const sortField = hasSort ? BRAND_SORT_FIELDS[sortKeyRaw] : "created_at";
+    const rawOrder = String(req.query.order || "").trim().toLowerCase();
+    const sortOrder = hasSort
+      ? (rawOrder === "desc" ? -1 : 1)
+      : (rawOrder === "asc" ? 1 : -1);
+
+    const activeFilter = { is_deleted: false };
+
+    const [total, brands, totalBrands, activeBrands, withLogo, countryList] =
+      await Promise.all([
+        Brand.countDocuments(filter),
+        Brand.find(filter)
+          .sort({ [sortField]: sortOrder, _id: 1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .populate("createdby", "name email")
+          .populate("updatedby", "name email")
+          .lean(),
+        Brand.countDocuments(activeFilter),
+        Brand.countDocuments({ ...activeFilter, is_active: true }),
+        Brand.countDocuments({ ...activeFilter, "logo.img_url": { $nin: ["", null] } }),
+        Brand.distinct("country", activeFilter),
+      ]);
+
+    const pages = Math.max(1, Math.ceil(total / limit));
+
+    res.status(200).json({
+      success: true,
+      data: brands,
+      counts: {
+        total: totalBrands,
+        active: activeBrands,
+        inactive: Math.max(0, totalBrands - activeBrands),
+        withLogo,
+      },
+      countries: (countryList || [])
+        .filter(Boolean)
+        .map((c) => String(c))
+        .sort((a, b) => a.localeCompare(b)),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages,
+        hasNext: page < pages,
+        hasPrev: page > 1,
+      },
+    });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
