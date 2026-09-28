@@ -444,17 +444,8 @@ export default function DiscountDetailPage() {
         ))}
       </div>
 
-      {/* WORKING SECTION TABS */}
-      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)" }}>
-        {[["d-overview", "Basic Information"], ["d-target", "Targeting"], ["d-rules", "Conditions"], ["d-usage", "Usage & Limits"], ["d-activity", "History"]].map(([sectionId, label]) => (
-          <button key={sectionId} type="button"
-            onClick={() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="pb-2 text-[10px] font-semibold whitespace-nowrap transition-colors hover:text-[var(--accent)]"
-            style={{ color: "var(--text-muted)" }}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* ✅ Section tabs hata diye gaye — saare sections (Basic Information / Targeting /
+          Conditions / Usage & Limits / History) ab ek hi page par continuously render hote hain */}
 
       <div id="d-overview" className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start scroll-mt-4">
         <div className="space-y-3">

@@ -85,7 +85,7 @@ const formatValue = (discount) => {
 // ✅ Discount form ke numeric fields 0 se kam kabhi nahi ho sakte.
 // "-" ya "+" type hi nahi ho sakta, paste hone par sign hata diya jata hai,
 // aur value kabhi bhi negative accept nahi hoti (integer=true par decimals bhi nahi).
-const toNonNegative = (raw, integer = false) => {
+export const toNonNegative = (raw, integer = false) => {
   const digitsOnly = String(raw ?? "").replace(integer ? /[^\d]/g : /[^\d.]/g, "");
   let cleaned = digitsOnly;
   if (!integer) {
@@ -287,14 +287,20 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "", min, nonNegative = false, integer = false }) => (
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "", min, max, nonNegative = false, integer = false }) => (
   <input
     type={type}
     value={value || ""}
     min={nonNegative ? (min ?? 0) : min}
+    max={max}
     step={nonNegative && type === "number" ? (integer ? 1 : "any") : undefined}
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
-    onChange={(e) => onChange(nonNegative ? toNonNegative(e.target.value, integer) : e.target.value)}
+    onChange={(e) => {
+      const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
+      // ✅ Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
+      const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
+      onChange(clamped);
+    }}
     onKeyDown={nonNegative ? (e) => {
       // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
       if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
@@ -1367,8 +1373,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label="Discount Percentage (%)" fullWidth hint="Negative values are not allowed (minimum 0)">
-                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label="Discount Percentage (%)" fullWidth hint="Value must be between 0 and 100 (max 100)">
+                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
                     </FormField>
                   )}
 

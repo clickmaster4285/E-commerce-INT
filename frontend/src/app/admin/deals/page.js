@@ -9,6 +9,7 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
+import { toNonNegative, validateNonNegative } from "../discounts/page";
 import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
 
 /* ==================== ICONS ==================== */
@@ -439,6 +440,18 @@ export default function DealsPage() {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
 
+    // ✅ Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
+    const nonNegativeError = validateNonNegative([
+      ["Deal value", formData.value],
+      ["Buy quantity", formData.buy_quantity],
+      ["Get quantity", formData.get_quantity],
+      ["Get discount value", formData.get_discount_value],
+      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
+      ["Usage limit", formData.usage_limit],
+      ["Per customer limit", formData.per_user_limit],
+    ]);
+    if (nonNegativeError) return toast.error(nonNegativeError);
+
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
       if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
@@ -448,6 +461,7 @@ export default function DealsPage() {
     if (formData.value_type === "buy_x_get_y") {
       if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+      if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error("Discount on Get Item (%) cannot be greater than 100");
     }
 
     // ✅ Bundle deal — single offer condition validation
@@ -874,11 +888,27 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled }) => (
+// ✅ Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) —
+// "-"/"+"/"e"/"E" type nahi hota, paste par sign hat jata hai, min=0 aur spinner bhi 0 se neeche nahi jata.
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, min, max, nonNegative = type === "number", integer = false }) => (
   <input
     type={type}
     value={value || ""}
-    onChange={(e) => onChange(e.target.value)}
+    min={nonNegative ? (min ?? 0) : min}
+    max={max}
+    step={nonNegative && type === "number" ? (integer ? 1 : "any") : undefined}
+    inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
+    onChange={(e) => {
+      const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
+      // ✅ Upper bound (e.g. discount percentage max 100) — typing/paste se hi clamp ho jata hai
+      const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
+      onChange(clamped);
+    }}
+    onKeyDown={nonNegative ? (e) => {
+      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+    } : undefined}
+    onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
     className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1387,8 +1417,8 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label="Discount Percentage (%)" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label="Discount Percentage (%)" hint="Value must be between 0 and 100" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" max={100} style={inputStyle} />
                     </FormField>
                   )}
 
@@ -1407,7 +1437,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         <TextInput type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
                       </FormField>
                       <FormField label="Discount on Get Item (%)" hint="100 means free" fullWidth>
-                        <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" style={inputStyle} />
+                        <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" max={100} style={inputStyle} />
                       </FormField>
                     </>
                   )}
@@ -1969,8 +1999,13 @@ function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, ca
               <input
                 type="number"
                 min="0"
+                max={singleRule.reward_type === "percentage" ? "100" : undefined}
                 value={singleRule.value || ""}
-                onChange={(e) => update({ value: e.target.value })}
+                onChange={(e) => {
+                  const raw = toNonNegative(e.target.value);
+                  // ✅ Percentage discount 100% se zyada nahi ho sakta — typing/paste par clamp
+                  update({ value: singleRule.reward_type === "percentage" && raw !== "" && Number(raw) > 100 ? "100" : raw });
+                }}
                 placeholder={singleRule.reward_type === "percentage" ? "e.g., 10" : "e.g., 200"}
                 className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
                 style={inputStyle}

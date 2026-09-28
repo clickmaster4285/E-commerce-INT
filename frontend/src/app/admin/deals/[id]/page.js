@@ -502,25 +502,8 @@ export default function DealDetailPage() {
         </div>
       </div>
 
-      {/* SECTION TABS */}
-      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
-        {[
-          ["d-overview", "Overview"],
-          ...(deal.applyTo === "product" ? [["d-products", "Products"]] : []),
-          ...(deal.applyTo === "category" ? [["d-categories", "Categories"]] : []),
-          ...(deal.applyTo === "brand" ? [["d-brands", "Brands"]] : []),
-          ["d-usage", "Usage & Limits"],
-          ["d-history", "History"],
-        ].map(([sectionId, label]) => (
-          <button key={sectionId} type="button"
-            onClick={() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="relative pb-2.5 text-[12px] font-semibold whitespace-nowrap transition-colors hover:opacity-80"
-            style={{ color: "var(--text-muted)" }}>
-            {label}
-            <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ backgroundColor: "var(--border-color)" }} />
-          </button>
-        ))}
-      </div>
+      {/* ✅ Section tabs hata diye gaye — saare sections (Overview / Products|Categories|
+          Brands / Usage & Limits / History) ab ek hi page par continuously render hote hain */}
 
       {/* OVERVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">

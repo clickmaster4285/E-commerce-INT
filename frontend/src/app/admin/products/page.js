@@ -992,7 +992,16 @@ const [viewMode, setViewMode] = useState(() => {
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
   /* Queries */
-  const { data: products = [], isLoading, isError: productsError, error: productsErrorMsg } = useQuery({ queryKey: ["products"], queryFn: productApi.getAll, retry: false });
+  // ✅ SERVER-SIDE PAGINATION — search/filter/page sab backend par (DB-level).
+  // Backend response: { products, stats, pagination } — sirf current page ke products aate hain.
+  const { data: productsData, isLoading, isError: productsError, error: productsErrorMsg } = useQuery({
+    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus],
+    queryFn: () => productApi.getPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
+    retry: false,
+  });
+  const products = productsData?.products || [];
+  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+  const productStats = productsData?.stats || null;
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
 
@@ -1505,23 +1514,29 @@ const [viewMode, setViewMode] = useState(() => {
     return p?.brand_id?.name || brands.find((b) => String(b._id) === bid)?.name || "Unknown";
   };
 
-  const filteredProducts = products.filter((p) => {
-    const kw = search.trim().toLowerCase();
-    const skuMatch = (p?.variants || []).some((v) => String(v?.sku || "").toLowerCase().includes(kw));
-    const nameMatch = String(p?.name || "").toLowerCase().includes(kw);
-    const matchSearch = !kw || nameMatch || skuMatch;
-    const cid = normalizeId(p?.category_id);
-    const bid = normalizeId(p?.brand_id);
-    return matchSearch && (filterCategory === "all" || cid === String(filterCategory)) && (filterBrand === "all" || bid === String(filterBrand)) && (filterStatus === "all" || p?.status === filterStatus);
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
-  const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // ✅ SERVER-SIDE PAGINATION — search/filter DB par apply ho chuke hain (backend),
+  // is liye yahan koi client-side filtering/slicing nahi. Jo data aaya wohi current page hai.
+  const paginatedProducts = products;
+  const totalPages = Math.max(1, Number(pagination.pages) || 1);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  const activeProducts = products.filter((p) => p?.status === "active").length;
-  const totalVariants = products.reduce((t, p) => t + (p?.variants?.length || 0), 0);
-  const totalStock = products.reduce((t, p) => t + (p?.variants || []).reduce((vt, v) => vt + Number(v?.quantity || 0), 0), 0);
+  // ✅ Stats ab server se aate hain (poori filtered dataset par, sirf current page par nahi).
+  // Agar stats missing hon (legacy response) to current page data se fallback.
+  const activeProducts = productStats ? Number(productStats.activeProducts) || 0 : products.filter((p) => p?.status === "active").length;
+  const totalVariants = productStats ? Number(productStats.totalVariants) || 0 : products.reduce((t, p) => t + (p?.variants?.length || 0), 0);
+  const totalStock = productStats ? Number(productStats.totalStock) || 0 : products.reduce((t, p) => t + (p?.variants || []).reduce((vt, v) => vt + Number(v?.quantity || 0), 0), 0);
+
+  // ✅ Numbered pagination (Discounts page ke pattern ke mutabiq)
+  const renderPageNumbers = () => {
+    const pages = []; const maxVisible = 5;
+    if (totalPages <= maxVisible) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+    else {
+      if (currentPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+      else if (currentPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      else pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+    }
+    return pages;
+  };
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isToggling = toggleStatusMutation.isPending;
@@ -1559,7 +1574,7 @@ const [viewMode, setViewMode] = useState(() => {
 
       {/* STATS */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[{ l: "Total Products", v: products.length }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
+        {[{ l: "Total Products", v: pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
           <div key={i} className="rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
             <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
@@ -1664,12 +1679,18 @@ const [viewMode, setViewMode] = useState(() => {
       )}
 
       {/* PAGINATION */}
-      {filteredProducts.length > ITEMS_PER_PAGE && (
+      {pagination.pages > 1 && (
         <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
-          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products</p>
+          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {pagination.total === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} products</p>
           <div className="flex items-center gap-2">
             <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeft className="h-4 w-4" /></button>
-            <span className="px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>Page {currentPage} of {totalPages}</span>
+            {renderPageNumbers().map((pg, i) =>
+              pg === "..." ? (
+                <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
+              ) : (
+                <button key={pg} type="button" onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
+              )
+            )}
             <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRight className="h-4 w-4" /></button>
           </div>
         </div>

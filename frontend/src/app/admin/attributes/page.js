@@ -65,71 +65,163 @@ const getDataTypeLabel = (type) => {
 const ATTRS_PER_PAGE = 15;
 
 // ==================== RIGHT SIDE DETAIL PANEL ====================
-function AttributeOptionsPanel({ attr, onClose }) {
-  if (!attr) return null;
+function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false }) {
+  // ✅ Slide-in/out animation — mount par drawer right se smoothly slide hota hai,
+  //    close par pehle slide-out animation, phir parent se unmount hota hai.
+  const [visible, setVisible] = useState(false);
+  const [newOption, setNewOption] = useState("");
+  const closingRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  const onAddAttributeRef = useRef(onAddAttribute);
+  useEffect(() => {
+    onAddAttributeRef.current = onAddAttribute;
+  }, [onAddAttribute]);
 
-  // Robustly extract option labels
-  const getOptions = () => {
-    if (!attr.values) return [];
-    return attr.values.map(v => {
-      if (typeof v === 'string') return v;
-      return v.label || v.value || v.name || String(v);
-    }).filter(Boolean);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true));
+    // ✅ Drawer open hone par background scroll lock (existing modal behavior ke mutabiq)
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  // ESC se bhi close — standard drawer UX
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape" || closingRef.current) return;
+      closingRef.current = true;
+      setVisible(false);
+      setTimeout(() => onCloseRef.current(), 280);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const requestClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(() => onCloseRef.current(), 280);
   };
 
-  const options = getOptions();
+  // ✅ Panel se naya attribute add karne ka flow — pehle drawer ka slide-out
+  //    animation complete hota hai, phir parent ka existing "Add Attribute" form
+  //    open hota hai. Is tarah drawer ka z-[70] overlay aur form modal overlap
+  //    (z-index conflict) nahi karte aur form ka code duplicate nahi hota.
+  const handleAddAttribute = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(() => {
+      onCloseRef.current();
+      if (onAddAttributeRef.current) onAddAttributeRef.current();
+    }, 280);
+  };
+
+  if (!attr) return null;
+
+  // ✅ Robust option label extraction — values objects ({label, value}) ya strings
+  //    dono handle, "[object Object]" kabhi show nahi hota
+  const getOptionLabel = (v) => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string") return v;
+    return String(v.label || v.value || v.name || "").trim();
+  };
+
+  const options = (attr.values || []).map(getOptionLabel).filter(Boolean);
   const isActive = attr.is_active !== false;
-  const isBoolean = attr.data_type === 'boolean';
+  const isBoolean = attr.data_type === "boolean";
+  // ✅ Sirf multi_select ke paas options hote hain (existing form modal ke mutabiq)
+  const canAddOptions = attr.data_type === "multi_select";
+
+  const submitNewOption = () => {
+    const val = newOption.trim();
+    if (!val || isAddingOption) return;
+    const exists = options.some((o) => o.toLowerCase() === val.toLowerCase());
+    if (exists) {
+      toast.error(`Option "${val}" already exists`);
+      return;
+    }
+    onAddOption && onAddOption(val);
+    setNewOption("");
+  };
 
   return (
     <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity duration-300" 
-        onClick={onClose}
+      {/* Backdrop — ✅ NO blur (user request). Sirf halka dim + click-to-close.
+          Page blur ke bajaye content "minimize" (scale down) hota hai — neeche wrapper. */}
+      <div
+        className={`fixed inset-0 z-[60] bg-black/10 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={requestClose}
+        aria-hidden="true"
       />
-      
-      {/* Slide-in Panel */}
-      <div className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-md bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out">
+
+      {/* Slide-in Drawer */}
+      <div className={`fixed top-0 right-0 bottom-0 z-[70] w-full sm:max-w-md bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${visible ? "translate-x-0" : "translate-x-full"}`}>
         
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shrink-0">
-              <SlidersIcon className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-lg font-bold text-[var(--text-primary)] truncate">{attr.name}</h3>
-              <p className="text-xs font-mono text-[var(--text-muted)] mt-0.5">{attr.code}</p>
-            </div>
+        {/* Header — Panel title (Attribute Options) + Close */}
+        <div className="px-5 sm:px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 bg-[var(--bg-card)]">
+          <div className="flex items-center gap-2 min-w-0">
+            <SlidersIcon className="w-4 h-4 text-[var(--accent)] shrink-0" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] truncate">Attribute Options</h3>
           </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Close panel"
+            title="Close panel"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
           >
             <CloseIcon className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Attribute identity — name + data type badge */}
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-card)]">
+          <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shrink-0">
+            <SlidersIcon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{attr.name}</h4>
+            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 mt-1">
+              {getDataTypeLabel(attr.data_type)}
+            </span>
+          </div>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           
-          {/* Details Section */}
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Details</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)]">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Type</span>
+          {/* Summary Section — Code / Data Type / Status / Options Count */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Summary</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Attribute Code</span>
+                <span className="block text-xs font-mono font-semibold text-[var(--text-primary)] truncate">{attr.code || "—"}</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Data Type</span>
                 <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
                   {getDataTypeLabel(attr.data_type)}
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)]">
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
                 <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Status</span>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   {isActive ? 'Active' : 'Inactive'}
                 </span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Options Count</span>
+                <span className="block text-xs font-bold text-[var(--text-primary)]">{options.length}</span>
               </div>
             </div>
             
@@ -142,7 +234,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
             )}
           </div>
 
-          {/* Available Options Section */}
+          {/* Options Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
@@ -156,18 +248,18 @@ function AttributeOptionsPanel({ attr, onClose }) {
             <div className="space-y-2">
               {options.length > 0 ? (
                 options.map((opt, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={`${opt}-${idx}`}
                     className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] group hover:border-[var(--accent)]/30 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors shrink-0">
                         {idx + 1}
                       </span>
-                      <span className="text-sm font-medium text-[var(--text-primary)]">{opt}</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)] truncate">{opt}</span>
                     </div>
                     {isBoolean && (
-                       <span className={`w-2 h-2 rounded-full ${opt.toLowerCase() === 'yes' || opt.toLowerCase() === 'true' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                       <span className={`w-2 h-2 rounded-full shrink-0 ${opt.toLowerCase() === 'yes' || opt.toLowerCase() === 'true' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                     )}
                   </div>
                 ))
@@ -178,17 +270,61 @@ function AttributeOptionsPanel({ attr, onClose }) {
                 </div>
               )}
             </div>
+
+            {/* ✅ Add Option — existing attribute update API (PUT /attributes/:id) reuse karta hai,
+                koi naya endpoint/schema nahi. Drawer ke andar hi option add ho jata hai. */}
+            {canAddOptions && (
+              <div className="space-y-2 pt-1">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newOption}
+                    onChange={(e) => setNewOption(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitNewOption(); } }}
+                    placeholder="Add an option (e.g. 8 GB)"
+                    disabled={isAddingOption}
+                    className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitNewOption}
+                    disabled={isAddingOption || !newOption.trim()}
+                    className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAddingOption ? <Spinner className="w-3 h-3" /> : <PlusIcon className="w-3 h-3" />}
+                    <span>{isAddingOption ? "Adding..." : "Add Option"}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)]">
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
-          <button 
-            onClick={onClose}
-            className="w-full h-10 rounded-lg text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm"
-          >
-            Close Panel
-          </button>
+        {/* Footer — panel actions */}
+        <div className="p-5 sm:p-6 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={handleAddAttribute}
+              title="Add a new attribute"
+              aria-label="Add new attribute"
+              className="flex-1 h-10 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>Add Attribute</span>
+            </button>
+            <button
+              type="button"
+              onClick={requestClose}
+              title="Close panel"
+              aria-label="Close panel"
+              className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+            >
+              <span>Close Panel</span>
+            </button>
+          </div>
         </div>
       </div>
     </>
@@ -692,6 +828,35 @@ export default function AttributesPage() {
     deleteAttributeMutation.mutate(deleteTarget._id);
   };
 
+  // ===== ADD OPTION (View Options drawer se) =====
+  // ✅ Existing update API reuse — PUT /attributes/:id with full values array.
+  //    Koi naya endpoint/schema nahi; purane options preserve hoke naya option append hota hai.
+  const addOptionMutation = useMutation({
+    mutationFn: async ({ attrId, values }) => attributeApi.update(attrId, { values }),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      // Drawer turant fresh data dikhaye — API updated attribute return karta hai
+      setDetailAttr((prev) => (prev ? { ...prev, ...(updated || {}) } : prev));
+      toast.success("Option added successfully");
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to add option"),
+  });
+
+  const handleAddOption = (label) => {
+    if (!detailAttr) return;
+    const clean = String(label || "").trim();
+    if (!clean) return;
+    // ✅ Existing values ko {label, value} shape mein normalize karo — form modal jaisa hi
+    const existing = (detailAttr.values || [])
+      .map((v) => {
+        if (typeof v === "string") return { label: v, value: v.toLowerCase() };
+        return { label: String(v?.label || v?.value || ""), value: String(v?.value || v?.label || "").toLowerCase() };
+      })
+      .filter((v) => v.label);
+    const next = [...existing, { label: clean, value: clean.toLowerCase() }];
+    addOptionMutation.mutate({ attrId: detailAttr._id, values: next });
+  };
+
   // ===== CLIENT-SIDE STATUS FILTER =====
   const filteredAttributes = useMemo(() => {
     if (statusFilter === "all") return sortedAttributes;
@@ -877,9 +1042,12 @@ export default function AttributesPage() {
       
       {/* ✅ RENDER DETAIL PANEL */}
       {detailAttr && (
-        <AttributeOptionsPanel 
-          attr={detailAttr} 
-          onClose={() => setDetailAttr(null)} 
+        <AttributeOptionsPanel
+          attr={detailAttr}
+          onClose={() => setDetailAttr(null)}
+          onAddAttribute={() => setShowAttributeModal(true)}
+          onAddOption={handleAddOption}
+          isAddingOption={addOptionMutation.isPending}
         />
       )}
 
@@ -891,12 +1059,24 @@ export default function AttributesPage() {
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>All attributes</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button onClick={() => setShowAttributeModal(true)} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <span>+ Add Attribute</span>
+            <button
+              type="button"
+              onClick={() => setShowAttributeModal(true)}
+              title="Add a new attribute"
+              aria-label="Add attribute"
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span>Add Attribute</span>
             </button>
           </div>
         </div>
 
+        {/* ✅ Main content wrapper — drawer open hone par table/list MINIMIZE + focus
+            ho jati hai (subtle scale-down + dim). Blur intentionally NAHI hai (user request);
+            drawer close par smoothly wapas normal ho jata hai. */}
+        <div className={`space-y-5 origin-top-left transition-all duration-300 ease-out ${detailAttr ? "scale-[0.98] opacity-60 pointer-events-none select-none" : "scale-100 opacity-100"}`}>
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total}</p></div>
@@ -966,10 +1146,21 @@ export default function AttributesPage() {
                     const isActive = attr.is_active !== false;
                     const opts = attr.values?.length || 0;
                     return (
-                      <tr key={attr._id} className="transition"
-                        style={{                         borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
+                      <tr
+                        key={attr._id}
+                        tabIndex={0}
+                        aria-label={`View options for ${attr.name}`}
+                        title="Click to view options"
+                        onClick={() => setDetailAttr(attr)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailAttr(attr); }
+                        }}
+                        className="transition cursor-pointer outline-none"
+                        style={{ borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; e.currentTarget.style.boxShadow = "inset 3px 0 0 var(--accent)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-card)"; e.currentTarget.style.boxShadow = "none"; }}
+                        onFocus={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; e.currentTarget.style.boxShadow = "inset 3px 0 0 var(--accent)"; }}
+                        onBlur={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-card)"; e.currentTarget.style.boxShadow = "none"; }}>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)" }}>
@@ -1017,6 +1208,8 @@ export default function AttributesPage() {
 
         <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
           label={totalAttributes > 0 ? `Showing ${attrStartIndex}–${attrEndIndex} of ${totalAttributes} attributes` : "No attributes"} />
+        </div>
+
       </div>
 
       {/* ===== Add Attribute Modal ===== */}

@@ -213,10 +213,16 @@ const getProducts = async (req, res) => {
     const search = String(req.query.search || req.query.q || "").trim();
     const sort = String(req.query.sort || "newest");
     const brandId = req.query.brand_id;
+    const categoryId = req.query.category_id;
+    const statusFilter = String(req.query.status || "").trim();
 
     // ---- Filter build ----
+    // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
+    //     sirf tab apply hote hain jab explicitly bheja jaye.
     const filter = { is_deleted: { $ne: true } };
     if (brandId) filter.brand_id = brandId;
+    if (categoryId && categoryId !== "all") filter.category_id = categoryId;
+    if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
 
     if (search) {
       const rx = { $regex: escapeRegex(search), $options: "i" };
@@ -276,6 +282,27 @@ Brand
     const safePage = Math.min(page, pages);
     const skip = (safePage - 1) * limit;
 
+    // ✅ Stat cards ke liye GLOBAL stats — filter ke mutabiq poori dataset par
+    //     (sirf current page par nahi). Ek aggregation se variants + stock dono.
+    const allMatchedIds = (await Product.find(filter).select("_id").lean()).map((d) => d._id);
+    const [activeProducts, variantAgg] = await Promise.all([
+      allMatchedIds.length
+        ? Product.countDocuments({ _id: { $in: allMatchedIds }, status: "active" })
+        : Promise.resolve(0),
+      allMatchedIds.length
+        ? Variant.aggregate([
+            { $match: { is_deleted: { $ne: true }, product_id: { $in: allMatchedIds } } },
+            { $group: { _id: null, totalVariants: { $sum: 1 }, totalStock: { $sum: { $ifNull: ["$quantity", 0] } } } },
+          ])
+        : Promise.resolve([]),
+    ]);
+    const stats = {
+      totalProducts: total,
+      activeProducts,
+      totalVariants: variantAgg[0]?.totalVariants || 0,
+      totalStock: variantAgg[0]?.totalStock || 0,
+    };
+
     let pageIds = [];
 
     if (isPriceSort) {
@@ -308,6 +335,7 @@ Brand
     if (!pageIds.length) {
       return res.status(200).json({
         products: [],
+        stats,
         pagination: { total, page: safePage, limit, pages, hasNext: false, hasPrev: safePage > 1 },
       });
     }
@@ -343,6 +371,7 @@ Brand
 
     return res.status(200).json({
       products: result,
+      stats,
       pagination: {
         total,
         page: safePage,
