@@ -2,9 +2,10 @@
 28/09/2026
 
 ahsan: {
-    1. Email verification: send otp with 5minute expiree to email and verify,
-    2. Forgot password: on forgot password send otp to email wiht 5minute expiree and verify it,
-    3. Reviews the purchased delivered product,
+    1. redesign all the sended image on wp:ClickMasters Interns  28/09/2026
+    2. Email verification: send otp with 5minute expiree to email and verify,
+    3. Forgot password: on forgot password send otp to email wiht 5minute expiree and verify it,
+    4. Reviews the purchased delivered product,
 }
 
 hamza: {
