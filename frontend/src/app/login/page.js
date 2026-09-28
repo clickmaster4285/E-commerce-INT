@@ -11,6 +11,7 @@ import {
 import axiosInstance from "@/apis/axiosInstance";
 import { storeApi } from "@/apis/user/storeApi";
 import { categoryApi } from "@/apis/user/categoryApi";
+import { toast } from "sonner";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -41,7 +42,6 @@ export default function UserLoginPage() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -64,7 +64,6 @@ export default function UserLoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
     try {
       const endpoint = isLogin ? "/users/login" : "/users/register";
@@ -72,19 +71,18 @@ export default function UserLoginPage() {
       await axiosInstance.post(endpoint, payload);
       window.location.href = "/";
     } catch (err) {
-      setError(err.response?.data?.message || `${isLogin ? "Login" : "Registration"} failed.`);
+      toast.error(err.response?.data?.message || `${isLogin ? "Login" : "Registration"} failed.`);
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async (credential) => {
-    setError("");
     setLoading(true);
     try {
       await axiosInstance.post("/users/google-login", { credential });
       window.location.href = "/";
     } catch (err) {
-      setError(err.response?.data?.message || "Google login failed.");
+      toast.error(err.response?.data?.message || "Google login failed.");
       setLoading(false);
     }
   };
@@ -204,12 +202,6 @@ export default function UserLoginPage() {
               </p>
             </div>
 
-            {error && (
-              <div className="mb-5 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-sm">
-                {error}
-              </div>
-            )}
-
             {/* Google */}
             {isLogin && (
               <>
@@ -217,7 +209,7 @@ export default function UserLoginPage() {
                   {googleClientId ? (
                     <GoogleLogin
                       onSuccess={(res) => handleGoogleLogin(res.credential)}
-                      onError={() => setError("Google login failed. Try again.")}
+                      onError={() => toast.error("Google login failed. Try again.")}
                       theme="filled_black"
                       shape="pill"
                       size="large"
@@ -293,7 +285,7 @@ export default function UserLoginPage() {
             <p className="text-center mt-5 text-[var(--user-text-muted)] text-sm">
               {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
               <button
-                onClick={() => { setIsLogin(!isLogin); setError(""); }}
+                onClick={() => { setIsLogin(!isLogin); }}
                 className="text-[var(--user-accent)] pt-2 hover:underline font-semibold bg-transparent border-0 p-0 outline-none"
               >
                 {isLogin ? "Register" : "Login"}
