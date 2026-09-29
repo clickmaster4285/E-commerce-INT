@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
-import { useProductSocketSync } from "@/hooks/useProductSocketSync";
+import { useProductSocketSync, patchProductStatusInCaches } from "@/hooks/useProductSocketSync";
 import {
   AlertTriangle,
   Check,
@@ -34,7 +34,36 @@ import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
 
-const ITEMS_PER_PAGE = 20;
+// ✅ Default page size (user footer se 20 / 50 / 100 choose kar sakta hai)
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+/**
+ * ✅ Pagination ka page-number list — simple + predictable:
+ *   • hamesha First (1) aur Last page
+ *   • beech me 5 consecutive page numbers (current page beech me, edges par chipke
+ *     hue — is liye list "ek taraf khaali" kabhi nahi lagti)
+ *   • skip marker "…" page-button ke barabar wide hai — is liye pagination
+ *     "1 – 3" jaisa toota/broken nahi lagta, sirf saaf saaf "beech ke pages chhupay gaye".
+ * Pure function hai (testable), component se bahar rakhi gayi hai.
+ */
+function buildPageList(currentPage, totalPages, MID = 5) {
+  const total = Math.max(1, Number(totalPages) || 1);
+  const current = Math.min(Math.max(1, Number(currentPage) || 1), total);
+  if (total <= MID + 2) return Array.from({ length: total }, (_, i) => i + 1);
+
+  // 5 consecutive middle numbers, current page unke beech me (edges par chipke hue)
+  const start = Math.max(2, Math.min(current - Math.floor((MID - 1) / 2), total - MID));
+  const end = start + MID - 1;
+
+  const pages = [1];
+  if (start > 2) pages.push("…");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 
 /* Parent Category lock hone ki wajah professional alert ke roop mein —
@@ -1028,6 +1057,8 @@ const [viewMode, setViewMode] = useState(() => {
   return "list";
 });
   const [currentPage, setCurrentPage] = useState(1);
+  // ✅ Rows per page — footer ke "Rows per page" selector se change hoti hai
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
   // Product modal ke Category / Brand dropdowns ke andar chalne wale search bars
@@ -1084,12 +1115,14 @@ const [viewMode, setViewMode] = useState(() => {
     error: productsErrorMsg,
     refetch: refetchProducts,
   } = useQuery({
-    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus],
-    queryFn: () => productApi.getPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
+    // ⚠️ pageSize key ke END me hai — status filter index 6 par hi rahe, warna
+    //    patchProductStatusInCaches ka status-filter detection toot jayega.
+    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, pageSize],
+    queryFn: () => productApi.getPaginated({ page: currentPage, limit: pageSize, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
     retry: false,
   });
   const products = productsData?.products || [];
-  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: pageSize, pages: 1, hasNext: false, hasPrev: false };
 
   // ✅ SUMMARY CARDS ki API — products list se bilkul ALAG query.
   //    Backend optimization: stats ab list response ka hissa nahi (dedicated /products/stats endpoint),
@@ -1299,7 +1332,48 @@ const [viewMode, setViewMode] = useState(() => {
   const createMutation = useMutation({ mutationFn: productApi.create, onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["products"] }); const newId = data?.product?._id || data?.data?._id || data?._id; closeProductModal(); if (newId) { setCreateLoading(true); setTimeout(() => { router.push(`/admin/products/${newId}/add-variant`); setCreateLoading(false); }, 800); } else { toast.success("Product created successfully"); } }, onError: (e) => { setCreateLoading(false); handlePermissionError(e, "Product creation failed", "product"); } });
   const updateMutation = useMutation({ mutationFn: ({ id, data }) => productApi.update(id, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product updated successfully"); closeProductModal(); }, onError: (e) => handlePermissionError(e, "Product update failed", "product") });
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
-  const toggleStatusMutation = useMutation({ mutationFn: productApi.toggleStatus, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product status updated"); }, onError: (e) => handlePermissionError(e, "Status update failed", "product") });
+  // ✅ Activate/deactivate OPTIMISTIC: click karte hi row + summary cards foran
+  //    update ho jaate hain. Purana flow har click par PATCH + poori list/stats
+  //    ka refetch (+ usi browser me socket echo ka dobara refetch) ka wait karta
+  //    tha — is liye toggle "slow" lagta tha. Ab koi list refetch nahi.
+  const toggleStatusMutation = useMutation({
+    mutationFn: (id) => productApi.toggleStatus(id),
+    onMutate: async (productId) => {
+      const pid = String(productId);
+      const product = products.find((p) => String(p?._id) === pid);
+      const previousStatus = product?.status === "inactive" ? "inactive" : "active";
+      const nextStatus = previousStatus === "active" ? "inactive" : "active";
+
+      await queryClient.cancelQueries({ queryKey: ["products"] });
+      // Rollback ke liye snapshot
+      const listSnapshot = queryClient.getQueriesData({ queryKey: ["products", "paginated"] });
+      const statsSnapshot = queryClient.getQueriesData({ queryKey: ["products", "stats"] });
+      const detailSnapshot = queryClient.getQueriesData({ queryKey: ["product", pid] });
+
+      patchProductStatusInCaches(queryClient, { productId: pid, status: nextStatus, previousStatus });
+
+      return { listSnapshot, statsSnapshot, detailSnapshot, previousStatus, nextStatus };
+    },
+    onSuccess: (res, productId, ctx) => {
+      // Server ki authority se reconcile (rapid double-click jaisi race safe)
+      const confirmed = res?.product?.status;
+      if (confirmed && ctx?.previousStatus && confirmed !== ctx.previousStatus) {
+        patchProductStatusInCaches(queryClient, {
+          productId: String(productId),
+          status: confirmed,
+          previousStatus: ctx.previousStatus,
+        });
+      }
+      toast.success("Product status updated");
+    },
+    onError: (e, _productId, ctx) => {
+      // Ulta revert — UI wapas purani state par
+      ctx?.listSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      ctx?.statsSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      ctx?.detailSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      handlePermissionError(e, "Status update failed", "product");
+    },
+  });
   
   const createBrandMutation = useMutation({ mutationFn: (data) => brandApi.create(data), onSuccess: (res) => { queryClient.invalidateQueries({ queryKey: ["brands"] }); queryClient.invalidateQueries({ queryKey: ["adminBrands"] }); const nb = res?.data || res; if (nb?._id) { setFormData((p) => ({ ...p, brand_id: String(nb._id) })); toast.success("Brand created and selected!"); } else { toast.success("Brand created successfully"); } setShowNewBrandModal(false); resetBrandForm(); }, onError: (e) => handlePermissionError(e, "Failed to create brand", "brand") });
   
@@ -1635,20 +1709,30 @@ const [viewMode, setViewMode] = useState(() => {
   // ✅ Stats ab server se aate hain (poori filtered dataset par, sirf current page par nahi).
   // Agar stats missing hon (legacy response) to current page data se fallback.
   const activeProducts = productStats ? Number(productStats.activeProducts) || 0 : products.filter((p) => p?.status === "active").length;
+  // ✅ Summary card: Inactive count (backend se, warna Total - Active)
+  const inactiveProducts = productStats
+    ? Number(productStats.inactiveProducts) || Math.max(0, (Number(productStats.totalProducts) || 0) - activeProducts)
+    : products.filter((p) => p && p.status !== "active").length;
   const totalVariants = productStats ? Number(productStats.totalVariants) || 0 : products.reduce((t, p) => t + (p?.variants?.length || 0), 0);
-  const totalStock = productStats ? Number(productStats.totalStock) || 0 : products.reduce((t, p) => t + (p?.variants || []).reduce((vt, v) => vt + Number(v?.quantity || 0), 0), 0);
 
-  // ✅ Numbered pagination (Discounts page ke pattern ke mutabiq)
-  const renderPageNumbers = () => {
-    const pages = []; const maxVisible = 5;
-    if (totalPages <= maxVisible) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
-    else {
-      if (currentPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
-      else if (currentPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-      else pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
-    }
-    return pages;
+  // ✅ Backend `limit` ko clamp karta hai (max 100) — is liye effective size wahi
+  //    maante hain jo API ne maangi, warna "Showing 1-100" ho jab tak rows 20 hi aayein.
+  const effectivePageSize = Number(pagination.limit) || pageSize;
+  const totalRecords = Number(pagination.total) || 0;
+  const firstRow = totalRecords === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
+  const lastRow = Math.min(currentPage * effectivePageSize, totalRecords);
+  const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+
+  const goToPage = (pg) => {
+    setCurrentPage(Math.min(Math.max(1, pg), totalPages));
   };
+  const handlePageSizeChange = (size) => {
+    setPageSize(size);
+    setCurrentPage(1); // nayi size ke saath purana page number meaningless ho jaata hai
+  };
+
+  // ✅ Simple, predictable page list (module-level helper — buildPageList)
+  const renderPageNumbers = () => buildPageList(currentPage, totalPages);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isToggling = toggleStatusMutation.isPending;
@@ -1689,7 +1773,7 @@ const [viewMode, setViewMode] = useState(() => {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {isSummaryLoading
           ? Array.from({ length: 4 }).map((_, i) => <SummaryCardSkeleton key={`summary-skeleton-${i}`} />)
-          : [{ l: "Total Products", v: productStats ? Number(productStats.totalProducts) || 0 : pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
+          : [{ l: "Total Products", v: productStats ? Number(productStats.totalProducts) || 0 : pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Inactive", v: inactiveProducts, c: "text-red-400" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }].map((s, i) => (
             <div key={i} className="rounded-lg p-4" style={cardStyle}>
               <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
               <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
@@ -1751,7 +1835,7 @@ const [viewMode, setViewMode] = useState(() => {
               {/* ✅ Table loading = skeleton rows (blank table / spinner nahi).
                   Skeleton → error state → empty state → real rows (smooth fade-in). */}
               {isLoading ? (
-                <ProductTableSkeleton rows={ITEMS_PER_PAGE} />
+                <ProductTableSkeleton rows={Math.min(pageSize, 20)} />
               ) : (
               <tbody style={{ animation: "fadeIn 0.22s ease" }}>
                 {productsError ? (
@@ -1834,20 +1918,87 @@ const [viewMode, setViewMode] = useState(() => {
         )
       )}
 
-      {/* PAGINATION */}
-      {pagination.pages > 1 && (
-        <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
-          <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {pagination.total === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} products</p>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeft className="h-4 w-4" /></button>
-            {renderPageNumbers().map((pg, i) =>
-              pg === "..." ? (
-                <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
-              ) : (
-                <button key={pg} type="button" onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
-              )
-            )}
-            <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRight className="h-4 w-4" /></button>
+      {/* PAGINATION — simple & professional:
+          Left  : "Showing X–Y of Z products" + "Page N of M"
+          Right : Rows-per-page selector + Prev/Next (labels ke sath) + page numbers.
+          Skip marker "…" button ke barabar wide hai, is liye pagination "toota hua" nahi lagta. */}
+      {!isLoading && totalRecords > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={cardStyle}>
+          {/* Left: record range + position */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            <span>
+              Showing <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(firstRow)}–{fmt(lastRow)}</span> of{" "}
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalRecords)}</span> products
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Page <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{currentPage}</span> of{" "}
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalPages)}</span>
+            </span>
+          </div>
+
+          {/* Right: controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
+            {/* Rows per page */}
+            <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              <span className="hidden sm:inline">Rows</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                aria-label="Rows per page"
+                className="h-8 cursor-pointer rounded-md px-2 text-[12px] font-medium outline-none transition focus:ring-2"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-center gap-1.5" role="navigation" aria-label="Pagination">
+              {/* Previous */}
+              <button
+                type="button"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+                className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Prev
+              </button>
+
+              {/* Page numbers */}
+              {renderPageNumbers().map((pg, i) =>
+                pg === "…" ? (
+                  <span key={`skip-${i}`} aria-hidden="true" className="flex h-8 w-8 items-center justify-center text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
+                ) : (
+                  <button
+                    key={pg}
+                    type="button"
+                    onClick={() => goToPage(pg)}
+                    aria-current={pg === currentPage ? "page" : undefined}
+                    aria-label={`Page ${pg}`}
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums transition hover:opacity-80"
+                    style={pg === currentPage
+                      ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" }
+                      : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+                  >{pg}</button>
+                )
+              )}
+
+              {/* Next */}
+              <button
+                type="button"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                aria-label="Next page"
+                className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+              >
+                Next <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2653,7 +2804,7 @@ function SummaryCardSkeleton() {
   );
 }
 
-function ProductTableSkeleton({ rows = ITEMS_PER_PAGE }) {
+function ProductTableSkeleton({ rows = DEFAULT_PAGE_SIZE }) {
   return (
     <tbody aria-busy="true" aria-label="Loading products">
       {Array.from({ length: rows }).map((_, i) => (

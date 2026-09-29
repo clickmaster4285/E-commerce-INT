@@ -4,6 +4,15 @@ const { getNextSku } = require("../utils/skuHelper");
 const { deleteImageFile } = require("../utils/uploadHelpers");
 const { isSameValue, isSameList } = require("../utils/activityHelper");
 
+// ✅ Live stock sync — variant quantity change par manage-stock page socket se refresh ho
+//    jata hai (manual page refresh ki zaroorat nahi).
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = require("../utils/socket").getIO();
+    if (io) io.emit(event, data);
+  } catch (_) {}
+};
+
 // ⭐ TAG RESOLVER (Find or Create): ensures each tag name has a Tag document
 // (with createdby tracked) so the Tags tab can show who created it.
 const resolveTags = async (tagNames, userId) => {
@@ -142,6 +151,8 @@ const updateVariant = async (req, res) => {
     if (req.body.title !== undefined) variant.title = req.body.title;
     if (req.body.description !== undefined) variant.description = req.body.description;
     if (req.body.cost_price !== undefined) variant.cost_price = Number(req.body.cost_price);
+    // ✅ Live-update ke liye quantity ka purana value pakad le rahe hain
+    const previousQuantity = variant.quantity ?? 0;
     if (req.body.selling_price !== undefined) variant.selling_price = Number(req.body.selling_price);
     // ✅ Stock poore units mein — decimal bhejne par 400 error (silent fractional stock nahi)
     if (req.body.quantity !== undefined) {
@@ -201,6 +212,16 @@ const updateVariant = async (req, res) => {
     if (variant.isModified()) {
       variant.updatedby = req.user?._id || null;
       await variant.save();
+
+      // ✅ Stock quantity sach me badli ho to live update emit (manage-stock auto refresh)
+      if ((variant.quantity ?? 0) !== previousQuantity) {
+        emitSocketEvent("stockUpdated", {
+          variant_id: variant._id,
+          product_id: variant.product_id?._id || variant.product_id || null,
+          quantity: variant.quantity ?? 0,
+          source: "variant_update",
+        });
+      }
     }
 
     res.status(200).json({

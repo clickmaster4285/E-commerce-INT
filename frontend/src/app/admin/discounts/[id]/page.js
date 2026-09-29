@@ -250,6 +250,18 @@ export default function DiscountDetailPage() {
       (discount?.updated_at ?? discount?.updatedAt) !== (discount?.created_at ?? discount?.createdAt))
   );
   
+  // ✅ Sirf wahi targets render hote hain jo is discount par ASSIGN hain.
+  //    Target type ke hisab se filter — purane stale ids (DB me maujood) detail par
+  //    "assigned" jaise dikhna band ho jaata hai.
+  const applyToKey = discount?.applyTo || discount?.target_type || "all";
+  const targetsProducts = applyToKey === "specific_products" || applyToKey === "product";
+  const targetsCategories = applyToKey === "specific_categories" || applyToKey === "category";
+  const targetsBrands = applyToKey === "specific_brands" || applyToKey === "brand";
+  const assignedProducts = targetsProducts ? (discount?.selectedProducts || []) : [];
+  const assignedCategories = targetsCategories ? (discount?.selectedCategories || []) : [];
+  const assignedBrands = targetsBrands ? (discount?.selectedBrands || []) : [];
+  const targetsEverything = !targetsProducts && !targetsCategories && !targetsBrands;
+
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
@@ -458,8 +470,11 @@ export default function DiscountDetailPage() {
             <DataRow icon={Target} label="Apply To" value={formatTarget(discount.applyTo)} />
             <DataRow icon={Activity} label="Status" value={isActive ? "Active" : "Inactive"} highlight={isActive} />
           </InfoCard>
-          <InfoCard icon={Package} title="Applicable Products" action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{discount.selectedProducts?.length ? `View All (${discount.selectedProducts.length})` : "Preview"}</span>}>
-            {discount.selectedProducts?.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{discount.selectedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div> : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>All products</p>}
+          <InfoCard icon={Package} title="Applicable Products" action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
+            {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
+              : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Not targeted by product — this discount targets {assignedCategories.length} selected categor{assignedCategories.length === 1 ? "y" : "ies"}.</p>
+              : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Not targeted by product — this discount targets {assignedBrands.length} selected brand{assignedBrands.length === 1 ? "" : "s"}.</p>
+              : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>All products</p>}
           </InfoCard>
         </div>
 
@@ -469,7 +484,7 @@ export default function DiscountDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title="Targeting"><DataRow icon={Globe} label="Apply To" value={formatTarget(discount.applyTo)} /><DataRow icon={Package} label="Selected Products" value={`${discount.selectedProducts?.length || 0} products`} /><DataRow icon={Layers} label="Selected Categories" value={`${discount.selectedCategories?.length || 0} categories`} /><DataRow icon={Tag} label="Selected Brands" value={`${discount.selectedBrands?.length || 0} brands`} /></InfoCard></div>
+          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title="Targeting"><DataRow icon={Globe} label="Apply To" value={formatTarget(discount.applyTo)} />{targetsProducts && <DataRow icon={Package} label="Selected Products" value={`${assignedProducts.length} products`} />}{targetsCategories && <DataRow icon={Layers} label="Selected Categories" value={`${assignedCategories.length} categories`} />}{targetsBrands && <DataRow icon={Tag} label="Selected Brands" value={`${assignedBrands.length} brands`} />}</InfoCard></div>
           <InfoCard icon={User} title="Created By"><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Created {formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
           {hasUpdates && <InfoCard icon={User} title="Updated By"><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Updated {formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
         </div>
@@ -504,13 +519,13 @@ export default function DiscountDetailPage() {
               </p>
             </div>
 
-            {discount.selectedProducts?.length > 0 && (
+            {assignedProducts.length > 0 && (
               <div className="mb-5">
                 <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Products ({discount.selectedProducts.length})
+                  Selected Products ({assignedProducts.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {discount.selectedProducts.map((product) => (
+                  {assignedProducts.map((product) => (
                     <span key={product._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Box className="w-3 h-3" style={{ color: "var(--accent)" }} />
@@ -522,13 +537,13 @@ export default function DiscountDetailPage() {
               </div>
             )}
 
-            {discount.selectedCategories?.length > 0 && (
+            {assignedCategories.length > 0 && (
               <div className="mb-5">
                 <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Categories ({discount.selectedCategories.length})
+                  Selected Categories ({assignedCategories.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {discount.selectedCategories.map((cat) => (
+                  {assignedCategories.map((cat) => (
                     <span key={cat._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Layers className="w-3 h-3" style={{ color: "var(--accent)" }} />
@@ -539,13 +554,13 @@ export default function DiscountDetailPage() {
               </div>
             )}
 
-            {discount.selectedBrands?.length > 0 && (
+            {assignedBrands.length > 0 && (
               <div className="mb-5">
                 <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Brands ({discount.selectedBrands.length})
+                  Selected Brands ({assignedBrands.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {discount.selectedBrands.map((brand) => (
+                  {assignedBrands.map((brand) => (
                     <span key={brand._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Tag className="w-3 h-3" style={{ color: "var(--accent)" }} />
@@ -556,10 +571,17 @@ export default function DiscountDetailPage() {
               </div>
             )}
 
-            {!discount.selectedProducts?.length && !discount.selectedCategories?.length && !discount.selectedBrands?.length && (
+            {targetsEverything && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                 <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "var(--success)" }} />
                 <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>This discount applies to all products automatically.</span>
+              </div>
+            )}
+
+            {!targetsEverything && assignedProducts.length + assignedCategories.length + assignedBrands.length === 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                <AlertTriangle className="w-5 h-5 shrink-0" style={{ color: "var(--warning)" }} />
+                <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No target is currently assigned to this discount — it will not apply anywhere.</span>
               </div>
             )}
           </InfoCard>

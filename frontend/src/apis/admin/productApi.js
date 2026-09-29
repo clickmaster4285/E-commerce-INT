@@ -31,7 +31,7 @@ export const adminProductApi = {
 
   // ✅ Summary stats (stat cards) — alag API, taake cards table se independently load hon.
   // Backend: ?search&category_id&brand_id&status
-  // Response: { success: true, stats: { totalProducts, activeProducts, totalVariants, totalStock } }
+  // Response: { success: true, stats: { totalProducts, activeProducts, inactiveProducts, totalVariants, totalStock } }
   getStats: ({ search = "", category_id = "", brand_id = "", status = "" } = {}) => {
     const params = {};
     if (search) params.search = search;

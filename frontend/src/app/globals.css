@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* tw-animate-css: drawer/modal ke `animate-in fade-in slide-in-from-*`
+   utilities ko enable karta hai (package pehle se dependency mein hai). */
+@import "tw-animate-css";
 
 /* Theme follows app class (not OS preference) */
 @custom-variant dark (&:where(.dark, .dark *));

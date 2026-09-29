@@ -1050,9 +1050,7 @@ export default function AddVariantPage() {
                     </div>
                   ))}
                 </div>
-                <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>
-                  Quantity sirf poore units mein (misal: 5) — decimal point allowed nahi.
-                </p>
+                
 
                 {variant.cost_price !== "" &&
                   variant.selling_price !== "" &&

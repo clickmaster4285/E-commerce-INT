@@ -57,9 +57,11 @@ const toStockItem = (variant) => {
     product_name: product?.name || "Unknown Product",
     product_is_deleted: Boolean(product?.is_deleted),
     category_id: product?.category_id?._id || product?.category_id || null,
-    category_name: product?.category_id?.name || "Uncategorized",
+    // ✅ Fake labels ("Uncategorized" / "No brand") hataye — jab category/brand
+    //    assign nahi hai to khaali bhejte hain aur frontend wo line chhupa deta hai.
+    category_name: product?.category_id?.name || "",
     brand_id: product?.brand_id?._id || product?.brand_id || null,
-    brand_name: product?.brand_id?.name || "No brand",
+    brand_name: product?.brand_id?.name || "",
     brand_logo: product?.brand_id?.logo?.img_url || "",
   };
 };

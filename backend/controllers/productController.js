@@ -261,6 +261,8 @@ const computeProductStats = async (filter, totalOverride = null) => {
   return {
     totalProducts: total,
     activeProducts,
+    // ✅ Summary card ke liye Inactive = Total - Active (brand stats jaisa hi pattern)
+    inactiveProducts: Math.max(0, total - activeProducts),
     totalVariants: variantAgg[0]?.totalVariants || 0,
     totalStock: variantAgg[0]?.totalStock || 0,
   };
@@ -420,7 +422,7 @@ const getProducts = async (req, res) => {
 // ✅ Products list se ALAG endpoint — table aur summary cards independently
 //     load/refresh hote hain (ek doosre ko block nahi karte).
 // ✅ Same filters support karta hai: search / category_id / brand_id / status
-// ✅ Response: { success: true, stats: { totalProducts, activeProducts, totalVariants, totalStock } }
+// ✅ Response: { success: true, stats: { totalProducts, activeProducts, inactiveProducts, totalVariants, totalStock } }
 // ======================================================
 const getProductStats = async (req, res) => {
   try {
@@ -1001,6 +1003,15 @@ const updateProduct = async (req, res) => {
         }
       }
 
+      // ✅ Live stock sync — product edit se variant quantity change hone par manage-stock
+      //    page socket se refresh ho jata hai (manual page refresh ki zaroorat nahi).
+      if (Array.isArray(variants) && variants.some((v) => v && Object.prototype.hasOwnProperty.call(v, "quantity"))) {
+        emitSocketEvent("stockUpdated", {
+          product_id: product._id,
+          source: "product_variant_update",
+        });
+      }
+
       // ⚠️ REMOVED (bug fix): Pehle yahan "jo variants payload mein nahi aaye unhe
       // is_deleted = true karke save kar do" wala soft-delete loop tha. Variant
       // model mein `is_deleted` / `deleted_at` fields maujood hi nahi hain, is liye:
@@ -1164,60 +1175,106 @@ const deleteProduct = async (req, res) => {
 // ======================================================
 // TOGGLE PRODUCT STATUS
 // ======================================================
+// ✅ PERFORMANCE FIX (activate/deactivate slow tha):
+//    1) Pehle poora document load + validate + save hota tha → ab sirf status flip
+//       ka ek ATOMIC update (aggregation pipeline) — 1 round-trip, zero validation.
+//    2) Activity log + populated read + socket broadcast pehle RESPONSE bhejne se
+//       pehle await hote the → ab background me (fire & forget) chalte hain,
+//       is liye button ka response foran milta hai.
 const toggleProductStatus = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findOne({
-      _id: req.params.id,
-      is_deleted: { $ne: true },
-    });
+    // ✅ Sirf status flip ka atomic update (aggregation pipeline) — poora document
+    //    load/validate/save nahi hota, is liye ek hi round-trip me response.
+    //    "updatePipeline: true" ZAROORI hai (Mongoose >= 7), warna mongoose
+    //    "Cannot pass an array to query updates..." error de kar 500 return karta hai.
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      [
+        {
+          $set: {
+            status: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$status", "active"] }, "active"] },
+                "inactive",
+                "active",
+              ],
+            },
+            updatedby: req.user?._id || null,
+            updated_at: new Date(),
+          },
+        },
+      ],
+      // "returnDocument: 'after'" (Mongoose 9 me 'new: true' deprecated hai)
+      { returnDocument: "after", updatePipeline: true, runValidators: false }
+    );
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    product.status = product.status === "active" ? "inactive" : "active";
-    product.updatedby = req.user?._id || null;
-    await product.save();
+    // Flip deterministic hai → naya status milte hi purana bhi pata hai
+    // (listeners stats counts accurately adjust kar sakein)
+    const previousStatus = product.status === "active" ? "inactive" : "active";
 
+    // ✅ Client ko turant jawaab — UI turant update ho jaata hai
+    res.status(200).json({
+      message: `Product status updated to ${product.status}`,
+      product,
+    });
+
+    // ---- Background task (await nahi hota → request latency par asar nahi) ----
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
+    const productId = product._id;
+    const productName = product.name;
+    const nextStatus = product.status;
+    const tagIds = product.tag_ids;
 
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${performerName} ${product.status === "active" ? "activated" : "deactivated"} product "${product.name}"`,
-        category: "Product Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: { productId: product._id, status: product.status },
-      },
-      performerId
-    );
+    setImmediate(async () => {
+      try {
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${performerName} ${nextStatus === "active" ? "activated" : "deactivated"} product "${productName}"`,
+            category: "Product Management",
+            performedBy: performerId,
+            performedByName: performerName,
+            details: { productId, status: nextStatus },
+          },
+          performerId
+        );
+      } catch (activityErr) {
+        console.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
+      }
 
-    const populatedProduct = await Product.findById(product._id)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .lean();
+      try {
+        const populatedProduct = await Product.findById(productId)
+          .populate("createdby", "name email")
+          .populate("updatedby", "name email")
+          .lean();
 
-    emitSocketEvent("productUpdated", {
-      _id: product._id,
-      name: product.name,
-      status: product.status,
-      tag_ids: product.tag_ids,
-      createdby: populatedProduct?.createdby || null,
-      updatedby: populatedProduct?.updatedby || null,
-      created_at: populatedProduct?.created_at,
-      updated_at: populatedProduct?.updated_at,
-    });
-
-    return res.status(200).json({
-      message: `Product status updated to ${product.status}`,
-      product,
+        emitSocketEvent("productUpdated", {
+          _id: productId,
+          name: productName,
+          status: nextStatus,
+          previousStatus,
+          // ✅ statusOnly: sirf status badla hai → listeners full list refetch ke
+          //    bajaye cache me targeted patch kar sakte hain
+          statusOnly: true,
+          tag_ids: tagIds,
+          createdby: populatedProduct?.createdby || null,
+          updatedby: populatedProduct?.updatedby || null,
+          created_at: populatedProduct?.created_at,
+          updated_at: populatedProduct?.updated_at,
+        });
+      } catch (socketErr) {
+        console.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
+      }
     });
   } catch (error) {
     console.error("❌ [toggleProductStatus] Error:", error);
