@@ -37,6 +37,20 @@ import { attributeApi } from "@/apis/admin/attributeApi";
 const ITEMS_PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
 
+/* Parent Category lock hone ki wajah professional alert ke roop mein —
+   dropdown disabled kyun hai ye user ko turant clear ho jata hai. */
+const ParentLockNotice = ({ title, children }) => (
+  <div className="flex items-start gap-2.5 rounded-[10px] border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-3 py-2.5">
+    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warning)] text-[var(--text-inverse)]">
+      <svg className="w-[11px] h-[11px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    </span>
+    <div className="min-w-0 space-y-0.5">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--warning-text)]">{title}</p>
+      <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{children}</p>
+    </div>
+  </div>
+);
+
 /* =========================================================
 HELPERS & ICONS
 ========================================================= */
@@ -408,6 +422,30 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
+
+    // ✅ NEW: Naam match (children wali existing category) → parent None compulsory
+    const nameMatchLockId = getExistingParentNameMatchId({ name: formData.name });
+    if (nameMatchLockId && formData.parent_category_id) {
+      toast.error(NAME_PARENT_LOCK_MESSAGE);
+      return;
+    }
+    // ✅ NEW: Final validation — Parent None par bhi existing Parent Category ke
+    // naam se category create nahi honi chahiye (backend bhi same rule lagata hai).
+    if (nameMatchLockId) {
+      const matched = (categories || []).find((c) => getId(c?._id) === String(nameMatchLockId));
+      toast.error(
+        `${matched?.name || String(formData.name || "").trim()} already has child categories and cannot be assigned under another category.`
+      );
+      return;
+    }
+    if (formData.parent_category_id) {
+      const withChildren = getParentIdsWithChildren(categories);
+      if (withChildren.has(String(formData.parent_category_id))) {
+        toast.error("Cannot assign this category as a child because it is already a parent category.");
+        return;
+      }
+    }
+
     const payload = { ...formData, parent_category_id: formData.parent_category_id || null, is_active: formData.status === "active" };
     createMutation.mutate(payload);
   };
@@ -424,6 +462,35 @@ function CategoryFormModal({ open, onClose, onCreated }) {
     return "";
   };
 
+  // ✅ NEW: Naam-based root lock — agar Category Name kisi aisi existing category
+  // se match karta hai (case-insensitive) jiske apne child categories hain, to
+  // Parent Category None (locked) hona chahiye. Har existing category par lagta hai.
+  const NAME_PARENT_LOCK_TEXT =
+    "A category with this name already contains subcategories, so Parent Category is locked to None.";
+  const NAME_PARENT_LOCK_MESSAGE =
+    "Parent category must be None because a category with this name already exists with subcategories.";
+
+  const getParentIdsWithChildren = (cats = []) => {
+    const ids = new Set();
+    (cats || []).forEach((c) => {
+      const parentId = getId(c?.parent_category_id);
+      if (parentId) ids.add(parentId);
+    });
+    return ids;
+  };
+
+  const getExistingParentNameMatchId = ({ name = "" }) => {
+    const target = String(name || "").trim().toLowerCase();
+    if (!target) return "";
+    const withChildren = getParentIdsWithChildren(categories);
+    const match = (categories || []).find((c) => {
+      const id = getId(c?._id);
+      if (!id || !withChildren.has(id)) return false;
+      return String(c?.name || "").trim().toLowerCase() === target;
+    });
+    return match ? getId(match._id) : "";
+  };
+
   const getAttributeId = (attribute) => {
     const aid = attribute?.attribute_id;
     if (!aid) return String(attribute?._id || "");
@@ -432,23 +499,19 @@ function CategoryFormModal({ open, onClose, onCreated }) {
     return String(aid);
   };
 
-  const buildHierarchy = (cats, parentId = null, depth = 0) => {
-    const result = [];
-    const normalizedParent = parentId === null ? "" : getId(parentId);
-    const children = cats.filter((c) => {
-      const cParentId = getId(c.parent_category_id);
-      return cParentId === normalizedParent;
-    });
-    for (const cat of children) {
-      result.push({ ...cat, depth });
-      result.push(...buildHierarchy(cats, cat._id, depth + 1));
-    }
-    return result;
-  };
-  const hierarchicalCategories = buildHierarchy(categories);
-  const selectedParentName = formData.parent_category_id
-    ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
-    : "None";
+  // ✅ Parent Category dropdown mein SIRF root categories (parent = None)
+  const rootCategories = (categories || []).filter((c) => !getId(c.parent_category_id));
+  const nameMatchLockId = getExistingParentNameMatchId({ name: formData.name });
+  const parentLockedByName = Boolean(nameMatchLockId);
+  const matchedName = parentLockedByName
+    ? categories.find((c) => String(c._id) === String(nameMatchLockId))?.name || formData.name
+    : "";
+  const parentDropdownDisabled = parentLockedByName;
+  const selectedParentName = parentLockedByName
+    ? "None"
+    : formData.parent_category_id
+      ? categories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+      : "None";
 
   const filteredAllAttributes = useMemo(() => {
     if (!attrSearch.trim()) return allAttributes;
@@ -565,7 +628,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>);
 
   const renderParentDropdown = () => {
-    if (!showParentDropdown) return null;
+    if (!showParentDropdown || parentDropdownDisabled) return null;
     return createPortal(
       <>
         <div className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
@@ -582,14 +645,13 @@ function CategoryFormModal({ open, onClose, onCreated }) {
             </button>
             {categoriesLoading ? (
               <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">Loading categories...</div>
-            ) : hierarchicalCategories.length === 0 ? (
+            ) : rootCategories.length === 0 ? (
               <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">No categories available</div>
             ) : (
-              hierarchicalCategories.map((cat) => (
+              rootCategories.map((cat) => (
                 <button key={cat._id} type="button"
                   onClick={() => { setFormData({ ...formData, parent_category_id: cat._id }); setShowParentDropdown(false); }}
-                  className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}
-                  style={{ paddingLeft: `${12 + cat.depth * 16}px` }}>
+                  className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
                   <span className="truncate">{cat.name}</span>
                   {String(formData.parent_category_id) === String(cat._id) && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
                 </button>
@@ -825,7 +887,12 @@ function CategoryFormModal({ open, onClose, onCreated }) {
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus
+                  <input type="text" value={formData.name} required autoFocus
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const locked = getExistingParentNameMatchId({ name });
+                      setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id }));
+                    }}
                     className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                     placeholder="e.g. Smartphones" />
                 </div>
@@ -844,18 +911,31 @@ function CategoryFormModal({ open, onClose, onCreated }) {
                 <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
                 <div className="relative">
                   <button ref={parentDropdownRef} type="button"
+                    disabled={parentDropdownDisabled}
                     onClick={() => {
+                      if (parentDropdownDisabled) return;
                       if (!showParentDropdown && parentDropdownRef.current) {
                         const rect = parentDropdownRef.current.getBoundingClientRect();
                         setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
                       }
                       setShowParentDropdown(!showParentDropdown);
                     }}
-                    className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors cursor-pointer flex items-center justify-between gap-2">
-                    <span className="truncate text-left">{selectedParentName}</span>
+                    title={parentDropdownDisabled ? NAME_PARENT_LOCK_TEXT : undefined}
+                    className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="truncate text-left">{selectedParentName}</span>
+                      {parentLockedByName && (
+                        <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Locked to None</span>
+                      )}
+                    </span>
                     <ChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                   </button>
                 </div>
+                {parentLockedByName && (
+                  <ParentLockNotice title="Parent Category locked to None">
+                    <span className="font-semibold text-[var(--text-primary)]">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-[var(--text-primary)]">None</span>.
+                  </ParentLockNotice>
+                )}
               </div>
             </div>
 
@@ -950,6 +1030,9 @@ const [viewMode, setViewMode] = useState(() => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  // Product modal ke Category / Brand dropdowns ke andar chalne wale search bars
+  const [categoryDropdownSearch, setCategoryDropdownSearch] = useState("");
+  const [brandDropdownSearch, setBrandDropdownSearch] = useState("");
   
   // Category Modal State (shared component handles its own form)
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
@@ -994,14 +1077,30 @@ const [viewMode, setViewMode] = useState(() => {
   /* Queries */
   // ✅ SERVER-SIDE PAGINATION — search/filter/page sab backend par (DB-level).
   // Backend response: { products, stats, pagination } — sirf current page ke products aate hain.
-  const { data: productsData, isLoading, isError: productsError, error: productsErrorMsg } = useQuery({
+  const {
+    data: productsData,
+    isLoading,
+    isError: productsError,
+    error: productsErrorMsg,
+    refetch: refetchProducts,
+  } = useQuery({
     queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus],
     queryFn: () => productApi.getPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
     retry: false,
   });
   const products = productsData?.products || [];
   const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
-  const productStats = productsData?.stats || null;
+
+  // ✅ SUMMARY CARDS ki API — products list se bilkul ALAG query.
+  //    Backend optimization: stats ab list response ka hissa nahi (dedicated /products/stats endpoint),
+  //    is liye cards load hote waqt table block nahi hota — aur table load hote waqt cards block nahi hote.
+  const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
+    queryKey: ["products", "stats", search, filterCategory, filterBrand, filterStatus],
+    queryFn: () => productApi.getStats({ search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
+    retry: false,
+  });
+  // Dedicated stats → fallback: agar stats API fail ho jaye to list ke (legacy) stats ya current page se values.
+  const productStats = summaryData || productsData?.stats || null;
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
   const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
 
@@ -1012,6 +1111,19 @@ const [viewMode, setViewMode] = useState(() => {
       setCategoryAttributes([]);
     }
   }, [formData.category_id]);
+
+  // Modal dropdowns ke search results (case-insensitive, name par filter)
+  const filteredCategoryOptions = useMemo(() => {
+    const term = categoryDropdownSearch.trim().toLowerCase();
+    if (!term) return categories;
+    return categories.filter((c) => String(c?.name || "").toLowerCase().includes(term));
+  }, [categories, categoryDropdownSearch]);
+
+  const filteredBrandOptions = useMemo(() => {
+    const term = brandDropdownSearch.trim().toLowerCase();
+    if (!term) return brands;
+    return brands.filter((b) => String(b?.name || "").toLowerCase().includes(term));
+  }, [brands, brandDropdownSearch]);
 
   const fetchCategoryAttributes = async (catId, productForMerge = null) => {
     try {
@@ -1544,7 +1656,8 @@ const [viewMode, setViewMode] = useState(() => {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  if (isLoading) return <div className="flex h-[60vh] items-center justify-center"><div className="h-7 w-7 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} /></div>;
+  // ✅ LOADING UX: poori page ko spinner se block nahi karte — header/toolbar turant render hote hain,
+  //    Summary cards apna skeleton dikhate hain aur Product table apne skeleton rows (dono independent).
 
   return (
     <>
@@ -1572,14 +1685,16 @@ const [viewMode, setViewMode] = useState(() => {
         </div>
       </div>
 
-      {/* STATS */}
+      {/* STATS — ✅ Summary API load hote waqt card-level skeleton (table ko block nahi karta) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[{ l: "Total Products", v: pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
-          <div key={i} className="rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
-            <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
-          </div>
-        ))}
+        {isSummaryLoading
+          ? Array.from({ length: 4 }).map((_, i) => <SummaryCardSkeleton key={`summary-skeleton-${i}`} />)
+          : [{ l: "Total Products", v: productStats ? Number(productStats.totalProducts) || 0 : pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }, { l: "Units in Stock", v: totalStock }].map((s, i) => (
+            <div key={i} className="rounded-lg p-4" style={cardStyle}>
+              <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
+              <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
+            </div>
+          ))}
       </div>
 
       {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -1600,8 +1715,25 @@ const [viewMode, setViewMode] = useState(() => {
 
         {/* Filters (Right Side) */}
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <SelectFilter value={filterCategory} onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }} options={categories.map((c) => ({ value: String(c._id), label: c.name }))} placeholder="All Categories" />
-          <SelectFilter value={filterBrand} onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }} options={brands.map((b) => ({ value: String(b._id), label: b.name }))} placeholder="All Brands" />
+          {/* Category & Brand dropdowns ke andar search bar hai (lambi lists ke liye) */}
+          <SelectFilter
+            value={filterCategory}
+            onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }}
+            options={categories.map((c) => ({ value: String(c._id), label: c.name }))}
+            placeholder="All Categories"
+            searchable
+            searchPlaceholder="Search category..."
+            clearLabel="All Categories"
+          />
+          <SelectFilter
+            value={filterBrand}
+            onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }}
+            options={brands.map((b) => ({ value: String(b._id), label: b.name }))}
+            placeholder="All Brands"
+            searchable
+            searchPlaceholder="Search brand..."
+            clearLabel="All Brands"
+          />
           <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
         </div>
       </div>
@@ -1616,8 +1748,21 @@ const [viewMode, setViewMode] = useState(() => {
                   <th key={h} className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`} style={{ color: "var(--text-muted)" }}>{h}</th>
                 ))}</tr>
               </thead>
-              <tbody>
-                {paginatedProducts.length === 0 ? (
+              {/* ✅ Table loading = skeleton rows (blank table / spinner nahi).
+                  Skeleton → error state → empty state → real rows (smooth fade-in). */}
+              {isLoading ? (
+                <ProductTableSkeleton rows={ITEMS_PER_PAGE} />
+              ) : (
+              <tbody style={{ animation: "fadeIn 0.22s ease" }}>
+                {productsError ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+                      <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
+                      <p className="text-[13px]">Failed to load products. Please check your connection.</p>
+                      <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+                    </td>
+                  </tr>
+                ) : paginatedProducts.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
                 ) : paginatedProducts.map((p) => {
                   const img = p?.variants?.[0]?.images?.[0]?.img_url;
@@ -1645,13 +1790,23 @@ const [viewMode, setViewMode] = useState(() => {
                   );
                 })}
               </tbody>
+              )}
             </table>
           </div>
         </div>
       )}
 
-      {/* GRID VIEW */}
+      {/* GRID VIEW — ✅ same independent loading state: skeleton cards replace blank grid */}
       {viewMode === "grid" && (
+        isLoading ? (
+          <ProductGridSkeleton cards={8} />
+        ) : productsError ? (
+          <div className="rounded-lg px-4 py-14 text-center" style={cardStyle}>
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>Failed to load products. Please check your connection.</p>
+            <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedProducts.map((p) => {
             const v = p?.variants?.[0];
@@ -1676,6 +1831,7 @@ const [viewMode, setViewMode] = useState(() => {
             );
           })}
         </div>
+        )
       )}
 
       {/* PAGINATION */}
@@ -1732,28 +1888,62 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Field label="Category *">
                       <div className="relative">
-                        <button type="button" onClick={() => { setIsCategoryDropdownOpen(o => !o); setIsBrandDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
+                        <button type="button" onClick={() => { setIsCategoryDropdownOpen(o => { if (!o) setCategoryDropdownSearch(""); return !o; }); setIsBrandDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
                           <span className="truncate">{formData.category_id ? categories.find(c => String(c._id) === String(formData.category_id))?.name || "Selected category" : "Select product category"}</span>
                           <ChevronDown className="h-4 w-4 shrink-0" />
                         </button>
                         {isCategoryDropdownOpen && (
                           <Dropdown>
-                            {categories.map(c => <button type="button" key={c._id} onClick={() => { setFormData(p => ({ ...p, category_id: String(c._id) })); setIsCategoryDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.category_id) === String(c._id) ? "var(--accent)" : "var(--text-primary)" }}>{c.name}</button>)}
-                            <button type="button" onClick={() => { setIsCategoryDropdownOpen(false); handleOpenCategoryModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Category</button>
+                            {/* Dropdown ke andar search bar (lambi category list ke liye) */}
+                            <div className="sticky top-0 z-10 p-2" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={categoryDropdownSearch}
+                                  onChange={(e) => setCategoryDropdownSearch(e.target.value)}
+                                  placeholder="Search category..."
+                                  className="h-9 w-full rounded-md pl-8 pr-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
+                                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                                />
+                              </div>
+                            </div>
+                            {filteredCategoryOptions.length === 0 ? (
+                              <p className="px-3 py-4 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>No category found</p>
+                            ) : filteredCategoryOptions.map(c => <button type="button" key={c._id} onClick={() => { setFormData(p => ({ ...p, category_id: String(c._id) })); setIsCategoryDropdownOpen(false); setCategoryDropdownSearch(""); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.category_id) === String(c._id) ? "var(--accent)" : "var(--text-primary)" }}>{c.name}</button>)}
+                            <button type="button" onClick={() => { setIsCategoryDropdownOpen(false); setCategoryDropdownSearch(""); handleOpenCategoryModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Category</button>
                           </Dropdown>
                         )}
                       </div>
                     </Field>
                     <Field label="Brand *">
                       <div className="relative">
-                        <button type="button" onClick={() => { setIsBrandDropdownOpen(o => !o); setIsCategoryDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
+                        <button type="button" onClick={() => { setIsBrandDropdownOpen(o => { if (!o) setBrandDropdownSearch(""); return !o; }); setIsCategoryDropdownOpen(false); }} className="flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm" style={inputStyle}>
                           <span className="truncate">{formData.brand_id ? brands.find(b => String(b._id) === String(formData.brand_id))?.name || "Selected brand" : "Select product brand"}</span>
                           <ChevronDown className="h-4 w-4 shrink-0" />
                         </button>
                         {isBrandDropdownOpen && (
                           <Dropdown>
-                            {brands.map(b => <button type="button" key={b._id} onClick={() => { setFormData(p => ({ ...p, brand_id: String(b._id) })); setIsBrandDropdownOpen(false); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.brand_id) === String(b._id) ? "var(--accent)" : "var(--text-primary)" }}>{b.name}</button>)}
-                            <button type="button" onClick={() => { setIsBrandDropdownOpen(false); handleOpenBrandModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Brand</button>
+                            {/* Dropdown ke andar search bar (lambi brand list ke liye) */}
+                            <div className="sticky top-0 z-10 p-2" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={brandDropdownSearch}
+                                  onChange={(e) => setBrandDropdownSearch(e.target.value)}
+                                  placeholder="Search brand..."
+                                  className="h-9 w-full rounded-md pl-8 pr-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
+                                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                                />
+                              </div>
+                            </div>
+                            {filteredBrandOptions.length === 0 ? (
+                              <p className="px-3 py-4 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>No brand found</p>
+                            ) : filteredBrandOptions.map(b => <button type="button" key={b._id} onClick={() => { setFormData(p => ({ ...p, brand_id: String(b._id) })); setIsBrandDropdownOpen(false); setBrandDropdownSearch(""); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5" style={{ color: String(formData.brand_id) === String(b._id) ? "var(--accent)" : "var(--text-primary)" }}>{b.name}</button>)}
+                            <button type="button" onClick={() => { setIsBrandDropdownOpen(false); setBrandDropdownSearch(""); handleOpenBrandModal(); }} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-semibold hover:bg-black/5 sticky bottom-0" style={{ borderColor: "var(--border-color)", color: "var(--accent)", backgroundColor: "var(--bg-card)" }}><Plus className="h-4 w-4" /> Create New Brand</button>
                           </Dropdown>
                         )}
                       </div>
@@ -2169,14 +2359,110 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
     </div>
   );
 }
-function SelectFilter({ value, onChange, options, placeholder }) {
+function SelectFilter({ value, onChange, options, placeholder, searchable = false, searchPlaceholder = "Search...", clearLabel = "" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const selectedOption = options.find((o) => String(o.value) === String(value)) || null;
+
+  const filteredOptions = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return options;
+    return options.filter((o) => String(o.label ?? "").toLowerCase().includes(term));
+  }, [options, search]);
+
+  // Searchable mode: bahar click / Escape se band, open hone par search focus
+  useEffect(() => {
+    if (!searchable) return undefined;
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [searchable]);
+
+  useEffect(() => {
+    if (!searchable || !isOpen) return undefined;
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 40);
+    return () => clearTimeout(timer);
+  }, [searchable, isOpen]);
+
+  // Purana native select (searchable na ho to) — Status filter isi ko use karta hai
+  if (!searchable) {
+    return (
+      <div className="relative">
+        <select value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full appearance-none rounded-lg pl-3 pr-8 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+          <option value="all">{placeholder}</option>
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+      </div>
+    );
+  }
+
+  const handleSelect = (nextValue) => {
+    onChange(nextValue);
+    setIsOpen(false);
+    setSearch("");
+  };
+
   return (
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full appearance-none rounded-lg pl-3 pr-8 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-        <option value="all">{placeholder}</option>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => { setIsOpen((open) => { if (open) setSearch(""); return !open; }); }}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-lg pl-3 pr-8 text-left text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]"
+        style={{ backgroundColor: "var(--bg-card)", border: `1px solid ${isOpen ? "var(--accent)" : "var(--border-color)"}`, color: "var(--text-primary)" }}
+      >
+        <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+      </button>
+      <ChevronDown className={`pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
+
+      {isOpen && (
+        <div className="absolute right-0 z-[100] mt-1 w-full min-w-[220px] overflow-hidden rounded-lg shadow-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-9 w-full rounded-md pl-8 pr-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              />
+            </div>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {clearLabel && !search.trim() && (
+              <button type="button" onClick={() => handleSelect("all")} className="block w-full px-3 py-2 text-left text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === "all" ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === "all" ? 600 : 400 }}>{clearLabel}</button>
+            )}
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-3 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>No match for &quot;{search.trim()}&quot;</p>
+            ) : filteredOptions.map((o) => (
+              <button type="button" key={o.value} onClick={() => handleSelect(o.value)} className="block w-full px-3 py-2 text-left text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === String(o.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(o.value) ? 600 : 400 }}>{o.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2346,5 +2632,82 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
       {assignedOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
       <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>+ Add new value...</option>
     </select>
+  );
+}
+
+/* ========================================================
+   SKELETON LOADING UI (existing `.skeleton` shimmer utility reuse)
+   ✅ Structure / paddings / column widths real table + cards jaise hi hain,
+      is liye loading ke waqt table ka height ya layout shift nahi hota.
+   ✅ Sirf loading state ke liye — real table/grid design mein koi change nahi.
+======================================================== */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye round shapes ke liye inline radius.
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function SummaryCardSkeleton() {
+  return (
+    <div className="rounded-lg p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }} aria-hidden="true">
+      <p className="text-[12px] font-medium"><span className="skeleton inline-block h-3 w-24 rounded align-middle" /></p>
+      <p className="mt-1 text-[20px] font-bold"><span className="skeleton inline-block h-5 w-12 rounded align-middle" /></p>
+    </div>
+  );
+}
+
+function ProductTableSkeleton({ rows = ITEMS_PER_PAGE }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading products">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`product-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+          {/* Product — image + name + SKU */}
+          <td className="px-4 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="skeleton h-8 w-8 shrink-0" style={SKELETON_ROUND} />
+              <div className="min-w-0">
+                <p className="max-w-[160px] truncate text-[13px] font-medium"><span className="skeleton inline-block h-3 w-[110px] rounded align-middle" /></p>
+                <p className="max-w-[160px] truncate font-mono text-[11px]"><span className="skeleton inline-block h-2.5 w-[70px] rounded align-middle" /></p>
+              </div>
+            </div>
+          </td>
+          {/* Category */}
+          <td className="px-4 py-2.5 text-[13px]"><span className="skeleton inline-block h-3 w-[80px] rounded align-middle" /></td>
+          {/* Brand */}
+          <td className="px-4 py-2.5 text-[13px]"><span className="skeleton inline-block h-3 w-[70px] rounded align-middle" /></td>
+          {/* Description */}
+          <td className="px-4 py-2.5 text-[13px]"><span className="skeleton inline-block h-3 w-[180px] max-w-[220px] rounded align-middle" /></td>
+          {/* Tax */}
+          <td className="px-4 py-2.5 text-[13px] font-medium"><span className="skeleton inline-block h-3 w-[34px] rounded align-middle" /></td>
+          {/* Status badge */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-5 w-[66px] align-middle" style={SKELETON_ROUND} /></td>
+          {/* Actions menu */}
+          <td className="w-1 whitespace-nowrap px-4 py-2.5">
+            <div className="flex items-center justify-end"><div className="skeleton h-[34px] w-[34px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function ProductGridSkeleton({ cards = 8 }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-busy="true" aria-label="Loading products">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={`product-grid-skeleton-${i}`} className="flex flex-col gap-3 rounded-lg p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="flex items-start justify-between">
+            <div className="skeleton h-10 w-10 shrink-0" style={SKELETON_ROUND} />
+            <span className="skeleton inline-block h-5 w-[66px]" style={SKELETON_ROUND} />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold"><span className="skeleton inline-block h-3 w-[140px] rounded align-middle" /></p>
+            <p className="mt-0.5 font-mono text-[11px]"><span className="skeleton inline-block h-2.5 w-[70px] rounded align-middle" /></p>
+            <p className="mt-0.5 text-[11px]"><span className="skeleton inline-block h-2.5 w-[160px] rounded align-middle" /></p>
+            <p className="mt-1 text-[11px] font-medium"><span className="skeleton inline-block h-2.5 w-[60px] rounded align-middle" /></p>
+          </div>
+          <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>
+            <div className="skeleton h-[34px] w-[34px] rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

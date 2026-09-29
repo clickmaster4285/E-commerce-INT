@@ -199,6 +199,74 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 };
 
 // ======================================================
+// SHARED FILTER BUILDER
+// ✅ Products list aur Products summary stats — dono same filter use karte hain
+//    (search / category / brand / status) taake dono ka data consistent rahe.
+// ======================================================
+const buildProductFilter = async (query = {}) => {
+  const brandId = query.brand_id;
+  const categoryId = query.category_id;
+  const statusFilter = String(query.status || "").trim();
+  const search = String(query.search || query.q || "").trim();
+
+  // ---- Filter build ----
+  // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
+  //     sirf tab apply hote hain jab explicitly bheja jaye.
+  const filter = { is_deleted: { $ne: true } };
+  if (brandId) filter.brand_id = brandId;
+  if (categoryId && categoryId !== "all") filter.category_id = categoryId;
+  if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
+
+  if (search) {
+    const rx = { $regex: escapeRegex(search), $options: "i" };
+    const [brandDocs, catDocs, variantDocs] = await Promise.all([
+      Brand
+        ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
+        : Promise.resolve([]),
+      Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
+      Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
+    ]);
+    filter.$or = [
+      { name: rx },
+      { brand_id: { $in: brandDocs.map((b) => b._id) } },
+      { category_id: { $in: catDocs.map((c) => c._id) } },
+      { _id: { $in: variantDocs.map((v) => v.product_id) } },
+    ];
+  }
+
+  return { filter, search };
+};
+
+// ======================================================
+// SUMMARY STATS COMPUTE
+// ✅ Stat cards ke liye GLOBAL stats — filter ke mutabiq poori dataset par
+//     (sirf current page par nahi). Ek aggregation se variants + stock dono.
+// ✅ Ye logic list se alag (dedicated /products/stats) use hota hai.
+// ======================================================
+const computeProductStats = async (filter, totalOverride = null) => {
+  const allMatchedIds = (await Product.find(filter).select("_id").lean()).map((d) => d._id);
+  const [total, activeProducts, variantAgg] = await Promise.all([
+    Number.isFinite(totalOverride) ? Promise.resolve(totalOverride) : Product.countDocuments(filter),
+    allMatchedIds.length
+      ? Product.countDocuments({ _id: { $in: allMatchedIds }, status: "active" })
+      : Promise.resolve(0),
+    allMatchedIds.length
+      ? Variant.aggregate([
+          { $match: { is_deleted: { $ne: true }, product_id: { $in: allMatchedIds } } },
+          { $group: { _id: null, totalVariants: { $sum: 1 }, totalStock: { $sum: { $ifNull: ["$quantity", 0] } } } },
+        ])
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    totalProducts: total,
+    activeProducts,
+    totalVariants: variantAgg[0]?.totalVariants || 0,
+    totalStock: variantAgg[0]?.totalStock || 0,
+  };
+};
+
+// ======================================================
 // GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
 // ======================================================
 // ======================================================
@@ -210,36 +278,11 @@ const getProducts = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
-    const search = String(req.query.search || req.query.q || "").trim();
     const sort = String(req.query.sort || "newest");
-    const brandId = req.query.brand_id;
-    const categoryId = req.query.category_id;
-    const statusFilter = String(req.query.status || "").trim();
 
     // ---- Filter build ----
-    // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
-    //     sirf tab apply hote hain jab explicitly bheja jaye.
-    const filter = { is_deleted: { $ne: true } };
-    if (brandId) filter.brand_id = brandId;
-    if (categoryId && categoryId !== "all") filter.category_id = categoryId;
-    if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
-
-    if (search) {
-      const rx = { $regex: escapeRegex(search), $options: "i" };
-      const [brandDocs, catDocs, variantDocs] = await Promise.all([
-Brand
-  ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
-  : Promise.resolve([]),
-          Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
-        Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
-      ]);
-      filter.$or = [
-        { name: rx },
-        { brand_id: { $in: brandDocs.map((b) => b._id) } },
-        { category_id: { $in: catDocs.map((c) => c._id) } },
-        { _id: { $in: variantDocs.map((v) => v.product_id) } },
-      ];
-    }
+    // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
+    const { filter } = await buildProductFilter(req.query);
 
     const isPriceSort = sort === "price-asc" || sort === "price-desc";
 
@@ -282,26 +325,12 @@ Brand
     const safePage = Math.min(page, pages);
     const skip = (safePage - 1) * limit;
 
-    // ✅ Stat cards ke liye GLOBAL stats — filter ke mutabiq poori dataset par
-    //     (sirf current page par nahi). Ek aggregation se variants + stock dono.
-    const allMatchedIds = (await Product.find(filter).select("_id").lean()).map((d) => d._id);
-    const [activeProducts, variantAgg] = await Promise.all([
-      allMatchedIds.length
-        ? Product.countDocuments({ _id: { $in: allMatchedIds }, status: "active" })
-        : Promise.resolve(0),
-      allMatchedIds.length
-        ? Variant.aggregate([
-            { $match: { is_deleted: { $ne: true }, product_id: { $in: allMatchedIds } } },
-            { $group: { _id: null, totalVariants: { $sum: 1 }, totalStock: { $sum: { $ifNull: ["$quantity", 0] } } } },
-          ])
-        : Promise.resolve([]),
-    ]);
-    const stats = {
-      totalProducts: total,
-      activeProducts,
-      totalVariants: variantAgg[0]?.totalVariants || 0,
-      totalStock: variantAgg[0]?.totalStock || 0,
-    };
+    // ✅ API OPTIMIZATION: Summary stats ki heavy aggregation ab list request se
+    //     hata di gayi hai — stat cards apne dedicated endpoint (/products/stats) se
+    //     load hote hain, taake list fast rahe aur table/summary dono independent ho jayein.
+    //     Backward compatibility: ?include_stats=1 bhejne par stats pehle ki tarah
+    //     isi response mein bhi mil jayenge.
+    const stats = String(req.query.include_stats || "") === "1" ? await computeProductStats(filter, total) : null;
 
     let pageIds = [];
 
@@ -335,7 +364,7 @@ Brand
     if (!pageIds.length) {
       return res.status(200).json({
         products: [],
-        stats,
+        ...(stats ? { stats } : {}),
         pagination: { total, page: safePage, limit, pages, hasNext: false, hasPrev: safePage > 1 },
       });
     }
@@ -371,7 +400,7 @@ Brand
 
     return res.status(200).json({
       products: result,
-      stats,
+      ...(stats ? { stats } : {}),
       pagination: {
         total,
         page: safePage,
@@ -384,6 +413,23 @@ Brand
   } catch (error) {
     console.error(" [getProducts] Error:", error);
     return res.status(500).json({ message: error.message || "Failed to fetch products" });
+  }
+};
+// ======================================================
+// GET PRODUCT SUMMARY STATS (stat cards ke liye)
+// ✅ Products list se ALAG endpoint — table aur summary cards independently
+//     load/refresh hote hain (ek doosre ko block nahi karte).
+// ✅ Same filters support karta hai: search / category_id / brand_id / status
+// ✅ Response: { success: true, stats: { totalProducts, activeProducts, totalVariants, totalStock } }
+// ======================================================
+const getProductStats = async (req, res) => {
+  try {
+    const { filter } = await buildProductFilter(req.query);
+    const stats = await computeProductStats(filter);
+    return res.status(200).json({ success: true, stats });
+  } catch (error) {
+    console.error("❌ [getProductStats] Error:", error);
+    return res.status(500).json({ message: error.message || "Failed to fetch product stats" });
   }
 };
 // ======================================================
@@ -595,7 +641,8 @@ const createProduct = async (req, res) => {
         description: item.description || "",
         cost_price: toNumber(item.cost_price, 0),
         selling_price: toNumber(item.selling_price, 0),
-        quantity: toNumber(item.quantity, 0),
+        // ✅ Variant stock sirf whole units (decimal point truncate)
+        quantity: Math.trunc(toNumber(item.quantity, 0)),
         min_qnt: toNumber(item.min_qnt, 0),
         max_qnt: toNumber(item.max_qnt, 0),
         attributes: item.option_values || item.attributes || {},
@@ -834,7 +881,8 @@ const updateProduct = async (req, res) => {
           }
 
           if (item.quantity !== undefined) {
-            variant.quantity = toNumber(item.quantity, 0);
+            // ✅ Stock whole units mein hi rakhein (0.09 jaise decimals na aayein)
+            variant.quantity = Math.trunc(toNumber(item.quantity, 0));
           }
 
           if (item.min_qnt !== undefined) {
@@ -938,7 +986,8 @@ const updateProduct = async (req, res) => {
             description: item.description || "",
             cost_price: toNumber(item.cost_price, 0),
             selling_price: toNumber(item.selling_price, 0),
-            quantity: toNumber(item.quantity, 0),
+            // ✅ Variant stock sirf whole units (decimal point truncate)
+            quantity: Math.trunc(toNumber(item.quantity, 0)),
             min_qnt: toNumber(item.min_qnt, 0),
             max_qnt: toNumber(item.max_qnt, 0),
             attributes: item.option_values || item.attributes || {},
@@ -1184,6 +1233,7 @@ const toggleProductStatus = async (req, res) => {
 module.exports = {
   createProduct,
   getProducts,
+  getProductStats,
   getProductById,
   updateProduct,
   deleteProduct,

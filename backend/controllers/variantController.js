@@ -66,7 +66,8 @@ const createVariant = async (req, res) => {
       description: req.body.description || "",
       cost_price: Number(req.body.cost_price || 0),
       selling_price: Number(req.body.selling_price || 0),
-      quantity: Number(req.body.quantity || 0),
+      // ✅ Stock poore units mein — fractional value truncate ho jati hai
+      quantity: Math.trunc(Number(req.body.quantity || 0)) || 0,
       min_qnt: Number(req.body.min_qnt || 0),
       max_qnt: Number(req.body.max_qnt || 0),
       attributes,
@@ -142,7 +143,16 @@ const updateVariant = async (req, res) => {
     if (req.body.description !== undefined) variant.description = req.body.description;
     if (req.body.cost_price !== undefined) variant.cost_price = Number(req.body.cost_price);
     if (req.body.selling_price !== undefined) variant.selling_price = Number(req.body.selling_price);
-    if (req.body.quantity !== undefined) variant.quantity = Number(req.body.quantity);
+    // ✅ Stock poore units mein — decimal bhejne par 400 error (silent fractional stock nahi)
+    if (req.body.quantity !== undefined) {
+      const rawQuantity = Number(req.body.quantity);
+      if (!Number.isFinite(rawQuantity) || !Number.isInteger(rawQuantity) || rawQuantity < 0) {
+        return res.status(400).json({
+          message: "Quantity must be a valid non-negative whole number",
+        });
+      }
+      variant.quantity = rawQuantity;
+    }
     if (req.body.min_qnt !== undefined) variant.min_qnt = Number(req.body.min_qnt);
     if (req.body.max_qnt !== undefined) variant.max_qnt = Number(req.body.max_qnt);
 

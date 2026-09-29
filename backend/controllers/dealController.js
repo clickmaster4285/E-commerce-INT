@@ -21,6 +21,10 @@ const emitSocketEvent = (event, data) => {
 // resolve karo (Discount/Product controllers ka wahi pattern).
 const ACTOR_FIELDS = "name email role";
 
+// ✅ SEARCH SAFETY — user ka text seedha $regex me chala jata tha, is liye "." ya "["
+//    jaise special characters query bigaad (ya slow) kar dete thay.
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const resolveActor = async (rawId) => {
   if (!rawId) return null;
   // Pehle se populated (User/Employee document) → waisa hi return karo
@@ -175,68 +179,56 @@ const getDeals = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const query = {};
-
-    // ==========================================
-    // SEARCH
-    // ==========================================
-
-    if (search.trim()) {
-      query.$or = [
-        {
-          name: {
-            $regex: search.trim(),
-            $options: "i",
-          },
-        },
-        {
-          description: {
-            $regex: search.trim(),
-            $options: "i",
-          },
-        },
-      ];
-    }
-
-    // ==========================================
-    // TYPE FILTER
-    // ==========================================
-
-    if (type !== "all") {
-      query.type = type;
-    }
-
-    // ==========================================
-    // APPLY TO FILTER
-    // ==========================================
-
-    if (applyTo !== "all") {
-      query.applyTo = applyTo;
-    }
-
-    // ==========================================
-    // STATUS FILTER
-    // ==========================================
-
     const now = new Date();
+    const searchTerm = String(search).trim();
+    const safeSearch = searchTerm ? escapeRegExp(searchTerm) : "";
 
-    if (status === "active") {
-      query.isActive = true;
-      query.startDate = { $lte: now };
-      query.endDate = { $gte: now };
+    // ==========================================
+    // BASE CLAUSES (search + type + applyTo)
+    // ==========================================
+    // ⚠️ Ye sirf LIST query par lagte hain. Dashboard cards (stats) inhi par bante hain
+    //    taake "Active / Expired" counts poore dataset ko reflect karein, current page ko nahi.
+
+    const baseClauses = [];
+
+    if (safeSearch) {
+      baseClauses.push({
+        $or: [
+          { name: { $regex: safeSearch, $options: "i" } },
+          { code: { $regex: safeSearch, $options: "i" } },
+          { description: { $regex: safeSearch, $options: "i" } },
+        ],
+      });
     }
 
-    if (status === "upcoming") {
-      query.startDate = { $gt: now };
+    if (type && type !== "all") {
+      baseClauses.push({ type });
     }
 
-    if (status === "expired") {
-      query.endDate = { $lt: now };
+    if (applyTo && applyTo !== "all") {
+      baseClauses.push({ applyTo });
     }
 
-    if (status === "disabled") {
-      query.isActive = false;
-    }
+    // ✅ $and array use kar rahe hain — isse search ka $or aur status ke $or
+    //    ek saath merge ho sakte hain (do top-level $or allowed nahi hote).
+    const buildQuery = (extraClauses = []) => {
+      const clauses = [...baseClauses, ...extraClauses];
+      return clauses.length ? { $and: clauses } : {};
+    };
+
+    // ✅ STATUS SEMANTICS frontend ke getDealStatus() ke exactly match:
+    //    disabled = isActive false, baaki sab isActive true + date checks.
+    const statusClauses = {
+      active: [{ isActive: true }, { startDate: { $lte: now } }, { endDate: { $gte: now } }],
+      upcoming: [{ isActive: true }, { startDate: { $gt: now } }],
+      expired: [{ isActive: true }, { endDate: { $lt: now } }],
+      disabled: [{ isActive: false }],
+    };
+
+    // Frontend dropdown "scheduled" label use karta hai — dono aliases handle hain
+    const requestedStatus = String(status).trim();
+    const statusKey = requestedStatus === "scheduled" ? "upcoming" : requestedStatus;
+    const query = buildQuery(statusClauses[statusKey] || []);
 
     // ==========================================
     // PAGINATION
@@ -248,31 +240,45 @@ const getDeals = async (req, res) => {
     const skip = (currentPage - 1) * perPage;
 
     // ==========================================
-    // GET DATA
+    // GET DATA (+ server-side stats)
     // ==========================================
 
-    const [deals, total] = await Promise.all([
-      Deal.find(query)
-        .populate("productIds", "name sku images selling_price")
-        .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
-        .populate("categoryIds", "name code")
-        .populate("brandIds", "name logo")
-        .populate("createdBy", "name email role")
-        .populate("updatedBy", "name email role")
-        .sort({
-          priority: -1,
-          createdAt: -1,
-        })
-        .skip(skip)
-        .limit(perPage)
-        .lean(),
+    const [deals, total, baseTotal, activeCount, scheduledCount, expiredCount, disabledCount] =
+      await Promise.all([
+        Deal.find(query)
+          .populate("productIds", "name sku images selling_price")
+          .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
+          .populate("categoryIds", "name code")
+          .populate("brandIds", "name logo")
+          .populate("createdBy", "name email role")
+          .populate("updatedBy", "name email role")
+          .sort({
+            priority: -1,
+            createdAt: -1,
+          })
+          .skip(skip)
+          .limit(perPage)
+          .lean(),
 
-      Deal.countDocuments(query),
-    ]);
+        Deal.countDocuments(query),
+        Deal.countDocuments(buildQuery()),
+        Deal.countDocuments(buildQuery(statusClauses.active)),
+        Deal.countDocuments(buildQuery(statusClauses.upcoming)),
+        Deal.countDocuments(buildQuery(statusClauses.expired)),
+        Deal.countDocuments(buildQuery(statusClauses.disabled)),
+      ]);
 
     res.status(200).json({
       success: true,
       data: deals,
+      // ✅ Frontend ke stat cards ab inhi numbers par hain (page-size independent)
+      stats: {
+        total: baseTotal,
+        active: activeCount,
+        scheduled: scheduledCount,
+        expired: expiredCount,
+        disabled: disabledCount,
+      },
       pagination: {
         total,
         page: currentPage,

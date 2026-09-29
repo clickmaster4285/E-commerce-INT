@@ -958,7 +958,7 @@ export default function ManageStockPage() {
                     })}
                   </div>
 
-                  {/* Quantity Input */}
+                  {/* Quantity Input — stock sirf poore units mein (decimal allowed nahi) */}
                   <div>
                     <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Quantity <span style={{ color: "var(--danger)" }}>*</span></label>
                     <input 
@@ -966,11 +966,16 @@ export default function ManageStockPage() {
                       min={1} 
                       max={adjustForm.type === "remove" ? (adjustTarget.quantity ?? 0) : undefined}
                       step="1" 
+                      inputMode="numeric"
                       value={adjustForm.quantity} 
+                      onKeyDown={(e) => { if ([".", ",", "-", "+", "e", "E"].includes(e.key)) e.preventDefault(); }}
                       onChange={(e) => { 
                         setAdjustError(""); 
-                        const val = e.target.value;
                         const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
+                        // ✅ Poore units hi maane jate hain — decimal point (0.09) ka sirf
+                        // integer part rakha jata hai, baaki characters hata diye jate hain.
+                        const raw = e.target.value;
+                        const val = (raw.includes(".") ? raw.slice(0, raw.indexOf(".")) : raw).replace(/[^0-9]/g, "");
                         if (val === "" || Number(val) <= maxStock) {
                           setAdjustForm({ ...adjustForm, quantity: val });
                         }
@@ -982,7 +987,7 @@ export default function ManageStockPage() {
                       onBlur={(e) => e.target.style.borderColor = "var(--border-color)"} 
                       placeholder={adjustForm.type === "add" ? "Units to add" : "Units to remove"} 
                     />
-                    
+            
                     {adjustForm.type === "remove" && (
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <InfoIcon className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} />
@@ -1090,12 +1095,12 @@ export default function ManageStockPage() {
                   </div>
                 </div>
 
-                {adjustError && (
+                {/* {adjustError && (
                   <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                     <AlertTriangleIcon />
                     <p className="text-[12px]" style={{ color: "var(--danger)" }}>{adjustError}</p>
                   </div>
-                )}
+                )} */}
               </div>
 
               {/* Footer Actions */}

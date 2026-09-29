@@ -29,6 +29,7 @@ const FilterIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fi
 const FileTextIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>);
 const DotsVerticalIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>);
 const ShieldCheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>);
+const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 
 const SortIndicator = ({ active, direction }) => (
   <svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -77,6 +78,191 @@ const getCategoryName = (categoryId, categories) => {
   return category?.name || "None";
 };
 
+/* ================= Parent category restriction helpers =================
+   Ye sab helpers existing category data (`parent_category_id`) hi reuse karte
+   hain — koi naya API call / schema change nahi. */
+
+// Parent category ban chuki category ko kisi doosri category ke under assign
+// nahi kiya ja sakta.
+const PARENT_ALREADY_PARENT_TEXT =
+  "This category already contains child categories and cannot be assigned as a child of another category.";
+const PARENT_ALREADY_PARENT_MESSAGE =
+  "Cannot assign this category as a child because it is already a parent category.";
+
+// Parent Category dropdown ke liye SIRF root categories (parent = None) — child
+// categories (Mobile, Laptop, ...) kabhi parent option nahi ban sakti.
+const getRootCategories = (categories = []) =>
+  (categories || []).filter((category) => !getId(category?.parent_category_id));
+
+// Un tamam categories ke ids jo already kisi category ke parent hain
+const getParentIdsWithChildren = (categories = []) => {
+  const ids = new Set();
+  (categories || []).forEach((category) => {
+    const parentId = getId(category?.parent_category_id);
+    if (parentId) ids.add(parentId);
+  });
+  return ids;
+};
+
+// ✅ NEW: Naam-based root lock — agar Category Name kisi aisi existing category
+// se match karta hai (case-insensitive) jiske apne child categories hain, to ye
+// category root (Parent = None) honi chahiye. Rule hardcode nahi hai — har
+// existing category par lagta hai (Electronics, Clothing, ...).
+const NAME_PARENT_LOCK_TEXT =
+  "A category with this name already contains subcategories, so Parent Category is locked to None.";
+const NAME_PARENT_LOCK_MESSAGE =
+  "Parent category must be None because a category with this name already exists with subcategories.";
+
+/* Parent Category lock hone ki wajah professional alert ke roop mein —
+   dropdown disabled kyun hai ye user ko turant clear ho jata hai. */
+const ParentLockNotice = ({ title, children }) => (
+  <div className="flex items-start gap-2.5 rounded-[10px] border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-3 py-2.5">
+    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warning)] text-[var(--text-inverse)]">
+      <InfoIcon className="h-[11px] w-[11px]" />
+    </span>
+    <div className="min-w-0 space-y-0.5">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--warning-text)]">{title}</p>
+      <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{children}</p>
+    </div>
+  </div>
+);
+
+const getExistingParentNameMatchId = ({ categories = [], name = "", excludeId = "" }) => {
+  const target = String(name || "").trim().toLowerCase();
+  if (!target) return "";
+  const withChildren = getParentIdsWithChildren(categories);
+  const match = (categories || []).find((category) => {
+    const id = getId(category?._id);
+    if (!id || id === String(excludeId || "")) return false;
+    if (!withChildren.has(id)) return false;
+    return String(category?.name || "").trim().toLowerCase() === target;
+  });
+  return match ? getId(match._id) : "";
+};
+
+// Ek category ke tamam (nested) descendants — circular hierarchy rokne ke liye
+const getDescendantIds = (categories = [], rootId) => {
+  const root = getId(rootId);
+  const descendants = new Set();
+  if (!root) return descendants;
+
+  const childrenByParent = new Map();
+  (categories || []).forEach((category) => {
+    const parentId = getId(category?.parent_category_id);
+    const categoryId = getId(category?._id);
+    if (!parentId || !categoryId) return;
+    if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+    childrenByParent.get(parentId).push(categoryId);
+  });
+
+  const queue = [...(childrenByParent.get(root) || [])];
+  while (queue.length) {
+    const id = queue.shift();
+    if (descendants.has(id)) continue;
+    descendants.add(id);
+    queue.push(...(childrenByParent.get(id) || []));
+  }
+
+  return descendants;
+};
+
+// Parent dropdown ke har option ki state — disabled reason + badge + helper text.
+// Invalid option ko UI se hataya nahi jata, sirf disabled (muted) dikhaya jata hai.
+const getParentOptionState = ({
+  optionId,
+  editingId,
+  editingHasChildren,
+  descendantIds,
+  parentIdsWithChildren,
+}) => {
+  const id = getId(optionId);
+  const isSelf = Boolean(editingId) && id === String(editingId);
+
+  if (isSelf) {
+    return parentIdsWithChildren.has(id)
+      ? {
+          disabled: true,
+          badge: "Already a parent",
+          hint: PARENT_ALREADY_PARENT_TEXT,
+          message: PARENT_ALREADY_PARENT_MESSAGE,
+        }
+      : {
+          disabled: true,
+          badge: "This category",
+          hint: "A category cannot be selected as its own parent.",
+          message: "A category cannot be its own parent.",
+        };
+  }
+
+  if (descendantIds.has(id)) {
+    return {
+      disabled: true,
+      badge: "Subcategory",
+      hint: "This is a subcategory of the category being edited, so it cannot become its parent.",
+      message: "Cannot create a circular category hierarchy.",
+    };
+  }
+
+  // ✅ Rule: jis category ke apne children hain, uske liye Parent Category
+  // dropdown ke TAMAM options disabled — sirf "None" (root) rehna chahiye.
+  if (editingHasChildren) {
+    return {
+      disabled: true,
+      badge: "Already a parent",
+      hint: PARENT_ALREADY_PARENT_TEXT,
+      message: PARENT_ALREADY_PARENT_MESSAGE,
+    };
+  }
+
+  // Valid parent — root category (chahe uske apne children hon) normal select
+  // hota hai.
+  return { disabled: false, badge: "", hint: "", message: "" };
+};
+
+// Submit se pehle ki validation — UI bypass na ho sake (backend bhi same rule
+// apply karta hai).
+const getParentAssignmentError = ({ categories = [], editingCategory = null, nextParentId, name = "" }) => {
+  const next = getId(nextParentId);
+  const editingId = getId(editingCategory?._id);
+
+  // ✅ NEW: Final validation — agar Category Name kisi aisi existing category se
+  // match karti hai jiske apne child categories hain, to create/update block —
+  // chahe Parent Category None (locked) hi kyun na ho. UI bypass ho to bhi yahan.
+  const nameMatchId = getExistingParentNameMatchId({ categories, name, excludeId: editingId });
+  if (nameMatchId && !next) {
+    const matchedName = (categories || []).find((category) => getId(category?._id) === nameMatchId)?.name;
+    return `${matchedName || String(name || "").trim()} already has child categories and cannot be assigned under another category.`;
+  }
+
+  if (!next) return "";
+
+  const withChildren = getParentIdsWithChildren(categories);
+  const currentParentId = getId(editingCategory?.parent_category_id);
+  const parentChanged = next !== currentParentId;
+
+  // Sabse pehle self-parent (sab se specific error)
+  if (editingId && next === editingId) return "A category cannot be its own parent.";
+
+  // ✅ NEW: Naam match (children wali existing category) → parent selection allowed nahi
+  // (Create aur Edit dono par apply hota hai — UI bypass ho to bhi yahan block)
+  if (nameMatchId) {
+    return NAME_PARENT_LOCK_MESSAGE;
+  }
+
+  if (!editingCategory || !editingId) return "";
+
+  if (getDescendantIds(categories, editingId).has(next)) {
+    return "Cannot create a circular category hierarchy.";
+  }
+
+  // Jo category already children rakhti hai use kisi parent ke under nahi ja sakti
+  if (parentChanged && withChildren.has(editingId)) {
+    return PARENT_ALREADY_PARENT_MESSAGE;
+  }
+
+  return "";
+};
+
 /* ================= MAIN PAGE COMPONENT ================= */
 export default function CategoriesPage() {
   useCategorySocketSync();
@@ -123,6 +309,8 @@ const [viewMode, setViewMode] = useState(() => {
   const [showParentDropdown, setShowParentDropdown] = useState(false);
   const parentDropdownRef = useRef(null);
   const [parentDropdownPos, setParentDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  // ✅ NEW: Disabled parent option ka inline explanation (hover / focus / invalid attempt)
+  const [parentRestrictionHint, setParentRestrictionHint] = useState("");
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -367,6 +555,17 @@ const [viewMode, setViewMode] = useState(() => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
+
+    // ✅ NEW: Parent category restriction — submit se pehle frontend validation
+    // (backend bhi same rule enforce karta hai).
+    const parentError = getParentAssignmentError({
+      categories: categoryOptions,
+      editingCategory: showEditModal ? editingCategory : null,
+      nextParentId: formData.parent_category_id,
+      name: formData.name,
+    });
+    if (parentError) { toast.error(parentError); return; }
+
     const payload = { 
       ...formData, 
       parent_category_id: formData.parent_category_id || null,
@@ -820,24 +1019,47 @@ const [viewMode, setViewMode] = useState(() => {
     const isEdit = showEditModal && editingCategory;
     if (!showCreateModal && !showEditModal) return null;
 
-    // Build hierarchical category list for custom dropdown
-    const buildHierarchy = (cats, parentId = null, depth = 0) => {
-      const result = [];
-      const normalizedParent = parentId === null ? "" : getId(parentId);
-      const children = cats.filter((c) => {
-        const cParentId = getId(c.parent_category_id);
-        return cParentId === normalizedParent && String(c._id) !== String(editingCategory?._id);
-      });
-      for (const cat of children) {
-        result.push({ ...cat, depth });
-        result.push(...buildHierarchy(cats, cat._id, depth + 1));
-      }
-      return result;
-    };
-    const hierarchicalCategories = buildHierarchy(categoryOptions);
+    // ✅ NEW: Parent category restriction ke liye existing relationships inspect karo
+    // (same `categoryOptions` data se — koi extra API call nahi).
+    const editingId = isEdit ? String(editingCategory._id) : "";
+    const parentIdsWithChildren = getParentIdsWithChildren(categoryOptions);
+    const editingHasChildren = Boolean(editingId) && parentIdsWithChildren.has(editingId);
+    const descendantIds = getDescendantIds(categoryOptions, editingId);
+
+    // ✅ Parent Category dropdown mein SIRF root categories (parent = None)
+    // NOTE: Editing category ko list se hataya nahi jata — wo disabled (muted)
+    // dikhaya jata hai taa ke behavior confusing na ho.
+    const rootCategories = getRootCategories(categoryOptions).map((cat) => ({
+      ...cat,
+      parentState: getParentOptionState({
+        optionId: cat._id,
+        editingId,
+        editingHasChildren,
+        descendantIds,
+        parentIdsWithChildren,
+      }),
+    }));
     const selectedParentName = formData.parent_category_id
       ? categoryOptions.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
       : "None";
+
+    // ✅ NEW: Category Name kisi existing (children wali) category se match karta
+    // hai → Parent Category automatically None + dropdown disabled.
+    const nameMatchLockId = getExistingParentNameMatchId({
+      categories: categoryOptions,
+      name: formData.name,
+      excludeId: editingId,
+    });
+    const parentLockedByName = Boolean(nameMatchLockId);
+    const matchedName = parentLockedByName
+      ? categoryOptions.find((c) => String(c._id) === String(nameMatchLockId))?.name || formData.name
+      : "";
+    const parentDropdownDisabled = editingHasChildren || parentLockedByName;
+    const parentDropdownTitle = parentLockedByName
+      ? NAME_PARENT_LOCK_TEXT
+      : editingHasChildren
+        ? PARENT_ALREADY_PARENT_TEXT
+        : undefined;
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -878,7 +1100,21 @@ const [viewMode, setViewMode] = useState(() => {
                   </div>
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus
+                    <input type="text" value={formData.name} required autoFocus
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        // ✅ Naam match lock active ho to Parent Category = None (auto)
+                        const locked = getExistingParentNameMatchId({
+                          categories: categoryOptions,
+                          name,
+                          excludeId: editingId,
+                        });
+                        setFormData((prev) => ({
+                          ...prev,
+                          name,
+                          parent_category_id: locked ? "" : prev.parent_category_id,
+                        }));
+                      }}
                       className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                       placeholder="e.g. Smartphones" />
                   </div>
@@ -893,23 +1129,46 @@ const [viewMode, setViewMode] = useState(() => {
 
               {/* ── SECTION 2: CATEGORY HIERARCHY ── */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Parent Category</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
                   <div className="relative">
                     <button ref={parentDropdownRef} type="button"
+                      disabled={parentDropdownDisabled}
                       onClick={() => {
+                        if (parentDropdownDisabled) return;
                         if (!showParentDropdown && parentDropdownRef.current) {
                           const rect = parentDropdownRef.current.getBoundingClientRect();
                           setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
                         }
+                        // ✅ NEW: Dropdown khulte waqt purana restriction hint clear karo
+                        setParentRestrictionHint("");
                         setShowParentDropdown(!showParentDropdown);
                       }}
-                      className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors cursor-pointer flex items-center justify-between gap-2">
-                      <span className="truncate text-left">{selectedParentName}</span>
+                      title={parentDropdownTitle}
+                      className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="truncate text-left">{parentLockedByName ? "None" : selectedParentName}</span>
+                        {parentLockedByName && (
+                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Locked to None</span>
+                        )}
+                        {!parentLockedByName && editingHasChildren && (
+                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Already a parent</span>
+                        )}
+                      </span>
                       <ChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                     </button>
                   </div>
+                  {parentLockedByName && !editingHasChildren && (
+                    <ParentLockNotice title="Parent Category locked to None">
+                      <span className="font-semibold text-[var(--text-primary)]">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-[var(--text-primary)]">None</span>.
+                    </ParentLockNotice>
+                  )}
+                  {editingHasChildren && (
+                    <ParentLockNotice title="Already used as a parent category">
+                      <span className="font-semibold text-[var(--text-primary)]">{editingCategory?.name}</span> already contains subcategories, so it cannot be assigned under another category.
+                    </ParentLockNotice>
+                  )}
                 </div>
               </div>
 
@@ -968,14 +1227,14 @@ const [viewMode, setViewMode] = useState(() => {
           </form>
 
           {/* ── PARENT CATEGORY DROPDOWN (portaled to body) ── */}
-          {showParentDropdown && createPortal(
+          {showParentDropdown && !parentDropdownDisabled && createPortal(
             <>
               <div className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
               <div
-                className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden"
-                style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "240px" }}
+                className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden flex flex-col"
+                style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "280px" }}
               >
-                <div className="overflow-y-auto" style={{ maxHeight: "240px" }}>
+                <div className="overflow-y-auto" style={{ maxHeight: "240px", flexShrink: 1 }}>
                   <button type="button"
                     onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
                     className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
@@ -984,20 +1243,52 @@ const [viewMode, setViewMode] = useState(() => {
                   </button>
                   {categoriesLoading ? (
                     <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">Loading categories...</div>
-                  ) : hierarchicalCategories.length === 0 ? (
+                  ) : rootCategories.length === 0 ? (
                     <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">No categories available</div>
                   ) : (
-                    hierarchicalCategories.map((cat) => (
-                      <button key={cat._id} type="button"
-                        onClick={() => { setFormData({ ...formData, parent_category_id: cat._id }); setShowParentDropdown(false); }}
-                        className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}
-                        style={{ paddingLeft: `${12 + cat.depth * 16}px` }}>
-                        <span className="truncate">{cat.name}</span>
-                        {String(formData.parent_category_id) === String(cat._id) && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
-                      </button>
-                    ))
+                    rootCategories.map((cat) => {
+                      const state = cat.parentState || { disabled: false, badge: "", hint: "", message: "" };
+                      const isSelected = String(formData.parent_category_id) === String(cat._id);
+                      return (
+                        <button key={cat._id} type="button"
+                          onClick={() => {
+                            if (state.disabled) {
+                              // Invalid selection — silent fail ke bajaye clear reason do
+                              toast.error(state.message || "This parent category is not available.");
+                              setParentRestrictionHint(state.hint || "");
+                              return;
+                            }
+                            setFormData({ ...formData, parent_category_id: cat._id });
+                            setShowParentDropdown(false);
+                          }}
+                          onMouseEnter={() => { if (state.hint) setParentRestrictionHint(state.hint); }}
+                          onFocus={() => { if (state.hint) setParentRestrictionHint(state.hint); }}
+                          title={state.hint || undefined}
+                          aria-disabled={state.disabled ? "true" : undefined}
+                          className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between gap-2 transition-colors ${state.disabled
+                            ? "cursor-not-allowed text-[var(--text-muted)] opacity-60"
+                            : isSelected
+                              ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]"
+                              : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{cat.name}</span>
+                            {state.badge && (
+                              <span className={`text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] border shrink-0 whitespace-nowrap ${state.disabled
+                                ? "bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-[var(--border-color)]"
+                                : "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/15"}`}>{state.badge}</span>
+                            )}
+                          </span>
+                          {isSelected && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
+                        </button>
+                      );
+                    })
                   )}
                 </div>
+                {parentRestrictionHint && (
+                  <div className="px-3 py-2 text-[10.5px] leading-snug text-[var(--text-muted)] bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] shrink-0">
+                    {parentRestrictionHint}
+                  </div>
+                )}
               </div>
             </>,
             document.body
