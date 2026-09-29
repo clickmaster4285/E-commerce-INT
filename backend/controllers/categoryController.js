@@ -199,6 +199,65 @@ const assertValidParent = async ({ categoryId, parentId }) => {
 
     currentId = current?.parent_category_id || null;
   }
+
+  // ✅ NEW: Parent category restriction — jo category already child categories
+  // rakhti hai wo kisi doosri category ke neeche assign nahi ho sakti.
+  // (Sirf update par apply hota hai kyunke create ke waqt nayi category ke
+  // children exist hi nahi karte.)
+  const hasChildren = await Category.exists({
+    parent_category_id: categoryId,
+    is_deleted: false,
+  });
+
+  if (hasChildren) {
+    throw new Error(
+      "Cannot assign this category as a child because it is already a parent category."
+    );
+  }
+};
+
+// ✅ NEW: Naam-based root restriction — agar diya gaya Category Name kisi aisi
+// existing category se match karta hai (case-insensitive) jiske apne child
+// categories hain, to ye category root (Parent = None) honi chahiye. Kisi aur
+// category ka child assign karna allowed nahi.
+// (Hardcoded nahi — ye rule har existing category par apply hota hai.)
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const assertNameForcesRootParent = async ({ name, parentId, categoryId = null }) => {
+  // ✅ UPDATED: Parent None (ya missing) hone par bhi check hota hai — taake
+  // frontend bypass karke bhi koi existing Parent Category ke naam par nayi
+  // category create/update na ho sake.
+  const trimmedName = String(name || "").trim();
+  if (!trimmedName) return;
+
+  const query = {
+    name: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: "i" },
+    is_deleted: false,
+  };
+  // Edit mein khud ko exclude karo (same name wali category = ye wali category)
+  if (categoryId) query._id = { $ne: categoryId };
+
+  const sameNameCategory = await Category.findOne(query).select("_id name").lean();
+  if (!sameNameCategory) return;
+
+  const hasChildren = await Category.exists({
+    parent_category_id: sameNameCategory._id,
+    is_deleted: false,
+  });
+
+  if (hasChildren) {
+    // ✅ NEW: Final validation — Parent None par bhi existing Parent Category
+    // (jiske child categories hain) ke naam se create/update reject.
+    if (!parentId) {
+      throw new Error(
+        `${sameNameCategory.name} already has child categories and cannot be assigned under another category.`
+      );
+    }
+
+    throw new Error(
+      `Parent category must be None because a category named "${sameNameCategory.name}" already exists with subcategories.`
+    );
+  }
 };
 
 // ✅ UPDATED: getCategoryAttributesList no longer checks tenant_id
@@ -300,6 +359,9 @@ const createCategory = async (req, res) => {
     }
 
     const categoryCode = req.body.category_code || (await getNextCategoryCode());
+
+    // ✅ NEW: Naam match (children wali existing category) → parent None compulsory
+    await assertNameForcesRootParent({ name, parentId: parent_category_id });
 
     // ✅ FIX: Pass null or skip tenantId in helper
     await assertValidParent({ parentId: parent_category_id }); 
@@ -438,6 +500,51 @@ const updateCategory = async (req, res) => {
 
     if (Object.prototype.hasOwnProperty.call(req.body, "is_active")) {
       updateData.is_active = Boolean(req.body.is_active);
+    }
+
+    // ✅ NEW: Parent category restriction — parent sirf tab validate hota hai jab
+    // wo actually change ho raha ho, taa ke same value dobara bhejne par
+    // existing valid relationship break na ho.
+    const parentProvided = Object.prototype.hasOwnProperty.call(req.body, "parent_category_id");
+    const nameProvided = Object.prototype.hasOwnProperty.call(req.body, "name") && req.body.name !== undefined;
+    const effectiveName = nameProvided ? req.body.name : existingCategory.name;
+    const nameChanged =
+      String(effectiveName || "").trim() !== String(existingCategory.name || "").trim();
+
+    if (parentProvided) {
+      const nextParentId = req.body.parent_category_id || null;
+      const currentParentId = existingCategory.parent_category_id
+        ? String(existingCategory.parent_category_id)
+        : "";
+
+      const parentChanged = String(nextParentId || "") !== currentParentId;
+
+      // ✅ UPDATED: Naam change ho ya parent change ho — dono par final
+      // validation (Parent None par bhi), taa ke koi bhi invalid
+      // create/update bypass na ho sake.
+      if (parentChanged || nameChanged) {
+        await assertNameForcesRootParent({
+          name: effectiveName,
+          parentId: nextParentId,
+          categoryId: existingCategory._id,
+        });
+      }
+
+      if (parentChanged) {
+        await assertValidParent({
+          categoryId: existingCategory._id,
+          parentId: nextParentId,
+        });
+      }
+
+      updateData.parent_category_id = normalizeObjectId(nextParentId);
+    } else if (nameChanged) {
+      // ✅ UPDATED: Parent field na bheja ho tab bhi naam-change par same rule
+      await assertNameForcesRootParent({
+        name: effectiveName,
+        parentId: existingCategory.parent_category_id || null,
+        categoryId: existingCategory._id,
+      });
     }
 
     // Check if there are any actual changes before setting updatedby

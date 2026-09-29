@@ -16,6 +16,33 @@ export const adminProductApi = {
   // ✅ Ab /products use karo (admin/all exist nahi karta)
   getAll: () => axiosInstance.get("/products").then(list),
 
+  // ✅ Server-side pagination (Admin Products list)
+  // Backend: ?page&limit&search&category_id&brand_id&status&sort
+  // Response: { products: [...], stats: {...}, pagination: { total, page, limit, pages, hasNext, hasPrev } }
+  // Note: limit bina legacy full-array response milta hai (getAll wala behavior).
+  getPaginated: ({ page = 1, limit = 20, search = "", category_id = "", brand_id = "", status = "" } = {}) => {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (category_id && category_id !== "all") params.category_id = category_id;
+    if (brand_id && brand_id !== "all") params.brand_id = brand_id;
+    if (status && status !== "all") params.status = status;
+    return axiosInstance.get("/products", { params }).then((res) => res.data);
+  },
+
+  // ✅ Summary stats (stat cards) — alag API, taake cards table se independently load hon.
+  // Backend: ?search&category_id&brand_id&status
+  // Response: { success: true, stats: { totalProducts, activeProducts, totalVariants, totalStock } }
+  getStats: ({ search = "", category_id = "", brand_id = "", status = "" } = {}) => {
+    const params = {};
+    if (search) params.search = search;
+    if (category_id && category_id !== "all") params.category_id = category_id;
+    if (brand_id && brand_id !== "all") params.brand_id = brand_id;
+    if (status && status !== "all") params.status = status;
+    return axiosInstance
+      .get("/products/stats", { params })
+      .then((res) => (res.data?.stats ? res.data.stats : (res.data?.data || res.data || {})));
+  },
+
   getByBrand: (brandId) =>
     axiosInstance.get("/products", { params: { brand_id: brandId } }).then(list),
 

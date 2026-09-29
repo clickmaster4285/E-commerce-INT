@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createProduct,
   getProducts,
+  getProductStats,
   getProductById,
   updateProduct,
   deleteProduct,
@@ -25,6 +26,9 @@ const router = express.Router();
 // 🌐 PUBLIC ROUTES — bina login (User GUI)
 // ==========================================
 router.get("/", getProducts);
+// ✅ Summary stats (stat cards) — list se alag route, taake independently load ho sake.
+//    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
+router.get("/stats", getProductStats);
 router.get("/:id", getProductById);
 
 // ==========================================

@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
   Sparkles, AlertTriangle, DollarSign, FolderOpen, Store, Hash, Tag as TagIcon,
   Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText,
-  Ban, ChevronLeft, ZoomIn // Added ZoomIn and ChevronLeft for gallery
+  Ban, ChevronLeft, ZoomIn, Search // Added ZoomIn and ChevronLeft for gallery
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
@@ -38,6 +38,15 @@ const createEmptyVariant = (sku = "") => ({
 
 function fd(d) {
   return d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+}
+
+// Date + time (kab create / update hua) — Variant Details drawer ke audit cards ke liye
+function fdt(d) {
+  if (!d) return "—";
+  const date = new Date(d);
+  const day = date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return `${day}, ${time}`;
 }
 
 function tago(d) {
@@ -134,6 +143,8 @@ function EmptyState({ icon: Icon, title, description, action }) {
 }
 
 function AllAttributesModal({ attributes, onClose }) {
+  const [search, setSearch] = useState("");
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") onClose();
@@ -141,6 +152,15 @@ function AllAttributesModal({ attributes, onClose }) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // Modal ke andar search — attribute ke naam ya value par filter
+  const filteredAttributes = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return attributes;
+    return attributes.filter((attribute) =>
+      `${attribute.name || ""} ${attribute.value || ""}`.toLowerCase().includes(term)
+    );
+  }, [attributes, search]);
 
   return createPortal(
     <div
@@ -168,7 +188,7 @@ function AllAttributesModal({ attributes, onClose }) {
             <div className="min-w-0">
               <h2 id="all-attributes-title" className="text-[15px] font-bold">All Attributes</h2>
               <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                Product attributes and specifications
+                Product attributes and specifications — search bar se turant filter karein
               </p>
             </div>
           </div>
@@ -183,14 +203,45 @@ function AllAttributesModal({ attributes, onClose }) {
               <p className="text-[12px]">No attributes are available for this product.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {attributes.map((attribute) => (
-                <div key={attribute.name} className="min-w-0 rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                  <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
-                  <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{attribute.value || "—"}</p>
+            <>
+              {/* Search bar — attribute ka naam ya value search karne ke liye */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search attributes..."
+                  className="h-9 w-full rounded-lg pl-9 pr-9 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:text-[13px]"
+                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 transition hover:bg-black/10" style={{ color: "var(--text-muted)" }} aria-label="Clear search">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <p className="mb-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                Showing <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>{filteredAttributes.length}</span> of {attributes.length} attribute{attributes.length === 1 ? "" : "s"}
+              </p>
+
+              {filteredAttributes.length === 0 ? (
+                <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+                  <p className="text-[12px]">No attribute matches &quot;{search.trim()}&quot;.</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {filteredAttributes.map((attribute) => (
+                    <div key={attribute.name} className="min-w-0 rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                      <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                      <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{attribute.value || "—"}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -202,6 +253,107 @@ function AllAttributesModal({ attributes, onClose }) {
       </div>
     </div>,
     document.body
+  );
+}
+
+// Edit Product modal ke Category / Brand dropdown — dropdown ke andar search bar
+function SearchableSelectField({ value, onChange, options, placeholder = "Select...", searchPlaceholder = "Search...", emptyLabel = "No results found" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const selectedOption = options.find((option) => String(option.value) === String(value)) || null;
+
+  const filteredOptions = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return options;
+    return options.filter((option) => String(option.label || "").toLowerCase().includes(term));
+  }, [options, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const timer = setTimeout(() => searchInputRef.current?.focus(), 40);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  const handleSelect = (nextValue) => {
+    onChange(nextValue);
+    setIsOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => { if (!open) setSearch(""); return !open; })}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className="h-9 px-3 rounded-lg text-[12px] w-full flex items-center justify-between gap-2 outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+        style={{ backgroundColor: "var(--bg-tertiary)", border: `1px solid ${isOpen ? "var(--accent)" : "var(--border-color)"}`, color: "var(--text-primary)" }}
+      >
+        <span className="truncate" style={{ color: selectedOption ? "var(--text-primary)" : "var(--text-muted)" }}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 z-[100] mt-1 overflow-hidden rounded-lg shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <div className="p-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-9 w-full rounded-md pl-8 pr-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              />
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-4 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>{search.trim() ? `No match for "${search.trim()}"` : emptyLabel}</p>
+            ) : filteredOptions.map((option) => (
+              <button
+                type="button"
+                key={String(option.value)}
+                onClick={() => handleSelect(String(option.value))}
+                className="block w-full px-3 py-2 text-left text-[12px] transition hover:bg-[var(--bg-row-hover)]"
+                style={{ color: String(value) === String(option.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(option.value) ? 600 : 400 }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -352,6 +504,225 @@ function MoreMenu({ actions }) {
         document.body
       )}
     </div>
+  );
+}
+
+// ==================== VARIANT DETAILS DRAWER ====================
+// 3-dot menu → "View Detailed": variant ki poori detail right side panel mein.
+// Sare fields pehle se fetched product payload se aate hain (koi extra API call nahi).
+
+function DetailStat({ label, value, color, icon: Icon }) {
+  return (
+    <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+      <div className="flex items-center gap-1.5">
+        {Icon && <Icon className="w-3 h-3 shrink-0" style={{ color: "var(--text-muted)" }} />}
+        <p className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--text-muted)" }}>{label}</p>
+      </div>
+      <p className="mt-1 text-[13px] font-bold truncate" style={{ color: color || "var(--text-primary)" }}>{value}</p>
+    </div>
+  );
+}
+
+function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // Escape: pehle image preview band karo, warna panel.
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (previewImage !== null) setPreviewImage(null);
+      else onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [previewImage, onClose]);
+
+  if (!variant) return null;
+
+  const isActive = variant.status === "active" || !variant.status;
+  const quantity = Number(variant.quantity || 0);
+  const images = variant.images || [];
+  const tagList = (variant.tags || []).map(tagNameOf).filter(Boolean);
+  const attributes = Object.entries(variant.attributes || {})
+    .map(([name, raw]) => ({ name, value: attrValueOf(raw) }))
+    .filter((attribute) => attribute.value);
+  const createdBy = variant.createdby && typeof variant.createdby === "object" ? variant.createdby : null;
+  const updatedBy = variant.updatedby && typeof variant.updatedby === "object" ? variant.updatedby : null;
+  const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
+  // "Updated By" card sirf tab dikhta hai jab variant waqai update hua ho —
+  // warna creation timestamp hi update lagta hai (jaisa seed data mein hota hai).
+  const auditEntries = [
+    { label: "Created By", user: createdBy, date: variant.created_at, color: "emerald" },
+    ...(hasRealUpdate(variant.created_at, variant.updated_at)
+      ? [{ label: "Updated By", user: updatedBy, date: variant.updated_at, color: "blue" }]
+      : []),
+  ];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex justify-end">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+
+      <aside className="relative w-full sm:max-w-[460px] h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", borderLeft: "1px solid var(--border-color)", boxShadow: "0 0 40px rgba(0,0,0,0.35)" }}>
+        {/* HEADER */}
+        <div className="px-5 py-4 flex items-start justify-between gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+              <Layers3 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-bold" style={{ color: "var(--text-primary)" }}>Variant Details</h2>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{productName || "Product variant"}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close variant details" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[var(--bg-card)] shrink-0" style={{ color: "var(--text-muted)" }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* IDENTITY */}
+          <div className="flex items-start gap-3.5">
+            {images.length > 0 ? (
+              <button type="button" onClick={() => setPreviewImage(0)} className="w-16 h-16 rounded-lg overflow-hidden shrink-0 transition hover:opacity-90" style={{ border: "1px solid var(--border-color)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={getImageUrl(images[0].img_url)} alt={variantLabelOf(variant)} className="w-full h-full object-cover" />
+              </button>
+            ) : (
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-[14px] font-bold leading-5" style={{ color: "var(--text-primary)" }}>{variantLabelOf(variant)}</h3>
+                <StatusBadge active={isActive} />
+              </div>
+              <p className="mt-1 text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>SKU: {variant.sku || "—"}</p>
+              <p className="mt-1.5 text-[11.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                {variant.description || "No description provided for this variant."}
+              </p>
+            </div>
+          </div>
+
+          {/* PRICING */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Pricing</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <DetailStat label="Cost Price" value={money(variant.cost_price)} icon={DollarSign} />
+              <DetailStat label="Selling Price" value={money(variant.selling_price)} icon={TagIcon} color="var(--success)" />
+              <DetailStat label="Quantity" value={quantity} icon={Box} color={quantity <= 5 ? "var(--danger)" : undefined} />
+              <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3 h-3 shrink-0" style={{ color: "var(--text-muted)" }} />
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</p>
+                </div>
+                <div className="mt-1.5"><StatusBadge active={isActive} /></div>
+              </div>
+            </div>
+          </div>
+
+          {/* INVENTORY */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Inventory</p>
+            <div className="grid grid-cols-3 gap-2.5">
+              <DetailStat label="Quantity" value={quantity} />
+              <DetailStat label="Minimum Qty" value={Number(variant.min_qnt || 0)} />
+              <DetailStat label="Maximum Qty" value={Number(variant.max_qnt || 0)} />
+            </div>
+          </div>
+
+          {/* ATTRIBUTES */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Attributes</p>
+            {attributes.length === 0 ? (
+              <p className="text-[11.5px] italic" style={{ color: "var(--text-muted)" }}>No attributes defined for this variant.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {attributes.map((attribute) => (
+                  <div key={attribute.name} className="min-w-0 rounded-lg px-3 py-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                    <p className="mt-0.5 text-[12px] font-semibold break-words" style={{ color: "var(--text-primary)" }}>{attribute.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* TAGS */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Tags</p>
+              <button type="button" onClick={onManageTags} disabled={tagUpdatePending} className="text-[11px] font-semibold flex items-center gap-1 transition hover:opacity-80 disabled:opacity-50" style={{ color: "var(--accent)" }}>
+                <Plus className="w-3 h-3" /> Add Tag
+              </button>
+            </div>
+            {tagList.length === 0 ? (
+              <p className="text-[11.5px] italic" style={{ color: "var(--text-muted)" }}>No tags assigned to this variant.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {tagList.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
+                    {tag}
+                    <button type="button" onClick={() => onRemoveTag(tag)} disabled={tagUpdatePending} aria-label={`Remove tag ${tag}`} className="rounded p-0.5 transition hover:bg-black/20 disabled:opacity-50">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* IMAGES */}
+          {images.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Images ({images.length})</p>
+              <div className="grid grid-cols-4 gap-2">
+                {images.map((image, index) => (
+                  <button key={`${image.img_url}-${index}`} type="button" onClick={() => setPreviewImage(index)} className="aspect-square rounded-lg overflow-hidden transition hover:opacity-80" style={{ border: "1px solid var(--border-color)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant)} ${index + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AUDIT */}
+          <div className={`grid grid-cols-1 gap-2.5 ${auditEntries.length > 1 ? "sm:grid-cols-2" : ""}`}>
+            {auditEntries.map((entry) => (
+              <div key={entry.label} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 min-w-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                <Avatar user={entry.user} size="sm" color={entry.color} />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{entry.label}</p>
+                  <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{entry.user?.name || entry.user?.email || "System"}</p>
+                  <p className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>{fdt(entry.date)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="px-5 py-3.5 flex items-center gap-2.5 shrink-0" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+          <button type="button" onClick={onEdit} className="flex-1 h-10 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+            <Edit3 className="w-4 h-4" /> Edit Variant
+          </button>
+          <button type="button" onClick={onDelete} className="flex-1 h-10 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+            <Trash2 className="w-4 h-4" /> Delete Variant
+          </button>
+        </div>
+      </aside>
+
+      {/* FULL SIZE IMAGE PREVIEW */}
+      {previewImage !== null && images[previewImage] && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-6" onClick={() => setPreviewImage(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={getImageUrl(images[previewImage].img_url)} alt={variantLabelOf(variant)} className="max-h-full max-w-full rounded-lg object-contain" />
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -507,6 +878,7 @@ export default function ProductDetailPage() {
   const [expandedVariant, setExpandedVariant] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteVariantTarget, setDeleteVariantTarget] = useState(null);
+  const [variantDetailsTarget, setVariantDetailsTarget] = useState(null);
   const [deleteTagTarget, setDeleteTagTarget] = useState(null);
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [newTagModalValue, setNewTagModalValue] = useState("");
@@ -659,6 +1031,18 @@ export default function ProductDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["product", id] });
     },
     onError: (error) => { toast.error(error.response?.data?.message || "Failed to delete variant"); },
+  });
+
+  // Variant Details drawer se tags update karne ke liye (badge ke × se remove)
+  const variantTagUpdateMutation = useMutation({
+    mutationFn: ({ variantId, tags }) => variantApi.update(variantId, { tags }),
+    onSuccess: async () => {
+      toast.success("Variant tags updated");
+      await refetchProduct();
+      // Naye tag docs (Created By) Tags tab mein foran dikhein
+      refetchTags();
+    },
+    onError: (error) => { toast.error(error.response?.data?.message || "Failed to update variant tags"); },
   });
 
   const deleteMutation = useMutation({
@@ -1050,10 +1434,18 @@ export default function ProductDetailPage() {
   const variants = product.variants || [];
   const totalStock = variants.reduce((t, v) => t + Number(v.quantity || 0), 0);
   const totalVariants = variants.length;
+  // Detail drawer ke liye live variant — refetch / tag update ke baad bhi fresh data
+  const drawerVariant = variantDetailsTarget
+    ? variants.find((v) => String(v._id) === String(variantDetailsTarget._id)) || variantDetailsTarget
+    : null;
   const totalValue = variants.reduce((t, v) => t + (Number(v.selling_price || 0) * Number(v.quantity || 0)), 0);
+  // ✅ Product-level price: min/max variant price (existing variant data hi use hota hai).
+  // Sab variants ka same price → single price, warna price range "MIN – MAX".
   const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => Number(v.selling_price || 0))) : 0;
   const highestPrice = variants.length > 0 ? Math.max(...variants.map(v => Number(v.selling_price || 0))) : 0;
-  const priceRange = lowestPrice === highestPrice ? `Rs. ${lowestPrice.toLocaleString()}` : `Rs. ${lowestPrice.toLocaleString()} - Rs. ${highestPrice.toLocaleString()}`;
+  const priceRange = lowestPrice === highestPrice
+    ? `Rs. ${lowestPrice.toLocaleString()}`
+    : `Rs. ${lowestPrice.toLocaleString()} – Rs. ${highestPrice.toLocaleString()}`;
 
   const displayTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
   const assignedTagNames = new Set(displayTagNames.map(n => String(n).trim()).filter(Boolean));
@@ -1336,10 +1728,10 @@ export default function ProductDetailPage() {
               const isLowStock = Number(variant.quantity) <= 5;
               const isActive = variant.status === "active" || !variant.status;
               return (
-                <tr key={variant._id || index} style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                <tr key={variant._id || index} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-[var(--bg-row-hover)]" style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                   <td className="px-4 py-4">
                     {variant.images?.length > 0 ? (
-                      <button onClick={() => openGallery(0)} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
                         <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
                       </button>
                     ) : (
@@ -1377,6 +1769,12 @@ export default function ProductDetailPage() {
                   </td>
                   <td className="px-4 py-4 text-right relative z-10">
                     <MoreMenu actions={[
+                      {
+                        label: "View Detailed",
+                        icon: <Eye className="w-3.5 h-3.5" />,
+                        onClick: () => setVariantDetailsTarget(variant)
+                      },
+
                       { 
                         label: "Edit Variant", 
                         icon: <Edit3 className="w-3.5 h-3.5" />, 
@@ -1436,6 +1834,35 @@ export default function ProductDetailPage() {
           onClose={() => setShowImageGallery(false)} 
         />
       )}
+
+      {/* VARIANT DETAILS DRAWER (3-dot menu → View Detailed) */}
+      {drawerVariant && (
+        <VariantDetailsDrawer
+          variant={drawerVariant}
+          productName={product?.name}
+          onClose={() => { if (showVariantTagsModal) return; setVariantDetailsTarget(null); }}
+          onEdit={() => {
+            const variantId = drawerVariant._id;
+            setVariantDetailsTarget(null);
+            router.push(`/admin/products/${id}/add-variant?edit=${variantId}&tab=${activeTab}`);
+          }}
+          onDelete={() => {
+            setDeleteVariantTarget(drawerVariant);
+            setVariantDetailsTarget(null);
+          }}
+          onManageTags={() => {
+            setEditingVariantForTags({ ...drawerVariant, tags: drawerVariant.tags || [] });
+            setShowVariantTagsModal(true);
+            setVariantTagInput("");
+          }}
+          onRemoveTag={(tag) => variantTagUpdateMutation.mutate({
+            variantId: drawerVariant._id,
+            tags: (drawerVariant.tags || []).map(tagNameOf).filter((name) => name && name !== tag),
+          })}
+          tagUpdatePending={variantTagUpdateMutation.isPending}
+        />
+      )}
+
 
       {showAllAttributes && (
         <AllAttributesModal
@@ -1545,12 +1972,12 @@ export default function ProductDetailPage() {
               {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
             </p>
             <div className="flex items-baseline gap-3">
+              {/* ✅ Product price — sirf variant price data se:
+                  sab variants same price → single price; alag price → "Rs. MIN – Rs. MAX".
+                  Alag variant prices ko original/sale (crossed-out) treat NAHI karte. */}
               <span className="text-2xl font-extrabold" style={{ color: "var(--text-primary)" }}>
-                Rs. {Number(firstVariant?.selling_price || product.variants?.[0]?.selling_price || 0).toLocaleString()}
+                {priceRange}
               </span>
-              {lowestPrice !== highestPrice ? (
-                <span className="text-base line-through" style={{ color: "var(--text-muted)" }}>{priceRange}</span>
-              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: product.status === "active" ? "var(--success)" : "var(--danger)" }} />
@@ -2242,19 +2669,25 @@ export default function ProductDetailPage() {
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       <div>
                         <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Category *</label>
-                        <select required value={formData.category_id} onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                          className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                          <option value="">Select category</option>
-                          {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                        </select>
+                        <SearchableSelectField
+                          value={formData.category_id}
+                          onChange={(value) => setFormData({ ...formData, category_id: value })}
+                          options={categories.map(c => ({ value: String(c._id), label: c.name }))}
+                          placeholder="Select category"
+                          searchPlaceholder="Search category..."
+                          emptyLabel="No category found"
+                        />
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Brand *</label>
-                        <select required value={formData.brand_id} onChange={(e) => setFormData({ ...formData, brand_id: e.target.value })}
-                          className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                          <option value="">Select brand</option>
-                          {brands.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-                        </select>
+                        <SearchableSelectField
+                          value={formData.brand_id}
+                          onChange={(value) => setFormData({ ...formData, brand_id: value })}
+                          options={brands.map(b => ({ value: String(b._id), label: b.name }))}
+                          placeholder="Select brand"
+                          searchPlaceholder="Search brand..."
+                          emptyLabel="No brand found"
+                        />
                       </div>
                     </div>
                     <div>
@@ -2389,12 +2822,14 @@ export default function ProductDetailPage() {
                                 <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
                                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                                   {[{ l: "Cost Price *", f: "cost_price", p: "1000" }, { l: "Selling Price *", f: "selling_price", p: "1500" },
-                                  { l: "Quantity", f: "quantity", p: "50" }
+                                  { l: "Quantity (whole units)", f: "quantity", p: "50" }
                                   ].map(({ l, f, p }) => (
                                     <div key={f}>
                                       <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>{l}</label>
-                                      <input type="number" min="0" placeholder={p} value={variant[f]}
-                                        onChange={(e) => updateVariant(index, f, e.target.value)}
+                                      {/* Stock quantity sirf poore units mein — decimal point allowed nahi */}
+                                      <input type="number" min="0" step={f === "quantity" ? "1" : "0.01"} inputMode={f === "quantity" ? "numeric" : "decimal"} placeholder={p} value={variant[f]}
+                                        onKeyDown={(e) => { if (f === "quantity" && [".", ",", "-", "+", "e", "E"].includes(e.key)) e.preventDefault(); }}
+                                        onChange={(e) => updateVariant(index, f, f === "quantity" ? ((e.target.value.includes(".") ? e.target.value.slice(0, e.target.value.indexOf(".")) : e.target.value).replace(/[^0-9]/g, "")) : e.target.value)}
                                         className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                                     </div>
                                   ))}
@@ -2627,7 +3062,7 @@ export default function ProductDetailPage() {
 
       {/* Variant Tags Modal */}
       {showVariantTagsModal && editingVariantForTags && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[85] p-4">
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-center justify-between mb-5">
               <div>

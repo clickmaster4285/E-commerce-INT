@@ -46,57 +46,18 @@ export default function useDiscountSocketSync(discountId) {
     // ================================
     const handleDiscountUpdated = (result) => {
       const data = result?.data || result;
+      const changedId = data?._id ? data._id.toString() : null;
 
-      if (data?._id) {
-        const id = data._id.toString();
+      // ✅ Socket payload ko cache mein direct likhna band kiya — update event ka
+      // payload raw doc hota hai (updatedBy sirf ObjectId), jise detail cache
+      // mein likhne se "Updated By" adhoora/purana reh jata tha aur page refresh
+      // karna padta tha. Ab list + khuli hui detail dono invalidate karte hain,
+      // taake backend ka resolved GET payload aaye.
+      invalidateDiscounts();
 
-        // Update Discounts List Cache
-        queryClient.setQueryData(
-          ["discounts"],
-          (oldData) => {
-            if (!oldData) return oldData;
-
-            // If API returns array directly
-            if (Array.isArray(oldData)) {
-              return oldData.map((discount) =>
-                discount?._id?.toString() === id
-                  ? data
-                  : discount
-              );
-            }
-
-            // If API returns { data: [] }
-            if (Array.isArray(oldData.data)) {
-              return {
-                ...oldData,
-                data: oldData.data.map((discount) =>
-                  discount?._id?.toString() === id
-                    ? data
-                    : discount
-                ),
-              };
-            }
-
-            return oldData;
-          }
-        );
-
-        // Update Specific Discount Detail Cache
-        if (discountId && id === String(discountId)) {
-          queryClient.setQueryData(
-            ["discount", String(discountId)],
-            data
-          );
-        }
-      } else {
-        // If updated event doesn't contain full discount data
-        invalidateDiscounts();
-
-        if (discountId) {
-          queryClient.invalidateQueries({
-            queryKey: ["discount", String(discountId)],
-          });
-        }
+      const detailId = discountId ? String(discountId) : changedId;
+      if (detailId) {
+        queryClient.invalidateQueries({ queryKey: ["discount", detailId] });
       }
 
       if (selfActionRef.current === "update") {

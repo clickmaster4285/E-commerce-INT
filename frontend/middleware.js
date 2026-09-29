@@ -10,10 +10,10 @@ export function middleware(request) {
   }
 
   // ✅ Admin Login — public page
+  // Token ho ya na ho, login page hamesha khulna chahiye. Pehle yahan token
+  // hone par /admin/dashboard par redirect ho jata tha, jis se expired/stale
+  // token ki surat mein admin dobara login hi nahi kar pata tha.
   if (pathname === '/admin/login') {
-    if (hasToken) {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-    }
     return NextResponse.next();
   }
 

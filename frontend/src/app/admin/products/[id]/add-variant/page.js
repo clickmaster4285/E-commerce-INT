@@ -1026,27 +1026,33 @@ export default function AddVariantPage() {
                   {[
                     { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
                     { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
-                    { l: "Quantity", f: "quantity", p: "0", req: false },
+                    { l: "Quantity (whole units)", f: "quantity", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
                       <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                         {l}
                         {req && <span className="text-red-500"> *</span>}
                       </label>
+                      {/* Stock quantity sirf poore units mein — decimal point allowed nahi */}
                       <input
                         required={req}
                         type="number"
                         min="0"
-                        step="0.01"
+                        step={f === "quantity" ? "1" : "0.01"}
+                        inputMode={f === "quantity" ? "numeric" : "decimal"}
                         placeholder={placeholder}
                         value={variant[f]}
-                        onChange={(ev) => updateVariant(f, ev.target.value)}
+                        onKeyDown={(ev) => { if (f === "quantity" && [".", ",", "-", "+", "e", "E"].includes(ev.key)) ev.preventDefault(); }}
+                        onChange={(ev) => updateVariant(f, f === "quantity" ? ((ev.target.value.includes(".") ? ev.target.value.slice(0, ev.target.value.indexOf(".")) : ev.target.value).replace(/[^0-9]/g, "")) : ev.target.value)}
                         className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
                         style={inputStyle}
                       />
                     </div>
                   ))}
                 </div>
+                <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>
+                  Quantity sirf poore units mein (misal: 5) — decimal point allowed nahi.
+                </p>
 
                 {variant.cost_price !== "" &&
                   variant.selling_price !== "" &&

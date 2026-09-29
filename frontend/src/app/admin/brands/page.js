@@ -221,6 +221,7 @@ export default function BrandsPage() {
   const pathname = usePathname();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCountry, setFilterCountry] = useState("all");
   const [viewMode, setViewMode] = useState(() => {
@@ -262,8 +263,17 @@ export default function BrandsPage() {
   };
 
   // ✅ AUTO GENERATE BRAND CODE LOGIC
-  const computeFallbackBrandCode = (currentBrands) => {
-    const nums = currentBrands
+  // Server-side pagination ke baad `brands` sirf current page hota hai, is liye
+  // fallback ke liye poora list fetch karte hain (warna duplicate code ban sakta tha).
+  const computeFallbackBrandCode = async () => {
+    let allBrandsList = brands;
+    try {
+      const res = await adminBrandApi.getAll(); // ✅ legacy full list
+      if (Array.isArray(res) && res.length) allBrandsList = res;
+    } catch {
+      allBrandsList = brands; // aakhri option: current page
+    }
+    const nums = allBrandsList
       .filter((b) => typeof b.brand_code === "string" && /^BRD-\d+$/.test(b.brand_code))
       .map((b) => parseInt(b.brand_code.split("-")[1], 10))
       .filter(Number.isFinite);
@@ -279,7 +289,7 @@ export default function BrandsPage() {
       const trimmed = candidate.trim();
       
       // If API returns valid code use it, otherwise calculate locally
-      const validNextCode = /^BRD-\d+$/.test(trimmed) ? trimmed : computeFallbackBrandCode(brands);
+      const validNextCode = /^BRD-\d+$/.test(trimmed) ? trimmed : await computeFallbackBrandCode();
       
       setAutoBrandCode(validNextCode);
       if (!editingBrand) {
@@ -287,7 +297,7 @@ export default function BrandsPage() {
       }
     } catch (err) {
       console.error("Failed to fetch next brand code:", err);
-      const fallbackCode = computeFallbackBrandCode(brands);
+      const fallbackCode = await computeFallbackBrandCode();
       setAutoBrandCode(fallbackCode);
       if (!editingBrand) {
         setFormData((prev) => ({ ...prev, brand_code: fallbackCode }));
@@ -299,10 +309,21 @@ export default function BrandsPage() {
 
   const handleViewBrand = (id) => router.push(`${pathname}/${id}`);
 
-  const { data: brands = [], isLoading: loading, isError, error } = useQuery({
-    queryKey: ["adminBrands"],
-    queryFn: adminBrandApi.getAll,
+  const { data: paginatedBrandsData, isLoading: loading, isFetching, isError, error } = useQuery({
+    // ✅ Server-side pagination — filters/search/sort/page sab backend par jate hain
+    queryKey: ["adminBrands", "paginated", currentPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction],
+    queryFn: () => adminBrandApi.getAllPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      status: filterStatus,
+      country: filterCountry,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction,
+    }),
     retry: false,
+    // ✅ Page change par purana page visible rehta hai (flicker nahi)
+    placeholderData: (previousData) => previousData,
   });
 
   useEffect(() => {
@@ -367,48 +388,36 @@ export default function BrandsPage() {
     },
   });
 
-  /* ---------- Derived data ---------- */
-  const filteredBrands = useMemo(() => {
-    return brands.filter((b) => {
-      const matchSearch = b.name?.toLowerCase().includes(search.toLowerCase()) || b.brand_code?.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = filterStatus === "all" || (filterStatus === "active" && b.is_active) || (filterStatus === "inactive" && !b.is_active);
-      const matchCountry = filterCountry === "all" || b.country === filterCountry;
-      return matchSearch && matchStatus && matchCountry;
-    });
-  }, [brands, search, filterStatus, filterCountry]);
+  /* ---------- Derived data (server side paginated) ---------- */
+  // ✅ Sirf current page ke brands aate hain backend se
+  const brands = Array.isArray(paginatedBrandsData?.items) ? paginatedBrandsData.items : [];
+  const brandCounts = paginatedBrandsData?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 };
+  const countries = Array.isArray(paginatedBrandsData?.countries) ? paginatedBrandsData.countries : [];
+  const pagination = paginatedBrandsData?.pagination || {
+    total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false,
+  };
 
-  const sortedBrands = useMemo(() => {
-    const arr = [...filteredBrands];
-    if (!sortConfig.key) return arr;
-    arr.sort((a, b) => {
-      let va, vb;
-      switch (sortConfig.key) {
-        case "code": va = a.brand_code?.toLowerCase() || ""; vb = b.brand_code?.toLowerCase() || ""; break;
-        case "name": va = a.name?.toLowerCase() || ""; vb = b.name?.toLowerCase() || ""; break;
-        case "country": va = a.country?.toLowerCase() || ""; vb = b.country?.toLowerCase() || ""; break;
-        case "status": va = a.is_active ? 1 : 0; vb = b.is_active ? 1 : 0; break;
-        default: return 0;
-      }
-      if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
-      if (va > vb) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return arr;
-  }, [filteredBrands, sortConfig]);
-
-  const totalBrands = sortedBrands.length;
-  const totalPages = Math.ceil(totalBrands / itemsPerPage);
+  const paginatedBrands = brands;                                  // current page (server se)
+  const totalBrands = pagination.total || 0;                       // filtered total
+  const totalPages = pagination.pages || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedBrands = sortedBrands.slice(startIndex, endIndex);
 
-  useEffect(() => setCurrentPage(1), [search, filterStatus, filterCountry]);
+  // ✅ Search debounce (300ms) + page reset + selection clear
+  // (setState setTimeout callback ke andar — effect body mein sync setState nahi)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+      setSelectedIds([]);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-  const allBrands = brands.length;
-  const activeBrands = brands.filter((b) => b.is_active).length;
-  const inactiveBrands = allBrands - activeBrands;
-  const countries = [...new Set(brands.map((b) => b.country).filter(Boolean))];
-  const withLogo = brands.filter((b) => b.logo?.img_url).length;
+  const allBrands = brandCounts.total || 0;
+  const activeBrands = brandCounts.active || 0;
+  const inactiveBrands = brandCounts.inactive || 0;
+  const withLogo = brandCounts.withLogo || 0;
 
   const allSelected = paginatedBrands.length > 0 && paginatedBrands.every((b) => selectedIds.includes(b._id));
   const toggleSelectAll = () => setSelectedIds(allSelected ? [] : paginatedBrands.map((b) => b._id));
@@ -457,8 +466,18 @@ export default function BrandsPage() {
     deleteMutation.mutate(ids, { onSettled: () => setDeleteTarget(null) });
   };
 
-  const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
-  const goToPage = (page) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
+  const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas
+    setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setCurrentPage(1);
+    setSelectedIds([]);
+  };
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+      setSelectedIds([]); // ✅ cross-page selection clear
+    }
+  };
 
   const renderPageNumbers = () => {
     const pages = [];
@@ -705,13 +724,13 @@ export default function BrandsPage() {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <SelectFilter value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
               <option value="all">All Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </SelectFilter>
             
-            <SelectFilter value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)}>
+            <SelectFilter value={filterCountry} onChange={(e) => { setFilterCountry(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
               <option value="all">All Countries</option>
               {countries.map((c) => (<option key={c} value={c}>{c}</option>))}
             </SelectFilter>
@@ -864,26 +883,34 @@ export default function BrandsPage() {
           </div>
         )}
 
-        {/* ===== Pagination ===== */}
+        {/* ===== Pagination (server side) ===== */}
         {totalBrands > 20 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {startIndex + 1}-{Math.min(endIndex, totalBrands)} of {totalBrands} brands</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Showing {startIndex + 1}-{Math.min(endIndex, totalBrands)} of {totalBrands} brands
+              {isFetching && !loading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+            </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => goToPage(page)} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => goToPage(page)} disabled={isFetching && currentPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
                     )}
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-        {paginatedBrands.length > 0 && totalBrands <= 20 && <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Showing {paginatedBrands.length} of {allBrands} brands</p>}
+        {paginatedBrands.length > 0 && totalBrands <= 20 && (
+          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            Showing {paginatedBrands.length} of {totalBrands} brands
+            {isFetching && !loading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+          </p>
+        )}
       </div>
 
       {/* ===== Add/Edit Modal ===== */}

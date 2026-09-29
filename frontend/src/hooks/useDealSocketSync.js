@@ -51,49 +51,19 @@ export default function useDealSocketSync() {
 
     const handleDealUpdated = (result) => {
       const data = result?.data || result;
-      
-      // Agar specific ID mil rahi hai to usay update karein
-      if (data?._id) {
-        const dealKey = data._id.toString();
-        
-        // Single deal cache update
-        queryClient.setQueryData(["deal", dealKey], data);
-        
-        // List cache update (purane employee wale pattern se)
-        queryClient.setQueryData(["deals"], (oldData) => {
-          if (!oldData) return oldData;
-          
-          // Array check karein
-          if (Array.isArray(oldData)) {
-            return oldData.map((deal) => 
-              deal?._id?.toString() === dealKey ? data : deal
-            );
-          }
-          
-          // Nested array check karein ({ deals: [] } ya { data: [] })
-          if (Array.isArray(oldData.deals)) {
-            return {
-              ...oldData,
-              deals: oldData.deals.map((deal) => 
-                deal?._id?.toString() === dealKey ? data : deal
-              )
-            };
-          }
-          
-          if (Array.isArray(oldData.data)) {
-            return {
-              ...oldData,
-              data: oldData.data.map((deal) => 
-                deal?._id?.toString() === dealKey ? data : deal
-              )
-            };
-          }
-          
-          return oldData;
-        });
+      const dealKey = data?._id ? data._id.toString() : null;
+
+      // ✅ Socket payload ko cache mein likhna band kiya: wo GET se chhota
+      // populate karta hai (cost_price / bundle rule waghera missing) aur
+      // createdBy/updatedBy resolve na hone par "Updated by" blank aa jata tha —
+      // page refresh karne par hi sahi data milta tha. Ab list + open deal
+      // detail dono invalidate karte hain, taake fresh GET data aa jaye.
+      invalidateDeals();
+
+      if (dealKey) {
+        queryClient.invalidateQueries({ queryKey: ["deal", dealKey] });
       } else {
-        // Agar ID nahi mili to puri list refresh karein
-        invalidateDeals();
+        queryClient.invalidateQueries({ queryKey: ["deal"] });
       }
 
       if (selfActionRef.current === "update" || selfActionRef.current === "toggle") {
