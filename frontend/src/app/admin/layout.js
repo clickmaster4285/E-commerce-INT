@@ -22,6 +22,8 @@ const ROUTE_PERMISSIONS = {
   '/admin/categories': 'categories',
   '/admin/attributes': 'attribute',
   '/admin/products': 'products',
+  // ✅ Featured Products — products ka hi subset hai (same permission)
+  '/admin/featured-products': 'products',
   '/admin/store-info': 'store',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',

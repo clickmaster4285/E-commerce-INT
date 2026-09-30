@@ -17,15 +17,16 @@ export const adminProductApi = {
   getAll: () => axiosInstance.get("/products").then(list),
 
   // ✅ Server-side pagination (Admin Products list)
-  // Backend: ?page&limit&search&category_id&brand_id&status&sort
+  // Backend: ?page&limit&search&category_id&brand_id&status&sort&featured
   // Response: { products: [...], stats: {...}, pagination: { total, page, limit, pages, hasNext, hasPrev } }
   // Note: limit bina legacy full-array response milta hai (getAll wala behavior).
-  getPaginated: ({ page = 1, limit = 20, search = "", category_id = "", brand_id = "", status = "" } = {}) => {
+  getPaginated: ({ page = 1, limit = 20, search = "", category_id = "", brand_id = "", status = "", featured = "" } = {}) => {
     const params = { page, limit };
     if (search) params.search = search;
     if (category_id && category_id !== "all") params.category_id = category_id;
     if (brand_id && brand_id !== "all") params.brand_id = brand_id;
     if (status && status !== "all") params.status = status;
+    if (featured === true || featured === "true" || featured === "1") params.featured = "true";
     return axiosInstance.get("/products", { params }).then((res) => res.data);
   },
 
@@ -60,6 +61,10 @@ export const adminProductApi = {
 
   toggleStatus: (id) =>
     axiosInstance.patch(`/products/${id}/toggle-status`).then((res) => res.data),
+
+  // ✅ Featured Products page — mark / unmark (PATCH, atomic backend flip)
+  toggleFeatured: (id) =>
+    axiosInstance.patch(`/products/${id}/toggle-featured`).then((res) => res.data),
 };
 
 // ✅ ALIAS

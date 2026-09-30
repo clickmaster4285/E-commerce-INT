@@ -208,6 +208,9 @@ const buildProductFilter = async (query = {}) => {
   const categoryId = query.category_id;
   const statusFilter = String(query.status || "").trim();
   const search = String(query.search || query.q || "").trim();
+  // ✅ Featured Products page — sirf "?featured=true" bheje tab filter lagta hai
+  //    (legacy callers filter nahi bhejte → unka behavior bilkul same rehta hai).
+  const featuredFilter = String(query.featured || "").trim().toLowerCase();
 
   // ---- Filter build ----
   // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
@@ -216,6 +219,8 @@ const buildProductFilter = async (query = {}) => {
   if (brandId) filter.brand_id = brandId;
   if (categoryId && categoryId !== "all") filter.category_id = categoryId;
   if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
+  if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
+  else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
 
   if (search) {
     const rx = { $regex: escapeRegex(search), $options: "i" };
@@ -579,6 +584,8 @@ const createProduct = async (req, res) => {
       description: String(req.body.description || "").trim(),
       tax: toNumber(req.body.tax, 0),
       status: req.body.status === "inactive" ? "inactive" : "active",
+      // ✅ Featured — create form se bhi mark ho sakta hai (default false)
+      is_featured: req.body.is_featured === true,
       createdby: req.user?._id || null,
       updatedby: null,
       is_deleted: false,
@@ -794,6 +801,10 @@ const updateProduct = async (req, res) => {
 
     if (req.body.status !== undefined) {
       product.status = req.body.status === "inactive" ? "inactive" : "active";
+    }
+
+    if (req.body.is_featured !== undefined) {
+      product.is_featured = req.body.is_featured === true;
     }
 
     // ✅ FIX (ROOT CAUSE): Product ke audit fields (updated_at / updatedby) sirf
@@ -1285,6 +1296,77 @@ const toggleProductStatus = async (req, res) => {
 };
 
 // ======================================================
+// TOGGLE PRODUCT FEATURED
+// ======================================================
+// ✅ "Featured Products" page ke liye — same atomic pattern as toggleProductStatus
+//    (single round-trip, aggregation pipeline, no full document validation).
+// ✅ Inactive product featured nahi ho sakta — sirf ACTIVE products feature ho
+//    sakte hain, warna storefront par inactive item show hota.
+const toggleProductFeatured = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    // ✅ Guard PEHLE check karte hain, aggregation pipeline se pehle. Pehle pipeline
+    //    khud is_featured = false chhor deta tha (status active nahi hone par), is liye
+    //    niche wala guard kabhi trigger hi nahi hota tha aur API galti se
+    //    "Product removed from featured" (200) bhej deti thi — jabki kuch hua hi nahi.
+    const current = await Product.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .select("is_featured status")
+      .lean();
+
+    if (!current) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // ✅ Sirf ACTIVE product ko featured mark kar sakte hain (unmark hamesha allowed).
+    if (current.is_featured !== true && current.status !== "active") {
+      return res.status(400).json({
+        message: "This product is inactive. Please activate it before marking it as featured.",
+      });
+    }
+
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      [
+        {
+          $set: {
+            is_featured: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$is_featured", false] }, true] },
+                false,
+                // Feature karte waqt product ACTIVE hona zaroori hai
+                { $eq: [{ $ifNull: ["$status", "active"] }, "active"] },
+              ],
+            },
+            updatedby: req.user?._id || null,
+            updated_at: new Date(),
+          },
+        },
+      ],
+      { returnDocument: "after", updatePipeline: true, runValidators: false }
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.status(200).json({
+      message: product.is_featured
+        ? "Product marked as featured"
+        : "Product removed from featured",
+      product,
+    });
+  } catch (error) {
+    console.error("❌ [toggleProductFeatured] Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to update featured status",
+    });
+  }
+};
+
+// ======================================================
 // EXPORTS
 // ======================================================
 module.exports = {
@@ -1295,4 +1377,5 @@ module.exports = {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
+  toggleProductFeatured,
 };

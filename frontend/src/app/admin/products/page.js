@@ -22,6 +22,8 @@ import {
   Power,
   Search,
   Sparkles,
+  Star,
+  StarOff,
   Trash2,
   Upload,
   X,
@@ -34,9 +36,8 @@ import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
 
-// ✅ Default page size (user footer se 20 / 50 / 100 choose kar sakta hai)
-const DEFAULT_PAGE_SIZE = 20;
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+// ✅ Ek hi page size — footer me "rows per page" selector nahi (simple + predictable list)
+const PRODUCTS_PER_PAGE = 20;
 
 /**
  * ✅ Pagination ka page-number list — simple + predictable:
@@ -1057,8 +1058,6 @@ const [viewMode, setViewMode] = useState(() => {
   return "list";
 });
   const [currentPage, setCurrentPage] = useState(1);
-  // ✅ Rows per page — footer ke "Rows per page" selector se change hoti hai
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
   // Product modal ke Category / Brand dropdowns ke andar chalne wale search bars
@@ -1115,14 +1114,14 @@ const [viewMode, setViewMode] = useState(() => {
     error: productsErrorMsg,
     refetch: refetchProducts,
   } = useQuery({
-    // ⚠️ pageSize key ke END me hai — status filter index 6 par hi rahe, warna
+    // ⚠️ Page size key ke END me hai — status filter index 6 par hi rahe, warna
     //    patchProductStatusInCaches ka status-filter detection toot jayega.
-    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, pageSize],
-    queryFn: () => productApi.getPaginated({ page: currentPage, limit: pageSize, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
+    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, PRODUCTS_PER_PAGE],
+    queryFn: () => productApi.getPaginated({ page: currentPage, limit: PRODUCTS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
     retry: false,
   });
   const products = productsData?.products || [];
-  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: pageSize, pages: 1, hasNext: false, hasPrev: false };
+  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: PRODUCTS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
 
   // ✅ SUMMARY CARDS ki API — products list se bilkul ALAG query.
   //    Backend optimization: stats ab list response ka hissa nahi (dedicated /products/stats endpoint),
@@ -1717,7 +1716,7 @@ const [viewMode, setViewMode] = useState(() => {
 
   // ✅ Backend `limit` ko clamp karta hai (max 100) — is liye effective size wahi
   //    maante hain jo API ne maangi, warna "Showing 1-100" ho jab tak rows 20 hi aayein.
-  const effectivePageSize = Number(pagination.limit) || pageSize;
+  const effectivePageSize = Number(pagination.limit) || PRODUCTS_PER_PAGE;
   const totalRecords = Number(pagination.total) || 0;
   const firstRow = totalRecords === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
   const lastRow = Math.min(currentPage * effectivePageSize, totalRecords);
@@ -1726,16 +1725,65 @@ const [viewMode, setViewMode] = useState(() => {
   const goToPage = (pg) => {
     setCurrentPage(Math.min(Math.max(1, pg), totalPages));
   };
-  const handlePageSizeChange = (size) => {
-    setPageSize(size);
-    setCurrentPage(1); // nayi size ke saath purana page number meaningless ho jaata hai
-  };
 
   // ✅ Simple, predictable page list (module-level helper — buildPageList)
   const renderPageNumbers = () => buildPageList(currentPage, totalPages);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;
   const isToggling = toggleStatusMutation.isPending;
+
+  // ✅ Featured Products page — mark / unmark (same optimistic pattern as status toggle)
+  const featuredMutation = useMutation({
+    mutationFn: (id) => productApi.toggleFeatured(id),
+    onMutate: async (productId) => {
+      const pid = String(productId);
+      const nextFeatured = !(products.find((p) => String(p?._id) === pid)?.is_featured === true);
+      await queryClient.cancelQueries({ queryKey: ["products"] });
+      // Optimistic: star turant toggle ho jaye
+      queryClient.setQueriesData({ queryKey: ["products", "paginated"] }, (old) =>
+        old && Array.isArray(old.products)
+          ? { ...old, products: old.products.map((p) => (String(p?._id) === pid ? { ...p, is_featured: nextFeatured } : p)) }
+          : old
+      );
+      return { pid, nextFeatured };
+    },
+    onError: (e, _id, ctx) => {
+      // Rollback
+      if (ctx?.pid) {
+        queryClient.setQueriesData({ queryKey: ["products", "paginated"] }, (old) =>
+          old && Array.isArray(old.products)
+            ? { ...old, products: old.products.map((p) => (String(p?._id) === ctx.pid ? { ...p, is_featured: !ctx.nextFeatured } : p)) }
+            : old
+        );
+      }
+      toast.error(e?.response?.data?.message || "Failed to update featured status");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["featured-products"] });
+    },
+  });
+  const isTogglingFeatured = featuredMutation.isPending;
+  const handleToggleFeatured = (product) => {
+    const wasFeatured = product?.is_featured === true;
+    // ✅ Client guard: inactive product ko featured mark nahi kar sakte. Backend par
+    //    bhi yehi rule hai (400), magar guard yahan hai taake user ko foran English
+    //    toast mile — bina request bhejte hue. Pehle yahan koi check nahi tha, is liye
+    //    API chup-chaap "removed from featured" bhej deti thi par green toast
+    //    "Marked as featured" dikhta tha aur product featured list me nahi aata tha.
+    if (!wasFeatured && product?.status !== "active") {
+      toast.error("This product is inactive. Please activate it before marking it as featured.", {
+        description: `${product?.name || "Product"} is currently inactive, so it can't be featured.`,
+        duration: 5000,
+      });
+      return;
+    }
+    featuredMutation.mutate(product?._id, {
+      onSuccess: (res) => {
+        toast.success(res?.message || (wasFeatured ? "Removed from featured products" : "Marked as featured"));
+      },
+    });
+  };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
@@ -1835,7 +1883,7 @@ const [viewMode, setViewMode] = useState(() => {
               {/* ✅ Table loading = skeleton rows (blank table / spinner nahi).
                   Skeleton → error state → empty state → real rows (smooth fade-in). */}
               {isLoading ? (
-                <ProductTableSkeleton rows={Math.min(pageSize, 20)} />
+                <ProductTableSkeleton rows={PRODUCTS_PER_PAGE} />
               ) : (
               <tbody style={{ animation: "fadeIn 0.22s ease" }}>
                 {productsError ? (
@@ -1869,7 +1917,7 @@ const [viewMode, setViewMode] = useState(() => {
                       </td>
                       <td className="px-4 py-2.5 text-[13px] font-medium">{p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
-                      <td className="w-1 whitespace-nowrap px-4 py-2.5" onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></td>
+                      <td className="w-1 whitespace-nowrap px-4 py-2.5" onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} onToggleFeatured={handleToggleFeatured} isDeleting={isDeleting} isToggling={isToggling} isTogglingFeatured={isTogglingFeatured} /></td>
                     </tr>
                   );
                 })}
@@ -1909,7 +1957,7 @@ const [viewMode, setViewMode] = useState(() => {
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Tax: {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
                 <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>
-                  <div onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} isDeleting={isDeleting} isToggling={isToggling} /></div>
+                  <div onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} onToggleFeatured={handleToggleFeatured} isDeleting={isDeleting} isToggling={isToggling} isTogglingFeatured={isTogglingFeatured} /></div>
                 </div>
               </div>
             );
@@ -1919,9 +1967,9 @@ const [viewMode, setViewMode] = useState(() => {
       )}
 
       {/* PAGINATION — simple & professional:
-          Left  : "Showing X–Y of Z products" + "Page N of M"
-          Right : Rows-per-page selector + Prev/Next (labels ke sath) + page numbers.
-          Skip marker "…" button ke barabar wide hai, is liye pagination "toota hua" nahi lagta. */}
+          Left  : "Showing X–Y of Z products"
+          Right : Prev/Next + page numbers.
+          Koi "rows per page" selector nahi — list hamesha 20 rows/page. */}
       {!isLoading && totalRecords > 0 && (
         <div className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={cardStyle}>
           {/* Left: record range + position */}
@@ -1938,23 +1986,7 @@ const [viewMode, setViewMode] = useState(() => {
           </div>
 
           {/* Right: controls */}
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
-            {/* Rows per page */}
-            <label className="flex items-center gap-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
-              <span className="hidden sm:inline">Rows</span>
-              <select
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                aria-label="Rows per page"
-                className="h-8 cursor-pointer rounded-md px-2 text-[12px] font-medium outline-none transition focus:ring-2"
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-              >
-                {PAGE_SIZE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </label>
-
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             <div className="flex items-center gap-1.5" role="navigation" aria-label="Pagination">
               {/* Previous */}
               <button
@@ -2403,12 +2435,13 @@ function StatusBadge({ status }) {
 function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
   return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
 }
-function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting, isToggling }) {
+function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFeatured, isDeleting, isToggling, isTogglingFeatured }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const isActive = product?.status === "active";
+  const isFeatured = product?.is_featured === true;
 
   const openMenu = () => {
     const rect = btnRef.current.getBoundingClientRect();
@@ -2492,6 +2525,42 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, isDeleting
           >
             <Power className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
           </button>
+          {/* ✅ Featured Products page — mark / unmark */}
+          {onToggleFeatured && (
+            <button
+              type="button"
+              disabled={isTogglingFeatured}
+              title={
+                !isFeatured && !isActive
+                  ? "This product is inactive. Please activate it before marking it as featured."
+                  : isFeatured
+                    ? "Remove from featured products"
+                    : "Mark as featured"
+              }
+              onClick={(e) => { e.stopPropagation(); setOpen(false); onToggleFeatured(product); }}
+              className={menuItemClass + " disabled:opacity-50"}
+              // ✅ Inactive product muted dikhta hai (error-red nahi) + "Inactive" tag,
+              //    click karne par upar wala guard English error toast dikhata hai.
+              style={{ color: isFeatured ? "var(--text-secondary)" : isActive ? "var(--warning-text)" : "var(--text-muted)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            >
+              {isFeatured ? (
+                <StarOff className="w-4 h-4 shrink-0" />
+              ) : (
+                <Star className="w-4 h-4 shrink-0 fill-amber-400 text-amber-400" />
+              )}
+              {isFeatured ? "Remove from Featured" : "Mark as Featured"}
+              {!isFeatured && !isActive && (
+                <span
+                  className="ml-auto rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
+                >
+                  Inactive
+                </span>
+              )}
+            </button>
+          )}
           <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
           <button
             type="button"
@@ -2804,7 +2873,7 @@ function SummaryCardSkeleton() {
   );
 }
 
-function ProductTableSkeleton({ rows = DEFAULT_PAGE_SIZE }) {
+function ProductTableSkeleton({ rows = PRODUCTS_PER_PAGE }) {
   return (
     <tbody aria-busy="true" aria-label="Loading products">
       {Array.from({ length: rows }).map((_, i) => (

@@ -57,6 +57,13 @@ const productSchema = new mongoose.Schema(
       default: "active",
     },
 
+    // ✅ FEATURED — admin is product ko "Featured Products" page se mark/unmark
+    //    kar sakta hai. Default false → purane products featured nahi banenge.
+    is_featured: {
+      type: Boolean,
+      default: false,
+    },
+
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
@@ -95,5 +102,7 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ category_id: 1 });
 productSchema.index({ brand_id: 1 });
 productSchema.index({ status: 1, is_deleted: 1 });
+// ✅ Featured Products page — filter + sort dono is index par
+productSchema.index({ is_featured: 1, is_deleted: 1 });
 
 module.exports = mongoose.model("Product", productSchema);

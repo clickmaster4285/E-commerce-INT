@@ -8,6 +8,7 @@ const {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
+  toggleProductFeatured,
 } = require("../controllers/productController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -56,5 +57,7 @@ router.put(
 
 router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
+// ✅ Featured Products page — mark / unmark
+router.patch("/:id/toggle-featured", authMiddleware, checkPermission("products"), toggleProductFeatured);
 
 module.exports = router;
