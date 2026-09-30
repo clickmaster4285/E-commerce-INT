@@ -540,9 +540,33 @@ const getProductById = async (req, res) => {
       console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
     }
 
+    // ⭐ Rating summary — for the stars + count on the detail page (reviews come from a separate endpoint)
+    let ratingSummary = { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+    try {
+      const Review = require("../models/Review");
+      const ratings = await Review.find({
+        product_id: product._id,
+        status: "active",
+        is_deleted: { $ne: true },
+      })
+        .select("rating")
+        .lean();
+      let sum = 0;
+      ratings.forEach((r) => {
+        const rating = Number(r.rating) || 0;
+        sum += rating;
+        if (ratingSummary.distribution[rating] !== undefined) ratingSummary.distribution[rating] += 1;
+      });
+      ratingSummary.count = ratings.length;
+      ratingSummary.avg = ratings.length ? Math.round((sum / ratings.length) * 10) / 10 : 0;
+    } catch (summaryErr) {
+      console.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+    }
+
     return res.status(200).json({
       ...product,
       variants,
+      ratingSummary,
     });
   } catch (error) {
     console.error("❌ [getProductById] Error:", error);

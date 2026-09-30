@@ -5,8 +5,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck, X, AlertCircle,
+  KeyRound, MailCheck, ArrowLeft,
 } from "lucide-react";
-import axiosInstance from "@/apis/axiosInstance";
+import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
+import OtpVerifyCard from "./OtpVerifyCard";
+import ResetPasswordCard from "./ResetPasswordCard";
 
 export default function LoginModal({ isOpen, onClose }) {
   const queryClient = useQueryClient();
@@ -19,6 +22,13 @@ export default function LoginModal({ isOpen, onClose }) {
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // ✅ AUTH FLOW STEPS — auth | verify-email | forgot | forgot-otp | reset
+  const [step, setStep] = useState("auth");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -159,17 +169,88 @@ export default function LoginModal({ isOpen, onClose }) {
 
     setLoading(true);
     try {
-      const endpoint = isLogin ? "/users/login" : "/users/register";
-      const payload = isLogin ? { email, password } : { name, username, phone, email, password };
-      await axiosInstance.post(endpoint, payload);
+      if (isLogin) {
+        await authApi.login({ email, password });
+        queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+        resetForm();
+        onClose();
+        return;
+      }
 
-      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
-      resetForm();
-      onClose();
+      // ✅ REGISTER → OTP email jata hai, phir verify screen
+      const res = await authApi.register({ name, username, phone, email, password });
+      setOtpEmail(res?.email || email);
+      setStep("verify-email");
+      setLoading(false);
     } catch (err) {
+      // 🔁 Email verify nahi hui — seedha OTP screen
+      if (err.response?.data?.needsVerification) {
+        setOtpEmail(err.response.data.email || email);
+        setStep("verify-email");
+        setLoading(false);
+        return;
+      }
       parseBackendError(err);
       setLoading(false);
     }
+  };
+
+  // ==========================================
+  // 📧 EMAIL VERIFICATION (OTP)
+  // ==========================================
+  const handleVerifyEmailOtp = async (otp) => {
+    await authApi.verifyEmailOtp(otpEmail, otp);
+    queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+    resetForm();
+    onClose();
+  };
+
+  const handleResendEmailOtp = async () => {
+    await authApi.sendEmailOtp(otpEmail);
+  };
+
+  // ==========================================
+  // 🔐 FORGOT PASSWORD (OTP)
+  // ==========================================
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    if (!isValidEmail(email)) {
+      setForgotError("Please enter a valid email address.");
+      return;
+    }
+    setForgotError("");
+    setForgotLoading(true);
+    try {
+      await authApi.sendForgotOtp(email.trim());
+      setOtpEmail(email.trim());
+      setStep("forgot-otp");
+    } catch (err) {
+      setForgotError(getApiErrorMessage(err, "Could not send the reset code."));
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async (otp) => {
+    const res = await authApi.verifyResetOtp(otpEmail, otp);
+    setResetToken(res?.resetToken || "");
+    setStep("reset");
+  };
+
+  const handleResendResetOtp = async () => {
+    await authApi.sendForgotOtp(otpEmail);
+  };
+
+  const handleResetPassword = async (newPassword) => {
+    await authApi.resetPassword({ email: otpEmail, resetToken, newPassword });
+    setErrors({});
+    setGeneralError("");
+    setPassword("");
+    setResetToken("");
+    setOtpEmail("");
+    setForgotError("");
+    setIsLogin(true);
+    setStep("auth");
   };
 
   const handleGoogleLogin = async (credential) => {
@@ -177,12 +258,12 @@ export default function LoginModal({ isOpen, onClose }) {
     setGeneralError("");
     setLoading(true);
     try {
-      await axiosInstance.post("/users/google-login", { credential });
+      await authApi.googleCustomerLogin(credential);
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       resetForm();
       onClose();
     } catch (err) {
-      setGeneralError(err.response?.data?.message || "Google login failed.");
+      setGeneralError(getApiErrorMessage(err, "Google login failed."));
       setLoading(false);
     }
   };
@@ -190,6 +271,7 @@ export default function LoginModal({ isOpen, onClose }) {
   const resetForm = () => {
     setName(""); setUsername(""); setPhone(""); setEmail(""); setPassword("");
     setErrors({}); setGeneralError(""); setLoading(false);
+    setStep("auth"); setOtpEmail(""); setResetToken(""); setForgotError("");
   };
 
   const handleClose = () => {
@@ -241,6 +323,110 @@ export default function LoginModal({ isOpen, onClose }) {
           </button>
 
           <div className="p-6 sm:p-8">
+
+            {/* ═══ STEP: EMAIL VERIFICATION OTP ═══ */}
+            {step === "verify-email" && (
+              <OtpVerifyCard
+                email={otpEmail}
+                icon={MailCheck}
+                title="Verify your email"
+                subtitle="Enter the 6-digit code we sent to"
+                submitLabel="Verify & Continue"
+                onVerify={handleVerifyEmailOtp}
+                onResend={handleResendEmailOtp}
+                onBack={() => setStep("auth")}
+                backLabel="Use a different email"
+                expiresInMinutes={5}
+              />
+            )}
+
+            {/* ═══ STEP: FORGOT PASSWORD — EMAIL ═══ */}
+            {step === "forgot" && (
+              <form onSubmit={handleForgotSubmit} noValidate>
+                <div className="mb-6 pr-8">
+                  <div className="flex items-center gap-2 mb-3">
+                    <KeyRound size={16} className="text-[var(--user-accent)]" />
+                    <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                      Forgot Password
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-black text-[var(--user-text)] mb-1">Reset your password</h2>
+                  <p className="text-[var(--user-text-muted)] text-sm">
+                    Enter your registered email and we&apos;ll send you a 6-digit code.
+                  </p>
+                </div>
+
+                <div className="relative">
+                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setForgotError("");
+                    }}
+                    placeholder="Email address"
+                    className={inputCls}
+                  />
+                </div>
+
+                {forgotError && (
+                  <div className="flex items-start gap-2 mt-3 px-3 py-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30">
+                    <AlertCircle size={14} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
+                    <p className="text-[var(--user-danger)] text-[0.75rem] font-semibold">{forgotError}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-4"
+                >
+                  {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
+                  {forgotLoading ? "Sending code..." : "Send reset code"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("auth");
+                    setForgotError("");
+                  }}
+                  className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition"
+                >
+                  <ArrowLeft size={13} /> Back to login
+                </button>
+              </form>
+            )}
+
+            {/* ═══ STEP: FORGOT PASSWORD — OTP ═══ */}
+            {step === "forgot-otp" && (
+              <OtpVerifyCard
+                email={otpEmail}
+                icon={KeyRound}
+                title="Enter reset code"
+                subtitle="Enter the 6-digit code we sent to"
+                submitLabel="Verify code"
+                onVerify={handleVerifyResetOtp}
+                onResend={handleResendResetOtp}
+                onBack={() => setStep("forgot")}
+                backLabel="Change email"
+                expiresInMinutes={5}
+              />
+            )}
+
+            {/* ═══ STEP: SET NEW PASSWORD ═══ */}
+            {step === "reset" && (
+              <ResetPasswordCard
+                email={otpEmail}
+                onSubmit={handleResetPassword}
+                onBack={() => setStep("auth")}
+              />
+            )}
+
+            {/* ═══ STEP: LOGIN / REGISTER (default) ═══ */}
+            {step === "auth" && (
+              <>
             <div className="mb-6 pr-8">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
@@ -366,6 +552,22 @@ export default function LoginModal({ isOpen, onClose }) {
                 <FieldError field="password" />
               </div>
 
+              {/* ✅ FORGOT PASSWORD — OTP flow */}
+              {isLogin && (
+                <div className="flex justify-end -mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotError("");
+                      setStep("forgot");
+                    }}
+                    className="text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -382,6 +584,8 @@ export default function LoginModal({ isOpen, onClose }) {
                 {isLogin ? "Register" : "Login"}
               </button>
             </p>
+              </>
+            )}
           </div>
         </div>
       </div>

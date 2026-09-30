@@ -56,11 +56,22 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // 🛑 Login request par refresh token logic skip karo
-    const isLoginRequest =
-      originalRequest.url?.includes("/users/login") ||
-      originalRequest.url?.includes("/users/admin/login") ||
-      originalRequest.url?.includes("/users/register");
+    // 🛑 Public auth requests par refresh-token logic skip karo
+    // (OTP verify endpoints 400/429 dete hain — unpar redirect nahi hona chahiye)
+    const publicAuthPaths = [
+      "/users/login",
+      "/users/admin/login",
+      "/users/register",
+      "/users/logout",
+      "/users/send-email-otp",
+      "/users/verify-email-otp",
+      "/users/forgot-password",
+      "/users/verify-reset-otp",
+      "/users/reset-password",
+    ];
+    const isLoginRequest = publicAuthPaths.some((path) =>
+      originalRequest.url?.includes(path),
+    );
 
     if (isLoginRequest) {
       return Promise.reject(error);

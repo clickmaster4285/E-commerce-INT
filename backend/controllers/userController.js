@@ -1,12 +1,23 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const PendingRegistration = require("../models/PendingRegistration");
 const Wishlist = require("../models/Wishlist");
 const CheckoutDraft = require("../models/CheckoutDraft");
 const Employee = require("../models/Employee");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { sendOtpEmail } = require("../utils/sendEmail");
+
+// ✅ OTP config (.env se, otpController ke same defaults)
+const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES) || 5;
+const REGISTER_OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS) || 60;
+
+const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
 
 const generateTokens = (userId, role, type = 'user') => {
   const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
@@ -33,50 +44,163 @@ const getCookieOptions = (maxAge) => ({
 // ==========================================
 const createUser = async (req, res) => {
   try {
-    const { name, username, phone, email, password } = req.body;
-    if (!email || !password)
-      return res
-        .status(400)
-        .json({ success: false, message: "Email and password are required" });
+    const { name, username, phone, email: rawEmail, password } = req.body;
+    const email = normalizeEmail(rawEmail);
+    const cleanUsername = String(username || "").trim();
+    const cleanPhone = String(phone || "").trim();
+    const cleanName = String(name || "").trim();
+
+    // ✅ Basic validation — User NAHI banega, sirf 400 milega
     const errors = {};
-    if (await User.findOne({ email: String(email).toLowerCase().trim() })) errors.email = "This email is already registered";
-    if (username && await User.findOne({ username: String(username).toLowerCase().trim() })) errors.username = "This username is already taken";
-    if (phone && await User.findOne({ phone: String(phone).trim() })) errors.phone = "This phone number is already registered";
-    if (Object.keys(errors).length > 0) return res.status(400).json({ message: "Registration failed", errors });
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const defaultStore = await Store.findOne();
-    const user = await User.create({
-      name,
-      username:
-        username || email.split("@")[0] + Math.floor(Math.random() * 9999),
-      phone,
-      email,
-      password: hashedPassword,
-      storeId: defaultStore?._id,
-      role: "user",
-    });
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
-    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000),
-    );
-    res.status(201).json({
+    if (!email || !isValidEmail(email)) errors.email = "Please enter a valid email address";
+    if (!password || String(password).length < 6)
+      errors.password = "Password must be at least 6 characters";
+    if (!cleanName) errors.name = "Name is required";
+    else if (cleanName.length < 2) errors.name = "Name must be at least 2 characters";
+    if (cleanUsername) {
+      if (cleanUsername.length < 3) errors.username = "Username must be at least 3 characters";
+      else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername))
+        errors.username = "Username can only contain letters, numbers, and underscores";
+    }
+    if (cleanPhone && cleanPhone.replace(/\D/g, "").length < 4)
+      errors.phone = "Phone number must be at least 4 digits";
+    if (Object.keys(errors).length > 0)
+      return res.status(400).json({ success: false, message: "Registration failed", errors });
+
+    const finalUsername = cleanUsername || email.split("@")[0] + Math.floor(Math.random() * 9999);
+
+    // ✅ Verified User ka email dobara register nahi ho sakta
+    // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser.emailVerified !== false) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration failed",
+        errors: { email: "This email is already registered" },
+      });
+    }
+    // ✅ Legacy adhoora User (fix se pehle OTP ke bina bana) — pending flow ke liye hata do
+    if (existingUser && existingUser.emailVerified === false) {
+      await User.deleteOne({ _id: existingUser._id });
+    }
+    // ✅ username/phone clash — verified Users + doosri emails ke pendings se
+    const dupErrors = {};
+    const usernameClash = await User.findOne({ username: String(finalUsername).toLowerCase().trim() });
+    if (usernameClash) dupErrors.username = "This username is already taken";
+    else {
+      const pendingUsernameClash = await PendingRegistration.findOne({
+        username: String(finalUsername).toLowerCase().trim(),
+        email: { $ne: email },
+      });
+      if (pendingUsernameClash) dupErrors.username = "This username is already taken";
+    }
+    if (cleanPhone) {
+      const phoneClash = await User.findOne({ phone: cleanPhone });
+      if (phoneClash) dupErrors.phone = "This phone number is already registered";
+      else {
+        const pendingPhoneClash = await PendingRegistration.findOne({
+          phone: cleanPhone,
+          email: { $ne: email },
+        });
+        if (pendingPhoneClash) dupErrors.phone = "This phone number is already registered";
+      }
+    }
+    if (Object.keys(dupErrors).length > 0)
+      return res.status(400).json({ success: false, message: "Registration failed", errors: dupErrors });
+
+    // ✅ Same email se dobara Create: sirf pending hai to error nahi — naya OTP bhej ke update karo
+    const existingPending = await PendingRegistration.findOne({ email });
+    if (existingPending && new Date(existingPending.expiresAt).getTime() > Date.now()) {
+      const elapsed = (Date.now() - new Date(existingPending.lastSentAt).getTime()) / 1000;
+      if (elapsed < REGISTER_OTP_RESEND_SECONDS) {
+        const retryAfter = Math.ceil(REGISTER_OTP_RESEND_SECONDS - elapsed);
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${retryAfter} second${retryAfter === 1 ? "" : "s"} before requesting a new code.`,
+          retryAfter,
+          requireVerification: true,
+          email,
+        });
+      }
+    } else if (existingPending) {
+      await PendingRegistration.deleteOne({ _id: existingPending._id });
+    }
+
+    // ✅ OTP + hashes — DB me plain text kuch nahi jayega
+    const code = generateOtpCode();
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const otpHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + REGISTER_OTP_EXPIRE_MINUTES * 60 * 1000);
+
+    if (existingPending && new Date(existingPending.expiresAt).getTime() > Date.now()) {
+      existingPending.name = cleanName;
+      existingPending.username = finalUsername;
+      existingPending.phone = cleanPhone;
+      existingPending.passwordHash = passwordHash;
+      existingPending.otpHash = otpHash;
+      existingPending.expiresAt = expiresAt;
+      existingPending.attempts = 0;
+      existingPending.lastSentAt = new Date();
+      await existingPending.save();
+    } else {
+      await PendingRegistration.create({
+        email,
+        name: cleanName,
+        username: finalUsername,
+        phone: cleanPhone,
+        passwordHash,
+        otpHash,
+        expiresAt,
+        attempts: 0,
+        lastSentAt: new Date(),
+      });
+    }
+
+    // 📧 Verification OTP bhejo — SMTP khaali ho to dev console fallback (sendEmail ke andar)
+    let delivery;
+    try {
+      delivery = await sendOtpEmail({
+        to: email,
+        otp: code,
+        purpose: "email_verification",
+        expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
+      });
+    } catch (emailError) {
+      await PendingRegistration.deleteOne({ email }).catch(() => {});
+      console.error("createUser otp error:", emailError.cause || emailError);
+      return res.status(500).json({ success: false, message: emailError.message });
+    }
+
+    // 🧪 DEV ONLY — SMTP off ho to bhi flow test ho sake (prod me kabhi OTP expose nahi hoga)
+    const debugOtp =
+      !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
+    if (debugOtp) {
+      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+    }
+
+    // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.
+    return res.status(201).json({
       success: true,
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
-      },
+      message: delivery.delivered
+        ? `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
+        : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein. (expires in ${REGISTER_OTP_EXPIRE_MINUTES} min)`,
+      requireVerification: true,
+      otpSent: true,
+      delivered: delivery.delivered,
+      email,
+      expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
+      resendAfterSeconds: REGISTER_OTP_RESEND_SECONDS,
+      ...(debugOtp ? { debugOtp } : {}),
+      user: { name: cleanName, username: finalUsername, phone: cleanPhone, email },
     });
   } catch (error) {
     console.error("createUser error:", error);
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || "field";
+      return res
+        .status(400)
+        .json({ success: false, message: "Registration failed", errors: { [field]: `This ${field} is already in use` } });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -115,6 +239,18 @@ const loginUser = async (req, res) => {
       return res
         .status(401)
         .json({ success: false, message: "Password incorrect" });
+
+    // ✅ EMAIL VERIFICATION — verified nahi hai to login nahi hoga
+    // (purane users mein field undefined hota hai, unhe verified maana jata hai)
+    if (user.emailVerified === false)
+      return res.status(403).json({
+        success: false,
+        needsVerification: true,
+        email: user.email,
+        message:
+          "Your email is not verified. Please verify it with the code we sent to your email.",
+      });
+
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
@@ -726,6 +862,8 @@ const googleCustomerLogin = async (req, res) => {
       const updates = {};
       if (!user.google_id && googleId) updates.google_id = googleId;
       if (!user.avatar && picture) updates.avatar = picture;
+      // ✅ Google email pehle se verified hoti hai — local OTP ki zaroorat nahi
+      if (!user.emailVerified) updates.emailVerified = true;
       if (Object.keys(updates).length) await User.findByIdAndUpdate(user._id, updates);
       user = await User.findById(user._id);
     } else {
@@ -741,6 +879,8 @@ const googleCustomerLogin = async (req, res) => {
         google_id: googleId,
         avatar: picture || "",
         storeId: defaultStore?._id,
+        // ✅ Google se aayi email already verified hoti hai
+        emailVerified: email_verified !== false,
       });
     }
 

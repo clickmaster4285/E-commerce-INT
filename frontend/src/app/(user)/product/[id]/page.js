@@ -6,12 +6,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
   ShoppingCart, Truck, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
-  Minus, Plus, Package, X, Check, Zap, ZoomIn, MapPin, Tag, Sparkles, Heart, TrendingUp, Search,
+  Minus, Plus, Package, X, Check, Zap, ZoomIn, MapPin, Tag, Sparkles, Heart, TrendingUp, Search, Star,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import ProductCard from "@/components/user/ProductCard";
+import ProductReviews from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
@@ -595,9 +596,18 @@ function ProductDetailContent({ params }) {
               <Link href={`/?brand=${brandId}`} className="inline-block text-[0.625rem] sm:text-[0.6875rem] font-bold text-[var(--user-accent)] uppercase tracking-[0.18em] hover:opacity-80 transition">{brandName}</Link>
             )}
             <h1 className="text-[1.25rem] sm:text-2xl lg:text-[1.75rem] font-bold text-[var(--user-text)] tracking-tight leading-snug break-words">{product.name}</h1>
-            <span className={`inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${stockStatus.dot}`} /> {stockStatus.text}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${stockStatus.dot}`} /> {stockStatus.text}
+              </span>
+              {(product.ratingSummary?.count || 0) > 0 && (
+                <a href="#reviews" className="inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-bold px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-500 hover:opacity-80 transition">
+                  <Star size={11} className="fill-amber-400 text-amber-400" />
+                  {Number(product.ratingSummary.avg || 0).toFixed(1)}
+                  <span className="font-semibold opacity-80">({product.ratingSummary.count} review{product.ratingSummary.count === 1 ? "" : "s"})</span>
+                </a>
+              )}
+            </div>
           </div>
 
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 space-y-3 sm:space-y-4">
@@ -801,6 +811,7 @@ function ProductDetailContent({ params }) {
         </div>
       </div>
 
+      <ProductReviews productId={productId} fallbackSummary={product.ratingSummary} />
       <MoreImagesStack images={allImages} onZoom={openLightbox} />
       <RelatedProducts products={related} />
 

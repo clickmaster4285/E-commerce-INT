@@ -25,6 +25,14 @@ const {
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
+const {
+  sendEmailVerificationOtp,
+  verifyEmailVerificationOtp,
+  sendForgotPasswordOtp,
+  verifyForgotPasswordOtp,
+  resetPasswordWithOtp,
+  getEmailHealth,
+} = require("../controllers/otpController");
 
 const router = express.Router();
 
@@ -38,6 +46,24 @@ router.post("/refresh-token", refreshAccessToken);
 router.post("/logout", logoutUser);
 router.post("/google-login", googleLogin);
 router.post("/google-customer-login", googleCustomerLogin);
+
+// ==========================================
+// 📧 EMAIL HEALTH (SMTP diagnose — bina DB ke bhi chalega)
+// ==========================================
+router.get("/email-health", getEmailHealth);
+
+// ==========================================
+// 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
+// ==========================================
+router.post("/send-email-otp", sendEmailVerificationOtp);
+router.post("/verify-email-otp", verifyEmailVerificationOtp);
+
+// ==========================================
+// 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
+// ==========================================
+router.post("/forgot-password", sendForgotPasswordOtp);
+router.post("/verify-reset-otp", verifyForgotPasswordOtp);
+router.post("/reset-password", resetPasswordWithOtp);
 
 // ==========================================
 // 🔒 PROTECTED ROUTES

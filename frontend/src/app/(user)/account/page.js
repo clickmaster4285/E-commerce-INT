@@ -186,7 +186,8 @@ function navBadgeCls(active) {
 
 function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLogout }) {
   return (
-    <Card className="overflow-hidden">
+    <div className="space-y-4">
+    <Card className="overflow-hidden rounded-l-none border-l-0">
       {/* identity block */}
       <div className="relative p-4 border-b border-[var(--user-border)] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
@@ -251,6 +252,34 @@ function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLog
         </button>
       </nav>
     </Card>
+
+    {/* PERKS — logout ke neeche sirf 2 (scroll nahi chahiye isliye chhota rakha) */}
+    <Card className="overflow-hidden rounded-l-none border-l-0">
+      <div className="space-y-0.5 p-2">
+        {[
+          { icon: ShieldCheck, title: "Secure Shopping", desc: "100% protected payments" },
+          { icon: Truck, title: "Fast Delivery", desc: "Quick dispatch on every order" },
+        ].map((perk) => {
+          const Icon = perk.icon;
+          return (
+            <div key={perk.title} className="flex items-center gap-2.5 rounded-xl px-2.5 py-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)]">
+                <Icon size={14} />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[0.75rem] font-bold text-[var(--user-text)]">
+                  {perk.title}
+                </span>
+                <span className="block truncate text-[0.625rem] text-[var(--user-text-muted)]">
+                  {perk.desc}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+    </div>
   );
 }
 
@@ -684,18 +713,18 @@ export default function AccountPage() {
   };
 
   return (
-    <main className="max-w-[75rem] mx-auto px-3 lg:px-6 pt-3 lg:pt-10 pb-24 md:pb-10">
+    <main className="w-full min-w-0 pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12 pb-24 md:pb-10">
       <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-      <div className="grid lg:grid-cols-[16.5rem_minmax(0,1fr)] gap-5 lg:gap-6 items-start">
-        {/* DESKTOP SIDEBAR */}
-        <aside className="hidden lg:block lg:sticky lg:top-24">
+      <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        {/* DESKTOP SIDEBAR — home page ki tara left edge ke sath attached */}
+        <aside className="hidden w-[16.375rem] shrink-0 lg:block lg:sticky lg:top-24 xl:w-[18rem] 2xl:w-[20rem]">
           <SidebarNav {...sidebarProps} />
         </aside>
 
         {/* CONTENT */}
-        <div className="min-w-0">
+        <div className="w-full min-w-0 flex-1">
           {showMobileMenu ? (
             <MobileMenu
               {...sidebarProps}
@@ -749,7 +778,8 @@ export default function AccountPage() {
 
 
                     {/* profile information */}
-                    <Card>
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                       <CardHeader
                         icon={User}
                         title="Profile Information"
@@ -845,7 +875,8 @@ export default function AccountPage() {
                   {/* right rail */}
                   <div className="space-y-4 min-w-0">
                     {/* account security */}
-                    <Card>
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                       <CardHeader
                         icon={ShieldCheck}
                         title="Account Security"
@@ -876,7 +907,8 @@ export default function AccountPage() {
 
 
                     {/* quick stats */}
-                    <Card>
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                       <CardHeader icon={Package} title="Quick Stats" />
                       <div className="p-3 grid grid-cols-2 gap-2.5">
                         {stats.map((s) => {
@@ -914,6 +946,7 @@ export default function AccountPage() {
               {/* ============ ADDRESS ============ */}
               {tab === "address" && (
                 <Card className="overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                   <CardHeader
                     icon={MapPin}
                     title={`Addresses (${addresses.length})`}
@@ -1023,6 +1056,7 @@ export default function AccountPage() {
 
               {/* ============ SETTING ============ */}
               {tab === "settings" && (
+                <div className="space-y-4">
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
                   <div className="space-y-4 min-w-0">
                     {/* change password */}
@@ -1222,7 +1256,11 @@ export default function AccountPage() {
                         </div>
                       </div>
                     </Card>
+                  </div>
+                </div>
 
+                {/* bottom row — Default Address + Quick Actions ek hi row me */}
+                <div className="grid items-start gap-4 sm:grid-cols-2">
                     <Card className="overflow-hidden">
                       <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                       <CardHeader
@@ -1326,7 +1364,7 @@ export default function AccountPage() {
                         })}
                       </div>
                     </Card>
-                  </div>
+                </div>
                 </div>
               )}
 
