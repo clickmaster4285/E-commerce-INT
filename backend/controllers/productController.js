@@ -208,6 +208,9 @@ const buildProductFilter = async (query = {}) => {
   const categoryId = query.category_id;
   const statusFilter = String(query.status || "").trim();
   const search = String(query.search || query.q || "").trim();
+  // ✅ Featured Products page — sirf "?featured=true" bheje tab filter lagta hai
+  //    (legacy callers filter nahi bhejte → unka behavior bilkul same rehta hai).
+  const featuredFilter = String(query.featured || "").trim().toLowerCase();
 
   // ---- Filter build ----
   // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
@@ -216,6 +219,8 @@ const buildProductFilter = async (query = {}) => {
   if (brandId) filter.brand_id = brandId;
   if (categoryId && categoryId !== "all") filter.category_id = categoryId;
   if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
+  if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
+  else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
 
   if (search) {
     const rx = { $regex: escapeRegex(search), $options: "i" };
@@ -261,6 +266,8 @@ const computeProductStats = async (filter, totalOverride = null) => {
   return {
     totalProducts: total,
     activeProducts,
+    // ✅ Summary card ke liye Inactive = Total - Active (brand stats jaisa hi pattern)
+    inactiveProducts: Math.max(0, total - activeProducts),
     totalVariants: variantAgg[0]?.totalVariants || 0,
     totalStock: variantAgg[0]?.totalStock || 0,
   };
@@ -269,6 +276,25 @@ const computeProductStats = async (filter, totalOverride = null) => {
 // ======================================================
 // GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
 // ======================================================
+// ✅ DETERMINISTIC LIST ORDER (pagination ka base)
+// Sirf `created_at` par sort karna kaafi nahi tha: bulk/seed insert ki wajah se
+// kai products ka created_at bilkul same (same millisecond) hota hai, aur MongoDB
+// ka sort ties par stable nahi hota. Is liye har page request par ties ka order
+// badal jata tha → skip/limit ke saath pages overlap karte the (page 2 par page 1
+// ke products dobara aa jate the aur kuch products kabhi dikhte hi nahi the).
+// `_id` tie-breaker ek TOTAL order banata hai, is liye har page exactly ek baar.
+const PRODUCT_LIST_SORT = { created_at: -1, _id: -1 };
+
+// ✅ FEATURED PAGE SORT — "recent upar, top par"
+//    Featured Products page ke liye. `created_at` yahan kaam ka nahi: bulk/seed
+//    insert me sab products ka created_at ek hi millisecond ka hota hai, is liye
+//    created_at par sort sab tie karta hai aur order sirf _id (random ObjectId)
+//    par chala jata tha — user ko "recent upar" dikhai hi nahi deta tha.
+//    `featured_at` wo timestamp hai jab product featured mark kiya gaya → jo
+//    abhi feature hua wo hamesha top. Purane featured products (featured_at null)
+//    niche rehte hain aur created_at → _id se deterministic order milta hai.
+const FEATURED_RECENT_SORT = { featured_at: -1, created_at: -1, _id: -1 };
+
 // ======================================================
 // GET ALL PRODUCTS (OPTIONAL SERVER-SIDE PAGINATION)
 // ✅ Non-breaking: agar ?limit= nahi bheja gaya to purana full-array response hi milega
@@ -285,6 +311,10 @@ const getProducts = async (req, res) => {
     const { filter } = await buildProductFilter(req.query);
 
     const isPriceSort = sort === "price-asc" || sort === "price-desc";
+    // ✅ Sirf Featured Products page ye sort bhejta hai (?sort=featured-recent).
+    //    Baaki sab callers ke liye PRODUCT_LIST_SORT wala purana order same rehta hai.
+    const isFeaturedRecent = sort === "featured-recent";
+    const listSort = isFeaturedRecent ? FEATURED_RECENT_SORT : PRODUCT_LIST_SORT;
 
     // ---- LEGACY MODE (no limit) → exact old behavior ----
     if (!limit) {
@@ -294,7 +324,7 @@ const getProducts = async (req, res) => {
         .populate("tag_ids", "name")
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
-        .sort({ created_at: -1 })
+        .sort(listSort)
         .lean();
 
       if (!products.length) return res.status(200).json([]);
@@ -335,7 +365,9 @@ const getProducts = async (req, res) => {
     let pageIds = [];
 
     if (isPriceSort) {
-      const idDocs = await Product.find(filter).select("_id").lean();
+      // ✅ Base order deterministic (_id tie-break) — JS sort stable hai, is liye
+      //    equal price wale products bhi har request par same order me rahenge.
+      const idDocs = await Product.find(filter).select("_id").sort(listSort).lean();
       const ids = idDocs.map((d) => d._id);
       if (ids.length) {
         const priceDocs = await Variant.aggregate([
@@ -352,9 +384,10 @@ const getProducts = async (req, res) => {
         pageIds = ids.slice(skip, skip + limit);
       }
     } else {
+      // ✅ Pages overlap na hon — is liye same deterministic total order + _id tie-break.
       const idDocs = await Product.find(filter)
         .select("_id")
-        .sort({ created_at: -1 })
+        .sort(listSort)
         .skip(skip)
         .limit(limit)
         .lean();
@@ -420,7 +453,7 @@ const getProducts = async (req, res) => {
 // ✅ Products list se ALAG endpoint — table aur summary cards independently
 //     load/refresh hote hain (ek doosre ko block nahi karte).
 // ✅ Same filters support karta hai: search / category_id / brand_id / status
-// ✅ Response: { success: true, stats: { totalProducts, activeProducts, totalVariants, totalStock } }
+// ✅ Response: { success: true, stats: { totalProducts, activeProducts, inactiveProducts, totalVariants, totalStock } }
 // ======================================================
 const getProductStats = async (req, res) => {
   try {
@@ -577,6 +610,8 @@ const createProduct = async (req, res) => {
       description: String(req.body.description || "").trim(),
       tax: toNumber(req.body.tax, 0),
       status: req.body.status === "inactive" ? "inactive" : "active",
+      // ✅ Featured — create form se bhi mark ho sakta hai (default false)
+      is_featured: req.body.is_featured === true,
       createdby: req.user?._id || null,
       updatedby: null,
       is_deleted: false,
@@ -794,6 +829,10 @@ const updateProduct = async (req, res) => {
       product.status = req.body.status === "inactive" ? "inactive" : "active";
     }
 
+    if (req.body.is_featured !== undefined) {
+      product.is_featured = req.body.is_featured === true;
+    }
+
     // ✅ FIX (ROOT CAUSE): Product ke audit fields (updated_at / updatedby) sirf
     // tab update hote hain jab product-level field waqai badla ho. Pehle ye
     // unconditional tha, is liye "Add variant" / "Edit variant" page (jo
@@ -1001,6 +1040,15 @@ const updateProduct = async (req, res) => {
         }
       }
 
+      // ✅ Live stock sync — product edit se variant quantity change hone par manage-stock
+      //    page socket se refresh ho jata hai (manual page refresh ki zaroorat nahi).
+      if (Array.isArray(variants) && variants.some((v) => v && Object.prototype.hasOwnProperty.call(v, "quantity"))) {
+        emitSocketEvent("stockUpdated", {
+          product_id: product._id,
+          source: "product_variant_update",
+        });
+      }
+
       // ⚠️ REMOVED (bug fix): Pehle yahan "jo variants payload mein nahi aaye unhe
       // is_deleted = true karke save kar do" wala soft-delete loop tha. Variant
       // model mein `is_deleted` / `deleted_at` fields maujood hi nahi hain, is liye:
@@ -1164,65 +1212,193 @@ const deleteProduct = async (req, res) => {
 // ======================================================
 // TOGGLE PRODUCT STATUS
 // ======================================================
+// ✅ PERFORMANCE FIX (activate/deactivate slow tha):
+//    1) Pehle poora document load + validate + save hota tha → ab sirf status flip
+//       ka ek ATOMIC update (aggregation pipeline) — 1 round-trip, zero validation.
+//    2) Activity log + populated read + socket broadcast pehle RESPONSE bhejne se
+//       pehle await hote the → ab background me (fire & forget) chalte hain,
+//       is liye button ka response foran milta hai.
 const toggleProductStatus = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findOne({
-      _id: req.params.id,
-      is_deleted: { $ne: true },
-    });
+    // ✅ Sirf status flip ka atomic update (aggregation pipeline) — poora document
+    //    load/validate/save nahi hota, is liye ek hi round-trip me response.
+    //    "updatePipeline: true" ZAROORI hai (Mongoose >= 7), warna mongoose
+    //    "Cannot pass an array to query updates..." error de kar 500 return karta hai.
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      [
+        {
+          $set: {
+            status: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$status", "active"] }, "active"] },
+                "inactive",
+                "active",
+              ],
+            },
+            updatedby: req.user?._id || null,
+            updated_at: new Date(),
+          },
+        },
+      ],
+      // "returnDocument: 'after'" (Mongoose 9 me 'new: true' deprecated hai)
+      { returnDocument: "after", updatePipeline: true, runValidators: false }
+    );
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    product.status = product.status === "active" ? "inactive" : "active";
-    product.updatedby = req.user?._id || null;
-    await product.save();
+    // Flip deterministic hai → naya status milte hi purana bhi pata hai
+    // (listeners stats counts accurately adjust kar sakein)
+    const previousStatus = product.status === "active" ? "inactive" : "active";
 
+    // ✅ Client ko turant jawaab — UI turant update ho jaata hai
+    res.status(200).json({
+      message: `Product status updated to ${product.status}`,
+      product,
+    });
+
+    // ---- Background task (await nahi hota → request latency par asar nahi) ----
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
+    const productId = product._id;
+    const productName = product.name;
+    const nextStatus = product.status;
+    const tagIds = product.tag_ids;
 
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${performerName} ${product.status === "active" ? "activated" : "deactivated"} product "${product.name}"`,
-        category: "Product Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: { productId: product._id, status: product.status },
-      },
-      performerId
-    );
+    setImmediate(async () => {
+      try {
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${performerName} ${nextStatus === "active" ? "activated" : "deactivated"} product "${productName}"`,
+            category: "Product Management",
+            performedBy: performerId,
+            performedByName: performerName,
+            details: { productId, status: nextStatus },
+          },
+          performerId
+        );
+      } catch (activityErr) {
+        console.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
+      }
 
-    const populatedProduct = await Product.findById(product._id)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .lean();
+      try {
+        const populatedProduct = await Product.findById(productId)
+          .populate("createdby", "name email")
+          .populate("updatedby", "name email")
+          .lean();
 
-    emitSocketEvent("productUpdated", {
-      _id: product._id,
-      name: product.name,
-      status: product.status,
-      tag_ids: product.tag_ids,
-      createdby: populatedProduct?.createdby || null,
-      updatedby: populatedProduct?.updatedby || null,
-      created_at: populatedProduct?.created_at,
-      updated_at: populatedProduct?.updated_at,
-    });
-
-    return res.status(200).json({
-      message: `Product status updated to ${product.status}`,
-      product,
+        emitSocketEvent("productUpdated", {
+          _id: productId,
+          name: productName,
+          status: nextStatus,
+          previousStatus,
+          // ✅ statusOnly: sirf status badla hai → listeners full list refetch ke
+          //    bajaye cache me targeted patch kar sakte hain
+          statusOnly: true,
+          tag_ids: tagIds,
+          createdby: populatedProduct?.createdby || null,
+          updatedby: populatedProduct?.updatedby || null,
+          created_at: populatedProduct?.created_at,
+          updated_at: populatedProduct?.updated_at,
+        });
+      } catch (socketErr) {
+        console.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
+      }
     });
   } catch (error) {
     console.error("❌ [toggleProductStatus] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to update product status",
+    });
+  }
+};
+
+// ======================================================
+// TOGGLE PRODUCT FEATURED
+// ======================================================
+// ✅ "Featured Products" page ke liye — same atomic pattern as toggleProductStatus
+//    (single round-trip, aggregation pipeline, no full document validation).
+// ✅ Inactive product featured nahi ho sakta — sirf ACTIVE products feature ho
+//    sakte hain, warna storefront par inactive item show hota.
+const toggleProductFeatured = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    // ✅ Guard PEHLE check karte hain, aggregation pipeline se pehle. Pehle pipeline
+    //    khud is_featured = false chhor deta tha (status active nahi hone par), is liye
+    //    niche wala guard kabhi trigger hi nahi hota tha aur API galti se
+    //    "Product removed from featured" (200) bhej deti thi — jabki kuch hua hi nahi.
+    const current = await Product.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .select("is_featured status")
+      .lean();
+
+    if (!current) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // ✅ Sirf ACTIVE product ko featured mark kar sakte hain (unmark hamesha allowed).
+    if (current.is_featured !== true && current.status !== "active") {
+      return res.status(400).json({
+        message: "This product is inactive. Please activate it before marking it as featured.",
+      });
+    }
+
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      [
+        {
+          $set: {
+            is_featured: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$is_featured", false] }, true] },
+                false,
+                // Feature karte waqt product ACTIVE hona zaroori hai
+                { $eq: [{ $ifNull: ["$status", "active"] }, "active"] },
+              ],
+            },
+            // ✅ "Recent upar" order ka source — featured mark karne ka timestamp.
+            //    Logic is_featured se exactly mirror karti hai: abhi featured tha
+            //    → unmark (null), warna mark (ab ka time). Is se jo product abhi
+            //    feature hua wo Featured page par sabse upar aata hai.
+            featured_at: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$is_featured", false] }, true] },
+                null,
+                new Date(),
+              ],
+            },
+            updatedby: req.user?._id || null,
+            updated_at: new Date(),
+          },
+        },
+      ],
+      { returnDocument: "after", updatePipeline: true, runValidators: false }
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.status(200).json({
+      message: product.is_featured
+        ? "Product marked as featured"
+        : "Product removed from featured",
+      product,
+    });
+  } catch (error) {
+    console.error("❌ [toggleProductFeatured] Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to update featured status",
     });
   }
 };
@@ -1238,4 +1414,5 @@ module.exports = {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
+  toggleProductFeatured,
 };

@@ -6,9 +6,9 @@ import { createPortal } from "react-dom";
 import { useProductSocketSync } from "@/hooks/useProductSocketSync";
 import { useSocket } from "@/hooks/useSocket";
 import {
-  Package, Layers3, Box, TrendingUp, Clock, Pencil, Check,
+  Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
-  Sparkles, AlertTriangle, DollarSign, FolderOpen, Store, Hash, Tag as TagIcon,
+  Sparkles, AlertTriangle, FolderOpen, Store, Hash, Tag as TagIcon,
   Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText,
   Ban, ChevronLeft, ZoomIn, Search // Added ZoomIn and ChevronLeft for gallery
 } from "lucide-react";
@@ -511,27 +511,78 @@ function MoreMenu({ actions }) {
 // 3-dot menu → "View Detailed": variant ki poori detail right side panel mein.
 // Sare fields pehle se fetched product payload se aate hain (koi extra API call nahi).
 
-function DetailStat({ label, value, color, icon: Icon }) {
+// Color attribute ke value ke aage chhota swatch (jaise "Blue") dikhane ke liye
+function isColorAttribute(name, value) {
+  return /colou?r/i.test(name || "") && /^[a-zA-Z]+$/.test(value || "");
+}
+
+// Section header: simple title + optional right-side action.
+// `delay` se sections halke-halke (staggered) andar aate hain jab drawer khulta hai.
+function DrawerSection({ title, delay = 0, action, children }) {
   return (
-    <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-      <div className="flex items-center gap-1.5">
-        {Icon && <Icon className="w-3 h-3 shrink-0" style={{ color: "var(--text-muted)" }} />}
-        <p className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--text-muted)" }}>{label}</p>
+    <section className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300" style={{ animationDelay: `${delay}ms` }}>
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <h4 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{title}</h4>
+        {action}
       </div>
-      <p className="mt-1 text-[13px] font-bold truncate" style={{ color: color || "var(--text-primary)" }}>{value}</p>
+      {children}
+    </section>
+  );
+}
+
+// Summary tile: label + bold value + optional status dot / supporting line.
+function DetailStat({ label, value, sub, subColor, dotColor, color }) {
+  return (
+    <div className="rounded-xl px-3 py-3 transition hover:-translate-y-0.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+      <p className="truncate text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>{label}</p>
+      <p className="mt-1 flex items-center gap-1.5 text-[13.5px] font-black leading-tight tabular-nums" style={{ color: color || "var(--text-primary)" }}>
+        {dotColor && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />}
+        <span className="truncate">{value}</span>
+      </p>
+      {sub && <p className="mt-0.5 truncate text-[10.5px] font-medium" style={{ color: subColor || "var(--text-muted)" }}>{sub}</p>}
     </div>
   );
 }
 
 function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
   const [previewImage, setPreviewImage] = useState(null);
+  const [copiedSku, setCopiedSku] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const panelRef = useRef(null);
+
+  // ✅ Background page scroll lock — drawer khula ho to peeche wala list na hile
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    return () => { document.body.style.overflow = originalOverflow; };
+  }, []);
 
   // Escape: pehle image preview band karo, warna panel.
+  // Tab: focus drawer ke andar hi cycle kare (focus trap), bahar na nikle.
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key !== "Escape") return;
-      if (previewImage !== null) setPreviewImage(null);
-      else onClose();
+    const focusableElements = () => Array.from(
+      panelRef.current?.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') || []
+    ).filter((element) => !element.disabled && element.offsetParent !== null);
+
+    const handleKey = (event) => {
+      if (event.key === "Escape") {
+        if (previewImage !== null) setPreviewImage(null);
+        else onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const list = focusableElements();
+      if (list.length === 0) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -558,168 +609,232 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
       : []),
   ];
 
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex justify-end">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+  // ✅ Stock status sirf quantity se (min/max qty UI mein nahi hain)
+  const stockState = quantity <= 0
+    ? { label: "Out of Stock", color: "var(--danger)" }
+    : quantity <= 5
+      ? { label: "Low Stock", color: "var(--warning)" }
+      : { label: "In Stock", color: "var(--success)" };
 
-      <aside className="relative w-full sm:max-w-[460px] h-full flex flex-col" style={{ backgroundColor: "var(--bg-card)", borderLeft: "1px solid var(--border-color)", boxShadow: "0 0 40px rgba(0,0,0,0.35)" }}>
+  // ---- Summary tiles ke numbers ----
+  const costPrice = Number(variant.cost_price || 0);
+  const sellingPrice = Number(variant.selling_price || 0);
+
+  const sku = variant.sku || "";
+  const description = variant.description || "";
+  const hasLongDescription = description.length > 140;
+  const primaryImage = images[0];
+
+  // SKU copy — clipboard se ek click mein
+  const copySku = async () => {
+    if (!sku) return;
+    try {
+      await navigator.clipboard.writeText(sku);
+      setCopiedSku(true);
+      setTimeout(() => setCopiedSku(false), 1800);
+      toast.success("SKU copied to clipboard");
+    } catch {
+      toast.error("Could not copy SKU");
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80] flex justify-end" role="dialog" aria-modal="true" aria-labelledby="variant-drawer-title">
+      <div className="absolute inset-0 animate-in fade-in duration-300 bg-black/60 backdrop-blur-[3px]" onClick={onClose} />
+
+      <aside
+        ref={panelRef}
+        tabIndex={-1}
+        className="relative flex h-full w-full flex-col outline-none animate-in slide-in-from-right duration-300 sm:max-w-[480px]"
+        style={{ backgroundColor: "var(--bg-card)", borderLeft: "1px solid var(--border-color)", boxShadow: "-18px 0 50px rgba(0,0,0,0.35)" }}
+      >
+        {/* Top accent bar — flat, koi glow/gradient nahi */}
+        <div className="h-1 w-full shrink-0" style={{ backgroundColor: "var(--accent)" }} />
+
         {/* HEADER */}
-        <div className="px-5 py-4 flex items-start justify-between gap-3 shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="shrink-0 px-5 py-3.5" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+          <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
               <Layers3 className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-[14px] font-bold" style={{ color: "var(--text-primary)" }}>Variant Details</h2>
-              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{productName || "Product variant"}</p>
+            <div className="min-w-0 flex-1">
+              <h2 id="variant-drawer-title" className="text-[14px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>Variant Details</h2>
+              <p className="mt-0.5 text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{productName || "Product variant"}</p>
             </div>
+            <button type="button" onClick={onClose} aria-label="Close variant details" title="Close (Esc)" className="w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0 hover:brightness-125" style={{ color: "var(--text-muted)", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close variant details" className="w-8 h-8 rounded-lg flex items-center justify-center transition hover:bg-[var(--bg-card)] shrink-0" style={{ color: "var(--text-muted)" }}>
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* IDENTITY */}
-          <div className="flex items-start gap-3.5">
-            {images.length > 0 ? (
-              <button type="button" onClick={() => setPreviewImage(0)} className="w-16 h-16 rounded-lg overflow-hidden shrink-0 transition hover:opacity-90" style={{ border: "1px solid var(--border-color)" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getImageUrl(images[0].img_url)} alt={variantLabelOf(variant)} className="w-full h-full object-cover" />
-              </button>
-            ) : (
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[14px] font-bold leading-5" style={{ color: "var(--text-primary)" }}>{variantLabelOf(variant)}</h3>
-                <StatusBadge active={isActive} />
-              </div>
-              <p className="mt-1 text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>SKU: {variant.sku || "—"}</p>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                {variant.description || "No description provided for this variant."}
-              </p>
-            </div>
-          </div>
-
-          {/* PRICING */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Pricing</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <DetailStat label="Cost Price" value={money(variant.cost_price)} icon={DollarSign} />
-              <DetailStat label="Selling Price" value={money(variant.selling_price)} icon={TagIcon} color="var(--success)" />
-              <DetailStat label="Quantity" value={quantity} icon={Box} color={quantity <= 5 ? "var(--danger)" : undefined} />
-              <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <div className="flex items-center gap-1.5">
-                  <Activity className="w-3 h-3 shrink-0" style={{ color: "var(--text-muted)" }} />
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</p>
+        <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
+          {/* HERO — identity: image · title · status · SKU (copy) · description */}
+          <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 flex items-start gap-3.5">
+              {primaryImage ? (
+                <button type="button" onClick={() => setPreviewImage(0)} aria-label="Open image preview" className="group relative w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={getImageUrl(primaryImage.img_url)} alt={variantLabelOf(variant)} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.08]" />
+                  <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.45)" }}>
+                    <ZoomIn className="w-4 h-4 text-white" />
+                  </span>
+                  {images.length > 1 && (
+                    <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9.5px] font-bold text-white">+{images.length - 1}</span>
+                  )}
+                </button>
+              ) : (
+                <div className="w-[84px] h-[84px] rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-card)", border: "1px dashed var(--border-color)" }}>
+                  <ImageIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
                 </div>
-                <div className="mt-1.5"><StatusBadge active={isActive} /></div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-[15.5px] font-bold leading-snug" style={{ color: "var(--text-primary)" }}>{variantLabelOf(variant)}</h3>
+                  <StatusBadge active={isActive} />
+                </div>
+
+                {/* SKU + one-click copy */}
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="inline-flex min-w-0 items-center rounded-md px-2 py-1 text-[10.5px] font-mono" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+                    <span className="truncate">{sku ? `SKU: ${sku}` : "No SKU"}</span>
+                  </span>
+                  {sku && (
+                    <button type="button" onClick={copySku} title="Copy SKU" aria-label="Copy variant SKU" className="inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-md transition hover:brightness-110" style={{ backgroundColor: copiedSku ? "var(--success-soft)" : "var(--accent-soft)", color: copiedSku ? "var(--success)" : "var(--accent)", border: `1px solid color-mix(in srgb, ${copiedSku ? "var(--success)" : "var(--accent)"} 28%, transparent)` }}>
+                      {copiedSku ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  )}
+                </div>
+
+                {description ? (
+                  <>
+                    <p className={`mt-2 text-[12px] leading-relaxed ${descExpanded ? "" : "line-clamp-2"}`} style={{ color: "var(--text-secondary)" }}>{description}</p>
+                    {hasLongDescription && (
+                      <button type="button" onClick={() => setDescExpanded((prev) => !prev)} className="mt-1 text-[11px] font-semibold transition hover:underline" style={{ color: "var(--accent)" }}>
+                        {descExpanded ? "Show less" : "Show more"}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-[12px] italic" style={{ color: "var(--text-muted)" }}>No description provided for this variant.</p>
+                )}
               </div>
             </div>
+
+          {/* SUMMARY TILES — cost · selling · quantity · status */}
+          <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <DetailStat label="Cost Price" value={money(costPrice)} />
+            <DetailStat label="Selling Price" value={money(sellingPrice)} color="var(--success)" />
+            <DetailStat label="Quantity" value={quantity.toLocaleString()} sub={stockState.label} subColor={stockState.color} />
+            <DetailStat label="Status" value={isActive ? "Active" : "Inactive"} color={isActive ? "var(--success)" : "var(--danger)"} dotColor={isActive ? "var(--success)" : "var(--danger)"} />
           </div>
 
-          {/* INVENTORY */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Inventory</p>
-            <div className="grid grid-cols-3 gap-2.5">
-              <DetailStat label="Quantity" value={quantity} />
-              <DetailStat label="Minimum Qty" value={Number(variant.min_qnt || 0)} />
-              <DetailStat label="Maximum Qty" value={Number(variant.max_qnt || 0)} />
-            </div>
-          </div>
-
-          {/* ATTRIBUTES */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Attributes</p>
+          {/* ATTRIBUTES — 2-column boxes: label upar · value neeche */}
+          <DrawerSection title="Attributes" delay={120}>
             {attributes.length === 0 ? (
-              <p className="text-[11.5px] italic" style={{ color: "var(--text-muted)" }}>No attributes defined for this variant.</p>
+              <div className="rounded-xl px-4 py-5 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                <p className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No attributes defined for this variant.</p>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {attributes.map((attribute) => (
-                  <div key={attribute.name} className="min-w-0 rounded-lg px-3 py-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
-                    <p className="mt-0.5 text-[12px] font-semibold break-words" style={{ color: "var(--text-primary)" }}>{attribute.value}</p>
+                  <div key={attribute.name} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                    <p className="truncate text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                    <p className="mt-1 flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {isColorAttribute(attribute.name, attribute.value) && (
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: attribute.value, border: "1px solid var(--border-color)" }} />
+                      )}
+                      <span className="min-w-0 break-words">{attribute.value}</span>
+                    </p>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </DrawerSection>
+
+          {/* INVENTORY — sirf quantity (min/max qty UI mein nahi) */}
+          <DrawerSection title="Inventory" delay={180}>
+            <DetailStat label="Quantity" value={quantity.toLocaleString()} sub={stockState.label} subColor={stockState.color} />
+          </DrawerSection>
 
           {/* TAGS */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Tags</p>
-              <button type="button" onClick={onManageTags} disabled={tagUpdatePending} className="text-[11px] font-semibold flex items-center gap-1 transition hover:opacity-80 disabled:opacity-50" style={{ color: "var(--accent)" }}>
+          <DrawerSection
+            title="Tags"
+            delay={240}
+            action={(
+              <button type="button" onClick={onManageTags} disabled={tagUpdatePending} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition hover:opacity-80 disabled:opacity-50" style={{ color: "var(--accent)", backgroundColor: "var(--accent-soft)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
                 <Plus className="w-3 h-3" /> Add Tag
               </button>
-            </div>
+            )}
+          >
             {tagList.length === 0 ? (
-              <p className="text-[11.5px] italic" style={{ color: "var(--text-muted)" }}>No tags assigned to this variant.</p>
+              <div className="rounded-xl px-4 py-5 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                <p className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>No tags assigned to this variant.</p>
+              </div>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {tagList.map((tag) => (
-                  <span key={tag} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[11px] font-medium" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
+                  <span key={tag} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg text-[11px] font-semibold transition hover:brightness-110" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)" }}>
+                    <TagIcon className="w-3 h-3 shrink-0" />
                     {tag}
-                    <button type="button" onClick={() => onRemoveTag(tag)} disabled={tagUpdatePending} aria-label={`Remove tag ${tag}`} className="rounded p-0.5 transition hover:bg-black/20 disabled:opacity-50">
+                    <button type="button" onClick={() => onRemoveTag(tag)} disabled={tagUpdatePending} aria-label={`Remove tag ${tag}`} title={`Remove ${tag}`} className="rounded p-0.5 transition hover:bg-black/20 disabled:opacity-50">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </DrawerSection>
 
           {/* IMAGES */}
           {images.length > 0 && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>Images ({images.length})</p>
-              <div className="grid grid-cols-4 gap-2">
+            <DrawerSection title="Images" delay={300}>
+              <div className="grid grid-cols-4 gap-2.5">
                 {images.map((image, index) => (
-                  <button key={`${image.img_url}-${index}`} type="button" onClick={() => setPreviewImage(index)} className="aspect-square rounded-lg overflow-hidden transition hover:opacity-80" style={{ border: "1px solid var(--border-color)" }}>
+                  <button key={`${image.img_url}-${index}`} type="button" onClick={() => setPreviewImage(index)} aria-label={`Open image ${index + 1}`} className="group relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant)} ${index + 1}`} className="w-full h-full object-cover" />
+                    <img src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant)} ${index + 1}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.06]" />
+                    <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.5)" }}>
+                      <ZoomIn className="w-4 h-4 text-white" />
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
+            </DrawerSection>
           )}
 
-          {/* AUDIT */}
-          <div className={`grid grid-cols-1 gap-2.5 ${auditEntries.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        </div>
+
+        {/* FOOTER — Created By / Updated By + actions */}
+        <div className="shrink-0 px-5 py-4" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
+          <div className={`grid gap-2.5 ${auditEntries.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
             {auditEntries.map((entry) => (
-              <div key={entry.label} className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 min-w-0" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <Avatar user={entry.user} size="sm" color={entry.color} />
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{entry.label}</p>
-                  <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{entry.user?.name || entry.user?.email || "System"}</p>
-                  <p className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>{fdt(entry.date)}</p>
+              <div key={entry.label} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{entry.label}</p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Avatar user={entry.user} size="sm" color={entry.color} />
+                  <div className="min-w-0">
+                    <p className="truncate text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{entry.user?.name || entry.user?.email || "System"}</p>
+                    <p className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>{fdt(entry.date)}</p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        </div>
 
-        {/* FOOTER */}
-        <div className="px-5 py-3.5 flex items-center gap-2.5 shrink-0" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-          <button type="button" onClick={onEdit} className="flex-1 h-10 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-            <Edit3 className="w-4 h-4" /> Edit Variant
-          </button>
-          <button type="button" onClick={onDelete} className="flex-1 h-10 rounded-lg text-[12px] font-semibold flex items-center justify-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-            <Trash2 className="w-4 h-4" /> Delete Variant
-          </button>
+          <div className="mt-3 flex items-center gap-2.5">
+            <button type="button" onClick={onEdit} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-[12.5px] font-semibold transition hover:brightness-110" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <Edit3 className="w-4 h-4" /> Edit Variant
+            </button>
+            <button type="button" onClick={onDelete} aria-label="Delete variant" title="Delete variant" className="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-[12.5px] font-semibold transition hover:brightness-110" style={{ backgroundColor: "var(--danger)", color: "#ffffff" }}>
+              <Trash2 className="w-4 h-4" /> Delete Variant
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* FULL SIZE IMAGE PREVIEW */}
+      {/* FULL SIZE IMAGE PREVIEW — arrows, counter aur thumbnails ke saath */}
       {previewImage !== null && images[previewImage] && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-6" onClick={() => setPreviewImage(null)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={getImageUrl(images[previewImage].img_url)} alt={variantLabelOf(variant)} className="max-h-full max-w-full rounded-lg object-contain" />
-        </div>
+        <ImageGalleryModal images={images} initialIndex={previewImage} onClose={() => setPreviewImage(null)} />
       )}
     </div>,
     document.body
@@ -1031,6 +1146,36 @@ export default function ProductDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["product", id] });
     },
     onError: (error) => { toast.error(error.response?.data?.message || "Failed to delete variant"); },
+  });
+
+  // ✅ Variant activate/deactivate: pehle POORA product + saare variants FormData ke
+  //    saath PUT hota tha (bahut slow). Ab sirf ek lightweight variant PATCH +
+  //    optimistic cache patch — row ka status foran badal jaata hai.
+  const variantStatusMutation = useMutation({
+    mutationFn: ({ variantId, status }) => variantApi.update(variantId, { status }),
+    onMutate: async ({ variantId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["product", id] });
+      const previous = queryClient.getQueryData(["product", id]);
+      queryClient.setQueryData(["product", id], (old) => {
+        if (!old?.variants) return old;
+        return {
+          ...old,
+          variants: old.variants.map((v) =>
+            String(v._id) === String(variantId) ? { ...v, status } : v
+          ),
+        };
+      });
+      return { previous };
+    },
+    onSuccess: (_res, vars) => {
+      toast.success(`Variant ${vars?.status === "active" ? "activated" : "deactivated"}`);
+      // Audit fields (updated_by / updated_at) background me fresh — UI block nahi hota
+      refetchProduct();
+    },
+    onError: (error, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["product", id], ctx.previous);
+      toast.error(error.response?.data?.message || "Failed to update variant status");
+    },
   });
 
   // Variant Details drawer se tags update karne ke liye (badge ke × se remove)
@@ -1687,7 +1832,7 @@ export default function ProductDetailPage() {
 
   // ==================== VARIANTS SECTION (shared: Overview + Variants tabs) ====================
   const variantsSection = (
-  <div className="space-y-5">
+  <div className="space-y-4">
     <div className="flex items-center justify-between">
       <div>
         <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Variants</h2>
@@ -1699,7 +1844,7 @@ export default function ProductDetailPage() {
     </div>
 
     {variants.length === 0 ? (
-      <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div className="rounded-xl py-10 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
           <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
         </div>
@@ -1729,7 +1874,7 @@ export default function ProductDetailPage() {
               const isActive = variant.status === "active" || !variant.status;
               return (
                 <tr key={variant._id || index} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-[var(--bg-row-hover)]" style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-2.5">
                     {variant.images?.length > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
                         <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
@@ -1740,8 +1885,8 @@ export default function ProductDetailPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
+                  <td className="px-4 py-2.5">
                     <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
                     {variant.tags?.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -1754,9 +1899,9 @@ export default function ProductDetailPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: "var(--success)" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
-                  <td className="px-4 py-4 font-semibold text-[13px]" style={{ color: isLowStock ? "var(--danger)" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-2.5 font-semibold text-[13px]" style={{ color: "var(--success)" }}>Rs. {Number(variant.selling_price || 0).toLocaleString()}</td>
+                  <td className="px-4 py-2.5 font-semibold text-[13px]" style={{ color: isLowStock ? "var(--danger)" : "var(--text-primary)" }}>{variant.quantity || 0}</td>
+                  <td className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
                       style={{
                         backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)",
@@ -1767,7 +1912,7 @@ export default function ProductDetailPage() {
                       {isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-right relative z-10">
+                  <td className="px-4 py-2.5 text-right relative z-10">
                     <MoreMenu actions={[
                       {
                         label: "View Detailed",
@@ -1793,14 +1938,7 @@ export default function ProductDetailPage() {
                         label: isActive ? "Disable" : "Enable", 
                         icon: isActive ? <Ban className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />, 
                         onClick: () => {
-                          const updatedVariants = product.variants.map(v => 
-                            String(v._id) === String(variant._id) 
-                              ? { ...v, status: isActive ? "inactive" : "active" } 
-                              : v
-                          );
-                          const data = new FormData();
-                          data.append("variants", JSON.stringify(updatedVariants));
-                          updateMutation.mutate({ id: product._id, data });
+                          variantStatusMutation.mutate({ variantId: variant._id, status: isActive ? "inactive" : "active" });
                         }
                       },
                       { 
@@ -1824,7 +1962,7 @@ export default function ProductDetailPage() {
   );
 
   return (
-    <div className="w-full space-y-5 pb-10">
+    <div className="w-full space-y-4 pb-10">
       
       {/* IMAGE GALLERY MODAL */}
       {showImageGallery && firstVariant?.images && (
@@ -1906,7 +2044,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* PRODUCT HERO: Gallery + Info + Meta panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         <div className="xl:col-span-8 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-0">
           {/* Image Area - NOW CLICKABLE */}
@@ -1965,7 +2103,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Info Area */}
-          <div className="p-5 md:p-6 flex flex-col gap-4">
+          <div className="p-4 md:p-5 flex flex-col justify-center gap-4">
             <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
@@ -2026,7 +2164,7 @@ export default function ProductDetailPage() {
 
         {/* SIDE PANEL: Brand / Category / Key Attributes */}
         <div className="xl:col-span-4 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-          <div className="p-5 flex flex-col gap-4">
+          <div className="p-4 flex flex-col gap-4">
             {/* Brand */}
             <div>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Brand</p>
@@ -2092,9 +2230,9 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5">
+      <div className="grid grid-cols-1 gap-4">
         {/* MAIN CONTENT - FULL WIDTH NOW */}
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* TABS */}
           <div className="flex items-center gap-6 border-b" style={{ borderColor: "var(--border-color)" }}>
             {[
@@ -2129,19 +2267,19 @@ export default function ProductDetailPage() {
           </div>
 
           {/* TAB CONTENT */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {activeTab === "overview" && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {/* Product Details + Description + Variants | Side cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                  <div className="lg:col-span-2 flex flex-col gap-5 self-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2 flex flex-col gap-4 self-start">
                     {/* Product Details */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
                         <h3 className="text-sm font-bold text-[var(--text-primary)]">Product Details</h3>
                         <span className="text-[10px] font-medium text-[var(--text-muted)]">Basic information</span>
                       </div>
-                      <div className="p-5">
+                      <div className="p-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">SKU</p>
@@ -2188,10 +2326,10 @@ export default function ProductDetailPage() {
                     </div>
                     {/* Description + Tags */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
                         <h3 className="text-sm font-bold text-[var(--text-primary)]">Description</h3>
                       </div>
-                      <div className="p-5 space-y-5">
+                      <div className="p-4 space-y-4">
                         <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
                           {product.description || "No description provided for this product."}
                         </p>
@@ -2356,7 +2494,7 @@ export default function ProductDetailPage() {
 
             {/* TAGS TAB */}
             {activeTab === "tags" && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Tags</h2>
@@ -2503,7 +2641,7 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
               }>
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {/* Summary */}
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {activitySummary.map((stat) => {

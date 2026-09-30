@@ -518,6 +518,9 @@ export default function ManageStockPage() {
                       <tbody>
                         {paginatedStockItems.map((item, index) => {
                           const status = getStockStatus(item);
+                          // ✅ Category/brand assign nahi hai to ye line bilkul render nahi hoti
+                          //    (backend ab "Uncategorized"/"No brand" jaisa fake text nahi bhejta).
+                          const metaLine = [item.category_name, item.brand_name].filter(Boolean).join(" · ");
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
@@ -525,7 +528,9 @@ export default function ManageStockPage() {
     <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
       <span className="font-medium text-[13px] truncate max-w-[160px] block">{item.product_name}</span>
-       <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{item.category_name} · {item.brand_name}</span>
+        {metaLine && (
+          <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine}</span>
+        )}
       {item.product_is_deleted && (
         <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
           Deleted

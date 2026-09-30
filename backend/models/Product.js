@@ -57,6 +57,25 @@ const productSchema = new mongoose.Schema(
       default: "active",
     },
 
+    // ✅ FEATURED — admin is product ko "Featured Products" page se mark/unmark
+    //    kar sakta hai. Default false → purane products featured nahi banenge.
+    is_featured: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ✅ FEATURED_AT — featured mark karne ka timestamp.
+    //    Featured Products page ka "recent upar" order IS field se chalta hai,
+    //    `created_at` se nahi: bulk/seed insert me sab products ka created_at
+    //    bilkul same hota hai (same millisecond), is liye created_at par sort
+    //    kuch nahi badalta aur order sirf _id (random) par chala jata tha.
+    //    Unmark karte waqt null ho jata hai → dobara feature karne par naya
+    //    timestamp milta hai aur wo product foran top par aa jata hai.
+    featured_at: {
+      type: Date,
+      default: null,
+    },
+
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
@@ -95,5 +114,13 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ category_id: 1 });
 productSchema.index({ brand_id: 1 });
 productSchema.index({ status: 1, is_deleted: 1 });
+// ✅ Featured Products page — filter (is_featured) + "recent first" sort dono
+//    is compound index se serve hote hain (bina in-memory sort). `_id` tie-break
+//    un products ke liye hai jinka featured_at abhi null hai (purana data / seed).
+productSchema.index({ is_featured: 1, is_deleted: 1, featured_at: -1, _id: -1 });
+// ✅ Products list pagination — sort ({ created_at: -1, _id: -1 }) isi index se
+//    serve hota hai (bina in-memory sort), aur _id tie-break pages ko overlap hone
+//    se rokta hai jab kai products ka created_at same ho.
+productSchema.index({ created_at: -1, _id: -1 });
 
 module.exports = mongoose.model("Product", productSchema);

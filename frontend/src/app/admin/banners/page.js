@@ -117,6 +117,68 @@ const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+      widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
+      par layout shift nahi hota (pehle yahan sirf spinner tha).
+   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+========================================================= */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function BannerRowsSkeleton({ rows = 10 }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading banners">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`banner-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
+          {/* checkbox */}
+          <td className="px-4 py-2.5"><span className="skeleton block h-4 w-4 rounded" /></td>
+          {/* preview image */}
+          <td className="px-4 py-2.5"><span className="skeleton block h-12 w-24 rounded" /></td>
+          {/* title */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-3 w-[130px] rounded align-middle" /></td>
+          {/* type */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-3 w-[70px] rounded align-middle" /></td>
+          {/* status */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-5 w-[66px] align-middle" style={SKELETON_ROUND} /></td>
+          {/* schedule */}
+          <td className="px-4 py-2.5 hidden lg:table-cell"><span className="skeleton inline-block h-3 w-[150px] rounded align-middle" /></td>
+          {/* position */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-3 w-6 rounded align-middle" /></td>
+          {/* actions */}
+          <td className="px-4 py-2.5 whitespace-nowrap w-1">
+            <div className="flex items-center justify-end"><span className="skeleton block h-[38px] w-[44px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function BannerCardsSkeleton({ cards = 8, cardStyle }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading banners">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={`banner-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
+          <span className="skeleton block h-32 w-full rounded-md" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="skeleton block h-3 w-[75%] rounded" />
+              <span className="skeleton mt-1.5 block h-2.5 w-[45%] rounded" />
+            </div>
+            <span className="skeleton inline-block h-5 w-[66px]" style={SKELETON_ROUND} />
+          </div>
+          <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <span className="skeleton inline-block h-3 w-[46px] rounded align-middle" />
+            <span className="skeleton block h-[38px] w-[44px] rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
 const SortIndicator = ({ active, direction }) => (<svg className={`w-3 h-3 transition ${active ? "" : "opacity-40"}`} style={{ color: "var(--accent)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>{active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}</svg>);
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
@@ -1110,9 +1172,31 @@ export default function BannersPage() {
 
         {/* ===== Data Display ===== */}
         {loading ? (
-          <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}>
-            <Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading banners...</span>
-          </div>
+          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+             list view me wahi table shell + shimmer rows, grid view me shimmer cards */
+          viewMode === "list" ? (
+            <div className="rounded-lg overflow-hidden" style={cardStyle}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Preview</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Title</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Type</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Schedule</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Pos</th>
+                      <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <BannerRowsSkeleton rows={itemsPerPage} />
+                </table>
+              </div>
+            </div>
+          ) : (
+            <BannerCardsSkeleton cards={8} cardStyle={cardStyle} />
+          )
         ) : paginatedBanners.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? "No banners match your filters" : "No banners yet"}</p>

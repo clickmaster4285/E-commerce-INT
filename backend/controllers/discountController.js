@@ -35,6 +35,26 @@ const normalizeArray = (value) => {
   return value.filter(Boolean);
 };
 
+// ✅ TARGET NORMALIZATION — discount sirf usi type ke targets rakhta hai jis par wo apply hota hai.
+//    Pehle stale ids bachte thay: e.g. "Specific Brands" → "Specific Products" switch karne par
+//    purane brands DB me rehte the aur detail page par "Selected Brands" dikhte the, jabki wo
+//    discount un par apply hi nahi karta. Ab non-matching arrays hamesha clear hoti hain.
+//    Partial updates (jaise sirf status toggle) me matching array bachi rahti hai.
+const resolveTargetArrays = (applyTo, incoming = {}, existing = {}) => {
+  const pick = (incomingKey, existingKey) =>
+    incoming[incomingKey] !== undefined
+      ? normalizeArray(incoming[incomingKey])
+      : normalizeArray(existing[existingKey]);
+
+  return {
+    selectedProducts: applyTo === "specific_products" ? pick("selected_product_ids", "selectedProducts") : [],
+    selectedCategories: applyTo === "specific_categories" ? pick("selected_category_ids", "selectedCategories") : [],
+    selectedBrands: applyTo === "specific_brands" ? pick("selected_brand_ids", "selectedBrands") : [],
+    selectedTags: applyTo === "specific_tags" ? pick("selected_tag_ids", "selectedTags") : [],
+    selectedSizes: applyTo === "specific_sizes" ? pick("selected_size_ids", "selectedSizes") : [],
+  };
+};
+
 // ✅ Numeric fields 0 se kam kabhi nahi — pehla invalid field ka label return karta hai
 const findNegativeField = (entries) => {
   for (const [label, raw] of entries) {
@@ -227,11 +247,14 @@ exports.createDiscount = async (req, res) => {
       value: Number(value),
       maxDiscountAmount: max_discount !== undefined && max_discount !== null && max_discount !== "" ? Number(max_discount) : null,
       applyTo,
-      selectedProducts: normalizeArray(selected_product_ids),
-      selectedCategories: normalizeArray(selected_category_ids),
-      selectedBrands: normalizeArray(selected_brand_ids),
-      selectedTags: normalizeArray(selected_tag_ids),
-      selectedSizes: normalizeArray(selected_size_ids),
+      // ✅ Sirf matching target type ki ids save hoti hain
+      ...resolveTargetArrays(applyTo, {
+        selected_product_ids,
+        selected_category_ids,
+        selected_brand_ids,
+        selected_tag_ids,
+        selected_size_ids,
+      }),
       priceMin: applyTo === "price_range" ? Number(price_min) : null,
       priceMax: applyTo === "price_range" ? Number(price_max) : null,
       minOrderValue: min_order_amount !== undefined && min_order_amount !== null && min_order_amount !== "" ? Number(min_order_amount) : 0,
@@ -509,11 +532,22 @@ exports.updateDiscount = async (req, res) => {
     // TARGET ARRAYS
     // ===================================================
     discount.applyTo = applyTo;
-    if (selected_product_ids !== undefined) discount.selectedProducts = normalizeArray(selected_product_ids);
-    if (selected_category_ids !== undefined) discount.selectedCategories = normalizeArray(selected_category_ids);
-    if (selected_brand_ids !== undefined) discount.selectedBrands = normalizeArray(selected_brand_ids);
-    if (selected_tag_ids !== undefined) discount.selectedTags = normalizeArray(selected_tag_ids);
-    if (selected_size_ids !== undefined) discount.selectedSizes = normalizeArray(selected_size_ids);
+    // ✅ Target type change par purane (stale) ids clear ho jaate hain — sirf matching
+    //    type ki selection bachti hai. Partial update me existing ids safe rehti hain.
+    Object.assign(
+      discount,
+      resolveTargetArrays(
+        applyTo,
+        {
+          selected_product_ids,
+          selected_category_ids,
+          selected_brand_ids,
+          selected_tag_ids,
+          selected_size_ids,
+        },
+        discount
+      )
+    );
 
     // ===================================================
     // PRICE RANGE
