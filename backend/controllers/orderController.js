@@ -440,6 +440,10 @@ const getOrderById = async (req, res) => {
 };
 
 // ==========================================
+// ✅ FIX: Search text ko safe regex banane ke liye — warna ".", "[", "(" jaise
+//    special characters query ko bigaad dete hain (ya crash/slow kar dete hain).
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // GET /api/orders/admin/all — Get All Orders (Admin Only)
 // ==========================================
 const getAllOrders = async (req, res) => {
@@ -452,10 +456,12 @@ const getAllOrders = async (req, res) => {
     }
 
     if (search.trim()) {
+      // ✅ FIX: escaped regex — "." ya "[" jaise characters search ko break nahi karenge
+      const rx = new RegExp(escapeRegex(String(search).trim()), "i");
       query.$or = [
-        { order_number: { $regex: search, $options: "i" } },
-        { "address_snapshot.full_name": { $regex: search, $options: "i" } },
-        { "address_snapshot.phone": { $regex: search, $options: "i" } }
+        { order_number: rx },
+        { "address_snapshot.full_name": rx },
+        { "address_snapshot.phone": rx },
       ];
     }
 
@@ -505,11 +511,34 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
+    // ✅ FIX: Cancel hone par stock WAPAS restore (modal me yahi likha hai).
+    //    Yahi logic deleteOrder() me pehle se tha — ab consistent hai.
+    //    Double restore se bacha gaya hai: sirf tab jab pehle cancelled nahi tha.
+    const previousStatus = order.status;
+    const shouldRestoreStock = status === "cancelled" && previousStatus !== "cancelled";
+
       order.status = status;
     if (notes) order.notes = notes;
     if (status === "cancelled" && cancel_reason) order.cancel_reason = cancel_reason;
 
     await order.save();
+
+    if (shouldRestoreStock) {
+      const restoredVariants = [];
+      for (const item of order.items || []) {
+        if (!item.variant_id) continue;
+        const restoreQty = (Number(item.qty) || 0) + (Number(item.free_items) || 0);
+        await Variant.updateOne(
+          { _id: item.variant_id },
+          { $inc: { quantity: restoreQty } }
+        );
+        restoredVariants.push({ variant_id: item.variant_id, change: restoreQty });
+      }
+      // ✅ Live update — stock restore hote hi manage-stock page khud refresh
+      if (restoredVariants.length > 0) {
+        emitStockEvent({ variants: restoredVariants, source: "order_cancelled" });
+      }
+    }
 
     emitOrderEvent("order:updated", { success: true, data: order });
     emitOrderEvent("order:statusChanged", { success: true, data: order });

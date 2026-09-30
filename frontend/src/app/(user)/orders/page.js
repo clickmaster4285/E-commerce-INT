@@ -26,6 +26,53 @@ const getImgUrl = (img) => {
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
 
+/* ============ QTY / DEAL BREAKDOWN ============
+   Backend stores item.qty as the PAID quantity (orderController.js:188 `qty: payableItems`)
+   and item.free_items as units given ON TOP of it (stock moves by qty + free_items).
+   So: paid = payable_items || qty, free = free_items, received = paid + free.        */
+const DEAL_TYPE_LABEL = {
+  buy_x_get_y: "Buy X Get Y",
+  percentage: "Percentage Discount",
+  fixed_amount: "Flat Price Discount",
+  fixed: "Flat Price Discount",
+  bundle: "Bundle Deal",
+};
+
+const buildQtyBreakdown = (item) => {
+  const paidQty = Number(item.payable_items) > 0 ? Number(item.payable_items) : Number(item.qty) || 1;
+  const freeQty = Number(item.free_items) || 0;
+  const totalQty = paidQty + freeQty;
+
+  const buy = Number(item.deal_buy_quantity) || 0;
+  const get = Number(item.deal_get_quantity) || 0;
+  const isBXG = item.deal_type === "buy_x_get_y";
+
+  const dealTitle =
+    item.bundle_name ||
+    (isBXG && buy > 0 && get > 0 ? `Buy ${buy} Get ${get} Free` : item.deal_name || DEAL_TYPE_LABEL[item.deal_type] || "");
+
+  const unitPrice = Number(item.price || 0);
+  const originalPrice = Number(item.original_price || 0);
+  const priceCut = originalPrice > unitPrice ? (originalPrice - unitPrice) * paidQty : 0;
+  const savings = Math.max(0, Number(item.deal_savings) || 0) + priceCut;
+
+  const reasons = [];
+  if (item.discount_name) reasons.push(item.discount_name);
+  if (freeQty > 0) {
+    reasons.push(isBXG && buy > 0 && get > 0
+      ? `Buy ${buy} Get ${get} — you receive ${totalQty} units for the price of ${paidQty}`
+      : `You receive ${totalQty} units (${paidQty} paid + ${freeQty} free)`);
+  } else if (item.deal_name && !isBXG) {
+    reasons.push(item.deal_name);
+  }
+  if (savings > 0) reasons.push(`You saved Rs. ${savings.toLocaleString()} on this item`);
+
+  return {
+    paidQty, freeQty, totalQty, dealTitle, isBXG, reasons, savings,
+    hasDetail: freeQty > 0 || !!dealTitle || savings > 0 || !!item.discount_name,
+  };
+};
+
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 const STATUS_CONFIG = {
@@ -133,10 +180,11 @@ const OrderProgress = ({ status }) => {
 };
 
 /* ============ PRODUCT SCROLL LIST ============ */
-const ProductScrollList = ({ items }) => {
+const ProductScrollList = ({ items, idPrefix }) => {
   const scrollRef = useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  const [openIndex, setOpenIndex] = useState(null);
 
   const checkScroll = () => {
     if (scrollRef.current) {
@@ -170,11 +218,13 @@ const ProductScrollList = ({ items }) => {
         {items.map((item, index) => {
           const unitPrice = Number(item.price || item.displayPrice || 0);
           const originalPrice = Number(item.original_price || item.originalPrice || 0);
-          const qty = Number(item.qty) || 1;
-          const freeItems = Number(item.free_items || 0);
-          const payableQty = qty - freeItems;
-          const totalPrice = unitPrice * payableQty;
+          const q = buildQtyBreakdown(item);
+          // qty is ALREADY the paid qty (free units sit on top) — never subtract free_items here.
+          const totalPrice = unitPrice * q.paidQty;
           const hasDiscount = originalPrice > unitPrice;
+          const isOpen = openIndex === index;
+          const panelId = `qty-breakdown-${idPrefix || "ord"}-${index}`;
+          const qtyLabel = `Qty ${q.paidQty}${q.freeQty > 0 ? ` +${q.freeQty} free` : ""} — ${q.totalQty} unit${q.totalQty > 1 ? "s" : ""} in total. Tap for deal details`;
           return (
                        <div key={index} className="flex-shrink-0 w-44 sm:w-72">
               <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-accent)]/40 transition-all">
@@ -186,22 +236,71 @@ const ProductScrollList = ({ items }) => {
                       <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between items-end">
-                    <div className="text-right min-w-0">
-                      {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
-                      <p className="text-sm sm:text-base font-black text-[var(--user-accent)] truncate">Rs. {totalPrice.toLocaleString()}</p>
-                    </div>
-                    {freeItems > 0 && <span className="text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-1.5 py-0.5 rounded border border-[var(--user-success)]/20">+{freeItems} FREE</span>}
+                  <div className="flex-1 min-w-0 flex flex-col justify-end items-end text-right">
+                    {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
+                    <p className="text-sm sm:text-base font-black text-[var(--user-accent)] truncate">Rs. {totalPrice.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
                   <p className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
                   {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
                 </div>
-                <div className="flex items-center justify-between gap-1 pt-1.5 sm:pt-2 border-t border-[var(--user-border)]">
-                  <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {qty}</span>
-                  <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
+                {/* QTY + free/deal bonus — attached together, inside the card */}
+                <div className="pt-1.5 sm:pt-2 border-t border-[var(--user-border)]">
+                  <div className="flex items-center justify-between gap-1">
+                    {q.hasDetail ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenIndex(isOpen ? null : index); }}
+                        aria-expanded={isOpen}
+                        aria-controls={panelId}
+                        aria-label={qtyLabel}
+                        title={qtyLabel}
+                        className="inline-flex items-center gap-1 shrink-0 rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-0.5 hover:border-[var(--user-accent)]/60 active:scale-95 transition"
+                      >
+                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-text)]">Qty: {q.paidQty}</span>
+                        {q.freeQty > 0 && (
+                          <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-[var(--user-success)]/30 bg-[var(--user-success)]/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-black text-[var(--user-success)]">
+                            +{q.freeQty} FREE
+                          </span>
+                        )}
+                        <ChevronDown size={10} className={`text-[var(--user-text-subtle)] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      </button>
+                    ) : (
+                      <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {q.paidQty}</span>
+                    )}
+                    <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
+                  </div>
+
+                  {/* Inline breakdown — paid / free / total / deal reason / savings */}
+                  {q.hasDetail && isOpen && (
+                    <div id={panelId} className="mt-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-1.5 space-y-1">
+                      <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
+                        <span className="font-semibold text-[var(--user-text-muted)]">Paid units</span>
+                        <span className="font-bold text-[var(--user-text)]">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
+                      </div>
+                      {q.freeQty > 0 && (
+                        <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
+                          <span className="font-semibold text-[var(--user-success)]">Free units</span>
+                          <span className="font-black text-[var(--user-success)]">+{q.freeQty}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem] pt-1 border-t border-dashed border-[var(--user-border)]">
+                        <span className="font-bold text-[var(--user-text)]">Total you receive</span>
+                        <span className="font-black text-[var(--user-text)]">{q.totalQty} unit{q.totalQty > 1 ? "s" : ""}</span>
+                      </div>
+                      {q.dealTitle && (
+                        <p className="flex items-start gap-1 pt-1 border-t border-dashed border-[var(--user-border)] text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-accent)]">
+                          <Zap size={9} className="mt-0.5 shrink-0" /> <span className="min-w-0">{q.dealTitle}</span>
+                        </p>
+                      )}
+                      {q.reasons.map((reason, ri) => (
+                        <p key={ri} className="text-[0.5rem] sm:text-[0.5625rem] leading-snug text-[var(--user-text-muted)]">{reason}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
               </div>
             </div>
           );
@@ -649,7 +748,7 @@ export default function OrdersPage({ compact = false }) {
                       </div>
                     </div>
                   )}
-                  <ProductScrollList items={order.items} />
+                  <ProductScrollList items={order.items} idPrefix={order._id} />
                   {!["delivered", "cancelled"].includes(order.status) && (
                     <div className="mt-2 border-t border-[var(--user-border)] border-dashed">
                       <OrderProgress status={order.status} />
@@ -848,7 +947,7 @@ export default function OrdersPage({ compact = false }) {
                                  {/* Product card */}
                   {order.items?.length > 0 && (
                     <div className="p-2.5 pb-1.5">
-                      <ProductScrollList items={order.items} />
+                      <ProductScrollList items={order.items} idPrefix={order._id} />
                     </div>
                   )}
 
