@@ -83,6 +83,47 @@ function OrderItemImage({ item, size = 60 }) {
   );
 }
 
+/* ==================== ORDER COUNT / PROMO HELPERS ==================== */
+// ✅ "Items" ka matlab saaf karo: product lines vs paid units vs free units
+const orderItemRows = (order) => (order?.items || []).length;
+const orderPaidUnits = (order) =>
+  (order?.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0);
+const orderFreeUnits = (order) =>
+  (order?.items || []).reduce((s, it) => s + (Number(it.free_items) || 0), 0);
+const orderDealCount = (order) => (order?.deal_ids || []).length;
+const orderBundleCount = (order) => (order?.bundle_ids || []).length;
+
+// Deal type → human-readable label (checkout/cart wali wording)
+function dealLabel(item) {
+  const type = item?.deal_type || "";
+  if (type === "buy_x_get_y") {
+    const b = Number(item.deal_buy_quantity) || 0;
+    const g = Number(item.deal_get_quantity) || 0;
+    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+  }
+  if (type === "free_shipping") return "Free Shipping";
+  if (type === "bundle") return item.deal_name || "Bundle Deal";
+  return item.deal_name || item.discount_name || "";
+}
+
+// ✅ Sirf tab label do jab us line par waqai koi deal lagi ho
+const itemDealTag = (item) => (item?.deal_type ? dealLabel(item) : "");
+
+function PromoTag({ children, tone = "warning" }) {
+  const tones = {
+    warning: { backgroundColor: "var(--warning-soft, var(--bg-tertiary))", color: "var(--warning-text)" },
+    success: { backgroundColor: "var(--success-soft)", color: "var(--success-text)" },
+    info: { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" },
+  };
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+      style={tones[tone] || tones.warning}>
+      {children}
+    </span>
+  );
+}
+
+
 function SkeletonRows({ rows = 6 }) {
   return (
     <tbody>
@@ -478,14 +519,14 @@ export default function OrdersPage() {
                   <tr>
                 
                     <th className="w-[36px] px-1 py-4" />
-                    <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="14%" />
-                    <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="24%" />
-                    <th className="px-4 py-4 text-right text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell"
-                      style={{ color: "var(--text-muted)", width: "9%" }}>Items</th>
-                    <SortHeader label="Total" sortKey="total" sortConfig={sortConfig} onSort={handleSort} align="right" width="13%" />
-                    <th className="px-4 py-4 text-center text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell"
-                      style={{ color: "var(--text-muted)", width: "10%" }}>Payment</th>
-                    <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" width="12%" />
+                    <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="12%" />
+                    <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="16%" />
+                    <th className="px-3 py-4 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell"
+                      style={{ color: "var(--text-muted)", width: "28%" }}>Products</th>
+                    <SortHeader label="Total" sortKey="total" sortConfig={sortConfig} onSort={handleSort} align="right" width="12%" />
+                    <th className="px-3 py-4 text-center text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell"
+                      style={{ color: "var(--text-muted)", width: "9%" }}>Payment</th>
+                    <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" width="11%" />
                     <SortHeader label="Date" sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} hidden width="9%" />
                     <th className="w-[80px] px-3 py-4 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap rounded-tr-lg"
                       style={{ color: "var(--text-secondary)" }}></th>
@@ -540,12 +581,44 @@ export default function OrdersPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 align-middle text-right whitespace-nowrap hidden md:table-cell box-border"
-                            style={{ color: "var(--text-secondary)" }}>
-                            {order.items?.length || 0} item{(order.items?.length || 0) === 1 ? "" : "s"}
+                          <td className="px-3 py-3 align-middle hidden md:table-cell box-border">
+                            <div className="space-y-1">
+                              {(order.items || []).slice(0, 4).map((item, idx) => (
+                                <div key={`${order._id}-row-item-${idx}`} className="flex items-center gap-1.5 min-w-0">
+                                  <OrderItemImage item={item} size={26} />
+                                  <span className="truncate text-[12px] min-w-0" title={item.name}>{item.name}</span>
+                                  <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                                    ×{item.qty}
+                                  </span>
+                                  {itemDealTag(item) && (
+                                    <span className="shrink-0"><PromoTag tone="warning">{itemDealTag(item)}</PromoTag></span>
+                                  )}
+                                  {Number(item.free_items) > 0 && (
+                                    <span className="shrink-0 hidden xl:inline-block"><PromoTag tone="success">+{item.free_items} free</PromoTag></span>
+                                  )}
+                                  {item.bundle_name && (
+                                    <span className="shrink-0"><PromoTag tone="info">Combo</PromoTag></span>
+                                  )}
+                                </div>
+                              ))}
+                              {(order.items || []).length > 4 && (
+                                <p className="text-[11px] pl-[34px]" style={{ color: "var(--text-muted)" }}>
+                                  +{(order.items || []).length - 4} more item{(order.items || []).length - 4 === 1 ? "" : "s"}
+                                </p>
+                              )}
+                              <p className="text-[10px] pl-[34px]" style={{ color: "var(--text-muted)" }}>
+                                {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"} · {orderPaidUnits(order)} unit{orderPaidUnits(order) === 1 ? "" : "s"}
+                                {orderFreeUnits(order) > 0 ? ` (+${orderFreeUnits(order)} free)` : ""}
+                              </p>
+                            </div>
                           </td>
                           <td className="px-4 py-4 align-middle text-right box-border">
                             <p className="font-bold whitespace-nowrap">Rs. {order.total?.toLocaleString()}</p>
+                            {orderFreeUnits(order) > 0 && (
+                              <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--success-text)" }}>
+                                +{orderFreeUnits(order)} free
+                              </p>
+                            )}
                             {(order.items || []).some((it) => it.savings > 0) && (
                               <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
                                 saved Rs. {(order.items || []).reduce((s, it) => s + Number(it.savings || 0), 0).toLocaleString()}
@@ -613,9 +686,20 @@ export default function OrdersPage() {
                         {isExpanded && (
                           <tr style={{ backgroundColor: "var(--bg-tertiary)" }}>
 <td colSpan={9} className={`px-6 py-4 box-border ${index === filteredOrders.length - 1 ? "rounded-b-lg" : ""}`}>
+                              {/* ✅ Preview summary — kitni lines, kitni units, kya promos */}
+                              <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                                <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                                  {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"} · {orderPaidUnits(order)} unit{orderPaidUnits(order) === 1 ? "" : "s"}
+                                </span>
+                                {orderFreeUnits(order) > 0 && (
+                                  <PromoTag tone="success">{orderFreeUnits(order)} free</PromoTag>
+                                )}
+                                {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
+                                {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
+                              </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
                                 {(order.items || []).map((item, idx) => (
-                                  <div key={`${order._id}-item-${idx}`} className="flex items-center gap-2.5 p-2 rounded-md max-w-full box-border"
+                                  <div key={`${order._id}-item-${idx}`} className="flex items-start gap-2.5 p-2 rounded-md max-w-full box-border"
                                     style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
@@ -623,6 +707,15 @@ export default function OrdersPage() {
                                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                                         Qty {item.qty} × Rs. {item.price?.toLocaleString()}{item.variantTitle ? ` • ${item.variantTitle}` : ""}
                                       </p>
+                                      {(dealLabel(item) || Number(item.free_items) > 0 || item.bundle_name) && (
+                                        <p className="flex flex-wrap items-center gap-1 mt-1">
+                                          {dealLabel(item) && <PromoTag tone="warning">{dealLabel(item)}</PromoTag>}
+                                          {Number(item.free_items) > 0 && (
+                                            <PromoTag tone="success">+{item.free_items} free</PromoTag>
+                                          )}
+                                          {item.bundle_name && <PromoTag tone="info">Combo</PromoTag>}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 ))}
@@ -857,9 +950,23 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
               +{order.items.length - 3}
             </span>
           )}
-          <span className="ml-auto text-[11px] whitespace-nowrap font-medium" style={{ color: "var(--text-secondary)" }}>
-            {order.items.length} item{order.items.length === 1 ? "" : "s"}
+          <span className="ml-auto text-[11px] whitespace-nowrap font-medium text-right" style={{ color: "var(--text-secondary)" }}>
+            {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"}
+            {orderPaidUnits(order) !== orderItemRows(order) && (
+              <span className="block text-[10px]" style={{ color: "var(--text-muted)" }}>
+                {orderPaidUnits(order)} units
+              </span>
+            )}
           </span>
+        </div>
+      )}
+
+      {/* ✅ Promo tags — deal / combo / free units (mobile card) */}
+      {(orderDealCount(order) > 0 || orderBundleCount(order) > 0 || orderFreeUnits(order) > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
+          {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
+          {orderFreeUnits(order) > 0 && <PromoTag tone="success">+{orderFreeUnits(order)} free</PromoTag>}
         </div>
       )}
 

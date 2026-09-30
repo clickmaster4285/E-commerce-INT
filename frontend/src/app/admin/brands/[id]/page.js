@@ -464,6 +464,12 @@ export default function BrandDetailPage() {
   const hasLogo = Boolean(brand?.logo?.img_url) && !logoFailed;
   const hasUpdates = Boolean(brand?.updatedby);
 
+  // ✅ Naya logo upload/update hone par error flag reset karo — warna purana
+  // 404 set hone ke baad "No logo uploaded" chip atak jata tha.
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoSrc]);
+
   if (loading) {
     return (
       <div className="flex min-h-[500px] w-full items-center justify-center">

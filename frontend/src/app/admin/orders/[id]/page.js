@@ -20,6 +20,9 @@ const BanIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill=
 const AlertIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>);
 const LockIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
 const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
+const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>);
+const CreditCardIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h3m4 0h3M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" /></svg>);
+const ReceiptIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17h6M9 13h6M9 9h3m9 12V5a2 2 0 00-2-2H5a2 2 0 00-2 2v16l3-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5z" /></svg>);
 
 /* ==================== HELPERS ==================== */
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -48,6 +51,29 @@ const PAYMENT_STATUS_CONFIG = {
   failed:   { label: "Failed",   bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
+
+// Payment method ka poora naam (order payload me short code aata hai: cod/bank/card)
+const PAYMENT_METHOD_LABEL = {
+  cod: "Cash on Delivery",
+  bank: "Bank Transfer",
+  card: "Card Payment",
+};
+const paymentMethodLabel = (method) => PAYMENT_METHOD_LABEL[method] || (method ? String(method).toUpperCase() : "—");
+
+// ✅ Promo line = koi bhi deal ya bundle wali line
+function isPromoLine(item) {
+  return !!(item?.deal_id || item?.deal_type || item?.bundle_id || item?.bundle_name);
+}
+
+// ✅ Line-level savings — deal/bundle line ka discount deal-engine se aata hai,
+//    is liye un par `savings` (per-unit price drop) DOBARA count nahi karte.
+//    Checkout ka bhi yahi rule hai: dealActive ? dealSavings : savings * qty
+function itemLineSavings(item) {
+  if (isPromoLine(item)) {
+    return (Number(item?.deal_savings) || 0) + (Number(item?.bundle_savings) || 0);
+  }
+  return (Number(item?.savings) || 0) * (Number(item?.qty) || 0);
+}
 
 function StatusBadge({ status }) {
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
@@ -87,61 +113,161 @@ function OrderItemImage({ item, size = 60 }) {
   );
 }
 
+/* ==================== DEAL / BUNDLE HELPERS ==================== */
+// Deal type ko human-readable label me badalta hai (checkout/cart wali wording)
+function dealLabel(item) {
+  const type = item?.deal_type || "";
+  if (type === "buy_x_get_y") {
+    const b = Number(item.deal_buy_quantity) || 0;
+    const g = Number(item.deal_get_quantity) || 0;
+    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+  }
+  if (type === "free_shipping") return "Free Shipping";
+  if (type === "percentage") return item.deal_name || item.discount_name || "Percentage Deal";
+  if (type === "fixed_amount") return item.deal_name || item.discount_name || "Fixed Amount Deal";
+  if (type === "bundle") return item.deal_name || "Bundle Deal";
+  return item.deal_name || "";
+}
+
+// Ek item par lagne wale saare promos (deal + bundle) — badges ke liye
+function itemPromoBadges(item) {
+  const badges = [];
+  const dl = dealLabel(item);
+  if (dl) badges.push({ key: "deal", text: dl, tone: "warning" });
+  if (Number(item.free_items) > 0) {
+    badges.push({ key: "free", text: `${item.free_items} FREE`, tone: "success" });
+  }
+  if (item.bundle_id || item.bundle_name) {
+    badges.push({ key: "bundle", text: item.bundle_name ? `Combo: ${item.bundle_name}` : "Combo", tone: "info" });
+  }
+  if (!dl && !item.bundle_id) {
+    const dn = item.discount_name || "";
+    if (dn) badges.push({ key: "disc", text: dn, tone: "info" });
+  }
+  return badges;
+}
+
+function PromoTag({ children, tone = "warning" }) {
+  const tones = {
+    warning: { backgroundColor: "var(--warning-soft, var(--bg-tertiary))", color: "var(--warning-text)" },
+    success: { backgroundColor: "var(--success-soft)", color: "var(--success-text)" },
+    info: { backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" },
+  };
+  return (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+      style={tones[tone] || tones.warning}>
+      {children}
+    </span>
+  );
+}
+
+// ✅ "Yeh deal KYUN lagi" — professional order view me yeh explanation hoti hai
+function promoReason(group) {
+  const rows = group.items || [];
+  const paid = rows.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+  const unitWord = (n) => `${n} unit${n === 1 ? "" : "s"}`;
+
+  if (group.kind === "bundle") {
+    return `Combo bundle price applied — ${unitWord(paid)} across ${rows.length} product${rows.length === 1 ? "" : "s"} were charged at the combo rate instead of separate prices.`;
+  }
+  if (group.type === "buy_x_get_y") {
+    return `Customer ordered ${unitWord(paid)} — the "Buy ${group.buyQty} Get ${group.getQty}" rule qualified (minimum ${group.buyQty}), so ${unitWord(group.freeUnits)} were added FREE of charge.`;
+  }
+  if (group.type === "free_shipping") {
+    return "Free-shipping deal applied — delivery charge was waived for this line.";
+  }
+  if (group.type === "percentage") {
+    return `Percentage deal applied — unit price was reduced for the qualifying quantity (${unitWord(paid)}).`;
+  }
+  if (group.type === "fixed_amount") {
+    return `Fixed-amount deal applied — a flat amount was deducted from the unit price for ${unitWord(paid)}.`;
+  }
+  return `Deal applied on ${unitWord(paid)} — pricing and savings were adjusted for this line.`;
+}
+
+// Item-level ek line me wajah (items table me dikhane ke liye)
+function itemPromoReason(item) {
+  const type = item?.deal_type || "";
+  if (type === "buy_x_get_y") {
+    const b = Number(item.deal_buy_quantity) || 0;
+    const g = Number(item.deal_get_quantity) || 0;
+    return `Deal qualified (Buy ${b} Get ${g}) → ${item.free_items} free, saves Rs. ${Number(item.deal_savings || 0).toLocaleString()}`;
+  }
+  if (item?.bundle_name) {
+    return `Combo bundle rate applied → saves Rs. ${Number(item.bundle_savings || 0).toLocaleString()}`;
+  }
+  if (Number(item?.savings) > 0) {
+    const dn = item.discount_name || "Discount";
+    return `${dn} applied → Rs. ${Number(item.savings).toLocaleString()} off per unit`;
+  }
+  if (type) return "Deal applied on this line";
+  return "";
+}
+
 const STATUS_FLOW = ["pending", "confirmed", "shipped", "delivered"];
-function StatusStepper({ order }) {
+const ORDER_STEP_LABEL = {
+  pending: "Placed",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
+
+// Vertical timeline — sirf woh times jo order me waqai record hain
+// (placed = created_at, current stage = updated_at). Baaki stages ki exact
+// timestamps store nahi hoti, is liye un par time show nahi karte.
+function OrderTimeline({ order }) {
   const cancelled = order.status === "cancelled";
   const effective = order.status === "processing" ? "confirmed" : order.status;
   const currentIdx = STATUS_FLOW.indexOf(effective);
-  const paymentDone = order.payment?.status === "paid";
-  const paymentWaiting = !cancelled && effective === "delivered" && !paymentDone;
+
+  const rows = [];
+  if (cancelled) {
+    rows.push({
+      key: "cancelled", label: "Cancelled", done: true, danger: true,
+      note: order.cancel_reason || "", time: `Cancelled ${formatDateTime(order.updated_at)}`,
+    });
+  } else {
+    [...STATUS_FLOW].reverse().forEach((step) => {
+      const i = STATUS_FLOW.indexOf(step);
+      const done = currentIdx >= i;
+      const isCurrent = currentIdx === i && step !== "pending";
+      rows.push({
+        key: step,
+        label: isCurrent ? ORDER_STEP_LABEL[order.status] || ORDER_STEP_LABEL[step] : ORDER_STEP_LABEL[step],
+        done,
+        current: isCurrent,
+        time: step === "pending"
+          ? formatDateTime(order.created_at)
+          : isCurrent ? `Last update ${formatDateTime(order.updated_at)}` : "",
+      });
+    });
+  }
 
   return (
-    <div className="flex items-start flex-wrap gap-y-3">
-      {STATUS_FLOW.map((step, i) => {
-        const done = !cancelled && currentIdx >= i;
-        const connectorGreen = !cancelled && (i === STATUS_FLOW.length - 1 ? paymentDone : currentIdx > i);
-        return (
-          <React.Fragment key={step}>
-            <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
-                style={{ backgroundColor: done ? "var(--success)" : "transparent", borderColor: done ? "var(--success)" : "var(--border-color)", color: "#fff" }}>
-                {done ? <CheckIcon className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--border-color)" }} />}
-              </div>
-              <span className="text-[10px] font-semibold capitalize text-center leading-tight"
-                style={{ color: done ? "var(--text-primary)" : "var(--text-muted)" }}>
-                {step === "pending" ? "Placed" : step}
-              </span>
-            </div>
-            <div className="flex-1 h-0.5 mt-3 mx-1 rounded min-w-[20px]"
-              style={{ backgroundColor: connectorGreen ? "var(--success)" : "var(--border-color)" }} />
-          </React.Fragment>
-        );
-      })}
-
-      <div className="flex flex-col items-center gap-1.5 min-w-[64px]">
-        <div className="w-6 h-6 rounded-full flex items-center justify-center border-2 transition"
-          style={{
-            backgroundColor: paymentDone ? "var(--success)" : "transparent",
-            borderColor: paymentDone ? "var(--success)" : paymentWaiting ? "var(--warning-text)" : "var(--border-color)",
-            color: paymentDone ? "#fff" : paymentWaiting ? "var(--warning-text)" : "var(--border-color)",
-          }}>
-          {paymentDone ? <CheckIcon className="w-3 h-3" /> : <BanknoteIcon className="w-3 h-3" />}
-        </div>
-        <span className="text-[10px] font-semibold text-center leading-tight"
-          style={{ color: paymentDone ? "var(--text-primary)" : paymentWaiting ? "var(--warning-text)" : "var(--text-muted)" }}>
-          Payment
-        </span>
-      </div>
-
-      {cancelled && (
-        <div className="flex flex-col items-center gap-1.5 min-w-[64px] ml-2">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center border-2"
-            style={{ backgroundColor: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }}>
-            <XIcon className="w-3 h-3" />
+    <div className="space-y-0">
+      {rows.map((row, idx) => (
+        <div key={row.key} className="flex gap-3">
+          <div className="flex flex-col items-center">
+            <span className="w-5 h-5 rounded-full flex items-center justify-center border-2 shrink-0"
+              style={{
+                backgroundColor: row.done ? (row.danger ? "var(--danger)" : "var(--success)") : "transparent",
+                borderColor: row.done ? (row.danger ? "var(--danger)" : "var(--success)") : "var(--border-color)",
+                color: "#fff",
+              }}>
+              {row.done ? <CheckIcon className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "var(--border-color)" }} />}
+            </span>
+            {idx < rows.length - 1 && <span className="w-0.5 flex-1 mt-1" style={{ backgroundColor: "var(--border-color)" }} />}
           </div>
-          <span className="text-[10px] font-semibold" style={{ color: "var(--danger-text)" }}>Cancelled</span>
+          <div className={`flex-1 min-w-0 ${idx < rows.length - 1 ? "pb-4" : ""}`}>
+            <div className="flex flex-wrap items-center justify-between gap-x-2">
+              <span className="text-[13px] font-semibold" style={{ color: row.done ? "var(--text-primary)" : "var(--text-muted)" }}>{row.label}</span>
+              {row.time && <span className="text-[11px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{row.time}</span>}
+            </div>
+            {row.note && <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "var(--text-muted)" }}>{row.note}</p>}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -270,9 +396,124 @@ export default function OrderDetailPage({ params }) {
   };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
-  const savings = useMemo(() => (order?.items || []).reduce((s, it) => s + Number(it.savings || 0), 0), [order]);
+
+  // ✅ Savings ke 3 ALAG buckets — warna double-counting ho jati:
+  //    priceDiscounts = regular price discount (sirf non-promo lines)
+  //    dealSavings    = buy X get Y / % / fixed-amount deal
+  //    bundleSavings  = combo bundle
+  const priceDiscounts = useMemo(
+    () => (order?.items || []).reduce((s, it) => s + (isPromoLine(it) ? 0 : itemLineSavings(it)), 0),
+    [order]
+  );
+  const dealSavings = useMemo(() => {
+    if (Number(order?.total_deal_savings) > 0) return Number(order.total_deal_savings);
+    return (order?.items || []).reduce((s, it) => s + (Number(it.deal_savings) || 0), 0);
+  }, [order]);
+  const bundleSavings = useMemo(() => {
+    if (Number(order?.total_bundle_savings) > 0) return Number(order.total_bundle_savings);
+    return (order?.items || []).reduce((s, it) => s + (Number(it.bundle_savings) || 0), 0);
+  }, [order]);
+  const totalSaved = priceDiscounts + dealSavings + bundleSavings;
+
+  // ✅ Counts: product rows, paid units aur free units — admin ko saaf pata chale
+  const itemRows = (order?.items || []).length;
+  const paidUnits = useMemo(
+    () => (order?.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0),
+    [order]
+  );
+  const freeUnits = useMemo(
+    () => (order?.items || []).reduce((s, it) => s + (Number(it.free_items) || 0), 0),
+    [order]
+  );
+
+  // ✅ Deals / bundles ko group karo — har group ka apna reason + savings
+  const promoGroups = useMemo(() => {
+    const rows = order?.items || [];
+    const map = new Map();
+
+    rows.forEach((it) => {
+      if (!it.deal_type && !it.deal_id) return;
+      const key = `deal:${it.deal_id || it.deal_name || it.deal_type}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          kind: "deal",
+          label: dealLabel(it),
+          name: it.deal_name || "",
+          type: it.deal_type || "",
+          buyQty: Number(it.deal_buy_quantity) || 0,
+          getQty: Number(it.deal_get_quantity) || 0,
+          items: [],
+          freeUnits: 0,
+          savings: 0,
+        });
+      }
+      const g = map.get(key);
+      g.items.push(it);
+      g.freeUnits += Number(it.free_items) || 0;
+      g.savings += Number(it.deal_savings) || 0;
+    });
+
+    rows.forEach((it) => {
+      if (!it.bundle_id && !it.bundle_name) return;
+      const key = `bundle:${it.bundle_id || it.bundle_name}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          kind: "bundle",
+          label: it.bundle_name ? `Combo: ${it.bundle_name}` : "Combo Bundle",
+          name: it.bundle_name || "",
+          type: "bundle",
+          items: [],
+          freeUnits: 0,
+          savings: 0,
+        });
+      }
+      const g = map.get(key);
+      g.items.push(it);
+      g.savings += Number(it.bundle_savings) || 0;
+    });
+
+    // Har group ke saath "kyun lagi" wali explanation
+    return Array.from(map.values()).map((g) => ({ ...g, description: promoReason(g) }));
+  }, [order]);
+
+  const dealGroups = promoGroups.filter((g) => g.kind === "deal");
+  const bundleGroups = promoGroups.filter((g) => g.kind === "bundle");
+
+  // ✅ Price discounts (deal ke ilawa) — discount name ke hisaab se group
+  const discountGroups = useMemo(() => {
+    const map = new Map();
+    (order?.items || []).forEach((it) => {
+      if (isPromoLine(it)) return;
+      if (!(Number(it.savings) > 0)) return;
+      const key = it.discount_name || "Product discount";
+      if (!map.has(key)) {
+        map.set(key, {
+          key, kind: "discount", label: key, name: key, type: "",
+          items: [], freeUnits: 0, savings: 0,
+          description: "Price discount applied — unit price was reduced from the original price (before tax & shipping).",
+        });
+      }
+      const g = map.get(key);
+      g.items.push(it);
+      g.savings += (Number(it.savings) || 0) * (Number(it.qty) || 0);
+      g.freeUnits += Number(it.free_items) || 0;
+    });
+    return Array.from(map.values());
+  }, [order]);
+
+  const promoColumnCount = [dealGroups.length, bundleGroups.length, discountGroups.length].filter((n) => n > 0).length;
+  const promoGridClass = promoColumnCount > 2
+    ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
+    : "grid grid-cols-1 md:grid-cols-2 gap-3";
+
   const payStatus = order?.payment?.status || "pending";
   const user = order?.user_id || {};
+  const customerName = order?.address_snapshot?.full_name || user.name || "Unknown";
+  const customerPhone = order?.address_snapshot?.phone || "";
+  const customerEmail = user.email || "";
+  const customerContact = customerEmail || customerPhone;
 
   if (isLoading) {
     return (
@@ -302,26 +543,30 @@ export default function OrderDetailPage({ params }) {
 
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-4 sm:space-y-5 p-3 sm:p-4">
+      <div className="w-full space-y-4 p-3 sm:p-4">
+
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1 text-[12px]" aria-label="Breadcrumb">
+          <button type="button" onClick={() => router.push("/admin/orders")}
+            className="font-medium hover:underline" style={{ color: "var(--text-muted)" }}>
+            Orders
+          </button>
+          <ChevronRightIcon className="w-3.5 h-3.5" />
+          <span className="font-semibold">Order Details</span>
+        </nav>
+
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/admin/orders")}
-              aria-label="Back to orders"
-              className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center transition hover:opacity-80"
-              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-              <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">Order {order.order_number}</h1>
-                <StatusBadge status={order.status} />
-                <PaymentBadge status={payStatus} />
-              </div>
-              <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-                Placed {formatDateTime(order.created_at)} • {order.items?.length || 0} items
-              </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">Order {order.order_number}</h1>
+              <StatusBadge status={order.status} />
             </div>
+            <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
+              Placed on {formatDateTime(order.created_at)}
+              {customerName !== "Unknown" ? ` • by ${customerName}` : ""}
+              {customerContact ? ` (${customerContact})` : ""}
+            </p>
           </div>
           <div className="w-full md:w-auto">
             <OrderActions
@@ -335,118 +580,312 @@ export default function OrderDetailPage({ params }) {
           </div>
         </div>
 
-        {/* Stepper */}
-        <div className="rounded-lg p-4" style={cardStyle}>
-          <StatusStepper order={order} />
-          <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
-            {order.status === "cancelled"
-              ? `This order was cancelled on ${formatDateTime(order.updated_at)}`
-              : `Last updated ${formatDateTime(order.updated_at)}`}
-          </p>
+        {/* Quick stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <StatCard
+            label="Order Status"
+            icon={<BoxIcon className="w-5 h-5" />}
+            accent="var(--info-text)"
+            accentSoft="var(--info-soft)"
+            value={ORDER_STEP_LABEL[order.status] || order.status}
+            sub={order.status === "cancelled"
+              ? `Cancelled ${formatDateTime(order.updated_at)}`
+              : `Updated ${formatDateTime(order.updated_at)}`}
+          />
+          <StatCard
+            label="Payment Status"
+            icon={<BanknoteIcon className="w-5 h-5" />}
+            accent="var(--success-text)"
+            accentSoft="var(--success-soft)"
+            value={(PAYMENT_STATUS_CONFIG[payStatus] || {}).label || "Unpaid"}
+            sub={`via ${paymentMethodLabel(order.payment?.method)}`}
+          />
+          <StatCard
+            label="Payment Method"
+            icon={<CreditCardIcon className="w-5 h-5" />}
+            accent="var(--purple-text)"
+            accentSoft="var(--purple-soft)"
+            value={paymentMethodLabel(order.payment?.method)}
+            sub={payStatus === "paid"
+              ? `Rs. ${Number(order.total || 0).toLocaleString()} received`
+              : `Rs. ${Number(order.total || 0).toLocaleString()} to collect`}
+          />
+          <StatCard
+            label="Total Amount"
+            icon={<ReceiptIcon className="w-5 h-5" />}
+            accent="var(--warning-text)"
+            accentSoft="var(--warning-soft)"
+            value={`Rs. ${Number(order.total || 0).toLocaleString()}`}
+            sub={<PaymentBadge status={payStatus} />}
+          />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <InfoCard title="Customer">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex h-11 w-11 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full text-sm sm:text-xs font-bold"
-                  style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
-                  {(order.address_snapshot?.full_name || "U").charAt(0).toUpperCase()}
+        {/* Main grid: items + summary (left) / customer + timeline + info (right) */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <div className="xl:col-span-8 space-y-4">
+
+
+            {/* ---- Order Items ---- */}
+            <div className="rounded-lg overflow-hidden" style={cardStyle}>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                style={{ borderBottom: "1px solid var(--border-color)" }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-[15px] font-bold">Order Items ({itemRows})</h2>
+                  {freeUnits > 0 && <PromoTag tone="success">{freeUnits} free unit{freeUnits === 1 ? "" : "s"}</PromoTag>}
+                  {dealGroups.length > 0 && <PromoTag tone="warning">{dealGroups.length} deal applied</PromoTag>}
+                  {bundleGroups.length > 0 && <PromoTag tone="info">{bundleGroups.length} bundle applied</PromoTag>}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate">{order.address_snapshot?.full_name || user.name || "Unknown"}</p>
-                  <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{user.email || order.address_snapshot?.phone}</p>
-                </div>
+                <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                  {paidUnits} paid unit{paidUnits === 1 ? "" : "s"}{freeUnits > 0 ? ` + ${freeUnits} free` : ""}
+                </span>
               </div>
-              {user.email && <p className="text-xs" style={{ color: "var(--text-muted)" }}>{user.email}</p>}
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{order.address_snapshot?.phone}</p>
-            </InfoCard>
 
-            <InfoCard title="Shipping Address">
-              <p className="text-sm leading-relaxed">
-                {order.address_snapshot?.street_address1}
-                {order.address_snapshot?.street_address2 ? `, ${order.address_snapshot.street_address2}` : ""}
-              </p>
-              <p className="text-sm mt-0.5">
-                {order.address_snapshot?.city}, {order.address_snapshot?.state}{order.address_snapshot?.zip_code ? ` ${order.address_snapshot.zip_code}` : ""}
-              </p>
-              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{order.address_snapshot?.country}</p>
-            </InfoCard>
-
-            <InfoCard title="Payment Details">
-              <div className="space-y-1.5 text-sm">
-                <p className="capitalize flex justify-between"><span style={{ color: "var(--text-muted)" }}>Method</span><span className="font-semibold">{order.payment?.method || "—"}</span></p>
-                <p className="flex justify-between items-center"><span style={{ color: "var(--text-muted)" }}>Status</span><PaymentBadge status={payStatus} /></p>
-                <p className="capitalize flex justify-between"><span style={{ color: "var(--text-muted)" }}>Delivery</span><span className="font-semibold">{order.shipping_method || "standard"}</span></p>
-              </div>
-            </InfoCard>
-
-            {order.notes && (
-              <InfoCard title="Customer Notes">
-                <p className="text-sm whitespace-pre-line">{order.notes}</p>
-              </InfoCard>
-            )}
-          </div>
-
-          <div className="lg:col-span-3 space-y-4">
-            {/* MOBILE OPTIMIZED TABLE: Horizontal scroll wrapper */}
-            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
               <div className="overflow-x-auto">
-                <table className="w-full text-[13px] min-w-[600px]" style={{ tableLayout: "fixed" }}>
+                <table className="w-full text-[13px] min-w-[760px]" style={{ tableLayout: "fixed" }}>
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
-                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
-                      <th className="w-[52px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
-                      <th className="w-[92px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
-                      <th className="w-[104px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Total</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
+                      <th className="w-[116px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
+                      <th className="w-[70px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
+                      <th className="w-[200px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Deal Details</th>
+                      <th className="w-[124px] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(order.items || []).map((item, idx) => (
-                      <tr key={`${order._id}-item-${idx}`}
-                        style={{ borderBottom: idx < (order.items?.length || 0) - 1 ? "1px solid var(--border-color)" : "none" }}>
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <OrderItemImage item={item} size={60} />
-                            <div className="min-w-0">
-                              <p className="font-medium truncate" title={item.name}>{item.name}</p>
-                              {(item.variantTitle || item.brand) && (
-                                <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
-                                  {[item.variantTitle, item.brand].filter(Boolean).join(" • ")}
-                                </p>
-                              )}
+                    {(order.items || []).map((item, idx) => {
+                      const badges = itemPromoBadges(item);
+                      const reason = itemPromoReason(item);
+                      const lineSaved = itemLineSavings(item);
+                      return (
+                        <tr key={`${order._id}-item-${idx}`}
+                          style={{ borderBottom: idx < (order.items?.length || 0) - 1 ? "1px solid var(--border-color)" : "none" }}>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <OrderItemImage item={item} size={56} />
+                              <div className="min-w-0">
+                                <p className="font-semibold" title={item.name}>{item.name}</p>
+                                {item.brand && (
+                                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>Brand {item.brand}</p>
+                                )}
+                                {item.variantTitle && (
+                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>Variant: {item.variantTitle}</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2.5 text-center">{item.qty}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          {Number(item.savings) > 0 && (
-                            <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                              Rs. {Number(item.original_price || 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right align-top">
+                            {Number(item.original_price) > Number(item.price) && (
+                              <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                                Rs. {Number(item.original_price).toLocaleString()}
+                              </span>
+                            )}
+                            <span className="font-semibold whitespace-nowrap">Rs. {Number(item.price || 0).toLocaleString()}</span>
+                            {Number(item.savings) > 0 && !isPromoLine(item) && (
+                              <span className="block text-[10px] whitespace-nowrap" style={{ color: "var(--success-text)" }}>
+                                save Rs. {Number(item.savings).toLocaleString()}/unit
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-3 text-center align-top">
+                            <span className="font-bold">{item.qty}</span>
+                            {Number(item.free_items) > 0 && (
+                              <span className="block text-[10px] font-bold whitespace-nowrap" style={{ color: "var(--success-text)" }}>
+                                +{item.free_items} free
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 align-top">
+                            {badges.length === 0 ? (
+                              <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>—</span>
+                            ) : (
+                              <>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {badges.map((b) => (
+                                    <PromoTag key={b.key} tone={b.tone}>{b.text}</PromoTag>
+                                  ))}
+                                </div>
+                                {reason && (
+                                  <p className="text-[10px] mt-1 leading-snug" style={{ color: "var(--text-muted)" }}>{reason}</p>
+                                )}
+                              </>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right align-top">
+                            <span className="font-bold whitespace-nowrap">
+                              Rs. {(Number(item.price || 0) * (Number(item.qty) || 0)).toLocaleString()}
                             </span>
-                          )}
-                          <span className="whitespace-nowrap">Rs. {item.price?.toLocaleString()}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-bold"><span className="whitespace-nowrap">Rs. {(item.price * item.qty)?.toLocaleString()}</span></td>
-                      </tr>
-                    ))}
+                            {lineSaved > 0 && (
+                              <span className="block text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--success-text)" }}>
+                                Saved: Rs. {lineSaved.toLocaleString()}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {(dealSavings > 0 || bundleSavings > 0) && (
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 px-4 py-2.5"
+                  style={{ backgroundColor: "var(--bg-tertiary)", borderTop: "1px solid var(--border-color)" }}>
+                  {dealSavings > 0 && (
+                    <span className="text-[12px] font-semibold">
+                      Total Deal Savings: <span style={{ color: "var(--success-text)" }}>Rs. {dealSavings.toLocaleString()}</span>
+                    </span>
+                  )}
+                  {bundleSavings > 0 && (
+                    <span className="text-[12px] font-semibold">
+                      Total Bundle Savings: <span style={{ color: "var(--success-text)" }}>Rs. {bundleSavings.toLocaleString()}</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="rounded-lg p-4 space-y-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-              <TotalRow label="Subtotal" value={`Rs. ${order.subtotal?.toLocaleString()}`} />
-              {savings > 0 && <TotalRow label="Discount savings" value={`− Rs. ${savings.toLocaleString()}`} accent="var(--success-text)" />}
-              <TotalRow label="Shipping" value={`Rs. ${order.shipping?.toLocaleString()}`} />
-              <TotalRow label="Tax" value={`Rs. ${order.tax?.toLocaleString()}`} />
-              <div className="flex justify-between text-base font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <span>Grand Total</span>
-                <span className="text-emerald-500">Rs. {order.total?.toLocaleString()}</span>
+            {/* ---- Order Summary ---- */}
+            <div className="rounded-lg p-4" style={cardStyle}>
+              <h2 className="text-[15px] font-bold mb-3">Order Summary</h2>
+              {/* ✅ Arithmetic: subtotal + shipping + tax = total amount
+                  (subtotal me discounted price pehle se hi baked hai) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                <div className="space-y-1.5">
+                  <TotalRow label="Subtotal" value={`Rs. ${Number(order.subtotal || 0).toLocaleString()}`} />
+                  <TotalRow label="Shipping Charges" value={`Rs. ${Number(order.shipping || 0).toLocaleString()}`} />
+                  <TotalRow label="Tax" value={`Rs. ${Number(order.tax || 0).toLocaleString()}`} />
+                  <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
+                    <span>Total Amount</span>
+                    <span>Rs. {Number(order.total || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-3 mt-3 md:pt-0 md:mt-0 md:border-l md:pl-6"
+                  style={{ borderColor: "var(--border-color)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>
+                    Savings &amp; promos
+                  </p>
+                  {priceDiscounts > 0 && (
+                    <TotalRow label="Price Discounts" value={`− Rs. ${priceDiscounts.toLocaleString()}`} accent="var(--success-text)" />
+                  )}
+                  {dealSavings > 0 && (
+                    <TotalRow label="Total Deal Savings" value={`− Rs. ${dealSavings.toLocaleString()}`} accent="var(--success-text)" />
+                  )}
+                  {bundleSavings > 0 && (
+                    <TotalRow label="Total Bundle Savings" value={`− Rs. ${bundleSavings.toLocaleString()}`} accent="var(--success-text)" />
+                  )}
+                  {totalSaved === 0 && (
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                      No discount, deal or bundle applied on this order.
+                    </p>
+                  )}
+                  {totalSaved > 0 && (
+                    <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
+                      <span>Total Saved</span>
+                      <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="xl:col-span-4 space-y-4">
+
+            {/* ---- Customer & Shipping Address ---- */}
+            <div className="rounded-lg p-4" style={cardStyle}>
+              <h2 className="text-[15px] font-bold mb-3">Customer &amp; Shipping Address</h2>
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+                  style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
+                  {(customerName || "U").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold truncate">{customerName}</p>
+                  {customerPhone && <p className="text-[12px] truncate" style={{ color: "var(--text-muted)" }}>{customerPhone}</p>}
+                  {customerEmail && <p className="text-[12px] truncate" style={{ color: "var(--text-muted)" }}>{customerEmail}</p>}
+                </div>
+              </div>
+
+              <p className="text-[10px] font-bold uppercase tracking-wide mt-4 mb-1.5" style={{ color: "var(--text-muted)" }}>
+                Shipping Address
+              </p>
+              <p className="text-[13px] leading-relaxed">
+                {order.address_snapshot?.street_address1}
+                {order.address_snapshot?.street_address2 ? `, ${order.address_snapshot.street_address2}` : ""}
+                <br />
+                {order.address_snapshot?.city}, {order.address_snapshot?.state}
+                {order.address_snapshot?.zip_code ? ` ${order.address_snapshot.zip_code}` : ""}
+                <br />
+                {order.address_snapshot?.country}
+              </p>
+            </div>
+
+            {/* ---- Order Timeline ---- */}
+            <div className="rounded-lg p-4" style={cardStyle}>
+              <h2 className="text-[15px] font-bold mb-3">Order Timeline</h2>
+              <OrderTimeline order={order} />
+            </div>
+
+            {/* ---- Additional Information ---- */}
+            <div className="rounded-lg p-4" style={cardStyle}>
+              <h2 className="text-[15px] font-bold mb-3">Additional Information</h2>
+              <div className="space-y-1.5 text-[13px]">
+                <InfoRow label="Order Number" value={order.order_number} />
+                <InfoRow label="Order Date" value={formatDateTime(order.created_at)} />
+                <InfoRow label="Shipping Method" value={order.shipping_method ? String(order.shipping_method) : "—"} capitalize />
+                <InfoRow label="Notes" value={order.notes ? order.notes : "—"} />
+                {order.status === "cancelled" && order.cancel_reason && (
+                  <InfoRow label="Cancellation Reason" value={order.cancel_reason} />
+                )}
               </div>
             </div>
           </div>
         </div>
+
+
+        {/* ---- Deal & Bundle Summary (jab order me koi promo lagi ho) ---- */}
+        {(dealGroups.length > 0 || bundleGroups.length > 0 || discountGroups.length > 0) && (
+          <div className="rounded-lg p-4" style={cardStyle}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="text-[15px] font-bold">Deal &amp; Bundle Summary</h2>
+              {totalSaved > 0 && (
+                <span className="text-[12px] font-semibold">
+                  Total saved on this order: <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
+                </span>
+              )}
+            </div>
+
+            <div className={promoGridClass}>
+              {dealGroups.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    Deals Applied ({dealGroups.length})
+                  </p>
+                  {dealGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
+                </div>
+              )}
+
+              {bundleGroups.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    Bundles Applied ({bundleGroups.length})
+                  </p>
+                  {bundleGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
+                </div>
+              )}
+
+              {discountGroups.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    Discounts Applied ({discountGroups.length})
+                  </p>
+                  {discountGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cancel Confirmation Modal (Mobile Optimized: Slides up from bottom) */}
@@ -499,20 +938,78 @@ export default function OrderDetailPage({ params }) {
   );
 }
 
-function InfoCard({ title, children }) {
-  return (
-    <div className="rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{title}</p>
-      {children}
-    </div>
-  );
-}
-
 function TotalRow({ label, value, accent }) {
   return (
     <div className="flex justify-between text-sm">
       <span style={{ color: "var(--text-muted)" }}>{label}</span>
       <span style={accent ? { color: accent } : undefined}>{value}</span>
+    </div>
+  );
+}
+
+/* ==================== PRESENTATIONAL HELPERS (naya order detail layout) ==================== */
+
+// Quick stat card — label + colored icon + value + sub text
+function StatCard({ label, icon, value, sub, accent = "var(--accent)", accentSoft = "var(--accent-soft)" }) {
+  return (
+    <div className="rounded-lg p-3.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{label}</p>
+      <div className="flex items-center gap-2.5 mt-2.5 min-w-0">
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: accentSoft, color: accent }}>
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold leading-tight truncate">{value}</div>
+          {sub && <div className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{sub}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Deal / bundle / discount group ka card — kyun lagi + kis product par + kitna bacha
+function PromoGroupCard({ group }) {
+  const promoTag = group.kind === "deal" ? "warning" : "info";
+
+  return (
+    <div className="rounded-md p-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <PromoTag tone={promoTag}>{group.label}</PromoTag>
+        {group.name && group.name !== group.label && (
+          <span className="text-[11px] font-semibold truncate" style={{ color: "var(--text-secondary)" }}>{group.name}</span>
+        )}
+        {group.freeUnits > 0 && <PromoTag tone="success">+{group.freeUnits} free</PromoTag>}
+      </div>
+
+      {group.description && (
+        <p className="text-[11px] mt-2 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          {group.description}
+        </p>
+      )}
+
+      {group.items?.length > 0 && (
+        <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+          <span className="font-semibold">Products: </span>
+          {group.items.map((it) => `${it.name} (×${it.qty}${Number(it.free_items) > 0 ? ` +${it.free_items} free` : ""})`).join(", ")}
+        </p>
+      )}
+
+      {group.savings > 0 && (
+        <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--success-text)" }}>
+          Savings: Rs. {group.savings.toLocaleString()}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Additional Information card ki ek row
+function InfoRow({ label, value, capitalize = false }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0" style={{ color: "var(--text-muted)" }}>{label}</span>
+      <span className={`font-semibold text-right break-words ${capitalize ? "capitalize" : ""}`}>{value}</span>
     </div>
   );
 }

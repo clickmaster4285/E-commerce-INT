@@ -239,10 +239,15 @@ const updateBrand = async (req, res) => {
     }
 
     if (req.brandImage) {
-      if (existingBrand.logo?.img_url) {
-        const oldFolderPath = path.join(__dirname, "../uploads/brands", existingBrand._id.toString());
-        if (await fs.pathExists(oldFolderPath)) {
-          await fs.remove(oldFolderPath);
+      // ⚠️ Purana FOLDER delete mat karo — middleware (imageMiddleware.js:21) ne nayi
+      // image isi brand folder me hi likhi hai (brandId = req.params.id). Folder delete
+      // karne se nayi image bhi mit jati thi aur logo 404 ho jata tha.
+      // Sirf purani FILE delete karo (tabhi jab wo local upload ho).
+      const oldImgUrl = existingBrand.logo?.img_url || "";
+      if (oldImgUrl && oldImgUrl.startsWith("uploads/")) {
+        const oldFilePath = path.join(__dirname, "..", oldImgUrl);
+        if (await fs.pathExists(oldFilePath)) {
+          await fs.remove(oldFilePath);
         }
       }
       updateData.logo = req.brandImage;
