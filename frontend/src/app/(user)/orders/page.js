@@ -78,7 +78,7 @@ const FilterDropdown = ({ icon: Icon, options, value, onChange, buttonClass, wid
                 {OIcon && <OIcon size={14} className={active ? "" : (o.color || "")} />}
                 <span className="flex-1 truncate">{o.label}</span>
                 {o.count !== undefined && (
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? "bg-[var(--user-accent-text)]/20" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"}`}>{o.count}</span>
+                  <span className={`text-[0.625rem] font-black px-1.5 py-0.5 rounded-full ${active ? "bg-[var(--user-accent-text)]/20" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"}`}>{o.count}</span>
                 )}
                 {active && <Check size={14} />}
               </button>
@@ -119,9 +119,9 @@ const OrderProgress = ({ status }) => {
                 {(isPast || isCurrent) && <CheckCircle2 size={10} strokeWidth={3} />}
               </div>
               {index < STATUS_FLOW.length - 1 && (
-                <div className={`absolute top-[7px] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
+                <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
               )}
-              <span className={`mt-2 text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
+              <span className={`mt-2 text-[0.5625rem] font-semibold uppercase tracking-wider whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
                 {cfg.label}
               </span>
             </div>
@@ -188,19 +188,19 @@ const ProductScrollList = ({ items }) => {
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-between items-end">
                     <div className="text-right min-w-0">
-                      {hasDiscount && <p className="text-[8px] sm:text-[9px] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
+                      {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
                       <p className="text-sm sm:text-base font-black text-[var(--user-accent)] truncate">Rs. {totalPrice.toLocaleString()}</p>
                     </div>
-                    {freeItems > 0 && <span className="text-[8px] sm:text-[9px] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-1.5 py-0.5 rounded border border-[var(--user-success)]/20">+{freeItems} FREE</span>}
+                    {freeItems > 0 && <span className="text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 px-1.5 py-0.5 rounded border border-[var(--user-success)]/20">+{freeItems} FREE</span>}
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
-                  <p className="text-[11px] sm:text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
-                  {item.variantTitle && <p className="text-[8px] sm:text-[9px] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
+                  <p className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
+                  {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
                 </div>
                 <div className="flex items-center justify-between gap-1 pt-1.5 sm:pt-2 border-t border-[var(--user-border)]">
-                  <span className="text-[8px] sm:text-[9px] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {qty}</span>
-                  <p className="text-[8px] sm:text-[9px] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
+                  <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {qty}</span>
+                  <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
                 </div>
               </div>
             </div>
@@ -245,7 +245,7 @@ const DraftProgress = ({ step }) => (
         {i < 2 && <div className={`h-0.5 w-8 rounded-full ${s < step ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />}
       </Fragment>
     ))}
-    <span className="text-[10px] font-bold text-[var(--user-accent)] uppercase tracking-wider">Step {step}/3</span>
+    <span className="text-[0.625rem] font-bold text-[var(--user-accent)] uppercase tracking-wider">Step {step}/3</span>
   </div>
 );
 
@@ -254,7 +254,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
   if (totalPages <= 1) return null;
   return (
     <div className="mt-8 lg:mt-10 flex flex-col items-center gap-3">
-      <p className="text-[11px] lg:text-xs text-[var(--user-text-muted)]">
+      <p className="text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)]">
         Showing{" "}
         <span className="font-semibold text-[var(--user-text)]">
           {rangeStart}–{rangeEnd}
@@ -281,7 +281,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
               key={item}
               onClick={() => goToPage(item)}
               aria-current={page === item ? "page" : undefined}
-              className={`h-9 min-w-[36px] px-2 lg:h-10 lg:min-w-[40px] rounded-lg lg:rounded-xl text-[11px] lg:text-xs font-bold transition ${
+              className={`h-9 min-w-[2.25rem] px-2 lg:h-10 lg:min-w-[2.5rem] rounded-lg lg:rounded-xl text-[0.6875rem] lg:text-xs font-bold transition ${
                 page === item
                   ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border border-[var(--user-accent)]"
                   : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/60"
@@ -305,7 +305,12 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
   );
 };
 
-export default function OrdersPage() {
+/* OrdersPage — /orders route ka full page AUR account ke My Orders tab
+   ka reused view (dono jagah EXACT same design).
+   compact=true (account tab): page chrome (desktop title header, mobile
+   sticky app bar, login redirect, page paddings, scroll-to-top) hide —
+   sirf toolbar + orders list + pagination render hota hai. */
+export default function OrdersPage({ compact = false }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { restoreItems } = useCart();
@@ -373,7 +378,7 @@ export default function OrdersPage() {
   const goToPage = (p) => {
     if (p < 1 || p > totalPages || p === page) return;
     setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!compact) window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const getPageItems = () => {
@@ -410,7 +415,7 @@ export default function OrdersPage() {
 
   const resumeDraft = (draftId) => router.push(`/checkout?draftId=${draftId}`);
 
-  useEffect(() => { if (!userLoading && !user) router.replace("/login?redirect=/orders"); }, [user, userLoading, router]);
+  useEffect(() => { if (!compact && !userLoading && !user) router.replace("/login?redirect=/orders"); }, [user, userLoading, router, compact]);
 
   if (isLoading) {
     return (
@@ -477,7 +482,7 @@ export default function OrdersPage() {
             <div className="w-10 h-10 rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center"><ShoppingBag size={18} className="text-[var(--user-accent)]" /></div>
             <div>
               <p className="font-black text-sm text-[var(--user-text)]">DRAFT ORDER</p>
-              <p className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
+              <p className="text-[0.625rem] text-[var(--user-text-muted)] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
             </div>
           </div>
           <DraftProgress step={draft.step} />
@@ -491,7 +496,7 @@ export default function OrdersPage() {
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{firstItem.name}</p>
-              <p className="text-[11px] text-[var(--user-text-muted)] mt-1">Qty: {firstItem.qty} {count > 1 && `• +${count - 1} more items`}</p>
+              <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-1">Qty: {firstItem.qty} {count > 1 && `• +${count - 1} more items`}</p>
             </div>
           </div>
         )}
@@ -499,7 +504,7 @@ export default function OrdersPage() {
           <div>
             <p className="text-xs text-[var(--user-text-muted)]">Estimated Total</p>
             <p className="text-lg font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</p>
-            {totalSavings > 0 && <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5 flex items-center gap-1"><Tag size={10} /> You save Rs. {totalSavings.toLocaleString()}</p>}
+            {totalSavings > 0 && <p className="text-[0.625rem] text-[var(--user-success)] font-semibold mt-0.5 flex items-center gap-1"><Tag size={10} /> You save Rs. {totalSavings.toLocaleString()}</p>}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => resumeDraft(draft._id)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 transition"><Play size={12} /> Resume</button>
@@ -514,8 +519,9 @@ export default function OrdersPage() {
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
     <div className="hidden lg:block">
-    <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10">
-      {/* HEADER */}
+    <main className={compact ? "" : "max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10"}>
+      {/* HEADER — account tab (compact) me account ka apna header hota hai */}
+      {!compact && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl lg:text-3xl font-black text-[var(--user-text)]">My Orders</h1>
@@ -525,6 +531,7 @@ export default function OrdersPage() {
           <ShoppingBag size={16} /> Continue Shopping
         </Link>
       </div>
+      )}
 
       {/* TOOLBAR (Search + Dropdowns) */}
       {(totalOrders > 0 || hasDrafts) && (
@@ -556,11 +563,11 @@ export default function OrdersPage() {
 
           {/* RESULT COUNT + CLEAR */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--user-border)]">
-            <p className="text-[11px] font-semibold text-[var(--user-text-muted)]">
+            <p className="text-[0.6875rem] font-semibold text-[var(--user-text-muted)]">
               Showing <span className="font-black text-[var(--user-text)]">{isDraftFilter ? drafts.length : (pagination.total || orders.length)}</span> of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders
             </p>
             {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-1 text-[11px] font-bold text-[var(--user-accent)] hover:opacity-80 transition">
+              <button onClick={clearFilters} className="flex items-center gap-1 text-[0.6875rem] font-bold text-[var(--user-accent)] hover:opacity-80 transition">
                 <X size={12} /> Clear all filters
               </button>
             )}
@@ -611,21 +618,21 @@ export default function OrdersPage() {
               <div key={order._id} className="group rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden hover:shadow-xl hover:border-[var(--user-accent)]/30 transition-all duration-300">
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 border-b border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 px-5 py-3">
                   <div className="sm:col-span-3">
-                    <p className="text-[9px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Order Number</p>
+                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Order Number</p>
                     <p className="text-sm font-black text-[var(--user-accent)] font-mono">{order.order_number}</p>
                   </div>
                   <div className="sm:col-span-3">
-                    <p className="text-[9px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Placed On</p>
+                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Placed On</p>
                     <p className="text-sm font-semibold text-[var(--user-text)] flex items-center gap-1.5"><Calendar size={12} className="text-[var(--user-text-subtle)]" /> {date}</p>
                   </div>
                   <div className="sm:col-span-3">
-                    <p className="text-[9px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Payment</p>
+                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Payment</p>
                     <p className="text-sm font-semibold text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {pay.label}</p>
                   </div>
                   <div className="sm:col-span-3 flex sm:justify-end">
                     <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.border}`}>
                       <StatusIcon size={12} className={cfg.color} />
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
+                      <span className={`text-[0.625rem] font-bold uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
                     </div>
                   </div>
                 </div>
@@ -652,11 +659,11 @@ export default function OrdersPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] bg-[var(--user-bg-hover)]/30 px-5 py-3">
                   <div>
-                    <p className="text-[10px] text-[var(--user-text-muted)] font-medium mb-0.5">Order Total</p>
+                    <p className="text-[0.625rem] text-[var(--user-text-muted)] font-medium mb-0.5">Order Total</p>
                     <div className="flex items-baseline gap-2">
                       <p className="text-xl font-black text-[var(--user-text)]">Rs. {order.total.toLocaleString()}</p>
                       {orderTotalSavings > 0 && (
-                        <span className="text-[10px] font-bold text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> Saved Rs. {orderTotalSavings.toLocaleString()}</span>
+                        <span className="text-[0.625rem] font-bold text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> Saved Rs. {orderTotalSavings.toLocaleString()}</span>
                       )}
                     </div>
                   </div>
@@ -699,7 +706,8 @@ export default function OrdersPage() {
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
     <div className="lg:hidden bg-[var(--user-bg)]">
-      {/* Sticky top app bar */}
+      {/* Sticky top app bar — account tab (compact) me account ka apna top bar hota hai */}
+      {!compact && (
       <div
         className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -709,20 +717,21 @@ export default function OrdersPage() {
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">My Orders</p>
-            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {totalOrders === 1 ? "order" : "orders"}</p>
+            <p className="text-[0.9375rem] font-black text-[var(--user-text)] leading-none truncate">My Orders</p>
+            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {totalOrders === 1 ? "order" : "orders"}</p>
           </div>
         </div>
       </div>
+      )}
 
-      <div className="px-3 pt-3 pb-24 space-y-2.5">
+      <div className={compact ? "space-y-2.5" : "px-3 pt-3 pb-24 space-y-2.5"}>
         {/* Status filter chips (horizontal scrollable) */}
         {(totalOrders > 0 || hasDrafts) && (
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3" style={{ scrollbarWidth: "none" }}>
             <button
               type="button"
               onClick={() => setFilter("all")}
-              className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+              className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
                 filter === "all"
                   ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
                   : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
@@ -734,7 +743,7 @@ export default function OrdersPage() {
               <button
                 type="button"
                 onClick={() => setFilter("draft")}
-                className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+                className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
                   filter === "draft"
                     ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
                     : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
@@ -752,7 +761,7 @@ export default function OrdersPage() {
                   key={key}
                   type="button"
                   onClick={() => setFilter(key)}
-                  className={`shrink-0 h-8 px-3 rounded-full border-2 text-[11px] font-black uppercase tracking-wider transition ${
+                  className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
                     active
                       ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
                       : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
@@ -774,13 +783,13 @@ export default function OrdersPage() {
                   <ShoppingBag size={18} className="text-[var(--user-accent)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-black text-[var(--user-text)]">DRAFT</p>
-                  <p className="text-[10px] text-[var(--user-text-muted)]">Step {draft.step}/3 · {draft.items?.length || 0} items</p>
+                  <p className="text-[0.75rem] font-black text-[var(--user-text)]">DRAFT</p>
+                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">Step {draft.step}/3 · {draft.items?.length || 0} items</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => resumeDraft(draft._id)}
-                  className="h-8 px-3 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] font-black"
+                  className="h-8 px-3 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.6875rem] font-black"
                 >
                   Resume
                 </button>
@@ -806,7 +815,7 @@ export default function OrdersPage() {
                 Clear Filters
               </button>
             ) : (
-              <Link href="/product" className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+              <Link href="/" className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
                 <ShoppingBag size={16} /> Start Shopping
               </Link>
             )}
@@ -830,7 +839,7 @@ export default function OrdersPage() {
                   {/* Cancelled reason strip */}
                   {order.status === "cancelled" && order.cancel_reason && (
                     <div className="px-2.5 py-1.5 bg-[var(--user-danger)]/10 border-b border-[var(--user-danger)]/20">
-                      <p className="text-[10px] font-semibold text-[var(--user-danger)] line-clamp-1">
+                      <p className="text-[0.625rem] font-semibold text-[var(--user-danger)] line-clamp-1">
                         <span className="font-black uppercase tracking-wider mr-1">Reason:</span>{order.cancel_reason}
                       </p>
                     </div>
@@ -845,15 +854,15 @@ export default function OrdersPage() {
 
                   {/* Single-line footer — total + status + view */}
                   <div className="flex items-center justify-between gap-2 px-2.5 py-2 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
-                    <p className="text-[13px] font-black text-[var(--user-accent)] leading-none">
+                    <p className="text-[0.8125rem] font-black text-[var(--user-accent)] leading-none">
                       Rs. {order.total.toLocaleString()}
                     </p>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border}`}>
                         <StatusIcon size={9} className={cfg.color} />
-                        <span className={`text-[8px] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
+                        <span className={`text-[0.5rem] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
                       </span>
-                      <span className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[10px] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
+                      <span className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[0.625rem] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
                         View Details <ChevronRight size={11} />
                       </span>
                     </div>

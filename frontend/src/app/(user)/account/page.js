@@ -1,6 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+/* ==========================================================
+   ACCOUNT PAGE — "profile workspace" layout
+   ----------------------------------------------------------
+   Design inspiration: dark SaaS account screen (identity card +
+   profile info grid + preference toggles + right rail for
+   security & quick stats).
+
+   ⚠️ user.css ko chhua nahi gaya — saara styling maujooda theme
+   variables (--user-accent, --user-bg-card, ...) aur Tailwind
+   arbitrary values se hui hai.
+
+   ⚠️ Koi hardcoded data nahi — har value API se aati hai:
+        GET /users/profile   → name, username, email, phone, dob,
+                               avatar, provider, twoFactorEnabled,
+                               preferences, created_at / updated_at
+        GET /orders/my       → orders + status counts
+        GET /addresses       → saved addresses
+        GET /users/wishlist  → wishlist (WishlistContext ke through)
+   ========================================================== */
+
+import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,631 +29,1358 @@ import axiosInstance from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import { useWishlist } from "@/components/user/WishlistContext";
 import AddressForm from "@/components/user/AddressForm";
+import OrdersView from "../orders/page";
+import WishlistView from "../wishlist/page";
 import {
-  LayoutDashboard, Package, MapPin, Settings, LogOut, User, Phone, Lock,
-  Plus, Pencil, Trash2, Heart, ShoppingBag, Calendar, ArrowRight, ArrowLeft, Loader2,
-  X, CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck,
-  Star, Save, ChevronDown, ChevronRight, SlidersHorizontal,
+  User, Package, Heart, MapPin, Settings, LogOut, Phone, Mail, Calendar,
+  Plus, Pencil, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Loader2, X,
+  CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save,
+  ChevronRight, SlidersHorizontal, KeyRound, Globe,
 } from "lucide-react";
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-const getImgUrl = (img) => {
-  const raw = typeof img === "string" ? img : img?.img_url;
-  if (!raw) return null;
-  if (raw.startsWith("http")) return raw;
-  return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
+/* ============ HELPERS ============ */
+/* ✅ Mobile breakpoint — hydration-safe (server par false, phir subscribe) */
+const MOBILE_QUERY = "(max-width: 1023px)";
+const subscribeMobile = (cb) => {
+  const mq = window.matchMedia(MOBILE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
 };
-const fmt = (n) => `Rs. ${Math.round(n).toLocaleString()}`;
-
-const STATUS_CONFIG = {
-  pending:   { label: "Pending",   icon: Clock,        color: "text-amber-500",   bg: "bg-amber-500/10",   border: "border-amber-500/30" },
-  confirmed: { label: "Confirmed", icon: CheckCircle2, color: "text-blue-500",    bg: "bg-blue-500/10",    border: "border-blue-500/30" },
-  processing:{ label: "Processing",icon: Package,      color: "text-cyan-500",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30" },
-  shipped:   { label: "Shipped",   icon: Truck,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/30" },
-  delivered: { label: "Delivered", icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
-  cancelled: { label: "Cancelled", icon: XCircle,      color: "text-red-500",     bg: "bg-red-500/10",     border: "border-red-500/30" },
+const getMobileSnapshot = () => window.matchMedia(MOBILE_QUERY).matches;
+const getMobileServerSnapshot = () => false;
+function useIsMobile() {
+  return useSyncExternalStore(subscribeMobile, getMobileSnapshot, getMobileServerSnapshot);
+}
+const fmtDate = (d, opts) => {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString(
+    "en-GB",
+    opts || { day: "numeric", month: "short", year: "numeric" },
+  );
 };
 
-const FILTER_OPTIONS = [
-  { value: "all", label: "All Orders" },
-  { value: "pending", label: "Pending" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "processing", label: "Processing" },
-  { value: "shipped", label: "Shipped" },
-  { value: "delivered", label: "Delivered" },
-  { value: "cancelled", label: "Cancelled" },
+/* ✅ Sidebar — sirf ye 5 tabs + Logout (aur kuch nahi) */
+const NAV_ITEMS = [
+  { id: "profile", label: "My Profile", icon: User },
+  { id: "orders", label: "My Orders", icon: Package },
+  { id: "wishlist", label: "Wishlist", icon: Heart },
+  { id: "address", label: "Address", icon: MapPin },
+  { id: "settings", label: "Setting", icon: Settings },
 ];
 
-/* ============ SIDEBAR NAV (DESKTOP ONLY) ============ */
-function SidebarNav({ user, avatarLetter, tab, orderFilter, wishlistCount, onNavigate, onExternal, onLogout }) {
-  const [openGroups, setOpenGroups] = useState({ orders: true });
+const TAB_TITLES = {
+  profile: "My Profile",
+  orders: "My Orders",
+  wishlist: "Wishlist",
+  address: "Address",
+  settings: "Setting",
+};
 
-  const orderItems = [
-    { filter: "all", label: "All Orders" },
-    { filter: "pending", label: "Pending" },
-    { filter: "processing", label: "To be Shipped" },
-    { filter: "shipped", label: "Shipped" },
-    { filter: "delivered", label: "Delivered" },
-    { filter: "cancelled", label: "Cancelled" },
-  ];
+/* purane URL tabs (overview / addresses) bhi kaam karte rahen */
+const TAB_ALIASES = { overview: "profile", addresses: "address" };
+const normalizeTab = (t) =>
+  !t ? "profile" : TAB_ALIASES[t] || (TAB_TITLES[t] ? t : "profile");
 
-  const itemCls = (active) =>
-    `w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-bold transition ${
-      active ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)]"
-    }`;
-
+/* ============ SMALL BUILDING BLOCKS ============ */
+function Card({ className = "", children }) {
   return (
-    <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden">
-      <div className="p-4 border-b border-[var(--user-border)] flex items-center gap-3">
-        {user.avatar ? (
-          <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border-2 border-[var(--user-accent)] object-cover" />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-base font-black flex items-center justify-center">{avatarLetter}</div>
-        )}
-        <div className="min-w-0">
-          <p className="text-sm font-black text-[var(--user-text)] truncate capitalize">{user.name || user.username}</p>
-          <p className="text-[10px] text-[var(--user-text-muted)] truncate">{user.email}</p>
-        </div>
-      </div>
-
-      <nav className="p-2">
-        <button onClick={() => onNavigate("overview")} className={itemCls(tab === "overview")}>
-          <LayoutDashboard size={15} /> Overview
-        </button>
-
-               <button onClick={() => onExternal("/orders")} className={itemCls(false)}>
-          <Package size={15} /> My Orders
-        </button>
-
-        <button onClick={() => onExternal("/wishlist")} className={itemCls(false)}>
-          <Heart size={15} /> Wish List
-          {wishlistCount > 0 && (
-            <span className="ml-auto text-[10px] bg-[var(--user-accent)] text-[var(--user-accent-text)] px-1.5 py-0.5 rounded-full">{wishlistCount}</span>
-          )}
-        </button>
-
-        <button onClick={() => onNavigate("addresses")} className={itemCls(tab === "addresses")}>
-          <MapPin size={15} /> Shipping Address
-        </button>
-
-        <button onClick={() => onNavigate("settings")} className={itemCls(tab === "settings")}>
-          <Settings size={15} /> Settings
-        </button>
-
-        <div className="h-px bg-[var(--user-border)] my-2" />
-        <button onClick={onLogout} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition">
-          <LogOut size={15} /> Logout
-        </button>
-      </nav>
+    <div
+      className={`rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm ${className}`}
+    >
+      {children}
     </div>
   );
 }
 
-/* ============ ✅ MOBILE TOP BAR WITH BACK ARROW ============ */
-function MobileTopBar({ tab, onBack }) {
-  // Overview pe back nahi chahiye (home hai)
-  if (tab === "overview") return null;
-
-  const titles = {
-    orders: "My Orders",
-    addresses: "Addresses",
-    settings: "Settings",
-  };
-
+function CardHeader({ icon: Icon, title, subtitle, action, tone = "accent" }) {
   return (
-    <div className="lg:hidden sticky top-[57px] z-30 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-b border-[var(--user-border)] mb-4">
-      <div className="flex items-center gap-3 h-12 px-3">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+      <div className="flex items-center gap-3 min-w-0">
+        {Icon && (
+          <span
+            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+              tone === "success"
+                ? "bg-[var(--user-success)]/10 text-[var(--user-success)]"
+                : tone === "danger"
+                  ? "bg-[var(--user-danger)]/10 text-[var(--user-danger)]"
+                  : "bg-[var(--user-accent)]/10 text-[var(--user-accent)]"
+            }`}
+          >
+            <Icon size={16} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-[0.9375rem] font-black text-[var(--user-text)] truncate">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5 truncate">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+function MetaRow({ icon: Icon, children }) {
+  return (
+    <span className="flex items-center gap-1.5 min-w-0 text-[0.75rem] text-[var(--user-text-muted)]">
+      {Icon && <Icon size={13} className="text-[var(--user-accent)] shrink-0" />}
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+function StatusPill({ status, size = "md" }) {
+  const active = status === "Active";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-bold border ${
+        size === "sm" ? "text-[0.5625rem] px-1.5 py-0.5" : "text-[0.625rem] px-2 py-0.5"
+      } ${
+        active
+          ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/30"
+          : "text-[var(--user-danger)] bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30"
+      }`}
+    >
+      <CheckCircle2 size={size === "sm" ? 9 : 11} /> {status}
+    </span>
+  );
+}
+
+function EmptyBlock({ icon: Icon, title, text, action }) {
+  return (
+    <div className="text-center py-10 sm:py-12 px-4">
+      <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
+        <Icon size={24} className="text-[var(--user-text-subtle)]" />
+      </div>
+      <p className="text-sm font-bold text-[var(--user-text)] mb-1">{title}</p>
+      {text && <p className="text-xs text-[var(--user-text-muted)] mb-4">{text}</p>}
+      {action}
+    </div>
+  );
+}
+
+
+/* ============ SIDEBAR (DESKTOP) ============ */
+function navItemCls(active) {
+  return `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold transition-all duration-200 ${
+    active
+      ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md"
+      : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"
+  }`;
+}
+
+function navBadgeCls(active) {
+  return `ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+    active
+      ? "bg-[var(--user-accent-text)]/15 text-[var(--user-accent-text)]"
+      : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"
+  }`;
+}
+
+function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLogout }) {
+  return (
+    <Card className="overflow-hidden">
+      {/* identity block */}
+      <div className="relative p-4 border-b border-[var(--user-border)] overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
+        <div className="relative flex items-center gap-3">
+          <div className="relative shrink-0">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name || user.username}
+                className="w-11 h-11 rounded-full object-cover border border-[var(--user-border)]"
+              />
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-base font-black flex items-center justify-center">
+                {avatarLetter}
+              </div>
+            )}
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[var(--user-bg-card)] ${
+                status === "Active" ? "bg-[var(--user-success)]" : "bg-[var(--user-danger)]"
+              }`}
+            />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate capitalize">
+              {user.name || user.username}
+            </p>
+            <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{user.email}</p>
+          </div>
+        </div>
+
+        <div className="relative mt-3">
+          <StatusPill status={status} />
+        </div>
+      </div>
+
+      {/* nav — sirf 5 tabs + logout */}
+      <nav className="p-2 space-y-0.5">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.id;
+          const count = counts?.[item.id] || 0;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              className={navItemCls(active)}
+            >
+              <Icon size={16} className="shrink-0" />
+              <span className="truncate">{item.label}</span>
+              {count > 0 && <span className={navBadgeCls(active)}>{count}</span>}
+            </button>
+          );
+        })}
+
+        <div className="h-px bg-[var(--user-border)] my-2" />
+
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+        >
+          <LogOut size={16} className="shrink-0" /> Logout
+        </button>
+      </nav>
+    </Card>
+  );
+}
+
+
+/* ============ MOBILE MENU ============ */
+function MobileMenu({
+  user,
+  avatarLetter,
+  status,
+  memberSince,
+  stats,
+  counts,
+  onNavigate,
+  onLogout,
+}) {
+  return (
+    <div className="lg:hidden space-y-3">
+      {/* identity */}
+      <Card className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -right-6 -bottom-10 opacity-[0.05] pointer-events-none">
+          <ShoppingBag size={150} className="text-[var(--user-accent)]" />
+        </div>
+        <div className="relative p-4 sm:p-5">
+          <div className="flex items-center gap-4">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name || user.username}
+                className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-2xl font-black flex items-center justify-center shadow-lg shrink-0">
+                {avatarLetter}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-black text-[var(--user-text)] capitalize truncate">
+                {user.name || user.username}
+              </h1>
+              <p className="text-[0.6875rem] text-[var(--user-text-muted)] truncate mt-0.5">
+                {user.email}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <StatusPill status={status} />
+                {memberSince && (
+                  <span className="text-[0.625rem] text-[var(--user-text-subtle)]">
+                    Since {memberSince}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* quick stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+            {stats.map((s) => (
+              <button
+                key={s.label}
+                onClick={s.onClick}
+                className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60 px-3 py-2.5 text-left active:scale-[0.98] transition"
+              >
+                <s.icon size={14} className="text-[var(--user-accent)]" />
+                <p className="text-base font-black text-[var(--user-text)] mt-1.5">{s.value}</p>
+                <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                  {s.label}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* nav list */}
+      <Card className="overflow-hidden">
+        <div className="px-4 py-3 border-b border-[var(--user-border)]">
+          <p className="text-[0.625rem] font-black text-[var(--user-text-muted)] uppercase tracking-widest">
+            Account Menu
+          </p>
+        </div>
+        <nav className="p-2 space-y-0.5">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const count = counts?.[item.id] || 0;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:bg-[var(--user-bg-hover)] transition-colors duration-200"
+              >
+                <span className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                  <Icon size={16} />
+                </span>
+                <span className="truncate">{item.label}</span>
+                {count > 0 && (
+                  <span className="ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] shrink-0">
+                    {count}
+                  </span>
+                )}
+                <ChevronRight size={15} className="text-[var(--user-text-subtle)] shrink-0" />
+              </button>
+            );
+          })}
+
+          <div className="h-px bg-[var(--user-border)] my-2" />
+
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+          >
+            <span className="w-9 h-9 rounded-lg bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0">
+              <LogOut size={16} />
+            </span>
+            Logout
+          </button>
+        </nav>
+      </Card>
+    </div>
+  );
+}
+
+
+/* ============ MOBILE TOP BAR (back to menu) ============ */
+function MobileTopBar({ title, onBack }) {
+  return (
+    <div className="lg:hidden sticky top-[3.5625rem] z-30 -mx-3 px-3 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-b border-[var(--user-border)] mb-4">
+      <div className="flex items-center gap-3 h-12">
         <button
           onClick={onBack}
-          aria-label="Back"
+          aria-label="Back to account menu"
           className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-base font-black text-[var(--user-text)] flex-1">{titles[tab] || "Account"}</h1>
+        <h1 className="text-base font-black text-[var(--user-text)] flex-1 truncate">{title}</h1>
       </div>
     </div>
   );
 }
 
-/* ============ ✅ MOBILE FILTER BOTTOM SHEET ============ */
-function FilterSheet({ open, current, onClose, onSelect }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[80] lg:hidden">
-      <div onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="absolute bottom-0 inset-x-0 bg-[var(--user-bg-card)] border-t border-[var(--user-border)] rounded-t-2xl max-h-[70vh] overflow-hidden flex flex-col" style={{ animation: "slideUp .25s ease" }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--user-border)] shrink-0">
-          <h3 className="text-sm font-black text-[var(--user-text)]">Filter Orders</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[var(--user-bg-hover)] flex items-center justify-center transition">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="overflow-y-auto p-2">
-          {FILTER_OPTIONS.map((opt) => {
-            const active = current === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => { onSelect(opt.value); onClose(); }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition mb-0.5 ${
-                  active ? "bg-[var(--user-accent)]/10 text-[var(--user-accent)]" : "text-[var(--user-text)] hover:bg-[var(--user-bg-hover)]"
-                }`}
-              >
-                <span>{opt.label}</span>
-                {active && <CheckCircle2 size={16} />}
-              </button>
-            );
-          })}
-        </div>
-        <div className="p-3 border-t border-[var(--user-border)] shrink-0" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-          <button onClick={onClose} className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider hover:opacity-90 transition active:scale-[0.98]">
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+/* ==========================================================
+   ACCOUNT PAGE
+   ========================================================== */
 export default function AccountPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { count: wishlistCount } = useWishlist();
 
   const [tab, setTab] = useState(() => {
-    if (typeof window === "undefined") return "overview";
-    return new URLSearchParams(window.location.search).get("tab") || "overview";
+    if (typeof window === "undefined") return "profile";
+    return normalizeTab(new URLSearchParams(window.location.search).get("tab"));
   });
+  const isMobile = useIsMobile();
+  const [hadTabInUrl] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      !!new URLSearchParams(window.location.search).get("tab"),
+  );
+  /* null = auto: mobile par menu, agar URL me tab na bheja gaya ho */
+  const [mobileMenu, setMobileMenu] = useState(null);
+  const showMobileMenu = mobileMenu === null ? isMobile && !hadTabInUrl : mobileMenu;
 
-  useEffect(() => {
-    const checkUrlTab = () => {
-      const urlTab = new URLSearchParams(window.location.search).get("tab");
-      if (urlTab && urlTab !== tab) setTab(urlTab);
-    };
-    const onTab = (e) => {
-      if (e.detail && e.detail !== tab) {
-        setTab(e.detail);
-        const url = new URL(window.location);
-        url.searchParams.set("tab", e.detail);
-        window.history.pushState({}, "", url);
-      }
-    };
-    checkUrlTab();
-    window.addEventListener("popstate", checkUrlTab);
-    window.addEventListener("account:tab", onTab);
-    return () => {
-      window.removeEventListener("popstate", checkUrlTab);
-      window.removeEventListener("account:tab", onTab);
-    };
-  }, [tab]);
-
-  const [orderFilter, setOrderFilter] = useState("all");
-  const [openSection, setOpenSection] = useState(null);
-  const [showFilterSheet, setShowFilterSheet] = useState(false);
-
+  const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState(null);
-  const [phoneForm, setPhoneForm] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPhone, setSavingPhone] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+
+  /* New password strength (0-4): length + case mix + digit + symbol */
+  const pwStrength = useMemo(() => {
+    const value = pwForm.next || "";
+    if (!value) return 0;
+    let score = 0;
+    if (value.length >= 6) score += 1;
+    if (value.length >= 10) score += 1;
+    if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+    if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score += 1;
+    return Math.min(score, 4);
+  }, [pwForm.next]);
+  const pwStrengthMeta = [
+    { label: "", bar: "bg-[var(--user-border)]" },
+    { label: "Weak", bar: "bg-red-500" },
+    { label: "Fair", bar: "bg-orange-500" },
+    { label: "Good", bar: "bg-amber-400" },
+    { label: "Strong", bar: "bg-emerald-500" },
+  ][pwStrength];
 
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editAddress, setEditAddress] = useState(null);
   const [deleteAddressId, setDeleteAddressId] = useState(null);
 
+  /* ---------- URL ↔ tab sync (Header.js ke "account:tab" event ke sath) ---------- */
+  useEffect(() => {
+    const applyTab = (next) => {
+      setTab(normalizeTab(next));
+      setEditingProfile(false);
+      setProfileForm(null);
+    };
+    const fromUrl = () => {
+      const urlTab = new URLSearchParams(window.location.search).get("tab");
+      if (urlTab) applyTab(urlTab);
+    };
+    const onTab = (e) => {
+      if (!e.detail) return;
+      applyTab(e.detail);
+      setMobileMenu(false);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", normalizeTab(e.detail));
+      window.history.pushState({}, "", url);
+    };
+    fromUrl();
+    window.addEventListener("popstate", fromUrl);
+    window.addEventListener("account:tab", onTab);
+    return () => {
+      window.removeEventListener("popstate", fromUrl);
+      window.removeEventListener("account:tab", onTab);
+    };
+  }, []);
+
+  /* ---------- data ---------- */
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
-    queryFn: async () => { const res = await axiosInstance.get("/users/profile"); return res.data?.user || res.data; },
+    queryFn: async () => {
+      const res = await axiosInstance.get("/users/profile");
+      return res.data?.user || res.data;
+    },
     retry: false,
   });
-  const { data: orders = [] } = useQuery({ queryKey: ["myOrders"], queryFn: async () => { const res = await axiosInstance.get("/orders/my"); return res.data?.data || []; }, enabled: !!user });
-  const { data: addresses = [] } = useQuery({ queryKey: ["addresses"], queryFn: addressApi.getAll, enabled: !!user });
 
-  if (userLoading) return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>;
+  const { data: orders = [] } = useQuery({
+    queryKey: ["myOrders"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/orders/my");
+      return res.data?.data || [];
+    },
+    enabled: !!user,
+  });
 
-  if (!user) {
+  const { data: addresses = [] } = useQuery({
+    queryKey: ["addresses"],
+    queryFn: addressApi.getAll,
+    enabled: !!user,
+  });
+
+  if (userLoading) {
     return (
-      <div className="max-w-md mx-auto px-4 py-24 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5"><User size={28} className="text-[var(--user-accent)] opacity-60" /></div>
-        <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">Login Required</h1>
-        <p className="text-sm text-[var(--user-text-muted)] mb-6">Please login to view your account.</p>
-        <Link href="/login?redirect=/account" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 transition">Login to Your Account</Link>
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
       </div>
     );
   }
 
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5">
+          <User size={28} className="text-[var(--user-accent)] opacity-60" />
+        </div>
+        <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">Login Required</h1>
+        <p className="text-sm text-[var(--user-text-muted)] mb-6">
+          Please login to view your account.
+        </p>
+        <Link
+          href="/login?redirect=/account"
+          className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
+        >
+          Login to Your Account
+        </Link>
+      </div>
+    );
+  }
+
+
+  /* ---------- derived ---------- */
   const avatarLetter = (user.name || user.email || "U").charAt(0).toUpperCase();
-  const memberSince = user.created_at ? new Date(user.created_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "";
-  const activeCount = orders.filter(o => !["delivered","cancelled"].includes(o.status)).length;
+  const memberSince = fmtDate(user.created_at);
+  const accountStatus =
+    user.is_deleted || String(user.status || "").toLowerCase() === "inactive"
+      ? "Inactive"
+      : "Active";
+  const activeCount = orders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
+  const counts = {
+    orders: orders.length,
+    wishlist: wishlistCount,
+    address: addresses.length,
+  };
+
+  const navigate = (nextTab) => {
+    const id = normalizeTab(nextTab);
+    setTab(id);
+    setMobileMenu(false);
+    setEditingProfile(false);
+    setProfileForm(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", id);
+    window.history.pushState({}, "", url);
+  };
+
+  const stats = [
+    { label: "Total Orders", value: orders.length, icon: Package, onClick: () => navigate("orders") },
+    { label: "Active Orders", value: activeCount, icon: Truck, onClick: () => navigate("orders") },
+    { label: "Wishlist", value: wishlistCount, icon: Heart, onClick: () => navigate("wishlist") },
+    { label: "Addresses", value: addresses.length, icon: MapPin, onClick: () => navigate("address") },
+  ];
 
   const refreshUser = () => queryClient.invalidateQueries({ queryKey: ["userProfile"] });
   const refreshAddresses = () => queryClient.invalidateQueries({ queryKey: ["addresses"] });
 
-  const navigate = (tabId, filter) => {
-    setTab(tabId);
-    if (filter) setOrderFilter(filter);
-    const url = new URL(window.location);
-    url.searchParams.set("tab", tabId);
-    if (filter) url.searchParams.set("filter", filter);
-    window.history.pushState({}, "", url);
+  /* ---------- profile edit ---------- */
+  const startEditProfile = () => {
+    setProfileForm({
+      name: user.name || "",
+      username: user.username || "",
+      phone: user.phone || "",
+      dob: user.dob ? String(user.dob).slice(0, 10) : "",
+    });
+    setEditingProfile(true);
   };
-  const external = (href) => router.push(href);
+  const cancelEditProfile = () => {
+    setEditingProfile(false);
+    setProfileForm(null);
+  };
+  const setField = (key, value) => setProfileForm((f) => ({ ...(f || {}), [key]: value }));
 
-  // ✅ MOBILE BACK → overview pe wapas
-  const handleBack = () => navigate("overview");
-
-  const saveProfile = async () => {
+  const saveDetails = async () => {
+    const form = profileForm || {};
+    if (!String(form.name || "").trim()) return toast.error("Name is required");
+    if (!String(form.username || "").trim()) return toast.error("Username is required");
+    if (form.phone && !/^[0-9+\-\s]{7,20}$/.test(String(form.phone)))
+      return toast.error("Enter a valid phone number");
     setSavingProfile(true);
     try {
-      await axiosInstance.put("/users/profile", { name: profileForm.name, username: profileForm.username });
-      refreshUser(); toast.success("Profile updated!"); setProfileForm(null); setOpenSection(null);
-    } catch (e) { toast.error(e.response?.data?.message || "Failed to update profile"); }
-    finally { setSavingProfile(false); }
+      await axiosInstance.put("/users/profile", {
+        name: String(form.name).trim(),
+        username: String(form.username).trim(),
+        phone: String(form.phone || "").trim(),
+        dob: form.dob || "",
+      });
+      await refreshUser();
+      toast.success("Profile updated!");
+      setEditingProfile(false);
+      setProfileForm(null);
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to update profile");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const savePhone = async () => {
-    if (!/^[0-9+\-\s]{7,20}$/.test(phoneForm)) { toast.error("Enter a valid phone number"); return; }
-    setSavingPhone(true);
-    try {
-      await axiosInstance.put("/users/phone", { phone: phoneForm });
-      refreshUser(); toast.success("Phone updated!"); setPhoneForm(""); setOpenSection(null);
-    } catch (e) { toast.error(e.response?.data?.message || "Failed to update phone"); }
-    finally { setSavingPhone(false); }
-  };
 
+  /* ---------- password ---------- */
   const savePassword = async () => {
-    if (pwForm.next.length < 6) { toast.error("New password must be 6+ characters"); return; }
-    if (pwForm.next !== pwForm.confirm) { toast.error("Passwords do not match"); return; }
+    if (!pwForm.current) return toast.error("Enter your current password");
+    if (pwForm.next.length < 6) return toast.error("New password must be 6+ characters");
+    if (pwForm.next !== pwForm.confirm) return toast.error("Passwords do not match");
     setSavingPw(true);
     try {
-      await axiosInstance.post("/users/change-password", { currentPassword: pwForm.current, newPassword: pwForm.next });
-      toast.success("Password changed!"); setPwForm({ current: "", next: "", confirm: "" }); setOpenSection(null);
-    } catch (e) { toast.error(e.response?.data?.message || "Failed to change password"); }
-    finally { setSavingPw(false); }
+      await axiosInstance.post("/users/change-password", {
+        currentPassword: pwForm.current,
+        newPassword: pwForm.next,
+      });
+      toast.success("Password changed!");
+      setPwForm({ current: "", next: "", confirm: "" });
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Failed to change password");
+    } finally {
+      setSavingPw(false);
+    }
   };
 
+  /* ---------- logout ---------- */
   const handleLogout = async () => {
-    try { await axiosInstance.post("/users/logout"); } catch {}
+    try {
+      await axiosInstance.post("/users/logout");
+    } catch {}
     queryClient.removeQueries({ queryKey: ["userProfile"] });
+    queryClient.removeQueries({ queryKey: ["myOrders"] });
+    queryClient.removeQueries({ queryKey: ["addresses"] });
+    queryClient.removeQueries({ queryKey: ["wishlist"] });
     router.push("/");
   };
 
+  /* ---------- addresses ---------- */
   const setDefaultAddress = async (a) => {
-    try { await addressApi.update(a._id, { ...a, is_default: true }); refreshAddresses(); toast.success("Default address set!"); }
-    catch (e) { toast.error("Failed to set default"); }
+    try {
+      await addressApi.update(a._id, { ...a, is_default: true });
+      refreshAddresses();
+      toast.success("Default address set!");
+    } catch {
+      toast.error("Failed to set default");
+    }
   };
   const removeAddress = async () => {
-    try { await addressApi.remove(deleteAddressId); refreshAddresses(); toast.success("Address deleted!"); setDeleteAddressId(null); }
-    catch (e) { toast.error("Failed to delete address"); setDeleteAddressId(null); }
+    try {
+      await addressApi.remove(deleteAddressId);
+      refreshAddresses();
+      toast.success("Address deleted!");
+      setDeleteAddressId(null);
+    } catch {
+      toast.error("Failed to delete address");
+      setDeleteAddressId(null);
+    }
   };
 
-  const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
-  const currentFilterLabel = FILTER_OPTIONS.find(f => f.value === orderFilter)?.label || "All";
+  /* ---------- shared class strings ---------- */
+  const inputCls =
+    "w-full h-11 px-3 rounded-xl text-sm outline-none transition bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)]";
+  const fieldCls = (editable) =>
+    `${inputCls} ${
+      editable ? "" : "cursor-default opacity-80 focus:ring-0 focus:border-[var(--user-border)]"
+    }`;
+  const labelCls =
+    "block text-[0.6875rem] font-bold text-[var(--user-text-muted)] mb-1.5 uppercase tracking-wider";
+  const btnPrimary =
+    "h-10 px-3.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]";
+  const btnSecondary =
+    "h-10 px-3.5 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-[0.98]";
 
-  const inputCls = "w-full h-11 lg:h-10 px-3 rounded-lg text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
-  const labelCls = "block text-[11px] font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
-  const cardCls = "rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
-  const btnPrimary = "h-11 lg:h-9 px-3.5 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50";
-  const btnSecondary = "h-11 lg:h-9 px-3.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5";
 
-  const toggleSection = (s) => setOpenSection(openSection === s ? null : s);
-
-  const sidebarProps = { user, avatarLetter, tab, orderFilter, wishlistCount, onNavigate: navigate, onExternal: external, onLogout: handleLogout };
+  /* ---------- shared sidebar props ---------- */
+  const sidebarProps = {
+    user,
+    avatarLetter,
+    status: accountStatus,
+    tab,
+    counts,
+    onNavigate: navigate,
+    onLogout: handleLogout,
+  };
 
   return (
-    <main className="max-w-[1200px] mx-auto px-3 lg:px-6 pt-3 lg:pt-10 pb-4 md:pb-4">
-      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+    <main className="max-w-[75rem] mx-auto px-3 lg:px-6 pt-3 lg:pt-10 pb-24 md:pb-10">
+      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-      {/* ✅ MOBILE TOP BAR — Back arrow on non-overview tabs */}
-      <MobileTopBar tab={tab} onBack={handleBack} />
-
-      <div className="grid lg:grid-cols-[260px_1fr] gap-6 items-start">
-        <aside className="hidden lg:block sticky top-24">
+      <div className="grid lg:grid-cols-[16.5rem_minmax(0,1fr)] gap-5 lg:gap-6 items-start">
+        {/* DESKTOP SIDEBAR */}
+        <aside className="hidden lg:block lg:sticky lg:top-24">
           <SidebarNav {...sidebarProps} />
         </aside>
 
-        <div className="space-y-4 sm:space-y-5">
-          {/* OVERVIEW */}
-          {tab === "overview" && (
-            <>
-              <div className={`${cardCls} relative overflow-hidden`}>
-                <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/10 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute -right-8 -bottom-12 opacity-[0.05] pointer-events-none"><ShoppingBag size={180} className="text-[var(--user-accent)]" /></div>
+        {/* CONTENT */}
+        <div className="min-w-0">
+          {showMobileMenu ? (
+            <MobileMenu
+              {...sidebarProps}
+              memberSince={memberSince}
+              stats={stats}
+              onNavigate={navigate}
+            />
+          ) : (
+            <div style={{ animation: "fadeUp .25s ease" }}>
+              <MobileTopBar title={TAB_TITLES[tab]} onBack={() => setMobileMenu(true)} />
 
-             <button
-  onClick={() => navigate("settings")}
-  aria-label="Settings"
-  className="lg:hidden absolute top-3 right-3 z-10 w-9 h-9 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-muted)] flex items-center justify-center active:scale-95 transition"
->
-  <Settings size={16} />
-</button>
+              {/* ============ MY PROFILE ============ */}
+              {tab === "profile" && (
+                <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    {/* identity */}
+                    <Card className="relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/10 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute -right-6 -bottom-10 opacity-[0.05] pointer-events-none">
+                        <ShoppingBag size={160} className="text-[var(--user-accent)]" />
+                      </div>
+                      <div className="relative p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                        {user.avatar ? (
+                          <img
+                            src={user.avatar}
+                            alt={user.name || user.username}
+                            className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-2xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-2xl font-black flex items-center justify-center shadow-lg shrink-0">
+                            {avatarLetter}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h1 className="text-lg font-black text-[var(--user-text)] capitalize truncate">
+                              {user.name || user.username}
+                            </h1>
+                            <StatusPill status={accountStatus} />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
+                            <MetaRow icon={Mail}>{user.email}</MetaRow>
+                            <MetaRow icon={Phone}>{user.phone || "Phone not added"}</MetaRow>
+                            {memberSince && (
+                              <MetaRow icon={Calendar}>Member since {memberSince}</MetaRow>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
 
-                <div className="relative p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-                  {user.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-[var(--user-accent)] object-cover shadow-lg" />
-                  ) : (
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xl sm:text-2xl font-black flex items-center justify-center shadow-lg">{avatarLetter}</div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-base sm:text-xl font-black text-[var(--user-text)] capitalize truncate">{user.name || user.username}</h1>
-                    <p className="text-[11px] sm:text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{user.email}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Member</span>
-                      {memberSince && <span className="text-[10px] text-[var(--user-text-subtle)]">Since {memberSince}</span>}
-                    </div>
+
+                    {/* profile information */}
+                    <Card>
+                      <CardHeader
+                        icon={User}
+                        title="Profile Information"
+                        subtitle="Manage your account details"
+                        action={
+                          editingProfile ? (
+                            <div className="flex items-center gap-2">
+                              <button onClick={cancelEditProfile} className={btnSecondary}>
+                                Cancel
+                              </button>
+                              <button
+                                onClick={saveDetails}
+                                disabled={savingProfile}
+                                className={btnPrimary}
+                              >
+                                {savingProfile ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <Save size={13} />
+                                )}
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={startEditProfile} className={btnSecondary}>
+                              <Pencil size={13} /> Edit Profile
+                            </button>
+                          )
+                        }
+                      />
+
+                      <div className="p-4 sm:p-5 grid sm:grid-cols-2 gap-3.5">
+                        <div>
+                          <label className={labelCls}>Full Name</label>
+                          <input
+                            value={editingProfile ? profileForm?.name ?? "" : user.name || ""}
+                            onChange={(e) => setField("name", e.target.value)}
+                            readOnly={!editingProfile}
+                            placeholder="Your full name"
+                            className={fieldCls(editingProfile)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Username</label>
+                          <input
+                            value={
+                              editingProfile ? profileForm?.username ?? "" : user.username || ""
+                            }
+                            onChange={(e) => setField("username", e.target.value)}
+                            readOnly={!editingProfile}
+                            placeholder="Username"
+                            className={fieldCls(editingProfile)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Email Address</label>
+                          <input value={user.email || ""} readOnly className={fieldCls(false)} />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Phone Number</label>
+                          <input
+                            value={editingProfile ? profileForm?.phone ?? "" : user.phone || ""}
+                            onChange={(e) => setField("phone", e.target.value)}
+                            readOnly={!editingProfile}
+                            placeholder="Not added"
+                            className={fieldCls(editingProfile)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Date of Birth</label>
+                          <input
+                            type="date"
+                            value={editingProfile ? profileForm?.dob ?? "" : user.dob || ""}
+                            onChange={(e) => setField("dob", e.target.value)}
+                            readOnly={!editingProfile}
+                            className={fieldCls(editingProfile)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Member Since</label>
+                          <input value={memberSince || ""} readOnly className={fieldCls(false)} />
+                        </div>
+                      </div>
+                    </Card>
+
                   </div>
-                  <div className="flex sm:flex-col gap-2 shrink-0">
-                    <div className="flex-1 sm:flex-none rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-4 py-2 text-center">
-                      <p className="text-lg font-black text-[var(--user-accent)]">{orders.length}</p>
-                      <p className="text-[9px] text-[var(--user-text-subtle)] uppercase tracking-wider">Orders</p>
-                    </div>
-                    <div className="flex-1 sm:flex-none rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-4 py-2 text-center">
-                      <p className="text-lg font-black text-[var(--user-accent)]">{activeCount}</p>
-                      <p className="text-[9px] text-[var(--user-text-subtle)] uppercase tracking-wider">Active</p>
-                    </div>
+
+                  {/* right rail */}
+                  <div className="space-y-4 min-w-0">
+                    {/* account security */}
+                    <Card>
+                      <CardHeader
+                        icon={ShieldCheck}
+                        title="Account Security"
+                        subtitle="Keep your account safe"
+                      />
+                      <div className="p-2 space-y-0.5">
+                        <button
+                          onClick={() => navigate("settings")}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[var(--user-bg-hover)] transition text-left"
+                        >
+                          <span className="w-9 h-9 rounded-xl bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <KeyRound size={16} />
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-[0.8125rem] font-bold text-[var(--user-text)]">
+                              Change Password
+                            </span>
+                            <span className="block text-[0.6875rem] text-[var(--user-text-muted)] truncate">
+                              {user.provider === "google"
+                                ? "Signed up with Google"
+                                : "Keep your account safe"}
+                            </span>
+                          </span>
+                          <ChevronRight size={15} className="text-[var(--user-text-muted)] shrink-0" />
+                        </button>
+                      </div>
+                    </Card>
+
+
+                    {/* quick stats */}
+                    <Card>
+                      <CardHeader icon={Package} title="Quick Stats" />
+                      <div className="p-3 grid grid-cols-2 gap-2.5">
+                        {stats.map((s) => {
+                          const Icon = s.icon;
+                          return (
+                            <button
+                              key={s.label}
+                              onClick={s.onClick}
+                              className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 text-left hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+                            >
+                              <span className="w-8 h-8 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center mb-2">
+                                <Icon size={15} />
+                              </span>
+                              <p className="text-base font-black text-[var(--user-text)]">
+                                {s.value}
+                              </p>
+                              <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                                {s.label}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Card>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                {[
-                  { label: "Total Orders", value: orders.length, icon: Package, to: "/orders" },
-                  { label: "Active", value: activeCount, icon: Truck, to: "/orders" },
-                  { label: "Wishlist", value: wishlistCount, icon: Heart, to: "/wishlist" },
-                  { label: "Addresses", value: addresses.length, icon: MapPin, to: null, onClick: () => setTab("addresses") },
-                ].map((s, i) => (
-                  <button key={i} onClick={() => s.to ? router.push(s.to) : s.onClick()} className={`${cardCls} p-3.5 sm:p-4 text-left hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-lg transition-all active:scale-[0.98]`}>
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center mb-2"><s.icon size={16} /></div>
-                    <p className="text-base sm:text-lg font-black text-[var(--user-text)]">{s.value}</p>
-                    <p className="text-[9px] sm:text-[10px] text-[var(--user-text-muted)] uppercase tracking-wider">{s.label}</p>
-                  </button>
-                ))}
-              </div>
+              {/* ============ MY ORDERS — orders page wala hi design (reuse) ============ */}
+              {tab === "orders" && <OrdersView compact />}
 
-              {/* ✅ RECENT ORDERS — Better mobile design */}
-              <div className={cardCls}>
-                <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center lg:hidden">
-                      <Package size={15} className="text-[var(--user-accent)]" />
-                    </div>
-                    <h2 className="text-sm font-black text-[var(--user-text)]">Recent Orders</h2>
-                  </div>
-                  <button onClick={() => router.push("/orders")} className="hidden lg:flex text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline items-center gap-1">View All <ArrowRight size={12} /></button>
-                                  </div>
-                <div className="p-3 sm:p-4">
-                  {orders.length === 0 ? (
-                    <div className="text-center py-8 sm:py-6">
-                      <div className="w-14 h-14 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
-                        <Package size={24} className="text-[var(--user-text-subtle)]" />
-                      </div>
-                      <p className="text-sm text-[var(--user-text-muted)] mb-1">No orders yet</p>
-                      <Link href="/" className="text-[12px] text-[var(--user-accent)] font-bold hover:underline">Start shopping →</Link>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {orders.slice(0, 3).map(o => {
-                        const cfg = STATUS_CONFIG[o.status] || STATUS_CONFIG.pending;
-                        const StatusIcon = cfg.icon;
-                        const date = new Date(o.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" });
-                        return (
-                          <Link key={o._id} href={`/orders/${o._id}`} className="block p-3 rounded-xl border border-[var(--user-border)] hover:border-[var(--user-accent)]/50 hover:shadow-md transition-all active:scale-[0.99]">
-                            {/* Top: Status badge (mobile-prominent) */}
-                            <div className="flex items-center justify-between mb-2.5">
-                              <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full border flex items-center gap-1 ${cfg.bg} ${cfg.border} ${cfg.color}`}>
-                                <StatusIcon size={10} /> {cfg.label}
-                              </span>
-                              <span className="text-[10px] text-[var(--user-text-muted)] flex items-center gap-1">
-                                <Calendar size={10} /> {date}
-                              </span>
-                            </div>
+              {/* ============ WISHLIST — wishlist page wala hi design (reuse) ============ */}
+              {tab === "wishlist" && <WishlistView compact />}
 
-                            {/* Middle: Image + Info */}
-                            <div className="flex items-center gap-3">
-                              {getImgUrl(o.items?.[0]?.image) ? (
-                                <img src={getImgUrl(o.items[0].image)} alt="" className="w-14 h-14 rounded-lg object-cover border border-[var(--user-border)] shrink-0" />
-                              ) : (
-                                <div className="w-14 h-14 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
+              {/* ============ ADDRESS ============ */}
+              {tab === "address" && (
+                <Card className="overflow-hidden">
+                  <CardHeader
+                    icon={MapPin}
+                    title={`Addresses (${addresses.length})`}
+                    subtitle="Shipping addresses saved on your account"
+                    action={
+                      <button
+                        onClick={() => {
+                          setEditAddress(null);
+                          setShowAddressModal(true);
+                        }}
+                        className={btnPrimary}
+                      >
+                        <Plus size={14} /> Add New
+                      </button>
+                    }
+                  />
+                  <div className="p-3 sm:p-4">
+                    {addresses.length === 0 ? (
+                      <EmptyBlock
+                        icon={MapPin}
+                        title="No saved addresses yet"
+                        text="Add an address to make checkout faster."
+                        action={
+                          <button
+                            onClick={() => {
+                              setEditAddress(null);
+                              setShowAddressModal(true);
+                            }}
+                            className={btnPrimary + " inline-flex"}
+                          >
+                            <Plus size={13} /> Add Address
+                          </button>
+                        }
+                      />
+                    ) : (
+                      <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
+                        {addresses.map((a) => (
+                          <div
+                            key={a._id}
+                            className={`flex flex-col p-4 sm:p-5 rounded-xl border-2 hover:-translate-y-0.5 hover:shadow-lg transition-all active:scale-[0.99] ${
+                              a.is_default
+                                ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5"
+                                : "border-[var(--user-border)]"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <p className="text-sm font-bold text-[var(--user-text)] capitalize">
+                                {a.full_name}
+                              </p>
+                              {a.is_default && (
+                                <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">
+                                  DEFAULT
+                                </span>
                               )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[11px] font-black text-[var(--user-accent)] font-mono mb-0.5">#{o.order_number}</p>
-                                <p className="text-[12px] font-semibold text-[var(--user-text)] truncate">{o.items?.[0]?.name || "Order"}</p>
-                                <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">
-                                  {o.items.length} {o.items.length === 1 ? "item" : "items"}
-                                  {o.items.length > 1 && <span className="ml-1">+{o.items.length - 1} more</span>}
-                                </p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className="text-[14px] font-black text-[var(--user-text)]">{fmt(o.total)}</p>
-                                <ChevronRight size={14} className="text-[var(--user-text-muted)] ml-auto mt-0.5" />
-                              </div>
                             </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
 
-                {/* ✅ MOBILE: Full width "View All" button */}
-                {orders.length > 0 && (
-                               <div className="lg:hidden px-3 pb-3">
-                    <button
-                      onClick={() => router.push("/orders")}
-                      className="w-full h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition"
-                    >
-                      View All Orders <ArrowRight size={14} />
-                    </button>
+                            <div className="flex-1 space-y-1.5">
+                              <p className="text-xs text-[var(--user-text)] leading-relaxed">
+                                {a.street_address1}
+                                {a.street_address2 && <>, {a.street_address2}</>}
+                              </p>
+                              <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
+                                {a.city}, {a.state} {a.zip_code && `(${a.zip_code})`}
+                              </p>
+                              <p className="text-xs text-[var(--user-text-muted)]">{a.country}</p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 pt-3 mt-3 border-t border-[var(--user-border)]">
+                              <span className="text-[0.6875rem] text-[var(--user-text-secondary)] flex items-center gap-1 flex-1">
+                                <Phone size={11} className="text-[var(--user-accent)]" /> {a.phone}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 pt-3">
+                              {!a.is_default && (
+                                <button
+                                  onClick={() => setDefaultAddress(a)}
+                                  className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                                >
+                                  <Star size={11} /> Default
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setEditAddress(a);
+                                  setShowAddressModal(true);
+                                }}
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-1 active:scale-95"
+                              >
+                                <Pencil size={11} /> Edit
+                              </button>
+                              <button
+                                onClick={() => setDeleteAddressId(a._id)}
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                              >
+                                <Trash2 size={11} /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
-          )}
+                </Card>
+              )}
 
-        
 
-          {/* ADDRESSES — unchanged */}
-          {tab === "addresses" && (
-            <div className={cardCls}>
-              <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)] gap-2">
-                <h2 className="text-sm font-black text-[var(--user-text)]">Shipping Addresses ({addresses.length})</h2>
-                <button onClick={() => { setEditAddress(null); setShowAddressModal(true); }} className={btnPrimary}><Plus size={14} /> <span className="hidden sm:inline">Add New</span><span className="sm:hidden">Add</span></button>
-              </div>
-              <div className="p-3 sm:p-4">
-                {addresses.length === 0 ? (
-                  <div className="text-center py-10 sm:py-12">
-                    <div className="w-14 h-14 mx-auto rounded-xl bg-[var(--user-bg-hover)] flex items-center justify-center mb-3"><MapPin size={24} className="text-[var(--user-text-subtle)]" /></div>
-                    <p className="text-sm text-[var(--user-text-muted)]">No saved addresses yet.</p>
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 gap-2.5 sm:gap-3">
-                    {addresses.map(a => (
-                      <div key={a._id} className={`flex flex-col p-4 sm:p-5 rounded-xl border-2 min-h-[150px] sm:min-h-[170px] hover:-translate-y-0.5 hover:shadow-lg transition-all active:scale-[0.99] ${a.is_default ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)]"}`}>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="text-sm font-bold text-[var(--user-text)] capitalize">{a.full_name}</p>
-                          {a.is_default && <span className="text-[8px] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">DEFAULT</span>}
+              {/* ============ SETTING ============ */}
+              {tab === "settings" && (
+                <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
+                  <div className="space-y-4 min-w-0">
+                    {/* change password */}
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <CardHeader
+                        icon={KeyRound}
+                        title="Change Password"
+                        subtitle="Use a strong password you don't use anywhere else"
+                      />
+                      <div className="p-4 sm:p-5 space-y-3">
+                        <div>
+                          <label className={labelCls}>Current Password</label>
+                          <div className="relative">
+                            <input
+                              type={showPw ? "text" : "password"}
+                              value={pwForm.current}
+                              onChange={(e) =>
+                                setPwForm({ ...pwForm, current: e.target.value })
+                              }
+                              placeholder="Current password"
+                              className={inputCls + " pr-10"}
+                            />
+                            <button
+                              onClick={() => setShowPw(!showPw)}
+                              aria-label={showPw ? "Hide password" : "Show password"}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition"
+                            >
+                              {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex-1 space-y-1.5">
-                          <p className="text-xs text-[var(--user-text)] leading-relaxed">{a.street_address1}{a.street_address2 && <>, {a.street_address2}</>}</p>
-                          <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">{a.city}, {a.state} {a.zip_code && `(${a.zip_code})`}</p>
-                          <p className="text-xs text-[var(--user-text-muted)]">{a.country}</p>
+
+                        <div className="grid sm:grid-cols-2 gap-3.5">
+                          <div>
+                            <label className={labelCls}>New Password</label>
+                            <input
+                              type={showPw ? "text" : "password"}
+                              value={pwForm.next}
+                              onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
+                              placeholder="New password"
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Confirm New Password</label>
+                            <input
+                              type={showPw ? "text" : "password"}
+                              value={pwForm.confirm}
+                              onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
+                              placeholder="Confirm new password"
+                              className={inputCls}
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-3 mt-3 border-t border-[var(--user-border)]">
-                          <span className="text-[11px] text-[var(--user-text-secondary)] flex items-center gap-1 flex-1"><Phone size={11} className="text-[var(--user-accent)]" /> {a.phone}</span>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            onClick={savePassword}
+                            disabled={savingPw}
+                            className={btnPrimary}
+                          >
+                            {savingPw ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <ShieldCheck size={13} />
+                            )}
+                            Update Password
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-3">
-                          {!a.is_default && (
-                            <button onClick={() => setDefaultAddress(a)} className="flex-1 h-8 rounded-md text-[10px] font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-1 active:scale-95"><Star size={11} /> Default</button>
-                          )}
-                          <button onClick={() => { setEditAddress(a); setShowAddressModal(true); }} className="flex-1 h-8 rounded-md text-[10px] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-1 active:scale-95"><Pencil size={11} /> Edit</button>
-                          <button onClick={() => setDeleteAddressId(a._id)} className="flex-1 h-8 rounded-md text-[10px] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-1 active:scale-95"><Trash2 size={11} /> Delete</button>
+
+                        {/* password strength */}
+                        {pwForm.next ? (
+                          <div>
+                            <div className="mb-1.5 flex items-center justify-between">
+                              <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[var(--user-text-subtle)]">
+                                Password strength
+                              </span>
+                              <span
+                                className={`text-[0.625rem] font-black uppercase tracking-wider ${
+                                  pwStrength >= 3
+                                    ? "text-emerald-500"
+                                    : pwStrength === 2
+                                      ? "text-orange-500"
+                                      : "text-red-500"
+                                }`}
+                              >
+                                {pwStrengthMeta.label}
+                              </span>
+                            </div>
+                            <div className="flex gap-1">
+                              {[1, 2, 3, 4].map((segment) => (
+                                <span
+                                  key={segment}
+                                  className={`h-1.5 flex-1 rounded-full ${
+                                    segment <= pwStrength
+                                      ? pwStrengthMeta.bar
+                                      : "bg-[var(--user-bg-hover)]"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {/* security tip */}
+                        <div className="flex items-start gap-2.5 rounded-xl border border-[var(--user-accent)]/25 bg-[var(--user-accent-soft)] px-3.5 py-3">
+                          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[var(--user-accent)]" />
+                          <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text-muted)]">
+                            Use 10+ characters with uppercase, numbers and symbols — and never
+                            reuse a password from another site.
+                          </p>
                         </div>
                       </div>
-                    ))}
+                    </Card>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* SETTINGS — unchanged */}
-          {tab === "settings" && (
-            <div className={`${cardCls} overflow-hidden`}>
-              <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-[var(--user-border)]">
-                <h2 className="text-sm font-black text-[var(--user-text)] flex items-center gap-2"><Settings size={15} className="text-[var(--user-accent)]" /> Settings</h2>
-                <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Manage your account preferences</p>
-              </div>
 
-              <div className="border-b border-[var(--user-border)]">
-                <button onClick={() => toggleSection("profile")} className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-[var(--user-bg-hover)]/40 active:bg-[var(--user-bg-hover)] transition text-left">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0"><User size={17} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] sm:text-sm font-bold text-[var(--user-text)]">Personal Information</p>
-                    <p className="text-[11px] sm:text-xs text-[var(--user-text-muted)] truncate capitalize">{user.name || "—"} · {user.email}</p>
-                  </div>
-                  <ChevronDown size={15} className={`text-[var(--user-text-muted)] transition-transform shrink-0 ${openSection === "profile" ? "rotate-180" : ""}`} />
-                </button>
-                {openSection === "profile" && (
-                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 bg-[var(--user-bg-hover)]/20 space-y-3">
-                    <div><label className={labelCls}>Name</label><input value={profileForm?.name ?? user.name ?? ""} onChange={e => setProfileForm({...profileForm, name: e.target.value, username: profileForm?.username ?? user.username ?? ""})} className={inputCls} /></div>
-                    <div><label className={labelCls}>Username</label><input value={profileForm?.username ?? user.username ?? ""} onChange={e => setProfileForm({...profileForm, username: e.target.value, name: profileForm?.name ?? user.name ?? ""})} className={inputCls} /></div>
-                    <div className="flex gap-2 justify-end pt-1">
-                      <button onClick={() => { setProfileForm(null); setOpenSection(null); }} className={btnSecondary}>Cancel</button>
-                      <button onClick={saveProfile} disabled={savingProfile} className={btnPrimary}>{savingProfile ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  {/* right rail — account details */}
+                  <div className="space-y-4 min-w-0">
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <CardHeader
+                        icon={Globe}
+                        title="Account Details"
+                        subtitle="Read-only information from your account"
+                      />
+                      <div className="divide-y divide-[var(--user-border)]">
+                        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <Mail size={14} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              Email
+                            </p>
+                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
 
-              <div className="border-b border-[var(--user-border)]">
-                <button onClick={() => toggleSection("phone")} className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-[var(--user-bg-hover)]/40 active:bg-[var(--user-bg-hover)] transition text-left">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0"><Phone size={17} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] sm:text-sm font-bold text-[var(--user-text)]">Phone Number</p>
-                    <p className="text-[11px] sm:text-xs text-[var(--user-text-muted)]">{user.phone || "Not set"}</p>
-                  </div>
-                  <ChevronDown size={15} className={`text-[var(--user-text-muted)] transition-transform shrink-0 ${openSection === "phone" ? "rotate-180" : ""}`} />
-                </button>
-                {openSection === "phone" && (
-                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 bg-[var(--user-bg-hover)]/20">
-                    <div className="flex gap-2">
-                      <input value={phoneForm} onChange={e => setPhoneForm(e.target.value)} placeholder="xxxxxx" className={inputCls + " flex-1 min-w-0"} />
-                      <button onClick={savePhone} disabled={savingPhone || !phoneForm} className={btnPrimary + " shrink-0"}>{savingPhone ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Update</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <Globe size={14} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              Sign-in Method
+                            </p>
+                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                              {user.provider === "google" ? "Google" : "Email & Password"}
+                            </p>
+                          </div>
+                        </div>
 
-              <div className="border-b border-[var(--user-border)]">
-                <button onClick={() => toggleSection("password")} className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 sm:py-4 hover:bg-[var(--user-bg-hover)]/40 active:bg-[var(--user-bg-hover)] transition text-left">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0"><Lock size={17} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] sm:text-sm font-bold text-[var(--user-text)]">Password</p>
-                    <p className="text-[11px] sm:text-xs text-[var(--user-text-muted)]">••••••••••</p>
-                  </div>
-                  <ChevronDown size={15} className={`text-[var(--user-text-muted)] transition-transform shrink-0 ${openSection === "password" ? "rotate-180" : ""}`} />
-                </button>
-                {openSection === "password" && (
-                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-1 bg-[var(--user-bg-hover)]/20 space-y-3">
-                    <div className="relative">
-                      <input type={showPw ? "text" : "password"} value={pwForm.current} onChange={e => setPwForm({...pwForm, current: e.target.value})} placeholder="Current password" className={inputCls + " pr-10"} />
-                      <button onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition">{showPw ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                    </div>
-                    <input type={showPw ? "text" : "password"} value={pwForm.next} onChange={e => setPwForm({...pwForm, next: e.target.value})} placeholder="New password" className={inputCls} />
-                    <input type={showPw ? "text" : "password"} value={pwForm.confirm} onChange={e => setPwForm({...pwForm, confirm: e.target.value})} placeholder="Confirm new password" className={inputCls} />
-                    <div className="flex justify-end pt-1">
-                      <button onClick={savePassword} disabled={savingPw} className={btnPrimary}>{savingPw ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} Change Password</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <ShieldCheck size={14} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              Account Status
+                            </p>
+                            <div className="mt-1">
+                              <StatusPill status={accountStatus} size="sm" />
+                            </div>
+                          </div>
+                        </div>
 
-              <div className="lg:hidden">
-                <button onClick={() => setTab("addresses")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--user-bg-hover)]/40 active:bg-[var(--user-bg-hover)] transition text-left">
-                  <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0"><MapPin size={17} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-[var(--user-text)]">Shipping Address</p>
-                    <p className="text-[11px] text-[var(--user-text-muted)]">{addresses.length} saved</p>
+                        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <Calendar size={14} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              Member Since
+                            </p>
+                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                              {memberSince || "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                            <Clock size={14} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              Last Updated
+                            </p>
+                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                              {fmtDate(user.updated_at) || "—"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <CardHeader
+                        icon={MapPin}
+                        title="Default Address"
+                        subtitle="Used automatically at checkout"
+                        action={
+                          <button
+                            onClick={() => navigate("address")}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+                          >
+                            Manage
+                            <ChevronRight size={12} />
+                          </button>
+                        }
+                      />
+                      {(() => {
+                        const defaultAddress = addresses.find((a) => a.is_default);
+                        if (!defaultAddress) {
+                          return (
+                            <div className="px-4 sm:px-5 py-5 text-center">
+                              <span className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-subtle)]">
+                                <MapPin size={18} />
+                              </span>
+                              <p className="text-[0.8125rem] font-bold text-[var(--user-text)]">
+                                {addresses.length ? "No default address set" : "No saved addresses"}
+                              </p>
+                              <p className="mt-1 text-[0.6875rem] text-[var(--user-text-muted)]">
+                                {addresses.length
+                                  ? "Pick one as default from your addresses."
+                                  : "Add an address to make checkout faster."}
+                              </p>
+                              <button
+                                onClick={() => navigate("address")}
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+                              >
+                                {addresses.length ? "Choose Default" : "Add Address"}
+                              </button>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="px-4 sm:px-5 py-4">
+                            <div className="rounded-xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5 p-3.5">
+                              <div className="mb-1.5 flex items-start justify-between gap-2">
+                                <p className="text-[0.8125rem] font-bold capitalize text-[var(--user-text)]">
+                                  {defaultAddress.full_name}
+                                </p>
+                                <span className="shrink-0 rounded border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[0.5rem] font-black text-[var(--user-accent)]">
+                                  DEFAULT
+                                </span>
+                              </div>
+                              <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text)]">
+                                {defaultAddress.street_address1}
+                                {defaultAddress.street_address2 && <>, {defaultAddress.street_address2}</>}
+                              </p>
+                              <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text-muted)]">
+                                {defaultAddress.city}, {defaultAddress.state}
+                                {defaultAddress.zip_code && ` (${defaultAddress.zip_code})`} · {defaultAddress.country}
+                              </p>
+                              <p className="mt-1.5 flex items-center gap-1 text-[0.6875rem] font-semibold text-[var(--user-text-secondary)]">
+                                <Phone size={11} className="text-[var(--user-accent)]" />
+                                {defaultAddress.phone}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </Card>
+
+                    <Card className="overflow-hidden">
+                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <CardHeader icon={Star} title="Quick Actions" subtitle="Jump to your stuff" />
+                      <div className="space-y-0.5 p-2">
+                        {[
+                          { id: "orders", label: "My Orders", icon: Package, count: counts.orders },
+                          { id: "wishlist", label: "Wishlist", icon: Heart, count: counts.wishlist },
+                          { id: "address", label: "Addresses", icon: MapPin, count: counts.address },
+                        ].map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => navigate(item.id)}
+                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
+                            >
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)]">
+                                <Icon size={14} />
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-bold text-[var(--user-text)]">
+                                {item.label}
+                              </span>
+                              {item.count > 0 ? (
+                                <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
+                                  {item.count}
+                                </span>
+                              ) : null}
+                              <ChevronRight size={14} className="shrink-0 text-[var(--user-text-subtle)]" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Card>
                   </div>
-                  <ChevronRight size={15} className="text-[var(--user-text-muted)] shrink-0" />
-                </button>
-              </div>
+                </div>
+              )}
+
             </div>
           )}
         </div>
       </div>
 
-      {/* Modals — unchanged */}
+      {/* ---------- modals (address form / delete confirm / mobile filter) ---------- */}
       {showAddressModal && (
         <AddressForm
           initialAddress={editAddress}
-          onSuccess={() => { setShowAddressModal(false); refreshAddresses(); }}
+          onSuccess={() => {
+            setShowAddressModal(false);
+            refreshAddresses();
+          }}
           onCancel={() => setShowAddressModal(false)}
         />
       )}
+
       {deleteAddressId && (
-        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteAddressId(null)}>
-          <div className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border-t-2 sm:border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-black text-[var(--user-text)] mb-2">Delete this address?</h3>
-            <p className="text-xs text-[var(--user-text-muted)] mb-5">This action cannot be undone.</p>
+        <div
+          className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setDeleteAddressId(null)}
+        >
+          <div
+            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border-t-2 sm:border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-black text-[var(--user-text)] mb-2">
+              Delete this address?
+            </h3>
+            <p className="text-xs text-[var(--user-text-muted)] mb-5">
+              This action cannot be undone.
+            </p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteAddressId(null)} className="flex-1 h-10 sm:h-9 rounded-lg border border-[var(--user-border)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Cancel</button>
-              <button onClick={removeAddress} className="flex-1 h-10 sm:h-9 rounded-lg bg-[var(--user-danger)] text-white text-xs font-bold hover:opacity-90 transition">Delete</button>
+              <button
+                onClick={() => setDeleteAddressId(null)}
+                className="flex-1 h-10 sm:h-9 rounded-xl border border-[var(--user-border)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={removeAddress}
+                className="flex-1 h-10 sm:h-9 rounded-xl bg-[var(--user-danger)] text-white text-xs font-bold hover:opacity-90 transition"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ Filter Bottom Sheet */}
-      <FilterSheet
-        open={showFilterSheet}
-        current={orderFilter}
-        onClose={() => setShowFilterSheet(false)}
-        onSelect={setOrderFilter}
-      />
     </main>
   );
 }
+

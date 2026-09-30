@@ -202,14 +202,16 @@ export default function ProductCard({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300"
+      className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden transition-colors duration-300"
     >
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
         {image ? (
           <img
             src={getImageUrl(image)}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -222,7 +224,7 @@ export default function ProductCard({
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}
+              className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={9} />
@@ -235,17 +237,17 @@ export default function ProductCard({
 
           {/* ✅ SIMPLE DISCOUNT — ab value dikhegi, sirf "Sale" nahi */}
           {!displayBadgeText && hasDiscount && !hideDiscountBadge && (
-            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
               <Tag size={9} /> {discountBadgeText || "Sale"}
             </span>
           )}
 
           {out ? (
-            <span className="bg-[var(--user-danger)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
               OUT OF STOCK
             </span>
           ) : totalStock < 5 ? (
-            <span className="bg-[var(--user-warning)] text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-[var(--user-warning)] text-black text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
               LOW STOCK
             </span>
           ) : null}
@@ -285,16 +287,16 @@ export default function ProductCard({
       </div>
 
       <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
-        <p className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-wider font-bold mb-1 truncate">
+        <p className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-wider font-bold mb-1 truncate">
           {brandName || ""}
         </p>
-        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[15px] line-clamp-2 leading-snug min-h-[2.6em]">
+        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[0.9375rem] line-clamp-2 leading-snug min-h-[2.6em]">
           {product.name}
         </h3>
 
         <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
           {oldPrice > price && (
-            <span className="text-[11px] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
+            <span className="text-[0.6875rem] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
               Rs. {oldPrice.toLocaleString()}
             </span>
           )}
@@ -302,12 +304,13 @@ export default function ProductCard({
             Rs. {price.toLocaleString()}
           </h4>
           {mentionDeal && (
-            <span className="mt-1 text-[10px] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
+            <span className="mt-1 text-[0.625rem] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
               <Sparkles size={10} className="text-orange-500" /> Also available
               in deal
             </span>
           )}
         </div>
+
         {children}
       </div>
     </Link>

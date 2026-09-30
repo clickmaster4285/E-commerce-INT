@@ -28,7 +28,7 @@ export default function BrandSection() {
 
   return (
     <section className="px-3 lg:px-6 py-5 lg:py-12">
-      <div className="max-w-[1400px] mx-auto">
+      <div className="user-shell mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
           <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
@@ -42,7 +42,7 @@ export default function BrandSection() {
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="w-[140px] sm:w-[160px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[130px] animate-pulse"
+                className="w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[8.125rem] animate-pulse"
               />
             ))}
           </div>
@@ -72,8 +72,8 @@ export default function BrandSection() {
                   return (
                     <Link
                       key={`${brand._id}-${i}`}
-                      href={`/brand/${brand._id}`}
-                      className="mr-3 w-[140px] sm:w-[160px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[130px] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
+                      href={`/?brand=${brand._id}`}
+                      className="mr-3 w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[8.125rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
                     >
                       {/* ✅ Logo (white circle) */}
                       {logoUrl ? (

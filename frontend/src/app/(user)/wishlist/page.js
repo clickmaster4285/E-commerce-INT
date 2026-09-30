@@ -8,7 +8,11 @@ import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { Heart, Loader2, ShoppingBag } from "lucide-react";
 
-export default function WishlistPage() {
+/* WishlistPage — /wishlist route ka full page AUR account ke Wishlist tab
+   ka reused view (dono jagah EXACT same design).
+   compact=true (account tab): page chrome (title header, page paddings)
+   hide — sirf loading / empty / grid render hota hai. */
+export default function WishlistPage({ compact = false }) {
   const { wishlist, count, loading } = useWishlist();
 
   // Full product data (same source as home page) — images + prices ke liye
@@ -27,8 +31,9 @@ export default function WishlistPage() {
   const isLoading = loading || (count > 0 && productsLoading);
 
   return (
-    <main className="max-w-[1200px] mx-auto px-3 lg:px-6 py-4 lg:py-10 pb-24 md:pb-10">
-      {/* Header */}
+    <main className={compact ? "" : "max-w-[75rem] mx-auto px-3 lg:px-6 py-4 lg:py-10 pb-24 md:pb-10"}>
+      {/* Header — account tab (compact) me account ka apna header hota hai */}
+      {!compact && (
       <div className="flex items-center justify-between mb-5 sm:mb-8">
         <div>
           <h1 className="flex items-center gap-2 text-xl lg:text-2xl font-black text-[var(--user-text)]">
@@ -41,11 +46,12 @@ export default function WishlistPage() {
         </div>
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline transition"
+          className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs font-bold text-[var(--user-accent)] hover:underline transition"
         >
           <ShoppingBag size={13} /> Continue Shopping
         </Link>
       </div>
+      )}
 
       {/* Loading */}
       {isLoading ? (

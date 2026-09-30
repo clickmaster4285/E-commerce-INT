@@ -56,7 +56,7 @@ const OrderTimeline = ({ status, reason }) => {
             <p className="text-xs text-[var(--user-text-muted)] mt-1">Items have been restored to stock.</p>
             {reason && (
               <div className="mt-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-danger)]/20 p-3">
-                <p className="text-[10px] font-black text-[var(--user-danger)] uppercase tracking-wider mb-1">Cancellation Reason</p>
+                <p className="text-[0.625rem] font-black text-[var(--user-danger)] uppercase tracking-wider mb-1">Cancellation Reason</p>
                 <p className="text-sm text-[var(--user-text)] leading-relaxed">{reason}</p>
               </div>
             )}
@@ -71,8 +71,8 @@ const OrderTimeline = ({ status, reason }) => {
   return (
     <>
       <div className="lg:hidden relative">
-        <div className="absolute left-[21px] top-6 bottom-6 w-[2px] bg-[var(--user-border)] rounded-full" />
-        <div className="absolute left-[21px] top-6 w-[2px] bg-[var(--user-accent)] rounded-full transition-all duration-700"
+        <div className="absolute left-[1.3125rem] top-6 bottom-6 w-[0.125rem] bg-[var(--user-border)] rounded-full" />
+        <div className="absolute left-[1.3125rem] top-6 w-[0.125rem] bg-[var(--user-accent)] rounded-full transition-all duration-700"
           style={{ height: `calc((100% - 48px) * ${idx / (STATUS_FLOW.length - 1)})` }} />
         <div className="space-y-7">
           {STATUS_FLOW.map((step, i) => {
@@ -94,7 +94,7 @@ const OrderTimeline = ({ status, reason }) => {
                 <div className="flex-1 min-w-0 pt-1">
                   <div className="flex items-center gap-2">
                     <p className={`text-sm font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
-                    {isCurrent && <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                    {isCurrent && <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
                   </div>
                   <p className="text-xs text-[var(--user-text-muted)] mt-1 leading-relaxed">{cfg.desc}</p>
                 </div>
@@ -105,8 +105,8 @@ const OrderTimeline = ({ status, reason }) => {
       </div>
 
       <div className="hidden lg:block relative">
-        <div className="absolute left-[10%] right-[10%] top-[24px] h-[2px] -translate-y-1/2 bg-[var(--user-border)] rounded-full" />
-        <div className="absolute left-[10%] top-[24px] h-[2px] -translate-y-1/2 bg-[var(--user-accent)] rounded-full transition-all duration-700"
+        <div className="absolute left-[10%] right-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-[var(--user-border)] rounded-full" />
+        <div className="absolute left-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-[var(--user-accent)] rounded-full transition-all duration-700"
           style={{ width: `${(idx / (STATUS_FLOW.length - 1)) * 80}%` }} />
         <div className="relative flex items-start">
           {STATUS_FLOW.map((step, i) => {
@@ -124,7 +124,7 @@ const OrderTimeline = ({ status, reason }) => {
                   {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={19} />}
                 </div>
                 <p className={`mt-3 text-xs font-black uppercase tracking-wider ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
-                {isCurrent && <span className="mt-1.5 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                {isCurrent && <span className="mt-1.5 text-[0.5625rem] font-black px-2.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
               </div>
             );
           })}
@@ -241,7 +241,7 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
             <button
               onClick={() => handleSave("order_only")}
               disabled={saving}
-              className="h-10 px-3 sm:px-4 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[11px] sm:text-xs font-black flex items-center gap-1.5 hover:opacity-90 transition disabled:opacity-50"
+              className="h-10 px-3 sm:px-4 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.6875rem] sm:text-xs font-black flex items-center gap-1.5 hover:opacity-90 transition disabled:opacity-50"
             >
               {saving && actionType === "order_only" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
               <span className="whitespace-nowrap">Order only</span>
@@ -250,7 +250,7 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
             <button
               onClick={() => handleSave("update_saved")}
               disabled={saving}
-              className="h-10 px-3 sm:px-4 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-[11px] sm:text-xs font-bold hover:border-[var(--user-accent)]/40 transition disabled:opacity-40 flex items-center gap-1.5"
+              className="h-10 px-3 sm:px-4 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-[0.6875rem] sm:text-xs font-bold hover:border-[var(--user-accent)]/40 transition disabled:opacity-40 flex items-center gap-1.5"
             >
               {saving && actionType === "update_saved" ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
               <span className="whitespace-nowrap">Save to address book</span>
@@ -298,7 +298,7 @@ export default function OrderDetailPage({ params }) {
   if (isLoading) {
     return (
     <>
-      <div className="hidden lg:block max-w-[1100px] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
+      <div className="hidden lg:block max-w-[68.75rem] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
         <div className="h-4 w-32 bg-[var(--user-bg-hover)] rounded" />
         <div className="h-72 bg-[var(--user-bg-card)] rounded-3xl border border-[var(--user-border)]" />
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
@@ -316,7 +316,7 @@ export default function OrderDetailPage({ params }) {
   if (!order) {
     return (
     <>
-      <div className="hidden lg:block max-w-[500px] mx-auto px-4 py-24 text-center">
+      <div className="hidden lg:block max-w-[31.25rem] mx-auto px-4 py-24 text-center">
         <div className="w-24 h-24 mx-auto rounded-3xl bg-[var(--user-accent)] flex items-center justify-center mb-6 shadow-2xl">
           <Package size={40} className="text-[var(--user-accent-text)]" />
         </div>
@@ -329,7 +329,7 @@ export default function OrderDetailPage({ params }) {
           <Package size={36} className="text-[var(--user-accent)]" />
         </div>
         <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Order Not Found</h2>
-        <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[280px]">This order does not exist or has been removed.</p>
+        <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">This order does not exist or has been removed.</p>
         <Link href="/orders" className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
           <ArrowLeft size={16} /> Back to Orders
         </Link>
@@ -370,7 +370,7 @@ export default function OrderDetailPage({ params }) {
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
     <div className="hidden lg:block">
-    <main className="max-w-[1100px] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-8 lg:py-10 pb-40 md:pb-10">
+    <main className="max-w-[68.75rem] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-8 lg:py-10 pb-40 md:pb-10">
       <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition mb-4 sm:mb-5 group">
         <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Back to Orders
       </Link>
@@ -387,7 +387,7 @@ export default function OrderDetailPage({ params }) {
               </span>
               {totalSavings > 0 && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 text-[var(--user-success)]">
-                  <Sparkles size={12} /><span className="text-[10px] font-black">Saved {fmt(totalSavings)}</span>
+                  <Sparkles size={12} /><span className="text-[0.625rem] font-black">Saved {fmt(totalSavings)}</span>
                 </span>
               )}
             </div>
@@ -398,16 +398,16 @@ export default function OrderDetailPage({ params }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start mb-6">
             <div>
-              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Number</p>
+              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Number</p>
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--user-text)] tracking-tight break-all">{order.order_number}</h1>
               <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mt-2 leading-relaxed max-w-md">{cfg.desc}</p>
             </div>
             <div className="sm:text-right sm:flex sm:flex-col sm:items-end">
-              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Total</p>
+              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Total</p>
               <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-[var(--user-text)]">{fmt(order.total)}</p>
               <p className="text-xs text-[var(--user-text-muted)] mt-2 font-semibold inline-flex items-center gap-1.5">
                 <PayIcon size={13} className="text-[var(--user-accent)]" /> {pay.label}
-                {order.payment?.status === "paid" && <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20">Paid</span>}
+                {order.payment?.status === "paid" && <span className="text-[0.5625rem] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20">Paid</span>}
               </p>
               <div className="hidden sm:block mt-4">
                 {canCancel ? (
@@ -415,7 +415,7 @@ export default function OrderDetailPage({ params }) {
                     <XCircle size={14} /> Cancel Order
                   </button>
                 ) : (
-                  order.status !== "cancelled" && <p className="text-[10px] text-[var(--user-text-muted)] inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
+                  order.status !== "cancelled" && <p className="text-[0.625rem] text-[var(--user-text-muted)] inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
                 )}
               </div>
             </div>
@@ -436,11 +436,11 @@ export default function OrderDetailPage({ params }) {
                   <Truck size={22} className="text-[var(--user-accent-text)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Estimated Delivery</p>
+                  <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Estimated Delivery</p>
                   <p className="text-base lg:text-lg font-black text-[var(--user-text)] mt-0.5">{estimatedDelivery} working days</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping</p>
+                  <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping</p>
                   <p className="text-sm font-black text-[var(--user-text)] mt-0.5 inline-flex items-center gap-1">
                     {order.shipping_method === "express" ? <><Zap size={14} /> Express</> : <><Truck size={14} /> Standard</>}
                   </p>
@@ -479,7 +479,7 @@ export default function OrderDetailPage({ params }) {
                 </div>
                 <div>
                   <h2 className="text-sm font-black text-[var(--user-text)]">Order Items</h2>
-                  <p className="text-[10px] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
+                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
                 </div>
               </div>
              
@@ -503,20 +503,20 @@ export default function OrderDetailPage({ params }) {
                       ) : (
                         <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
                       )}
-                      <div className="absolute -top-2 -right-2 min-w-[22px] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
+                      <div className="absolute -top-2 -right-2 min-w-[1.375rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
-                      {i.variantTitle && <p className="text-[11px] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
+                      {i.variantTitle && <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {i.deal_id && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
-                        {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[10px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
+                        {i.deal_id && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
+                        {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      {hasDiscount && <p className="text-[11px] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
+                      {hasDiscount && <p className="text-[0.6875rem] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
                       <p className="text-sm sm:text-lg font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
-                      {itemSavings > 0 && <p className="text-[10px] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
+                      {itemSavings > 0 && <p className="text-[0.625rem] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
                     </div>
                   </div>
                 );
@@ -534,7 +534,7 @@ export default function OrderDetailPage({ params }) {
                 <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><MapPin size={18} className="text-[var(--user-accent-text)]" /></div>
                 <div>
                   <h2 className="text-sm font-black text-[var(--user-text)]">Delivery Address</h2>
-                  <p className="text-[10px] text-[var(--user-text-muted)]">Shipping to</p>
+                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">Shipping to</p>
                 </div>
               </div>
               {canCancel && (
@@ -564,12 +564,12 @@ export default function OrderDetailPage({ params }) {
               <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><CreditCard size={18} className="text-[var(--user-accent-text)]" /></div>
               <div>
                 <h2 className="text-sm font-black text-[var(--user-text)]">Payment Summary</h2>
-                <p className="text-[10px] text-[var(--user-text-muted)]">{pay.label}</p>
+                <p className="text-[0.625rem] text-[var(--user-text-muted)]">{pay.label}</p>
               </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] mb-4">
               <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-text)]"><PayIcon size={16} className="text-[var(--user-accent)]" /> {pay.label}</p>
-              <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${order.payment?.status === "paid" ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/20" : "text-amber-600 bg-amber-500/10 border-amber-500/20"}`}>{order.payment?.status || "Pending"}</span>
+              <span className={`text-[0.625rem] font-black uppercase px-2.5 py-1 rounded-full border ${order.payment?.status === "paid" ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/20" : "text-amber-600 bg-amber-500/10 border-amber-500/20"}`}>{order.payment?.status || "Pending"}</span>
             </div>
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between text-[var(--user-text-muted)]"><span>Subtotal</span><span className="font-semibold text-[var(--user-text)]">{fmt(order.subtotal)}</span></div>
@@ -621,8 +621,8 @@ export default function OrderDetailPage({ params }) {
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">Order Details</p>
-            <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">#{order.order_number}</p>
+            <p className="text-[0.9375rem] font-black text-[var(--user-text)] leading-none truncate">Order Details</p>
+            <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">#{order.order_number}</p>
           </div>
         </div>
       </div>
@@ -647,18 +647,18 @@ export default function OrderDetailPage({ params }) {
               <StatusIcon size={22} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`text-[16px] font-black leading-tight ${
+              <p className={`text-[1rem] font-black leading-tight ${
                 order.status === "cancelled"
                   ? "text-[var(--user-danger)]"
                   : order.status === "delivered"
                   ? "text-[var(--user-success)]"
                   : "text-[var(--user-accent)]"
               }`}>{cfg.label}</p>
-              <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">#{order.order_number} · {date}</p>
+              <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">#{order.order_number} · {date}</p>
             </div>
           </div>
           {order.status === "cancelled" && order.cancel_reason && (
-            <p className="text-[11px] text-[var(--user-text)] mt-3 pt-3 border-t border-[var(--user-danger)]/20 leading-relaxed">
+            <p className="text-[0.6875rem] text-[var(--user-text)] mt-3 pt-3 border-t border-[var(--user-danger)]/20 leading-relaxed">
               <span className="font-black uppercase tracking-wider text-[var(--user-danger)]">Reason: </span>{order.cancel_reason}
             </p>
           )}
@@ -666,7 +666,7 @@ export default function OrderDetailPage({ params }) {
 
         {/* TIMELINE card */}
         <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
-          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-4 flex items-center gap-1.5">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-4 flex items-center gap-1.5">
             <Clock size={11} /> Order Progress
           </p>
           {order.status === "cancelled" ? (
@@ -675,15 +675,15 @@ export default function OrderDetailPage({ params }) {
                 <XCircle size={18} className="text-white" />
               </div>
               <div>
-                <p className="text-[13px] font-black text-[var(--user-danger)]">Cancelled</p>
-                <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">This order has been cancelled</p>
+                <p className="text-[0.8125rem] font-black text-[var(--user-danger)]">Cancelled</p>
+                <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">This order has been cancelled</p>
               </div>
             </div>
           ) : (
             <div className="relative pl-7">
-              <div className="absolute left-[10px] top-3 bottom-3 w-[2px] bg-[var(--user-border)] rounded-full" />
+              <div className="absolute left-[0.625rem] top-3 bottom-3 w-[0.125rem] bg-[var(--user-border)] rounded-full" />
               <div
-                className="absolute left-[10px] top-3 w-[2px] bg-[var(--user-success)] rounded-full transition-all duration-700"
+                className="absolute left-[0.625rem] top-3 w-[0.125rem] bg-[var(--user-success)] rounded-full transition-all duration-700"
                 style={{ height: `calc((100% - 24px) * ${Math.max(0, STATUS_FLOW.indexOf(order.status)) / (STATUS_FLOW.length - 1)})` }}
               />
               <div className="space-y-4">
@@ -702,10 +702,10 @@ export default function OrderDetailPage({ params }) {
                       }`}>
                         {isCompleted ? <CheckCircle2 size={11} strokeWidth={3} /> : <Icon size={10} />}
                       </div>
-                      <p className={`text-[12px] font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>
-                        {sCfg.label}{isCurrent && <span className="ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                      <p className={`text-[0.75rem] font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>
+                        {sCfg.label}{isCurrent && <span className="ml-2 text-[0.5625rem] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
                       </p>
-                      <p className={`text-[10px] mt-0.5 ${isCurrent || isCompleted ? "text-[var(--user-text-muted)]" : "text-[var(--user-text-muted)]/70"}`}>{sCfg.desc}</p>
+                      <p className={`text-[0.625rem] mt-0.5 ${isCurrent || isCompleted ? "text-[var(--user-text-muted)]" : "text-[var(--user-text-muted)]/70"}`}>{sCfg.desc}</p>
                     </div>
                   );
                 })}
@@ -720,10 +720,10 @@ export default function OrderDetailPage({ params }) {
             <div className="w-7 h-7 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
               <MapPin size={14} className="text-[var(--user-accent)]" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Delivery Address</p>
+            <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Delivery Address</p>
           </div>
-          <p className="text-[13px] font-black text-[var(--user-text)]">{order.address_snapshot?.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {order.address_snapshot?.phone}</span></p>
-          <p className="text-[12px] text-[var(--user-text-muted)] leading-relaxed mt-1 line-clamp-2">
+          <p className="text-[0.8125rem] font-black text-[var(--user-text)]">{order.address_snapshot?.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {order.address_snapshot?.phone}</span></p>
+          <p className="text-[0.75rem] text-[var(--user-text-muted)] leading-relaxed mt-1 line-clamp-2">
             {order.address_snapshot?.street_address1}{order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}, {order.address_snapshot?.city}, {order.address_snapshot?.state} {order.address_snapshot?.zip_code}
           </p>
         </div>
@@ -731,10 +731,10 @@ export default function OrderDetailPage({ params }) {
         {/* ITEMS card */}
         <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+            <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
               <Package size={12} /> Items ({order.items.length})
             </p>
-            <p className="text-[11px] font-bold text-[var(--user-text-muted)]">{fmt(order.subtotal)}</p>
+            <p className="text-[0.6875rem] font-bold text-[var(--user-text-muted)]">{fmt(order.subtotal)}</p>
           </div>
           <div className="divide-y divide-[var(--user-border)]">
             {order.items.map((i, idx) => {
@@ -755,18 +755,18 @@ export default function OrderDetailPage({ params }) {
                         <Package size={20} className="text-[var(--user-text-muted)]" />
                       </div>
                     )}
-                    <div className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
+                    <div className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{i.name}</p>
-                    {i.variantTitle && <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
-                    <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
-                    {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
+                    <p className="text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{i.name}</p>
+                    {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
+                    <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
+                    {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[13px] font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
-                    {hasDiscount && <p className="text-[9px] text-[var(--user-text-muted)] line-through">{fmt(originalPrice * qty)}</p>}
-                    {itemSavings > 0 && <p className="text-[9px] font-bold text-[var(--user-success)] mt-0.5">Save {fmt(itemSavings)}</p>}
+                    <p className="text-[0.8125rem] font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
+                    {hasDiscount && <p className="text-[0.5625rem] text-[var(--user-text-muted)] line-through">{fmt(originalPrice * qty)}</p>}
+                    {itemSavings > 0 && <p className="text-[0.5625rem] font-bold text-[var(--user-success)] mt-0.5">Save {fmt(itemSavings)}</p>}
                   </div>
                 </div>
               );
@@ -776,7 +776,7 @@ export default function OrderDetailPage({ params }) {
 
         {/* PAYMENT & DELIVERY card */}
         <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
             <CreditCard size={12} /> Payment & Delivery
           </p>
           <div className="flex items-center gap-3">
@@ -784,8 +784,8 @@ export default function OrderDetailPage({ params }) {
               <PayIcon size={16} className="text-[var(--user-accent)]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Payment</p>
-              <p className="text-[13px] font-bold text-[var(--user-text)] truncate">{pay.label}</p>
+              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Payment</p>
+              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] truncate">{pay.label}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -793,8 +793,8 @@ export default function OrderDetailPage({ params }) {
               {order.shipping_method === "express" ? <Zap size={16} className="text-[var(--user-accent)]" /> : <Truck size={16} className="text-[var(--user-accent)]" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Method</p>
-              <p className="text-[13px] font-bold text-[var(--user-text)]">{order.shipping_method === "express" ? "Express" : "Standard"} <span className="text-[var(--user-text-muted)] font-semibold">· {estimatedDelivery} days</span></p>
+              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Method</p>
+              <p className="text-[0.8125rem] font-bold text-[var(--user-text)]">{order.shipping_method === "express" ? "Express" : "Standard"} <span className="text-[var(--user-text-muted)] font-semibold">· {estimatedDelivery} days</span></p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -802,8 +802,8 @@ export default function OrderDetailPage({ params }) {
               <Tag size={16} className="text-[var(--user-text-secondary)]" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Fee</p>
-              <p className={`text-[13px] font-black ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Fee</p>
+              <p className={`text-[0.8125rem] font-black ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
                 {order.shipping === 0 ? "FREE" : fmt(order.shipping)}
               </p>
             </div>
@@ -811,8 +811,8 @@ export default function OrderDetailPage({ params }) {
         </div>
 
         {/* SUMMARY card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-2 text-[13px]">
-          <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5 mb-2">
+        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-2 text-[0.8125rem]">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5 mb-2">
             <TrendingUp size={12} /> Order Summary
           </p>
           <div className="flex justify-between">
@@ -832,7 +832,7 @@ export default function OrderDetailPage({ params }) {
             </span>
           </div>
           <div className="flex justify-between items-baseline pt-3 mt-1 border-t border-[var(--user-border)]">
-            <span className="text-[14px] font-black text-[var(--user-text)]">Total</span>
+            <span className="text-[0.875rem] font-black text-[var(--user-text)]">Total</span>
             <span className="text-xl font-black text-[var(--user-accent)]">{fmt(order.total)}</span>
           </div>
         </div>

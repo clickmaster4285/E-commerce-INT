@@ -349,10 +349,10 @@ const updateProfile = async (req, res) => {
   try {
     const {
       name,
+      username,
       email,
       phone,
-      role,
-      status,
+      dob,
       store,
       permissions,
       preferences,
@@ -360,14 +360,21 @@ const updateProfile = async (req, res) => {
     const userId = req.user._id;
     const userType = req.userType || 'user';
     const Model = userType === 'employee' ? Employee : User;
-    await Model.findByIdAndUpdate(userId, {
-      name,
-      email,
-      phone,
-      permissions,
-      preferences,
-      updatedby: userId,
-    });
+
+    // ✅ Sirf jo fields actually aayi hain unhi ko update karo
+    // (pehle name/username bhejne par username silently drop ho jata tha
+    //  kyunki updateProfileREST route kabhi match hi nahi hota tha)
+    // ⚠️ role/status yahan JAANBOOZH kar update nahi kiye — privilege escalation hoti
+    const update = { updatedby: userId };
+    if (name !== undefined) update.name = name;
+    if (username !== undefined) update.username = username;
+    if (email !== undefined) update.email = String(email).toLowerCase().trim();
+    if (phone !== undefined) update.phone = phone;
+    if (dob !== undefined) update.dob = dob;
+    if (permissions !== undefined) update.permissions = permissions;
+    if (preferences !== undefined) update.preferences = preferences;
+
+    await Model.findByIdAndUpdate(userId, update);
     if (store && req.user.storeId) {
       await Store.findByIdAndUpdate(req.user.storeId, {
         store_name: store.name,
@@ -381,6 +388,13 @@ const updateProfile = async (req, res) => {
     res.json({ success: true, message: "✅ Profile & Store saved!" });
   } catch (error) {
     console.error("updateProfile error:", error);
+    // ✅ Duplicate email/username par friendly 400 message (500 ki jagah)
+    if (error?.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || "field";
+      return res
+        .status(400)
+        .json({ success: false, message: `This ${field} is already in use` });
+    }
     res
       .status(500)
       .json({ success: false, message: "Save failed: " + error.message });

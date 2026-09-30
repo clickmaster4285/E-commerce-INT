@@ -56,10 +56,40 @@ export const getProductDiscountPercent = (product) => {
   return Math.round(((list - price) / list) * 100);
 };
 
+/* API `created_at` bhejta hai (Product model ka timestamp), kuch jagah
+   `createdAt` bhi aa sakta hai — dono handle karte hain. */
 export const getProductCreatedAt = (product) => {
-  const time = Date.parse(product?.createdAt || "");
+  const time = Date.parse(product?.created_at || product?.createdAt || "");
   return Number.isFinite(time) ? time : 0;
 };
+
+/* ---------- Stock (real variant quantities se) ---------- */
+export const LOW_STOCK_THRESHOLD = 5;
+
+export const getProductStock = (product) => {
+  const variants = product?.variants || [];
+  if (variants.length) {
+    return variants.reduce((sum, variant) => sum + Number(variant?.quantity || 0), 0);
+  }
+  const fallback = Number(product?.quantity);
+  return Number.isFinite(fallback) ? fallback : 0;
+};
+
+export const STOCK_STATES = [
+  { id: "in", label: "In Stock", min: LOW_STOCK_THRESHOLD },
+  { id: "low", label: "Low Stock", min: 1 },
+  { id: "out", label: "Out of Stock", min: 0 },
+];
+
+export const getStockState = (product) => {
+  const stock = getProductStock(product);
+  if (stock < 1) return "out";
+  if (stock < LOW_STOCK_THRESHOLD) return "low";
+  return "in";
+};
+
+/* ---------- Discount bands (real active discounts se) ---------- */
+export const DISCOUNT_BANDS = [10, 20, 30, 50];
 
 export const formatPrice = (value) => `Rs. ${Math.round(Number(value) || 0).toLocaleString()}`;
 
@@ -74,6 +104,17 @@ export const countByRef = (items, getRef) => {
 };
 
 export const getCategoryCounts = (products) => countByRef(products, (p) => p.category_id);
+
+export const getBrandCounts = (products) => countByRef(products, (p) => p.brand_id);
+
+export const isTopLevelCategory = (category) => idOf(category?.parent_category_id) === "";
+
+export const sortByPopularity = (list, counts) =>
+  [...(list || [])].sort((a, b) => {
+    const diff = (counts[idOf(b?._id)] || 0) - (counts[idOf(a?._id)] || 0);
+    if (diff !== 0) return diff;
+    return String(a?.name || "").localeCompare(String(b?.name || ""));
+  });
 
 /* ---------- Category tree: parent select ho to uske children bhi match hon ---------- */
 export const categorySubtreeIds = (categories, rootId) => {
@@ -96,34 +137,123 @@ export const categorySubtreeIds = (categories, rootId) => {
   return ids;
 };
 
+/* Parent category ka total = us category + uske saare children ke products */
+export const getCategorySubtreeCounts = (categories, products) => {
+  const direct = getCategoryCounts(products);
+  const counts = {};
+  (categories || []).forEach((category) => {
+    const id = idOf(category?._id);
+    if (!id) return;
+    let total = 0;
+    categorySubtreeIds(categories, id).forEach((subId) => {
+      total += direct[subId] || 0;
+    });
+    counts[id] = total;
+  });
+  return counts;
+};
+
 /* ---------- Sidebar filters ---------- */
 export const EMPTY_HOME_FILTERS = {
-  categoryId: "",
+  categoryIds: [],
   brandIds: [],
   minPrice: null,
   maxPrice: null,
+  stockStates: [],
+  discountBands: [],
+  discountBand: null,
+  dealIds: [],
 };
 
+/* ---------- Deals (sidebar "Deals" filter + right-side filtering) ----------
+   Deal shape (real API): { _id, name, type, applyTo, productIds,
+   categoryIds, brandIds }. IDs string / ObjectId / populated object ho sakte
+   hain — is liye har comparison idOf se hoti hai (wahi logic jo DealsSection
+   ka matchDealProducts use karta hai). */
+export const dealMatchesProduct = (deal, product) => {
+  if (!deal || !product) return false;
+  const pid = idOf(product?._id);
+  if (!pid) return false;
+  const inList = (list, value) =>
+    (list || []).some((entry) => idOf(entry) !== "" && idOf(entry) === value);
+  switch (deal.applyTo) {
+    case "product":
+      return inList(deal.productIds, pid);
+    case "category":
+      return inList(deal.categoryIds, idOf(product?.category_id));
+    case "brand":
+      return inList(deal.brandIds, idOf(product?.brand_id));
+    case "all":
+    default:
+      return (deal.productIds || []).length ? inList(deal.productIds, pid) : true;
+  }
+};
+
+export const getDealBadgeText = (deal) => {
+  if (!deal?.type) return null;
+  if (deal.type === "percentage") return `${deal.discountValue}% OFF`;
+  if (deal.type === "fixed_amount") return `Rs. ${deal.discountValue} OFF`;
+  if (deal.type === "buy_x_get_y") {
+    const b = deal.buyQuantity || 0;
+    const g = deal.getQuantity || 0;
+    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+  }
+  if (deal.type === "bundle") return "Bundle Deal";
+  if (deal.type === "free_shipping") return "Free Shipping";
+  return String(deal.type).replace(/_/g, " ").toUpperCase();
+};
+
+const priceFilterActive = (filters) =>
+  (filters?.minPrice ?? null) !== null || (filters?.maxPrice ?? null) !== null;
+
 export const hasActiveFilters = (filters) =>
-  Boolean(idOf(filters?.categoryId)) ||
+  (filters?.categoryIds || []).length > 0 ||
   (filters?.brandIds || []).length > 0 ||
-  (filters?.minPrice ?? null) !== null ||
-  (filters?.maxPrice ?? null) !== null;
+  priceFilterActive(filters) ||
+  (filters?.stockStates || []).length > 0 ||
+  (filters?.discountBands || []).length > 0 ||
+  (filters?.discountBand ?? null) !== null ||
+  (filters?.dealIds || []).length > 0;
 
 export const countActiveFilters = (filters) => {
   let total = 0;
-  if (idOf(filters?.categoryId)) total += 1;
+  total += (filters?.categoryIds || []).length;
   total += (filters?.brandIds || []).length;
-  if ((filters?.minPrice ?? null) !== null || (filters?.maxPrice ?? null) !== null) total += 1;
+  if (priceFilterActive(filters)) total += 1;
+  total += (filters?.stockStates || []).length;
+  total += (filters?.discountBands || []).length;
+  if ((filters?.discountBand ?? null) !== null) total += 1;
+  total += (filters?.dealIds || []).length;
   return total;
 };
 
-export const filterProducts = (products, filters, categories) => {
-  const categoryId = idOf(filters?.categoryId);
-  const subtree = categoryId ? categorySubtreeIds(categories, categoryId) : null;
+/**
+ * @param discountPercentFor  optional (product) => number | null — real
+ *                            discount % (publicDiscounts/deals se). Sirf tab
+ *                            diya jata hai jab discount band filter active ho.
+ * @param deals               optional active deals list — sidebar "Deals"
+ *                            filter (filters.dealIds) isi se match hota hai.
+ *                            Koi deal select ho to sirf us deal ke products
+ *                            pass hote hain (multiple select = OR).
+ */
+export const filterProducts = (products, filters, categories, discountPercentFor, deals = []) => {
+  const categoryIds = (filters?.categoryIds || []).map(idOf).filter(Boolean);
+  const subtrees = categoryIds.map((cid) => categorySubtreeIds(categories, cid));
+  const subtreeSet = new Set();
+  subtrees.forEach((set) => set.forEach((id) => subtreeSet.add(id)));
+  const subtree = subtreeSet.size ? subtreeSet : null;
   const brandIds = (filters?.brandIds || []).map(idOf).filter(Boolean);
   const minPrice = filters?.minPrice ?? null;
   const maxPrice = filters?.maxPrice ?? null;
+  const stockStates = filters?.stockStates || [];
+  const discountBands = filters?.discountBands || [];
+  const legacyBand = filters?.discountBand ?? null;
+  const allBands = legacyBand !== null ? [...discountBands, legacyBand] : discountBands;
+  const minBand = allBands.length ? Math.min(...allBands) : null;
+  const dealIds = (filters?.dealIds || []).map(idOf).filter(Boolean);
+  const selectedDeals = dealIds.length
+    ? (deals || []).filter((deal) => dealIds.includes(idOf(deal?._id)))
+    : [];
 
   return (products || []).filter((product) => {
     if (subtree && !subtree.has(idOf(product?.category_id))) return false;
@@ -131,6 +261,13 @@ export const filterProducts = (products, filters, categories) => {
     const price = getProductPrice(product);
     if (minPrice !== null && price < Number(minPrice)) return false;
     if (maxPrice !== null && price > Number(maxPrice)) return false;
+    if (stockStates.length && !stockStates.includes(getStockState(product))) return false;
+    if (minBand !== null) {
+      const percent = Number(discountPercentFor ? discountPercentFor(product) : 0) || 0;
+      if (percent < minBand) return false;
+    }
+    if (selectedDeals.length && !selectedDeals.some((deal) => dealMatchesProduct(deal, product)))
+      return false;
     return true;
   });
 };
@@ -151,8 +288,15 @@ export const shuffled = (list) => {
   return out;
 };
 
-export const pickDiverse = (products, limit, { maxPerCategory = 2, maxPerBrand = 2 } = {}) => {
+export const pickDiverse = (products, limit, { maxPerCategory = 2, maxPerBrand = 2, seed = 0 } = {}) => {
   const pool = shuffled(products);
+
+  // seed tabhi badalta hai jab user "Shuffle" dabata hai — is se wahi
+  // products dobara mix ho kar ek naya random set banate hain
+  if (seed > 0 && pool.length > 1) {
+    const offset = seed % pool.length;
+    pool.push(...pool.splice(0, offset));
+  }
   const picked = [];
   const perCategory = {};
   const perBrand = {};
@@ -182,13 +326,24 @@ export const pickDiverse = (products, limit, { maxPerCategory = 2, maxPerBrand =
   return picked;
 };
 
-export const getBrandCounts = (products) => countByRef(products, (p) => p.brand_id);
-
-export const isTopLevelCategory = (category) => idOf(category?.parent_category_id) === "";
-
-export const sortByPopularity = (list, counts) =>
-  [...(list || [])].sort((a, b) => {
-    const diff = (counts[idOf(b?._id)] || 0) - (counts[idOf(a?._id)] || 0);
-    if (diff !== 0) return diff;
-    return String(a?.name || "").localeCompare(String(b?.name || ""));
-  });
+/* ---------- Popular categories: real image + starting price + count ---------- */
+export const popularCategories = (categories, products, limit = 6) => {
+  const counts = getCategorySubtreeCounts(categories, products);
+  return (categories || [])
+    .filter((category) => isTopLevelCategory(category))
+    .map((category) => {
+      const ids = categorySubtreeIds(categories, category._id);
+      const items = (products || []).filter((product) => ids.has(idOf(product?.category_id)));
+      const priced = items.map(getProductPrice).filter((price) => price > 0);
+      const withImage = items.find((product) => getProductImage(product));
+      return {
+        ...category,
+        count: counts[idOf(category._id)] || items.length,
+        fromPrice: priced.length ? Math.min(...priced) : 0,
+        image: withImage ? getProductImage(withImage) : null,
+      };
+    })
+    .filter((category) => category.count > 0)
+    .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))
+    .slice(0, limit);
+};

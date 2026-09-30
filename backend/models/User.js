@@ -16,6 +16,17 @@ const userSchema = new mongoose.Schema(
     provider: { type: String, default: "local", enum: ["local", "google"] },
     phone: { type: String, default: "" },
     role: { type: String, default: "user", enum: ["user", "admin", "staff"] },
+
+    // ✅ Account page fields — ye pehle schema mein the hi nahi,
+    // isliye avatar save, 2FA toggle aur preferences silently drop ho rahe the
+    avatar: { type: String, default: null },
+    dob: { type: String, default: "" }, // YYYY-MM-DD (input type="date" se aata hai)
+    twoFactorEnabled: { type: Boolean, default: false },
+    preferences: {
+      emailNotifications: { type: Boolean, default: true },
+      smsNotifications: { type: Boolean, default: true },
+      productRecommendations: { type: Boolean, default: true },
+    },
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",

@@ -95,8 +95,8 @@ export default function UserLoginPage() {
       {/* ═══════════ LEFT — BRANDING (Desktop) ═══════════ */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 xl:p-14 bg-[var(--user-bg-elevated)] relative overflow-hidden border-r border-[var(--user-border)] shrink-0">
         {/* Glows */}
-        <div className="absolute top-[-140px] left-[-140px] w-[420px] h-[420px] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
-        <div className="absolute bottom-[-140px] right-[-140px] w-[420px] h-[420px] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
+        <div className="absolute top-[-140px] left-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
+        <div className="absolute bottom-[-140px] right-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
 
         {/* Top: Logo */}
               {/* Top: Logo */}
@@ -114,7 +114,7 @@ export default function UserLoginPage() {
         <div className="relative">
           <div className="flex items-center gap-2 mb-5">
             <Sparkles size={14} className="text-[var(--user-accent)]" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--user-accent)]">
+            <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--user-accent)]">
               Trusted by thousands of customers
             </span>
           </div>
@@ -190,7 +190,7 @@ export default function UserLoginPage() {
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-                <span className="text-[var(--user-accent)] text-[10px] font-bold uppercase tracking-widest">
+                <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
                   {isLogin ? "User Sign-In" : "Create Account"}
                 </span>
               </div>
@@ -225,7 +225,7 @@ export default function UserLoginPage() {
 
                 <div className="flex items-center gap-3 mb-6">
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-widest font-semibold">or with email</span>
+                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">or with email</span>
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
                 </div>
               </>
@@ -293,7 +293,7 @@ export default function UserLoginPage() {
             </p>
           </div>
 
-          <p className="text-center mt-4 text-[11px] text-[var(--user-text-subtle)]">
+          <p className="text-center mt-4 text-[0.6875rem] text-[var(--user-text-subtle)]">
             By continuing, you agree to our Terms & Privacy Policy.
           </p>
         </div>

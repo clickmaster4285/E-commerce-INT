@@ -152,16 +152,16 @@ function useStickyBar() {
 }
 
 const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
-  <nav className="flex items-center gap-1.5 text-[11px] sm:text-xs text-[var(--user-text-muted)] flex-wrap px-0.5">
+  <nav className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs text-[var(--user-text-muted)] flex-wrap px-0.5">
     <Link href="/" className="hover:text-[var(--user-accent)] transition-colors">Home</Link>
     <ChevronRight size={11} className="opacity-60" />
     {categoryName && categoryId && (
       <>
-        <Link href={`/category/${categoryId}`} className="hover:text-[var(--user-accent)] transition-colors">{categoryName}</Link>
+        <Link href={`/?category=${categoryId}`} className="hover:text-[var(--user-accent)] transition-colors">{categoryName}</Link>
         <ChevronRight size={11} className="opacity-60" />
       </>
     )}
-    <span className="text-[var(--user-text-secondary)] truncate max-w-[160px] sm:max-w-[200px] lg:max-w-[320px]">{productName}</span>
+    <span className="text-[var(--user-text-secondary)] truncate max-w-[10rem] sm:max-w-[12.5rem] lg:max-w-[20rem]">{productName}</span>
   </nav>
 ));
 Breadcrumb.displayName = "Breadcrumb";
@@ -203,8 +203,8 @@ const Gallery = memo(({ mainImage, images, onImageSelect, stock, onZoom }) => {
           ) : (
             <div className="w-full h-full flex items-center justify-center"><Package size={64} className="text-[var(--user-text-subtle)]" /></div>
           )}
-          {stock === 0 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">Out of Stock</span>}
-          {stock > 0 && stock < 5 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[10px] font-bold px-2.5 py-1 rounded-full">Only {stock} left</span>}
+          {stock === 0 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2.5 py-1 rounded-full">Out of Stock</span>}
+          {stock > 0 && stock < 5 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2.5 py-1 rounded-full">Only {stock} left</span>}
           <button onClick={(e) => { e.stopPropagation(); mainImage && onZoom(mainImage); }} aria-label="Zoom"
             className="absolute bottom-3 right-3 w-9 h-9 rounded-lg bg-[var(--user-bg-card)]/80 backdrop-blur border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text-secondary)] hover:text-[var(--user-accent)] transition">
             <Search size={15} />
@@ -227,7 +227,7 @@ const Gallery = memo(({ mainImage, images, onImageSelect, stock, onZoom }) => {
 Gallery.displayName = "Gallery";
 
 const SectionTitle = ({ children }) => (
-  <h2 className="flex items-center gap-2.5 text-[15px] sm:text-base font-bold text-[var(--user-text)]">
+  <h2 className="flex items-center gap-2.5 text-[0.9375rem] sm:text-base font-bold text-[var(--user-text)]">
     <span className="w-1 h-5 rounded-full bg-[var(--user-accent)]" />{children}
   </h2>
 );
@@ -255,15 +255,15 @@ const DescriptionCard = memo(({ shortDescription, fullDescription, variantTitle,
           style={!expanded ? { maxHeight: COLLAPSED_H, overflow: "hidden" } : undefined}
         >
           {shortDescription && (
-            <p className="text-[13px] sm:text-sm leading-6 sm:leading-7 font-medium text-[var(--user-text-secondary)]">{shortDescription}</p>
+            <p className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 font-medium text-[var(--user-text-secondary)]">{shortDescription}</p>
           )}
           {fullDescription && (
-            <div className="text-[13px] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{fullDescription}</div>
+            <div className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{fullDescription}</div>
           )}
           {variantDescription && (
             <div className="pt-3 sm:pt-4 border-t border-[var(--user-border)]">
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-[var(--user-text-secondary)] mb-1.5 sm:mb-2">{variantTitle || "Selected Variant"}</p>
-              <p className="text-[13px] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{variantDescription}</p>
+              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--user-text-secondary)] mb-1.5 sm:mb-2">{variantTitle || "Selected Variant"}</p>
+              <p className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{variantDescription}</p>
             </div>
           )}
         </div>
@@ -275,7 +275,7 @@ const DescriptionCard = memo(({ shortDescription, fullDescription, variantTitle,
             <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-[var(--user-border)] bg-[var(--user-bg-card)]">
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="inline-flex items-center gap-1.5 text-[13px] sm:text-sm font-semibold text-[var(--user-accent)] hover:underline"
+                className="inline-flex items-center gap-1.5 text-[0.8125rem] sm:text-sm font-semibold text-[var(--user-accent)] hover:underline"
               >
                 {expanded ? <>Read less <ChevronUp size={14} /></> : <>Read more <ChevronDown size={14} /></>}
               </button>
@@ -295,12 +295,12 @@ const SpecsCard = memo(({ attributes }) => {
     <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden">
       <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[var(--user-border)]"><SectionTitle>Specifications</SectionTitle></div>
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse min-w-[280px]">
+        <table className="w-full border-collapse min-w-[17.5rem]">
           <tbody>
             {entries.map(([key, value], i) => (
               <tr key={key} className={i % 2 === 1 ? "bg-[var(--user-bg-hover)]/40" : ""}>
-                <td className={`w-2/5 px-4 sm:px-6 py-3 sm:py-3.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-[var(--user-text-muted)] align-top ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{key}</td>
-                <td className={`px-4 sm:px-6 py-3 sm:py-3.5 text-[13px] sm:text-sm font-medium text-[var(--user-text)] break-words ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{value}</td>
+                <td className={`w-2/5 px-4 sm:px-6 py-3 sm:py-3.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--user-text-muted)] align-top ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{key}</td>
+                <td className={`px-4 sm:px-6 py-3 sm:py-3.5 text-[0.8125rem] sm:text-sm font-medium text-[var(--user-text)] break-words ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{value}</td>
               </tr>
             ))}
           </tbody>
@@ -319,7 +319,7 @@ const MoreImagesStack = memo(({ images, onZoom }) => {
       <div className="mt-4 sm:mt-5 space-y-3 sm:space-y-4 lg:space-y-5">
         {images.map((url, i) => (
           <button key={i} onClick={() => onZoom(url)} className="block w-full rounded-2xl overflow-hidden group cursor-zoom-in border border-[var(--user-border)]">
-            <img src={url} alt={`Product view ${i + 1}`} loading="lazy" className="w-full h-[240px] sm:h-[380px] lg:h-[560px] object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+            <img src={url} alt={`Product view ${i + 1}`} loading="lazy" className="w-full h-[15rem] sm:h-[23.75rem] lg:h-[35rem] object-cover group-hover:scale-[1.02] transition-transform duration-500" />
           </button>
         ))}
       </div>
@@ -333,7 +333,7 @@ const RelatedProducts = memo(({ products }) => {
   return (
     <section className="mt-10 sm:mt-12 lg:mt-14">
       <SectionTitle>You May Also Like</SectionTitle>
-      <div className="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
+      <div className="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2.5 sm:gap-4 lg:gap-5">
         {products.map((p) => <ProductCard key={p._id} product={p} />)}
       </div>
     </section>
@@ -348,8 +348,8 @@ const DeliveryInfo = memo(({ storeName, stock }) => (
         <Truck className="text-[var(--user-accent)]" size={17} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] sm:text-sm font-bold text-[var(--user-text)]">{storeName || "Official Store"}</p>
-        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] sm:text-[11px] text-[var(--user-text-muted)]">
+        <p className="text-[0.8125rem] sm:text-sm font-bold text-[var(--user-text)]">{storeName || "Official Store"}</p>
+        <div className="flex items-center gap-1.5 mt-0.5 text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-muted)]">
           <MapPin size={11} className="text-[var(--user-accent)]" />
           {stock > 0 ? <span className="text-[var(--user-success)] font-semibold">In stock, ready to ship</span> : <span>Currently unavailable</span>}
         </div>
@@ -363,16 +363,16 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded, onWishl
   if (!show) return null;
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-2xl safe-bottom" style={{ animation: "slideUp .25s ease" }}>
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-16 flex items-center gap-2 sm:gap-3">
+      <div className="user-shell mx-auto px-3 sm:px-4 h-16 flex items-center gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] text-[var(--user-text-muted)] truncate">{name}</p>
+          <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{name}</p>
           <p className="text-base sm:text-lg font-extrabold text-[var(--user-text)] leading-tight">Rs. {(price * qty).toLocaleString()}</p>
         </div>
         <button onClick={onWishlist} className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center transition-all ${isWishlisted ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-danger)]"}`}>
           <Heart size={17} fill={isWishlisted ? "currentColor" : "none"} />
         </button>
         <button onClick={onAdd} disabled={stock < 1}
-          className={`h-10 sm:h-11 px-4 sm:px-6 rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-2 transition active:scale-95 disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg"}`}>
+          className={`h-10 sm:h-11 px-4 sm:px-6 rounded-xl text-[0.6875rem] sm:text-xs font-bold flex items-center gap-2 transition active:scale-95 disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg"}`}>
           {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
           {isAdded ? "Added!" : "Add"}
         </button>
@@ -397,7 +397,7 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
 Lightbox.displayName = "Lightbox";
 
 const LoadingState = () => (
-  <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-6 py-6 sm:py-8 lg:py-10">
+  <div className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-6 sm:py-8 lg:py-10">
     <div className="h-4 w-64 bg-[var(--user-bg-card)] rounded-full animate-pulse mb-6 sm:mb-8" />
     <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12">
       <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse" />
@@ -412,7 +412,7 @@ const LoadingState = () => (
 );
 
 const ErrorState = ({ isError }) => (
-  <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-6 py-16 sm:py-20 lg:py-24 text-center">
+  <div className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-16 sm:py-20 lg:py-24 text-center">
     <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-4 sm:mb-5">
       <Package size={24} className="text-[var(--user-accent)]" />
     </div>
@@ -575,7 +575,7 @@ function ProductDetailContent({ params }) {
   if (isError || !product) return <ErrorState isError={isError} />;
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-12">
+    <main className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-12">
       <style>{`
         @keyframes galleryImgIn { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -592,10 +592,10 @@ function ProductDetailContent({ params }) {
         <div className="min-w-0 space-y-4 sm:space-y-5" ref={sentinelRef}>
           <div className="space-y-2">
             {brandName && brandId && (
-              <Link href={`/brand/${brandId}`} className="inline-block text-[10px] sm:text-[11px] font-bold text-[var(--user-accent)] uppercase tracking-[0.18em] hover:opacity-80 transition">{brandName}</Link>
+              <Link href={`/?brand=${brandId}`} className="inline-block text-[0.625rem] sm:text-[0.6875rem] font-bold text-[var(--user-accent)] uppercase tracking-[0.18em] hover:opacity-80 transition">{brandName}</Link>
             )}
-            <h1 className="text-[20px] sm:text-2xl lg:text-[28px] font-bold text-[var(--user-text)] tracking-tight leading-snug break-words">{product.name}</h1>
-            <span className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
+            <h1 className="text-[1.25rem] sm:text-2xl lg:text-[1.75rem] font-bold text-[var(--user-text)] tracking-tight leading-snug break-words">{product.name}</h1>
+            <span className={`inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${stockStatus.dot}`} /> {stockStatus.text}
             </span>
           </div>
@@ -607,7 +607,7 @@ function ProductDetailContent({ params }) {
                   const active = purchaseMode === key;
                   return (
                     <button key={key} type="button" onClick={() => { userSelectedModeRef.current = true; setPurchaseMode(key); }}
-                      className={`h-9 px-3.5 sm:px-4 rounded-lg text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition ${active ? (key === "deal" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow") : "text-[var(--user-text-muted)] hover:text-[var(--user-text)]"}`}>
+                      className={`h-9 px-3.5 sm:px-4 rounded-lg text-[0.6875rem] sm:text-xs font-bold flex items-center gap-1.5 transition ${active ? (key === "deal" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow") : "text-[var(--user-text-muted)] hover:text-[var(--user-text)]"}`}>
                       <Icon size={12} /> {label}
                     </button>
                   );
@@ -617,7 +617,7 @@ function ProductDetailContent({ params }) {
 
             {isDealMode && allDeals.length > 1 && (
               <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2.5 sm:p-3">
-                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-2 flex items-center gap-1.5">
+                <p className="text-[0.5625rem] sm:text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-2 flex items-center gap-1.5">
               
                 </p>
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
@@ -632,12 +632,12 @@ function ProductDetailContent({ params }) {
                         type="button"
                         onClick={() => setSelectedDealId(d._id)}
                         aria-pressed={sel}
-                        className={`flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold transition ${sel ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text)] hover:border-[var(--user-accent)]/50"}`}
+                        className={`flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3 rounded-lg text-[0.625rem] sm:text-xs font-bold transition ${sel ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text)] hover:border-[var(--user-accent)]/50"}`}
                       >
                         <Sparkles size={11} className={sel ? "text-white" : "text-purple-500"} />
                         <span>{badge}</span>
                         {saveAmt > 0 && (
-                          <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded ${sel ? "bg-white/20 text-white" : "bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20"}`}>
+                          <span className={`text-[0.5625rem] sm:text-[0.625rem] font-bold px-1.5 py-0.5 rounded ${sel ? "bg-white/20 text-white" : "bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20"}`}>
                             Save Rs. {saveAmt.toLocaleString()}
                           </span>
                         )}
@@ -649,29 +649,29 @@ function ProductDetailContent({ params }) {
             )}
 
             <div className="flex items-end gap-2 sm:gap-3 flex-wrap">
-              <span className="text-2xl sm:text-3xl lg:text-[34px] font-extrabold text-[var(--user-text)] leading-none">Rs. {activePrice.toLocaleString()}</span>
+              <span className="text-2xl sm:text-3xl lg:text-[2.125rem] font-extrabold text-[var(--user-text)] leading-none">Rs. {activePrice.toLocaleString()}</span>
               {activeHasDiscount && activeOriginalPrice > activePrice && (
                 <span className="text-sm sm:text-base text-[var(--user-text-subtle)] line-through pb-0.5">Rs. {activeOriginalPrice.toLocaleString()}</span>
               )}
               {discountPct > 0 && (
-                <span className="text-[10px] sm:text-xs font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-1 rounded-lg">-{discountPct}%</span>
+                <span className="text-[0.625rem] sm:text-xs font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-1 rounded-lg">-{discountPct}%</span>
               )}
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               {activeSavings > 0 && (
-                <span className="text-[10px] sm:text-xs font-semibold text-[var(--user-success)] flex items-center gap-1.5">
+                <span className="text-[0.625rem] sm:text-xs font-semibold text-[var(--user-success)] flex items-center gap-1.5">
                   <Tag size={12} /> You save Rs. {activeSavings.toLocaleString()}{regularDiscountName && !isDealMode ? ` · ${regularDiscountName}` : ""}
                 </span>
               )}
               {isDealMode && dealInfo && (
-                <span className="text-[10px] sm:text-[11px] font-bold text-purple-400 [.light_&]:text-purple-700 bg-purple-500/10 border border-purple-500/20 px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span className="text-[0.625rem] sm:text-[0.6875rem] font-bold text-purple-400 [.light_&]:text-purple-700 bg-purple-500/10 border border-purple-500/20 px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1.5">
                   <Sparkles size={11} /> {dealInfo.dealBadge}
                 </span>
               )}
             </div>
             {hasDeal && !isDealMode && (
-              <p className="text-[10px] sm:text-[11px] text-[var(--user-text-muted)] flex items-center gap-1.5">
+              <p className="text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-muted)] flex items-center gap-1.5">
                 <Sparkles size={11} className="text-orange-500" /> Also available in a deal — switch above to grab the deal price.
               </p>
             )}
@@ -680,7 +680,7 @@ function ProductDetailContent({ params }) {
           {highlightEntries.length > 0 && (
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {highlightEntries.map(([k, v]) => (
-                <span key={k} className="text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-1 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-secondary)]">
+                <span key={k} className="text-[0.625rem] sm:text-[0.6875rem] px-2 sm:px-2.5 py-1 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-secondary)]">
                   <span className="font-semibold text-[var(--user-text)] capitalize">{k}:</span> {v}
                 </span>
               ))}
@@ -689,14 +689,14 @@ function ProductDetailContent({ params }) {
 
           {variants.length > 1 && (
             <div>
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Variant</p>
+              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Variant</p>
               <div className="flex flex-wrap gap-2 sm:gap-2.5">
                 {variants.map((v, i) => {
                   const isOut = toNum(v.quantity) < 1;
                   const sel = i === variantIndex;
                   return (
                     <button key={v._id || i} onClick={() => selectVariant(i)} disabled={isOut}
-                      className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl border text-[13px] sm:text-sm font-semibold transition-all ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow" : isOut ? "opacity-40 line-through cursor-not-allowed border-[var(--user-border)] text-[var(--user-text-subtle)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-text)]"}`}>
+                      className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl border text-[0.8125rem] sm:text-sm font-semibold transition-all ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow" : isOut ? "opacity-40 line-through cursor-not-allowed border-[var(--user-border)] text-[var(--user-text-subtle)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-text)]"}`}>
                       {v.title || v.sku || `Option ${i + 1}`}
                     </button>
                   );
@@ -707,7 +707,7 @@ function ProductDetailContent({ params }) {
 
           {variants.length > 1 && (
             <div>
-              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Colour</p>
+              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Colour</p>
               <div className="flex flex-wrap gap-2.5 sm:gap-3">
                 {variants.map((v, i) => {
                   const firstImg = (v.images || [])[0];
@@ -717,7 +717,7 @@ function ProductDetailContent({ params }) {
                   return (
                     <button key={v._id || i} onClick={() => selectVariant(i)} disabled={isOut} aria-label={v.title || `Option ${i + 1}`} title={v.title || `Option ${i + 1}`}
                       className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 transition-all ${sel ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/25 scale-105" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/50"} ${isOut ? "opacity-30 cursor-not-allowed" : ""}`}>
-                      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[11px] sm:text-xs font-bold bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]">{(v.title || "?").charAt(0)}</span>}
+                      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[0.6875rem] sm:text-xs font-bold bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]">{(v.title || "?").charAt(0)}</span>}
                       {sel && <Check size={13} className="absolute inset-0 m-auto text-white drop-shadow-md" />}
                     </button>
                   );
@@ -739,7 +739,7 @@ function ProductDetailContent({ params }) {
                 <Heart size={18} fill={liked ? "currentColor" : "none"} />
               </button>
               <div className="flex-1 min-w-0 text-right">
-                <p className="text-[9px] uppercase tracking-wider text-[var(--user-text-muted)] font-bold">Total</p>
+                <p className="text-[0.5625rem] uppercase tracking-wider text-[var(--user-text-muted)] font-bold">Total</p>
                 <p className="text-base font-black text-[var(--user-accent)] leading-none truncate">Rs. {(activePrice * quantity).toLocaleString()}</p>
               </div>
             </div>
@@ -747,12 +747,12 @@ function ProductDetailContent({ params }) {
             {/* ✅ MOBILE Row 2 — Add + Buy side-by-side */}
             <div className="grid grid-cols-2 gap-2 sm:hidden">
               <button onClick={handleAdd} disabled={stock < 1}
-                className={`h-11 rounded-xl flex items-center justify-center gap-1.5 text-[12px] font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
+                className={`h-11 rounded-xl flex items-center justify-center gap-1.5 text-[0.75rem] font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
                 {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
                 {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : isDealMode ? "Add Deal" : "Add to Cart"}
               </button>
               <button onClick={handleBuy} disabled={stock < 1}
-                className="h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-[12px] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
+                className="h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-[0.75rem] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
                 <Zap size={14} /><span>Buy Now</span>
               </button>
             </div>

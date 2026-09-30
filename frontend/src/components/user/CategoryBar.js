@@ -17,7 +17,7 @@ export default function CategoryBar() {
 
   return (
     <section className="px-3 lg:px-6 py-5 lg:py-8">
-      <div className="max-w-[1400px] mx-auto">
+      <div className="user-shell mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
           <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
@@ -31,7 +31,7 @@ export default function CategoryBar() {
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="w-[140px] sm:w-[180px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[90px] animate-pulse"
+                className="w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[5.625rem] animate-pulse"
               />
             ))}
           </div>
@@ -58,8 +58,8 @@ export default function CategoryBar() {
                 {[...categories, ...categories].map((category, i) => (
                   <Link
                     key={`${category._id}-${i}`}
-                    href={`/category/${category._id}`}
-                    className="mr-3 w-[140px] sm:w-[180px] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-3 py-6 flex items-center justify-center min-h-[90px] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
+                    href={`/?category=${category._id}`}
+                    className="mr-3 w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-3 py-6 flex items-center justify-center min-h-[5.625rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
                   >
                     <p className="text-[var(--user-accent)] font-extrabold text-xs sm:text-sm uppercase tracking-wider text-center leading-relaxed">
                       {category.name}

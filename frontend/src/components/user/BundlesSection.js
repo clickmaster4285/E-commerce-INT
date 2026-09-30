@@ -18,7 +18,7 @@ export default function BundlesSection({ limit = 8 }) {
   if (!isLoading && bundles.length === 0) return null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-8">
+    <section className="user-shell mx-auto px-3 lg:px-6 py-5 lg:py-8">
       <div className="flex items-center justify-between mb-3 sm:mb-4">
         <div className="flex items-center gap-2">
           <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
@@ -29,22 +29,22 @@ export default function BundlesSection({ limit = 8 }) {
               Bundle Deals
               <Sparkles size={14} className="text-purple-500" />
             </h2>
-            <p className="text-[10px] sm:text-[11px] text-[var(--user-text-subtle)] font-semibold">
-              Combo packs — sabse kam price me zyada products
+            <p className="text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-subtle)] font-semibold">
+              Combo packs — more products for less
             </p>
           </div>
         </div>
 
         <Link
           href="/bundles"
-          className="text-[11px] sm:text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1 shrink-0"
+          className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1 shrink-0"
         >
           View All <ArrowRight size={13} />
         </Link>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-7 gap-2 sm:gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
@@ -57,7 +57,7 @@ export default function BundlesSection({ limit = 8 }) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-7 gap-2 sm:gap-3">
           {bundles.map((bundle) => (
             <BundleCard key={bundle._id || bundle.id} bundle={bundle} />
           ))}

@@ -15,7 +15,7 @@ export default function BundlesPage() {
 
   return (
     <main className="min-h-screen bg-[var(--user-bg-base)] text-[var(--user-text)]">
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 py-5 sm:py-7">
+      <div className="user-shell-1600 mx-auto px-3 sm:px-4 lg:px-6 py-5 sm:py-7">
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
@@ -25,15 +25,15 @@ export default function BundlesPage() {
             <h1 className="text-lg sm:text-xl font-black uppercase tracking-wider">
               Bundle Deals
             </h1>
-            <p className="text-[11px] sm:text-xs text-[var(--user-text-subtle)] font-semibold">
-              Combo packs — ek sath lein aur bachayein
+            <p className="text-[0.6875rem] sm:text-xs text-[var(--user-text-subtle)] font-semibold">
+              Combo packs — buy together and save
             </p>
           </div>
         </div>
 
         {/* States */}
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-7 gap-2 sm:gap-3">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
@@ -53,10 +53,10 @@ export default function BundlesPage() {
             <h2 className="text-sm sm:text-base font-black uppercase tracking-wider mb-1">
               {isError ? "Could not load bundles" : "No bundle deals yet"}
             </h2>
-            <p className="text-xs sm:text-[13px] text-[var(--user-text-subtle)] max-w-sm">
+            <p className="text-xs sm:text-[0.8125rem] text-[var(--user-text-subtle)] max-w-sm">
               {isError
                 ? "Something went wrong. Please try again later."
-                : "Jaise hi koi naya combo deal aayega, wo yahan dikhega."}
+                : "New combo deals will appear here as soon as they go live."}
             </p>
             <Link
               href="/"
@@ -66,7 +66,7 @@ export default function BundlesPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-7 gap-2 sm:gap-3">
             {bundles.map((bundle) => (
               <BundleCard key={bundle._id || bundle.id} bundle={bundle} />
             ))}

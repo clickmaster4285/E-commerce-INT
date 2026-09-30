@@ -1,0 +1,96 @@
+"use client";
+
+/* ==========================================================
+   POPULAR CATEGORIES — real category cards
+   Har card me:
+     - category ka real product image (us category ke kisi product se)
+     - "From Rs. X" (us category ka sab se sasta product)
+     - total products count (parent + children sab mila kar)
+   ========================================================== */
+
+import { useMemo } from "react";
+import Link from "next/link";
+import { ArrowRight, ImageOff } from "lucide-react";
+import SectionHeading from "./SectionHeading";
+import { formatPrice, popularCategories } from "@/utils/homeCatalog";
+
+const LIMIT = 12;
+
+export default function PopularCategories({ categories = [], products = [], isLoading = false }) {
+  const list = useMemo(() => popularCategories(categories, products, LIMIT), [categories, products]);
+
+  if (isLoading && !list.length) {
+    return (
+      <section>
+        <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
+        <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+          {[...Array(8).keys()].map((index) => (
+            <div
+              key={index}
+              className="h-[10.5rem] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (!list.length) return null;
+
+  return (
+    <section>
+      <SectionHeading
+        title="Popular Categories"
+        subtitle="Categories with the most products"
+        href="/"
+        linkLabel="View All"
+      />
+
+      <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+        {list.map((category) => (
+          <Link
+            key={category._id}
+            href={`/?category=${category._id}`}
+            className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:shadow-[var(--user-shadow-md)]"
+          >
+            <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
+              {category.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={category.image}
+                  alt={category.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <ImageOff size={26} className="text-[var(--user-text-subtle)]" />
+              )}
+            </span>
+
+            <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
+              <span className="w-full line-clamp-2 break-words text-[0.78125rem] font-bold capitalize text-[var(--user-text)]">
+                {category.name}
+              </span>
+              <span className="flex items-center justify-between gap-1 text-[0.65625rem] font-semibold">
+                <span className="truncate text-[var(--user-accent)]">
+                  {category.fromPrice > 0 ? `From ${formatPrice(category.fromPrice)}` : "Explore"}
+                </span>
+                <span className="shrink-0 text-[var(--user-text-subtle)]">{category.count}</span>
+              </span>
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-3 flex justify-center lg:hidden">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text)]"
+        >
+          Browse all products
+          <ArrowRight size={13} />
+        </Link>
+      </div>
+    </section>
+  );
+}

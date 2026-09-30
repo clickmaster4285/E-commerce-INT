@@ -220,7 +220,7 @@ export default function LoginModal({ isOpen, onClose }) {
     return (
       <div className="flex items-center gap-1.5 mt-1.5 px-1">
         <AlertCircle size={12} className="text-[var(--user-danger)] shrink-0" />
-        <p className="text-[11px] font-semibold text-[var(--user-danger)]">{errors[field]}</p>
+        <p className="text-[0.6875rem] font-semibold text-[var(--user-danger)]">{errors[field]}</p>
       </div>
     );
   };
@@ -244,7 +244,7 @@ export default function LoginModal({ isOpen, onClose }) {
             <div className="mb-6 pr-8">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-                <span className="text-[var(--user-accent)] text-[10px] font-bold uppercase tracking-widest">
+                <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
                   {isLogin ? "User Sign-In" : "Create Account"}
                 </span>
               </div>
@@ -284,7 +284,7 @@ export default function LoginModal({ isOpen, onClose }) {
                 </div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[10px] uppercase tracking-widest font-semibold">or with email</span>
+                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">or with email</span>
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
                 </div>
               </>

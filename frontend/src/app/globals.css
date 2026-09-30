@@ -4,6 +4,30 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================
+   EXTRA BREAKPOINTS — 2K / 4K (ultra-wide) screens
+   Tailwind ka default scale 2xl (96rem) par khatam ho jata tha, is liye bari
+   screens ke liye koi variant mojood nahi tha. In teen breakpoints se
+   2000px+ / 2560px+ / 3200px+ par grids ko extra columns mill sakte hain
+   (aur hero ko extra height) — 1080p ka design bilkul untouched rehta hai.
+
+     3xl = 125rem = 2000px  (FHD/1080p ke bilkul upar — 1920px par kuch change nahi)
+     4xl = 160rem = 2560px  (1440p · 4K @150% OS scaling)
+     5xl = 200rem = 3200px  (4K ke qareeb wala step)
+     6xl = 230rem = 3680px  (4K @100% OS scaling)
+
+   NOTE: values rem me is liye hain ki Tailwind variants ko default rem
+   breakpoints ke *baad* rakhe (warna xl/lg rules 4xl/5xl ko override kar
+   dete hain). Media query me rem = browser ka default font-size (16px),
+   is liye 125rem = 2000px — bilkul wahi jaisa px hota.
+   ============================================================ */
+@theme {
+  --breakpoint-3xl: 125rem;
+  --breakpoint-4xl: 160rem;
+  --breakpoint-5xl: 200rem;
+  --breakpoint-6xl: 230rem;
+}
+
+/* ============================================================
    ADMIN PANEL — PROFESSIONAL DESIGN SYSTEM
    Light theme = default · Dark theme = html.dark
    ============================================================ */
