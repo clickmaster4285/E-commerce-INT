@@ -1110,6 +1110,7 @@ const [viewMode, setViewMode] = useState(() => {
   const {
     data: productsData,
     isLoading,
+    isFetching,
     isError: productsError,
     error: productsErrorMsg,
     refetch: refetchProducts,
@@ -1121,7 +1122,24 @@ const [viewMode, setViewMode] = useState(() => {
     retry: false,
   });
   const products = productsData?.products || [];
-  const pagination = productsData?.pagination || { total: 0, page: currentPage, limit: PRODUCTS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+
+  // ✅ NAVIGATION FIX (footer stable rehna chahiye):
+  //    Page number click karne par naye page ki query ka apna key hota hai, is liye
+  //    request chalte waqt `productsData` undefined ho jata hai → total 0 → pagination
+  //    bar ghayab ho jati thi (layout jump + "navigation tooti hui" feel).
+  //    Ab same filters ke liye last known pagination yaad rakhi jati hai, is liye
+  //    "Showing 21–40 of 1,099" aur buttons turant update hote hain.
+  const paginationSignature = `${search}|${filterCategory}|${filterBrand}|${filterStatus}|${PRODUCTS_PER_PAGE}`;
+  const [paginationMemory, setPaginationMemory] = useState(null);
+  useEffect(() => {
+    if (productsData?.pagination) {
+      setPaginationMemory({ signature: paginationSignature, pagination: productsData.pagination });
+    }
+  }, [productsData, paginationSignature]);
+  const rememberedPagination =
+    paginationMemory?.signature === paginationSignature ? paginationMemory.pagination : null;
+
+  const pagination = productsData?.pagination || rememberedPagination || { total: 0, page: currentPage, limit: PRODUCTS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
 
   // ✅ SUMMARY CARDS ki API — products list se bilkul ALAG query.
   //    Backend optimization: stats ab list response ka hissa nahi (dedicated /products/stats endpoint),
@@ -1969,8 +1987,9 @@ const [viewMode, setViewMode] = useState(() => {
       {/* PAGINATION — simple & professional:
           Left  : "Showing X–Y of Z products"
           Right : Prev/Next + page numbers.
-          Koi "rows per page" selector nahi — list hamesha 20 rows/page. */}
-      {!isLoading && totalRecords > 0 && (
+          Koi "rows per page" selector nahi — list hamesha 20 rows/page.
+          ✅ Page switch ke doran bar MOUNTED rehti hai (sirf buttons disable hote hain). */}
+      {!productsError && totalRecords > 0 && (
         <div className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={cardStyle}>
           {/* Left: record range + position */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
@@ -1992,7 +2011,7 @@ const [viewMode, setViewMode] = useState(() => {
               <button
                 type="button"
                 onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || isFetching}
                 aria-label="Previous page"
                 className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
@@ -2009,6 +2028,7 @@ const [viewMode, setViewMode] = useState(() => {
                     key={pg}
                     type="button"
                     onClick={() => goToPage(pg)}
+                    disabled={isFetching}
                     aria-current={pg === currentPage ? "page" : undefined}
                     aria-label={`Page ${pg}`}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums transition hover:opacity-80"
@@ -2023,7 +2043,7 @@ const [viewMode, setViewMode] = useState(() => {
               <button
                 type="button"
                 onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage >= totalPages}
+                disabled={currentPage >= totalPages || isFetching}
                 aria-label="Next page"
                 className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}

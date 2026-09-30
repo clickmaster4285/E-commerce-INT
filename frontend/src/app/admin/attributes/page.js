@@ -20,6 +20,49 @@ const TrashIcon = ({ className = "w-4 h-4" }) => (
 const SlidersIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
 );
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+      widths real table jaise hi rakhe gaye hain, is liye data aane par layout
+      shift nahi hota (pehle yahan sirf spinner tha).
+   ✅ Sirf loading state ke liye — real table design me koi change nahi.
+========================================================= */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye pills/circles ke liye inline radius
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function AttributeRowsSkeleton({ rows = ATTRS_PER_PAGE }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading attributes">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`attr-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
+          {/* attribute name — icon + name + code */}
+          <td className="px-4 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="skeleton h-8 w-8 shrink-0" style={SKELETON_ROUND} />
+              <div className="flex flex-col gap-1.5">
+                <span className="skeleton inline-block h-3 w-[120px] rounded align-middle" />
+                <span className="skeleton inline-block h-2.5 w-[70px] rounded align-middle" />
+              </div>
+            </div>
+          </td>
+          {/* data type */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-4 w-[72px] rounded align-middle" /></td>
+          {/* category */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-3 w-[70px] rounded align-middle" /></td>
+          {/* options count */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-3 w-[62px] rounded align-middle" /></td>
+          {/* status */}
+          <td className="px-4 py-2.5"><span className="skeleton inline-block h-4 w-[60px] rounded align-middle" /></td>
+          {/* actions */}
+          <td className="px-4 py-2.5 text-right">
+            <div className="flex items-center justify-end"><span className="skeleton block h-[38px] w-[36px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
 const Spinner = ({ className = "w-4 h-4" }) => (
   <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
 );
@@ -1120,8 +1163,21 @@ export default function AttributesPage() {
         {/* Attribute Table */}
         <div className={`rounded-lg transition-opacity ${isFetching && !attributesLoading ? "opacity-60" : "opacity-100"}`} style={cardStyle}>
           {attributesLoading ? (
-            <div className="rounded-lg py-14 flex items-center justify-center gap-2">
-              <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading attributes...</span>
+            /* ✅ SKELETON — spinner ki jagah real table ka same shell (thead + shimmer rows) */
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Attribute Name</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Data Type</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Options Count</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
+                  </tr>
+                </thead>
+                <AttributeRowsSkeleton rows={ATTRS_PER_PAGE} />
+              </table>
             </div>
           ) : filteredAttributes.length === 0 ? (
             <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3">

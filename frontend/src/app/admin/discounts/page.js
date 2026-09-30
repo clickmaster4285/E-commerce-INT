@@ -324,6 +324,66 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
   />
 );
 
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+      widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
+      par layout shift nahi hota (pehle yahan sirf spinner tha).
+   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+========================================================= */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function DiscountRowsSkeleton({ rows = 10 }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading discounts">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
+          {/* checkbox */}
+          <td className="px-4 py-3"><span className="skeleton block h-4 w-4 rounded" /></td>
+          {/* discount — icon + name */}
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+              <span className="skeleton inline-block h-3 w-[140px] rounded align-middle" />
+            </div>
+          </td>
+          {/* applies to */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[80px] rounded align-middle" /></td>
+          {/* value */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[54px] rounded align-middle" /></td>
+          {/* status badge */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-5 w-[66px] align-middle" style={SKELETON_ROUND} /></td>
+          {/* actions */}
+          <td className="px-4 py-3 whitespace-nowrap w-1">
+            <div className="flex items-center justify-end"><span className="skeleton block h-[38px] w-[44px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function DiscountCardsSkeleton({ cards = 8, cardStyle }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading discounts">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={`discount-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
+          <div className="flex items-start justify-between">
+            <span className="skeleton h-10 w-10 shrink-0 rounded-lg" />
+            <span className="skeleton inline-block h-5 w-[66px]" style={SKELETON_ROUND} />
+          </div>
+          <span className="skeleton block h-3 w-[75%] rounded" />
+          <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <span className="skeleton inline-block h-3 w-[52px] rounded align-middle" />
+            <span className="skeleton block h-[38px] w-[44px] rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatCard({ title, value, valueStyle, cardStyle }) {
   return (<div className="rounded-lg p-4 flex flex-col justify-center" style={cardStyle}>
     <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{title}</p>
@@ -945,7 +1005,29 @@ export default function DiscountsPage() {
 
         {/* TABLE / GRID */}
         {isLoading ? (
-          <div className="rounded-lg py-14 flex justify-center items-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading discounts...</span></div>
+          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+             list view me wahi table shell + shimmer rows, grid view me shimmer cards */
+          viewMode === "list" ? (
+            <div className="rounded-lg overflow-hidden" style={cardStyle}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <DiscountRowsSkeleton rows={itemsPerPage} />
+                </table>
+              </div>
+            </div>
+          ) : (
+            <DiscountCardsSkeleton cards={8} cardStyle={cardStyle} />
+          )
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <TagIcon className="w-8 h-8 mb-3 opacity-50" />

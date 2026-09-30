@@ -358,6 +358,21 @@ export default function AddVariantPage() {
   const editVariantId = searchParams.get("edit");
   const isEditMode = !!editVariantId;
 
+  // ----------------------------------------------------------------
+  // ✅ TAB PRESERVE FIX
+  // ----------------------------------------------------------------
+  // Ye "Add/Edit Variant" drawer ek alag route hai, aur close hone par wapas
+  // product detail page par jata hai. Detail page apna activeTab URL ke
+  // `?tab=` param se decide karta hai (["overview","variants","tags",...]),
+  // param na ho to wo "overview" par default ho jata tha — is liye outside
+  // click karne par user ka Variants tab chala jata tha.
+  // Ab saare exit paths (outside click / Back / error) yahi helper use karte
+  // hain, jo jis tab se aaya tha wahi param wapas carry karta hai.
+  const tabParam = searchParams?.get("tab");
+  const goBackToProduct = () => {
+    router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
+  };
+
   const [formData, setFormData] = useState(null);
   const [initialized, setInitialized] = useState(false);
   const [variantAttributes, setVariantAttributes] = useState({});
@@ -819,10 +834,7 @@ export default function AddVariantPage() {
           </p>
           <button
             type="button"
-            onClick={() => {
-              const tabParam = searchParams?.get("tab");
-              router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
-            }}
+            onClick={goBackToProduct}
             className="mt-4 px-4 py-2 rounded-lg text-sm"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
@@ -844,7 +856,7 @@ export default function AddVariantPage() {
           backgroundColor: "rgba(0,0,0,0.6)",
           backdropFilter: "blur(5px)",
         }}
-        onClick={() => router.push(`/admin/products/${id}`)}
+        onClick={goBackToProduct}
       />
 
       {/* Modal */}
@@ -1026,7 +1038,7 @@ export default function AddVariantPage() {
                   {[
                     { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
                     { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
-                    { l: "Quantity (whole units)", f: "quantity", p: "0", req: false },
+                    { l: "Quantity", f: "quantity", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
                       <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
@@ -1149,10 +1161,7 @@ export default function AddVariantPage() {
             >
               <button
                 type="button"
-                onClick={() => {
-                  const tabParam = searchParams?.get("tab");
-                  router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
-                }}
+                onClick={goBackToProduct}
                 className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition hover:bg-[var(--bg-tertiary)]"
                 style={{
                   backgroundColor: "transparent",

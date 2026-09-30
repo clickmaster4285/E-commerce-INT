@@ -276,6 +276,25 @@ const computeProductStats = async (filter, totalOverride = null) => {
 // ======================================================
 // GET ALL PRODUCTS (UPDATED WITH PRICE CALCULATION)
 // ======================================================
+// ✅ DETERMINISTIC LIST ORDER (pagination ka base)
+// Sirf `created_at` par sort karna kaafi nahi tha: bulk/seed insert ki wajah se
+// kai products ka created_at bilkul same (same millisecond) hota hai, aur MongoDB
+// ka sort ties par stable nahi hota. Is liye har page request par ties ka order
+// badal jata tha → skip/limit ke saath pages overlap karte the (page 2 par page 1
+// ke products dobara aa jate the aur kuch products kabhi dikhte hi nahi the).
+// `_id` tie-breaker ek TOTAL order banata hai, is liye har page exactly ek baar.
+const PRODUCT_LIST_SORT = { created_at: -1, _id: -1 };
+
+// ✅ FEATURED PAGE SORT — "recent upar, top par"
+//    Featured Products page ke liye. `created_at` yahan kaam ka nahi: bulk/seed
+//    insert me sab products ka created_at ek hi millisecond ka hota hai, is liye
+//    created_at par sort sab tie karta hai aur order sirf _id (random ObjectId)
+//    par chala jata tha — user ko "recent upar" dikhai hi nahi deta tha.
+//    `featured_at` wo timestamp hai jab product featured mark kiya gaya → jo
+//    abhi feature hua wo hamesha top. Purane featured products (featured_at null)
+//    niche rehte hain aur created_at → _id se deterministic order milta hai.
+const FEATURED_RECENT_SORT = { featured_at: -1, created_at: -1, _id: -1 };
+
 // ======================================================
 // GET ALL PRODUCTS (OPTIONAL SERVER-SIDE PAGINATION)
 // ✅ Non-breaking: agar ?limit= nahi bheja gaya to purana full-array response hi milega
@@ -292,6 +311,10 @@ const getProducts = async (req, res) => {
     const { filter } = await buildProductFilter(req.query);
 
     const isPriceSort = sort === "price-asc" || sort === "price-desc";
+    // ✅ Sirf Featured Products page ye sort bhejta hai (?sort=featured-recent).
+    //    Baaki sab callers ke liye PRODUCT_LIST_SORT wala purana order same rehta hai.
+    const isFeaturedRecent = sort === "featured-recent";
+    const listSort = isFeaturedRecent ? FEATURED_RECENT_SORT : PRODUCT_LIST_SORT;
 
     // ---- LEGACY MODE (no limit) → exact old behavior ----
     if (!limit) {
@@ -301,7 +324,7 @@ const getProducts = async (req, res) => {
         .populate("tag_ids", "name")
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
-        .sort({ created_at: -1 })
+        .sort(listSort)
         .lean();
 
       if (!products.length) return res.status(200).json([]);
@@ -342,7 +365,9 @@ const getProducts = async (req, res) => {
     let pageIds = [];
 
     if (isPriceSort) {
-      const idDocs = await Product.find(filter).select("_id").lean();
+      // ✅ Base order deterministic (_id tie-break) — JS sort stable hai, is liye
+      //    equal price wale products bhi har request par same order me rahenge.
+      const idDocs = await Product.find(filter).select("_id").sort(listSort).lean();
       const ids = idDocs.map((d) => d._id);
       if (ids.length) {
         const priceDocs = await Variant.aggregate([
@@ -359,9 +384,10 @@ const getProducts = async (req, res) => {
         pageIds = ids.slice(skip, skip + limit);
       }
     } else {
+      // ✅ Pages overlap na hon — is liye same deterministic total order + _id tie-break.
       const idDocs = await Product.find(filter)
         .select("_id")
-        .sort({ created_at: -1 })
+        .sort(listSort)
         .skip(skip)
         .limit(limit)
         .lean();
@@ -1338,6 +1364,17 @@ const toggleProductFeatured = async (req, res) => {
                 false,
                 // Feature karte waqt product ACTIVE hona zaroori hai
                 { $eq: [{ $ifNull: ["$status", "active"] }, "active"] },
+              ],
+            },
+            // ✅ "Recent upar" order ka source — featured mark karne ka timestamp.
+            //    Logic is_featured se exactly mirror karti hai: abhi featured tha
+            //    → unmark (null), warna mark (ab ka time). Is se jo product abhi
+            //    feature hua wo Featured page par sabse upar aata hai.
+            featured_at: {
+              $cond: [
+                { $eq: [{ $ifNull: ["$is_featured", false] }, true] },
+                null,
+                new Date(),
               ],
             },
             updatedby: req.user?._id || null,

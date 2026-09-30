@@ -303,6 +303,8 @@ export default function FeaturedProductsPage() {
   const [viewMode, setViewMode] = useState("list");
 
   // ✅ Same API jo Products page use karta hai — sirf featured=true filter ke saath
+  // sort="featured-recent" → featured_at desc (jo abhi featured hua wo top par).
+  // Default created_at sort is page kaam ka nahi tha (bulk seed me sab same).
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["featured-products", currentPage, search],
     queryFn: () =>
@@ -311,6 +313,7 @@ export default function FeaturedProductsPage() {
         limit: PER_PAGE,
         search: search || "",
         featured: true,
+        sort: "featured-recent",
       }),
     retry: false,
   });
@@ -325,7 +328,15 @@ export default function FeaturedProductsPage() {
 
   // ✅ Stat cards — current page se (total record count server se aata hai)
   const activeCount = useMemo(() => products.filter((p) => p?.status === "active").length, [products]);
-  const inactiveCount = useMemo(() => products.filter((p) => p?.status !== "active").length, [products]);
+  // ✅ "Inactive" card hata diya — featured products ka inactive hona practically hamesha
+  //    0 hi hota tha (useless box). Uski jagah "Out of Stock": stock 0 wale featured
+  //    products ka count (actionable — inhe restock ya unfeature karna hota hai).
+  //    Stock wahi field use karta hai jo table ke Stock column me dikhta hai
+  //    (variants[0].quantity), is liye numbers table se match karte hain.
+  const outOfStockCount = useMemo(
+    () => products.filter((p) => (Number(p?.variants?.[0]?.quantity) || 0) === 0).length,
+    [products]
+  );
   const totalStock = useMemo(
     () => products.reduce((sum, p) => sum + (Number(p?.variants?.[0]?.quantity) || 0), 0),
     [products]
@@ -397,7 +408,7 @@ export default function FeaturedProductsPage() {
         {[
           { l: "Total Featured", v: totalRecords },
           { l: "Active", v: activeCount, c: "text-emerald-500" },
-          { l: "Inactive", v: inactiveCount, c: "text-red-400" },
+          { l: "Out of Stock", v: outOfStockCount, c: outOfStockCount ? "text-red-400" : "text-emerald-500" },
           { l: "Total Stock", v: totalStock, c: "text-blue-500" },
         ].map((s, i) => (
           <div key={i} className="rounded-lg p-4" style={cardStyle}>

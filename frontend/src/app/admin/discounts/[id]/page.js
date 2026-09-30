@@ -162,6 +162,100 @@ function DataRow({ label, value, mono, highlight, icon: Icon, action }) {
   );
 }
 
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Real page ka same shell (header + meta strip + section cards) render hota hai,
+      sirf values shimmer karti hain — is liye data aane par layout shift nahi hota.
+   ✅ Sirf loading state ke liye — real page design me koi change nahi.
+========================================================= */
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function SkeletonDataRows({ rows = 4 }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={`dk-row-${i}`} className="flex items-center justify-between gap-4 py-1.5">
+          <span className="skeleton inline-block h-2.5 w-[70px] rounded align-middle" />
+          <span className="skeleton inline-block h-2.5 rounded align-middle" style={{ width: `${45 + ((i * 17) % 40)}%` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DiscountDetailSkeleton() {
+  return (
+    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label="Loading discount details">
+      {/* HEADER */}
+      <div>
+        <div className="flex items-center gap-1.5 text-[10px] mb-2">
+          <span className="skeleton inline-block h-2.5 w-14 rounded align-middle" />
+          <span style={{ color: "var(--text-muted)" }}>›</span>
+          <span className="skeleton inline-block h-2.5 w-24 rounded align-middle" />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span className="skeleton block h-4 w-[180px] rounded" />
+            <span className="skeleton mt-2 block h-2.5 w-[90px] rounded" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="skeleton inline-block h-6 w-[70px]" style={SKELETON_ROUND} />
+            <span className="skeleton inline-block h-8 w-[62px] rounded-md" />
+            <span className="skeleton inline-block h-8 w-[74px] rounded-md" />
+          </div>
+        </div>
+      </div>
+
+      {/* META STRIP */}
+      <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={`dk-meta-${i}`} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}>
+            <span className="skeleton h-4 w-4 shrink-0 rounded" />
+            <div className="min-w-0 flex-1">
+              <span className="skeleton block h-2.5 w-[70px] rounded" />
+              <span className="skeleton mt-1.5 block h-2.5 w-[90px] rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* SECTIONS — real page jaise titles, sirf values shimmer */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start">
+        <div className="space-y-3">
+          <InfoCard icon={Tag} title="Basic Information"><SkeletonDataRows rows={7} /></InfoCard>
+          <InfoCard icon={Package} title="Applicable Products">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={`dk-product-${i}`} className="min-w-0">
+                  <span className="skeleton block h-14 rounded-md" />
+                  <span className="skeleton mt-1.5 block h-2.5 w-[80%] rounded" />
+                  <span className="skeleton mt-1 block h-2 w-[50%] rounded" />
+                </div>
+              ))}
+            </div>
+          </InfoCard>
+        </div>
+        <div className="space-y-3">
+          <InfoCard icon={Calendar} title="Validity Period"><SkeletonDataRows rows={3} /></InfoCard>
+          <InfoCard icon={TrendingUp} title="Usage Limits"><SkeletonDataRows rows={4} /></InfoCard>
+        </div>
+        <div className="space-y-3">
+          <InfoCard icon={Target} title="Targeting"><SkeletonDataRows rows={4} /></InfoCard>
+          <InfoCard icon={User} title="Created By">
+            <div className="flex items-center gap-2">
+              <span className="skeleton h-9 w-9 shrink-0" style={SKELETON_ROUND} />
+              <div className="min-w-0 flex-1">
+                <span className="skeleton block h-2.5 w-[70%] rounded" />
+                <span className="skeleton mt-1.5 block h-2.5 w-[45%] rounded" />
+              </div>
+            </div>
+          </InfoCard>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Avatar({ user, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
@@ -399,16 +493,10 @@ export default function DiscountDetailPage() {
     },
   });
 
-  // Loading
+  // ✅ Loading — spinner ki jagah skeleton (real shell: header + meta strip + section
+  //    cards), is liye data aane par layout shift nahi hota.
   if (loading) {
-    return (
-      <div className="w-full flex items-center justify-center py-24">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-[var(--accent)] border-t-transparent animate-spin" />
-          <p className="text-[13px] font-medium" style={{ color: "var(--text-muted)" }}>Loading discount details...</p>
-        </div>
-      </div>
-    );
+    return <DiscountDetailSkeleton />;
   }
 
   // Not Found
