@@ -358,6 +358,21 @@ export default function AddVariantPage() {
   const editVariantId = searchParams.get("edit");
   const isEditMode = !!editVariantId;
 
+  // ----------------------------------------------------------------
+  // ✅ TAB PRESERVE FIX
+  // ----------------------------------------------------------------
+  // Ye "Add/Edit Variant" drawer ek alag route hai, aur close hone par wapas
+  // product detail page par jata hai. Detail page apna activeTab URL ke
+  // `?tab=` param se decide karta hai (["overview","variants","tags",...]),
+  // param na ho to wo "overview" par default ho jata tha — is liye outside
+  // click karne par user ka Variants tab chala jata tha.
+  // Ab saare exit paths (outside click / Back / error) yahi helper use karte
+  // hain, jo jis tab se aaya tha wahi param wapas carry karta hai.
+  const tabParam = searchParams?.get("tab");
+  const goBackToProduct = () => {
+    router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
+  };
+
   const [formData, setFormData] = useState(null);
   const [initialized, setInitialized] = useState(false);
   const [variantAttributes, setVariantAttributes] = useState({});
@@ -819,10 +834,7 @@ export default function AddVariantPage() {
           </p>
           <button
             type="button"
-            onClick={() => {
-              const tabParam = searchParams?.get("tab");
-              router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
-            }}
+            onClick={goBackToProduct}
             className="mt-4 px-4 py-2 rounded-lg text-sm"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
@@ -844,7 +856,7 @@ export default function AddVariantPage() {
           backgroundColor: "rgba(0,0,0,0.6)",
           backdropFilter: "blur(5px)",
         }}
-        onClick={() => router.push(`/admin/products/${id}`)}
+        onClick={goBackToProduct}
       />
 
       {/* Modal */}
@@ -1033,20 +1045,24 @@ export default function AddVariantPage() {
                         {l}
                         {req && <span className="text-red-500"> *</span>}
                       </label>
+                      {/* Stock quantity sirf poore units mein — decimal point allowed nahi */}
                       <input
                         required={req}
                         type="number"
                         min="0"
-                        step="0.01"
+                        step={f === "quantity" ? "1" : "0.01"}
+                        inputMode={f === "quantity" ? "numeric" : "decimal"}
                         placeholder={placeholder}
                         value={variant[f]}
-                        onChange={(ev) => updateVariant(f, ev.target.value)}
+                        onKeyDown={(ev) => { if (f === "quantity" && [".", ",", "-", "+", "e", "E"].includes(ev.key)) ev.preventDefault(); }}
+                        onChange={(ev) => updateVariant(f, f === "quantity" ? ((ev.target.value.includes(".") ? ev.target.value.slice(0, ev.target.value.indexOf(".")) : ev.target.value).replace(/[^0-9]/g, "")) : ev.target.value)}
                         className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
                         style={inputStyle}
                       />
                     </div>
                   ))}
                 </div>
+                
 
                 {variant.cost_price !== "" &&
                   variant.selling_price !== "" &&
@@ -1145,10 +1161,7 @@ export default function AddVariantPage() {
             >
               <button
                 type="button"
-                onClick={() => {
-                  const tabParam = searchParams?.get("tab");
-                  router.push(`/admin/products/${id}${tabParam ? `?tab=${tabParam}` : ""}`);
-                }}
+                onClick={goBackToProduct}
                 className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition hover:bg-[var(--bg-tertiary)]"
                 style={{
                   backgroundColor: "transparent",

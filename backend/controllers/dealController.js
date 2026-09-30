@@ -1,4 +1,6 @@
 const Deal = require("../models/Deal");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
 
 const emitSocketEvent = (event, data) => {
@@ -6,6 +8,55 @@ const emitSocketEvent = (event, data) => {
     const io = getIO();
     if (io) io.emit(event, data);
   } catch (_) {}
+};
+
+// ==========================================
+// ✅ CREATEDBY / UPDATEDBY RESOLUTION
+// ==========================================
+// Deal model mein createdBy/updatedBy ka ref sirf "User" hai, lekin admin panel
+// se login karne wale accounts Employee collection mein hote hain. Aise case
+// mein .populate(...) null return karta hai — is wajah se detail page par
+// "Updated by" (aur history table ka editor) hamesha blank reh jata tha,
+// page refresh karne ke baad bhi. RAW id ko User -> Employee fallback ke sath
+// resolve karo (Discount/Product controllers ka wahi pattern).
+const ACTOR_FIELDS = "name email role";
+
+// ✅ SEARCH SAFETY — user ka text seedha $regex me chala jata tha, is liye "." ya "["
+//    jaise special characters query bigaad (ya slow) kar dete thay.
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const resolveActor = async (rawId) => {
+  if (!rawId) return null;
+  // Pehle se populated (User/Employee document) → waisa hi return karo
+  if (typeof rawId === "object" && (rawId.name || rawId.email)) return rawId;
+  // ObjectId / string id → DB lookup (ObjectId ka toString() hex id deta hai)
+  const id = String(rawId?._id || rawId);
+  try {
+    const user = await User.findById(id).select(ACTOR_FIELDS).lean();
+    if (user) return user;
+    return await Employee.findById(id).select(ACTOR_FIELDS).lean();
+  } catch (_) {
+    return null;
+  }
+};
+
+// Populated document par original (raw) id doc.populated(path) se milti hai —
+// populate fail hone par wahi id bachati hai, isliye fallback usi par chalta hai.
+const rawPopulatedId = (doc, path) => {
+  try {
+    const v = typeof doc?.populated === "function" ? doc.populated(path) : null;
+    return Array.isArray(v) ? v[0] : v;
+  } catch (_) {
+    return null;
+  }
+};
+
+const resolveDealActors = async (deal) => {
+  if (!deal) return deal;
+  const obj = typeof deal.toObject === "function" ? deal.toObject() : { ...deal };
+  if (!obj.createdBy) obj.createdBy = await resolveActor(rawPopulatedId(deal, "createdBy"));
+  if (!obj.updatedBy) obj.updatedBy = await resolveActor(rawPopulatedId(deal, "updatedBy"));
+  return obj;
 };
 
 // ==========================================
@@ -128,68 +179,56 @@ const getDeals = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const query = {};
-
-    // ==========================================
-    // SEARCH
-    // ==========================================
-
-    if (search.trim()) {
-      query.$or = [
-        {
-          name: {
-            $regex: search.trim(),
-            $options: "i",
-          },
-        },
-        {
-          description: {
-            $regex: search.trim(),
-            $options: "i",
-          },
-        },
-      ];
-    }
-
-    // ==========================================
-    // TYPE FILTER
-    // ==========================================
-
-    if (type !== "all") {
-      query.type = type;
-    }
-
-    // ==========================================
-    // APPLY TO FILTER
-    // ==========================================
-
-    if (applyTo !== "all") {
-      query.applyTo = applyTo;
-    }
-
-    // ==========================================
-    // STATUS FILTER
-    // ==========================================
-
     const now = new Date();
+    const searchTerm = String(search).trim();
+    const safeSearch = searchTerm ? escapeRegExp(searchTerm) : "";
 
-    if (status === "active") {
-      query.isActive = true;
-      query.startDate = { $lte: now };
-      query.endDate = { $gte: now };
+    // ==========================================
+    // BASE CLAUSES (search + type + applyTo)
+    // ==========================================
+    // ⚠️ Ye sirf LIST query par lagte hain. Dashboard cards (stats) inhi par bante hain
+    //    taake "Active / Expired" counts poore dataset ko reflect karein, current page ko nahi.
+
+    const baseClauses = [];
+
+    if (safeSearch) {
+      baseClauses.push({
+        $or: [
+          { name: { $regex: safeSearch, $options: "i" } },
+          { code: { $regex: safeSearch, $options: "i" } },
+          { description: { $regex: safeSearch, $options: "i" } },
+        ],
+      });
     }
 
-    if (status === "upcoming") {
-      query.startDate = { $gt: now };
+    if (type && type !== "all") {
+      baseClauses.push({ type });
     }
 
-    if (status === "expired") {
-      query.endDate = { $lt: now };
+    if (applyTo && applyTo !== "all") {
+      baseClauses.push({ applyTo });
     }
 
-    if (status === "disabled") {
-      query.isActive = false;
-    }
+    // ✅ $and array use kar rahe hain — isse search ka $or aur status ke $or
+    //    ek saath merge ho sakte hain (do top-level $or allowed nahi hote).
+    const buildQuery = (extraClauses = []) => {
+      const clauses = [...baseClauses, ...extraClauses];
+      return clauses.length ? { $and: clauses } : {};
+    };
+
+    // ✅ STATUS SEMANTICS frontend ke getDealStatus() ke exactly match:
+    //    disabled = isActive false, baaki sab isActive true + date checks.
+    const statusClauses = {
+      active: [{ isActive: true }, { startDate: { $lte: now } }, { endDate: { $gte: now } }],
+      upcoming: [{ isActive: true }, { startDate: { $gt: now } }],
+      expired: [{ isActive: true }, { endDate: { $lt: now } }],
+      disabled: [{ isActive: false }],
+    };
+
+    // Frontend dropdown "scheduled" label use karta hai — dono aliases handle hain
+    const requestedStatus = String(status).trim();
+    const statusKey = requestedStatus === "scheduled" ? "upcoming" : requestedStatus;
+    const query = buildQuery(statusClauses[statusKey] || []);
 
     // ==========================================
     // PAGINATION
@@ -201,31 +240,45 @@ const getDeals = async (req, res) => {
     const skip = (currentPage - 1) * perPage;
 
     // ==========================================
-    // GET DATA
+    // GET DATA (+ server-side stats)
     // ==========================================
 
-    const [deals, total] = await Promise.all([
-      Deal.find(query)
-        .populate("productIds", "name sku images selling_price")
-        .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
-        .populate("categoryIds", "name code")
-        .populate("brandIds", "name logo")
-        .populate("createdBy", "name email role")
-        .populate("updatedBy", "name email role")
-        .sort({
-          priority: -1,
-          createdAt: -1,
-        })
-        .skip(skip)
-        .limit(perPage)
-        .lean(),
+    const [deals, total, baseTotal, activeCount, scheduledCount, expiredCount, disabledCount] =
+      await Promise.all([
+        Deal.find(query)
+          .populate("productIds", "name sku images selling_price")
+          .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
+          .populate("categoryIds", "name code")
+          .populate("brandIds", "name logo")
+          .populate("createdBy", "name email role")
+          .populate("updatedBy", "name email role")
+          .sort({
+            priority: -1,
+            createdAt: -1,
+          })
+          .skip(skip)
+          .limit(perPage)
+          .lean(),
 
-      Deal.countDocuments(query),
-    ]);
+        Deal.countDocuments(query),
+        Deal.countDocuments(buildQuery()),
+        Deal.countDocuments(buildQuery(statusClauses.active)),
+        Deal.countDocuments(buildQuery(statusClauses.upcoming)),
+        Deal.countDocuments(buildQuery(statusClauses.expired)),
+        Deal.countDocuments(buildQuery(statusClauses.disabled)),
+      ]);
 
     res.status(200).json({
       success: true,
       data: deals,
+      // ✅ Frontend ke stat cards ab inhi numbers par hain (page-size independent)
+      stats: {
+        total: baseTotal,
+        active: activeCount,
+        scheduled: scheduledCount,
+        expired: expiredCount,
+        disabled: disabledCount,
+      },
       pagination: {
         total,
         page: currentPage,
@@ -269,9 +322,11 @@ const getDealById = async (req, res) => {
       });
     }
 
+    const data = await resolveDealActors(deal);
+
     res.status(200).json({
       success: true,
-      data: deal,
+      data,
     });
   } catch (error) {
     console.error("Get Deal By ID Error:", error);
@@ -319,13 +374,17 @@ const updateDeal = async (req, res) => {
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
-    emitSocketEvent("deal:updated", { success: true, data: updatedDeal });
-    emitSocketEvent("dealUpdated", { success: true, data: updatedDeal });
+    // ✅ Save ke baad wahi resolved payload emit/return karo jo GET deta hai —
+    // warna frontend ko "Updated by" dikhane ke liye page refresh karna padta tha.
+    const dealPayload = await resolveDealActors(updatedDeal);
+
+    emitSocketEvent("deal:updated", { success: true, data: dealPayload });
+    emitSocketEvent("dealUpdated", { success: true, data: dealPayload });
 
     res.status(200).json({
       success: true,
       message: "Deal updated successfully",
-      data: updatedDeal,
+      data: dealPayload,
     });
   } catch (error) {
     console.error("Update Deal Error:", error);

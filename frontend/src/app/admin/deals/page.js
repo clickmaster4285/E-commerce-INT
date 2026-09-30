@@ -9,7 +9,12 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
+import { toNonNegative, validateNonNegative } from "../discounts/page";
 import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
+
+/* ==================== CONSTANTS ==================== */
+// ✅ Server-side pagination — ek request par yehi deals aati hain
+const DEALS_PER_PAGE = 20;
 
 /* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -20,6 +25,8 @@ const EditIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill
 const TrashIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>);
 const CloseIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>);
+const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 18l-6-6 6-6" /></svg>);
+const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 18l6-6-6-6" /></svg>);
 const Spinner = ({ className = "w-4 h-4" }) => (<svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>);
 const DealIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16v5H4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 7v14" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.5 7C7.1 7 6 5.9 6 4.5S7.1 2 8.5 2C10.5 2 12 7 12 7" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.5 7C16.9 7 18 5.9 18 4.5S16.9 2 15.5 2C13.5 2 12 7 12 7" /></svg>);
 const CheckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>);
@@ -225,9 +232,21 @@ export default function DealsPage() {
   const router = useRouter();
   const pathname = usePathname();
   
-  const [search, setSearch] = useState("");
+  // ✅ SERVER-SIDE PAGINATION — search / status / target / page sab backend par (DB-level).
+  const [searchInput, setSearchInput] = useState(""); // input box (turant update)
+  const [search, setSearch] = useState("");          // debounced value → API query
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Typing ke dauran har keystroke par API hit na ho — 400ms debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -268,8 +287,30 @@ export default function DealsPage() {
     status: "active", is_featured: false,
   });
 
-  const { data: dealsResponse, isLoading } = useQuery({ queryKey: ["deals"], queryFn: dealApi.getAll });
-  const deals = useMemo(() => normalizeArrayResponse(dealsResponse), [dealsResponse]);
+  const { data: dealsResponse, isLoading, isFetching } = useQuery({
+    queryKey: ["deals", "paginated", currentPage, search, statusFilter, targetFilter],
+    queryFn: () =>
+      dealApi.getPaginated({
+        page: currentPage,
+        limit: DEALS_PER_PAGE,
+        search: search || "",
+        status: statusFilter,
+        applyTo: targetFilter === "all_targets" ? "all" : targetFilter,
+      }),
+    // Page/filter change par purani list retain hoti hai → table blink nahi karta
+    placeholderData: (previousData) => previousData,
+    retry: false,
+  });
+  // Backend sirf CURRENT PAGE ki deals bhejta hai → { deals, stats, pagination }
+  const deals = useMemo(() => normalizeArrayResponse(dealsResponse?.deals ?? dealsResponse), [dealsResponse]);
+  const pagination = dealsResponse?.pagination || {
+    total: 0,
+    page: currentPage,
+    limit: DEALS_PER_PAGE,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
   const { data: productsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
   const { data: categoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
@@ -356,25 +397,42 @@ export default function DealsPage() {
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
   });
 
-  const filteredDeals = useMemo(() => {
-    const term = search.toLowerCase().trim();
-    return deals.filter((deal) => {
-      const name = String(deal?.name || "").toLowerCase();
-      const matchSearch = !term || name.includes(term);
-      const status = getDealStatus(deal);
-      const matchStatus = statusFilter === "all" || status === statusFilter;
-      const rawTarget = deal?.applyTo || "all";
-      const matchTarget = targetFilter === "all_targets" || rawTarget === targetFilter;
-      return matchSearch && matchStatus && matchTarget;
-    });
-  }, [deals, search, statusFilter, targetFilter]);
+  // ✅ Search / status / target filtering ab backend par ho chuki hai — is liye yahan
+  //    koi client-side filter/slice nahi. Jo data aaya wohi current page hai.
+  const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  const stats = useMemo(() => ({
-    total: deals.length,
-    active: deals.filter((d) => getDealStatus(d) === "active").length,
-    expired: deals.filter((d) => getDealStatus(d) === "expired").length,
-    disabled: deals.filter((d) => getDealStatus(d) === "disabled").length,
-  }), [deals]);
+  // ✅ Stats ab server se aate hain (poori filtered dataset par, current page par nahi).
+  //    Legacy response (stats missing) ho to current page data se fallback.
+  const serverStats = dealsResponse?.stats || null;
+  const stats = useMemo(() => {
+    if (serverStats) {
+      return {
+        total: Number(serverStats.total) || 0,
+        active: Number(serverStats.active) || 0,
+        expired: Number(serverStats.expired) || 0,
+        disabled: Number(serverStats.disabled) || 0,
+      };
+    }
+    return {
+      total: deals.length,
+      active: deals.filter((d) => getDealStatus(d) === "active").length,
+      expired: deals.filter((d) => getDealStatus(d) === "expired").length,
+      disabled: deals.filter((d) => getDealStatus(d) === "disabled").length,
+    };
+  }, [serverStats, deals]);
+
+  // ✅ Numbered pagination (Products page ke pattern ke mutabiq)
+  const renderPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+    else if (currentPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+    else if (currentPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    else pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+    return pages;
+  };
 
   const openEdit = (deal) => {
     // ✅ Backward compatible: missing/empty freeShippingMethods → BOTH methods
@@ -439,6 +497,18 @@ export default function DealsPage() {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
 
+    // ✅ Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
+    const nonNegativeError = validateNonNegative([
+      ["Deal value", formData.value],
+      ["Buy quantity", formData.buy_quantity],
+      ["Get quantity", formData.get_quantity],
+      ["Get discount value", formData.get_discount_value],
+      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
+      ["Usage limit", formData.usage_limit],
+      ["Per customer limit", formData.per_user_limit],
+    ]);
+    if (nonNegativeError) return toast.error(nonNegativeError);
+
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
       if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
@@ -448,6 +518,7 @@ export default function DealsPage() {
     if (formData.value_type === "buy_x_get_y") {
       if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
       if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+      if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error("Discount on Get Item (%) cannot be greater than 100");
     }
 
     // ✅ Bundle deal — single offer condition validation
@@ -704,9 +775,9 @@ export default function DealsPage() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input 
               type="text" 
-              placeholder="Search deal name..." 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="Search deal name or code..." 
+              value={searchInput} 
+              onChange={(e) => setSearchInput(e.target.value)} 
               className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
               style={inputStyle} 
             />
@@ -714,18 +785,41 @@ export default function DealsPage() {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
-            <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+            <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+            <Select value={targetFilter} onChange={(v) => { setTargetFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
           </div>
         </div>
 
         {/* TABLE / GRID DISPLAY */}
         {isLoading ? (
-          <div className="rounded-lg py-14 flex justify-center items-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading deals...</span></div>
-        ) : filteredDeals.length === 0 ? (
+          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+             list view me wahi table shell + shimmer rows, grid view me shimmer cards */
+          viewMode === "list" ? (
+            <div className="rounded-lg overflow-hidden" style={cardStyle}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Deal</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Offer</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <DealRowsSkeleton rows={DEALS_PER_PAGE} />
+                </table>
+              </div>
+            </div>
+          ) : (
+            <DealCardsSkeleton cards={8} cardStyle={cardStyle} />
+          )
+        ) : deals.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <DealIcon className="w-8 h-8 mb-3 opacity-50" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No deals found" : "No deals created yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {searchInput || statusFilter !== "all" || targetFilter !== "all_targets" ? "No deals match your filters" : "No deals created yet"}
+            </p>
           </div>
         ) : viewMode === "list" ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -741,11 +835,11 @@ export default function DealsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDeals.map((deal, index) => {
+                  {deals.map((deal, index) => {
                     const id = deal?._id || deal?.id;
                     const status = getDealStatus(deal);
                     return (
-                      <tr key={id} onClick={() => handleViewDeal(id)} style={{ borderBottom: index < filteredDeals.length - 1 ? "1px solid var(--border-color)" : "none" }} className="hover:bg-white/[0.02] transition cursor-pointer">
+                      <tr key={id} onClick={() => handleViewDeal(id)} style={{ borderBottom: index < deals.length - 1 ? "1px solid var(--border-color)" : "none" }} className="hover:bg-white/[0.02] transition cursor-pointer">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
@@ -768,7 +862,7 @@ export default function DealsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {filteredDeals.map((deal) => (
+            {deals.map((deal) => (
               <div key={deal._id || deal.id} onClick={() => handleViewDeal(deal._id || deal.id)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-5 h-5" /></div>
@@ -784,6 +878,27 @@ export default function DealsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ✅ PAGINATION (server-side) */}
+        {totalPages > 1 && (
+          <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Showing {pagination.total === 0 ? 0 : (currentPage - 1) * DEALS_PER_PAGE + 1}-{Math.min(currentPage * DEALS_PER_PAGE, pagination.total)} of {pagination.total} deals
+              {isFetching && !isLoading && <span className="ml-2 opacity-70">• loading...</span>}
+            </p>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label="Previous page"><ChevronLeftIcon className="h-4 w-4" /></button>
+              {renderPageNumbers().map((pg, i) =>
+                pg === "..." ? (
+                  <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
+                ) : (
+                  <button key={pg} type="button" disabled={isFetching} onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
+                )
+              )}
+              <button type="button" disabled={currentPage >= totalPages || isFetching} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label="Next page"><ChevronRightIcon className="h-4 w-4" /></button>
+            </div>
           </div>
         )}
       </div>
@@ -819,6 +934,70 @@ export default function DealsPage() {
 }
 
 /* ==================== SUB-COMPONENTS ==================== */
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+      widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
+      par layout shift nahi hota (pehle yahan sirf spinner tha).
+   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+========================================================= */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading deals">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`deal-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
+          {/* deal — icon + name + code */}
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+              <div className="min-w-0">
+                <span className="skeleton block h-3 w-[140px] rounded" />
+                <span className="skeleton mt-1.5 block h-2.5 w-[70px] rounded" />
+              </div>
+            </div>
+          </td>
+          {/* applies to */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[80px] rounded align-middle" /></td>
+          {/* offer */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[54px] rounded align-middle" /></td>
+          {/* status badge */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-5 w-[66px] align-middle" style={SKELETON_ROUND} /></td>
+          {/* actions */}
+          <td className="px-4 py-3 whitespace-nowrap w-1">
+            <div className="flex items-center justify-end"><span className="skeleton block h-[38px] w-[44px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function DealCardsSkeleton({ cards = 8, cardStyle }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading deals">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={`deal-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
+          <div className="flex items-start justify-between">
+            <span className="skeleton h-10 w-10 shrink-0 rounded-lg" />
+            <span className="skeleton inline-block h-5 w-[66px]" style={SKELETON_ROUND} />
+          </div>
+          <div className="min-w-0">
+            <span className="skeleton block h-3 w-[75%] rounded" />
+            <span className="skeleton mt-1.5 block h-2.5 w-[40%] rounded" />
+          </div>
+          <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <span className="skeleton inline-block h-3 w-[52px] rounded align-middle" />
+            <span className="skeleton block h-[38px] w-[44px] rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatCard({ title, value, valueClass = "", cardStyle }) {
   return (<div className="rounded-lg p-4" style={cardStyle}>
     <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{title}</p>
@@ -874,11 +1053,27 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled }) => (
+// ✅ Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) —
+// "-"/"+"/"e"/"E" type nahi hota, paste par sign hat jata hai, min=0 aur spinner bhi 0 se neeche nahi jata.
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, min, max, nonNegative = type === "number", integer = false }) => (
   <input
     type={type}
     value={value || ""}
-    onChange={(e) => onChange(e.target.value)}
+    min={nonNegative ? (min ?? 0) : min}
+    max={max}
+    step={nonNegative && type === "number" ? (integer ? 1 : "any") : undefined}
+    inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
+    onChange={(e) => {
+      const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
+      // ✅ Upper bound (e.g. discount percentage max 100) — typing/paste se hi clamp ho jata hai
+      const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
+      onChange(clamped);
+    }}
+    onKeyDown={nonNegative ? (e) => {
+      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+    } : undefined}
+    onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
     className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1387,8 +1582,8 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label="Discount Percentage (%)" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label="Discount Percentage (%)" hint="Value must be between 0 and 100" fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" max={100} style={inputStyle} />
                     </FormField>
                   )}
 
@@ -1407,7 +1602,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         <TextInput type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
                       </FormField>
                       <FormField label="Discount on Get Item (%)" hint="100 means free" fullWidth>
-                        <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" style={inputStyle} />
+                        <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" max={100} style={inputStyle} />
                       </FormField>
                     </>
                   )}
@@ -1969,8 +2164,13 @@ function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, ca
               <input
                 type="number"
                 min="0"
+                max={singleRule.reward_type === "percentage" ? "100" : undefined}
                 value={singleRule.value || ""}
-                onChange={(e) => update({ value: e.target.value })}
+                onChange={(e) => {
+                  const raw = toNonNegative(e.target.value);
+                  // ✅ Percentage discount 100% se zyada nahi ho sakta — typing/paste par clamp
+                  update({ value: singleRule.reward_type === "percentage" && raw !== "" && Number(raw) > 100 ? "100" : raw });
+                }}
                 placeholder={singleRule.reward_type === "percentage" ? "e.g., 10" : "e.g., 200"}
                 className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
                 style={inputStyle}

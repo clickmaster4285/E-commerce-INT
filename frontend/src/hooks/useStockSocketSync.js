@@ -16,7 +16,8 @@ export function useStockSocketSync() {
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const handleStockAdjusted = () => {
+    // ✅ Stock change (adjust / order place-delete / variant edit) — list + history dono refresh
+    const handleStockChange = () => {
       queryClient.invalidateQueries({
         queryKey: ["stock"],
       });
@@ -26,12 +27,26 @@ export function useStockSocketSync() {
       });
     };
 
-    socket.on("stockAdjusted", handleStockAdjusted);
-    socket.on("stockUpdated", handleStockAdjusted);
+    // ✅ Product create/update/delete bhi manage-stock list badalta hai (names, variants,
+    //    "Deleted" badge) — is liye un events par bhi list refresh hoti hai.
+    const handleProductChange = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["stock"],
+      });
+    };
+
+    socket.on("stockAdjusted", handleStockChange);
+    socket.on("stockUpdated", handleStockChange);
+    socket.on("productCreated", handleProductChange);
+    socket.on("productUpdated", handleProductChange);
+    socket.on("productDeleted", handleProductChange);
 
     return () => {
-      socket.off("stockAdjusted", handleStockAdjusted);
-      socket.off("stockUpdated", handleStockAdjusted);
+      socket.off("stockAdjusted", handleStockChange);
+      socket.off("stockUpdated", handleStockChange);
+      socket.off("productCreated", handleProductChange);
+      socket.off("productUpdated", handleProductChange);
+      socket.off("productDeleted", handleProductChange);
     };
   }, [socket, isConnected, queryClient]);
 

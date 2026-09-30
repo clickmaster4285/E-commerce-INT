@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { toast } from "sonner";
@@ -29,11 +30,14 @@ import {
   Tag,
   ArrowLeft,
   Trash2,
+  Search,
+  ChevronDown,
+  Plus,
+  X,
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
 
-import Select from "react-select";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
@@ -187,6 +191,284 @@ const getLogoUrl = (storeData) => {
 };
 
 // ======================================================
+// SEARCHABLE SELECT — Location / Currency dropdowns
+// ======================================================
+// ✅ KYUN CUSTOM (react-select ki jagah):
+//   1) react-select ka menu control ke ANDAR render hota tha, aur Location /
+//      Business cards par `overflow-hidden` laga hai — is liye list kat jati thi
+//      aur neeche wale options par click hi nahi ho sakta tha. Ab list portal se
+//      document.body par `position: fixed` ke saath khulti hai, is liye koi card
+//      use clip nahi kar sakta.
+//   2) Dropdown ke andar VISIBLE search field (top par pinned) + result count +
+//      "no results" state — lambi lists ke liye zaroori (e.g. England = 2,919
+//      cities, aur India ke states me 574 tak cities).
+//   3) Kuch regions ka city data dataset me hi nahi hota (58 countries + kuch US
+//      territories) — allowCustom se wahan apna city type karke select ho jata
+//      hai, warna wo dropdown khaali + disabled hi reh jata tha.
+//   4) Baaki form fields jaisa hi look (same theme tokens, h-10/md:h-9, 13px).
+const MAX_VISIBLE_OPTIONS = 300;
+
+function SearchSelect({
+  value = "",
+  options = [],
+  onChange,
+  placeholder = "Select...",
+  searchPlaceholder = "Search...",
+  disabled = false,
+  allowCustom = false,
+  customPrefix = "Use",
+  emptyText = "No results found",
+  hint = "",
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [highlight, setHighlight] = useState(0);
+  const [rect, setRect] = useState(null);
+
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  const listRef = useRef(null);
+
+  // ⚠️ Legacy data: DB me aisa state/city ho sakta hai jo dataset me na ho
+  // (pehle haath se type kiya gaya ho) — usko bhi trigger par dikhana zaroori hai,
+  // warna saved value gayab lagti hai. Is liye raw value ka fallback rakha hai.
+  const selected = options.find((o) => String(o.value) === String(value)) || null;
+  const displayLabel = selected ? selected.label : value ? String(value) : "";
+  const term = search.trim().toLowerCase();
+  const filtered = term ? options.filter((o) => String(o.label).toLowerCase().includes(term)) : options;
+  const visible = filtered.slice(0, MAX_VISIBLE_OPTIONS);
+  const hiddenCount = filtered.length - visible.length;
+  const canAddCustom =
+    allowCustom && term.length > 0 && !filtered.some((o) => String(o.label).toLowerCase() === term);
+
+  const closePanel = () => { setOpen(false); setSearch(""); setHighlight(0); };
+
+  // ✅ rect click handler me nikalti hai (event handler) — is liye kisi effect me
+  //    synchronous setState nahi hota.
+  const openPanel = () => {
+    if (disabled) return;
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setRect(r);
+    setSearch("");
+    setHighlight(0);
+    setOpen(true);
+  };
+
+  const pick = (val) => {
+    if (val === undefined || val === null || val === "") return;
+    onChange?.(String(val));
+    closePanel();
+  };
+  // Outside click par close + scroll/resize par panel ko trigger ke saath rakho
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (r) setRect(r);
+    };
+    const onDocMouseDown = (e) => {
+      if (triggerRef.current?.contains(e.target)) return;
+      if (panelRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [open]);
+
+  // Arrow keys se navigate karte waqt highlighted option ko view me rakho
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.querySelector('[data-highlighted="true"]');
+    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "nearest" });
+  }, [open, highlight]);
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((h) => Math.min(h + 1, Math.max(0, visible.length - 1)));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const opt = visible[highlight];
+      if (opt) pick(opt.value);
+      else if (canAddCustom) pick(search.trim());
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closePanel();
+    } else if (e.key === "Tab") {
+      closePanel();
+    }
+  };
+
+  // Panel ki position/size — neeche jagah kam ho to upar flip karo.
+  // (rect sirf client par set hota hai, is liye SSR par window access nahi hota.)
+  const panelWidth = rect ? Math.max(rect.width, 240) : 240;
+  const spaceBelow = rect ? window.innerHeight - rect.bottom : 0;
+  const openUp = rect ? spaceBelow < 260 && rect.top > spaceBelow : false;
+  const panelMaxHeight = rect ? Math.max(200, Math.min(340, openUp ? rect.top - 16 : spaceBelow - 16)) : 320;
+  return (
+    <>
+      <button
+        type="button"
+        ref={triggerRef}
+        onClick={() => (open ? closePanel() : openPanel())}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={placeholder}
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:cursor-not-allowed disabled:opacity-60 md:h-9 md:text-[13px]"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: `1px solid ${open ? "var(--accent)" : "var(--border-color)"}`,
+          color: "var(--text-primary)",
+        }}
+      >
+        <span className="truncate" style={{ color: displayLabel ? "var(--text-primary)" : "var(--text-muted)" }}>
+          {displayLabel || placeholder}
+        </span>
+        <ChevronDown
+          className="h-3.5 w-3.5 shrink-0 transition-transform"
+          style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "none" }}
+        />
+      </button>
+
+      {open && rect && createPortal(
+        <div
+          ref={panelRef}
+          role="listbox"
+          aria-label={placeholder}
+          className="flex flex-col overflow-hidden"
+          style={{
+            position: "fixed",
+            left: rect.left,
+            width: panelWidth,
+            top: openUp ? undefined : rect.bottom + 6,
+            bottom: openUp ? window.innerHeight - rect.top + 6 : undefined,
+            maxHeight: panelMaxHeight,
+            zIndex: 9999,
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "10px",
+            boxShadow: "0 14px 32px rgba(0,0,0,0.22)",
+          }}
+        >
+          {/* Search field — list ke top par pinned */}
+          <div className="shrink-0 p-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <div className="relative">
+              <Search
+                className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
+                style={{ color: "var(--text-muted)" }}
+              />
+              <input
+                autoFocus
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setHighlight(0); }}
+                onKeyDown={onSearchKeyDown}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                className="h-9 w-full rounded-md pl-8 pr-8 text-[16px] outline-none md:text-[13px]"
+                style={{
+                  backgroundColor: "var(--bg-tertiary)",
+                  border: "1px solid var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setHighlight(0); }}
+                  aria-label="Clear search"
+                  className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
+              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                {filtered.length} {filtered.length === 1 ? "result" : "results"}
+              </span>
+              {hint ? (
+                <span className="truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{hint}</span>
+              ) : null}
+            </div>
+          </div>
+          {/* Options list */}
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
+            {visible.length === 0 ? (
+              <p className="px-3 py-4 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>
+                {allowCustom ? "No match — apna naam type karke Enter / Add dabayein" : emptyText}
+              </p>
+            ) : (
+              visible.map((o, i) => {
+                const isSelected = !!selected && String(o.value) === String(selected.value);
+                return (
+                  <button
+                    key={String(o.value)}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    data-highlighted={i === highlight ? "true" : undefined}
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => pick(o.value)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px]"
+                    style={{
+                      backgroundColor: i === highlight ? "var(--bg-tertiary)" : "transparent",
+                      color: isSelected ? "var(--accent)" : "var(--text-primary)",
+                    }}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {isSelected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Custom value (jab dataset me option hi na ho) */}
+          {canAddCustom ? (
+            <button
+              type="button"
+              onClick={() => pick(search.trim())}
+              className="flex shrink-0 items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold"
+              style={{
+                borderTop: "1px solid var(--border-color)",
+                color: "var(--accent)",
+                backgroundColor: "var(--bg-card)",
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" /> {customPrefix} &quot;{search.trim()}&quot;
+            </button>
+          ) : null}
+
+          {/* Long list ka notice */}
+          {hiddenCount > 0 ? (
+            <p
+              className="shrink-0 px-3 py-2 text-[11px]"
+              style={{ borderTop: "1px solid var(--border-color)", color: "var(--text-muted)" }}
+            >
+              Showing first {MAX_VISIBLE_OPTIONS} of {filtered.length} — type karke list chhoti karein
+            </p>
+          ) : null}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ======================================================
 // MAIN COMPONENT
 // ======================================================
 
@@ -207,30 +489,72 @@ export default function StoreInfoPage() {
   // LOCATION / CURRENCY DATA
   // ====================================================
 
+  // ✅ Alphabetical sorting: dataset apne order me aata hai (countries bhi sorted
+  //    nahi hain) — dropdown me A→Z hona chahiye warna dhoondhna mushkil hota hai.
   const countryOptions = useMemo(
     () =>
-      Country.getAllCountries().map((c) => ({
-        value: c.isoCode,
-        label: c.name,
-      })),
+      Country.getAllCountries()
+        .map((c) => ({
+          value: c.isoCode,
+          label: c.name,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
     []
   );
 
   const stateOptions = useMemo(() => {
     if (!formData.country) return [];
-    return State.getStatesOfCountry(formData.country).map((s) => ({
-      value: s.isoCode,
-      label: s.name,
-    }));
+    return State.getStatesOfCountry(formData.country)
+      .map((s) => ({
+        value: s.isoCode,
+        label: s.name,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [formData.country]);
 
-  const cityOptions = useMemo(() => {
-    if (!formData.country || !formData.state) return [];
-    return City.getCitiesOfState(formData.country, formData.state).map((c) => ({
+  // ✅ City list ka BUG FIX: pehle sirf selected state ki cities dikhti thi. Dataset
+  //    me bahut jagah city data missing hai — UK ke 247 states/counties me se 243 ke
+  //    liye 0 cities, US ke 14 territories ke liye 0, aur 58 countries ke liye poora
+  //    city data hi nahi hai. Un sab me city dropdown khaali + disabled ho jata tha.
+  //    Ab: state ki cities milein to wahi; warna poore country ki cities par fallback.
+  const { cityOptions, cityFallbackToCountry } = useMemo(() => {
+    if (!formData.country || !formData.state) {
+      return { cityOptions: [], cityFallbackToCountry: false };
+    }
+    const inState = (City.getCitiesOfState(formData.country, formData.state) || []).map((c) => ({
       value: c.name,
       label: c.name,
     }));
+    if (inState.length) {
+      return {
+        cityOptions: inState.sort((a, b) => a.label.localeCompare(b.label)),
+        cityFallbackToCountry: false,
+      };
+    }
+    const inCountry = (City.getCitiesOfCountry(formData.country) || []).map((c) => ({
+      value: c.name,
+      label: c.name,
+    }));
+    inCountry.sort((a, b) => a.label.localeCompare(b.label));
+    return { cityOptions: inCountry, cityFallbackToCountry: inCountry.length > 0 };
   }, [formData.country, formData.state]);
+
+  // Placeholders/hint — dataset me data hai ya nahi, uska saaf signal
+  const statePlaceholder = !formData.country
+    ? "Select country first"
+    : stateOptions.length
+    ? "Select state / province"
+    : "Type your state / province";
+  const cityPlaceholder = !formData.state
+    ? "Select state first"
+    : cityOptions.length
+    ? "Select city"
+    : "Type your city name";
+  const cityFallbackHint = cityFallbackToCountry
+    ? `No cities in this state — showing all cities of ${
+        countryOptions.find((o) => o.value === formData.country)?.label || formData.country
+      }`
+    : "";
 
   const currencyOptions = useMemo(() => {
     return cc
@@ -336,13 +660,15 @@ export default function StoreInfoPage() {
   const handlePhoneChange = (value, name) =>
     setFormData((p) => ({ ...p, [name]: value }));
 
-  const handleSelectChange = (opt, meta) => {
-    const val = opt?.value || "";
-    if (meta.name === "country") setFormData((p) => ({ ...p, country: val, state: "", city: "" }));
-    else if (meta.name === "state") setFormData((p) => ({ ...p, state: val, city: "" }));
-    else if (meta.name === "city") setFormData((p) => ({ ...p, city: val }));
-    else if (meta.name === "currency") setFormData((p) => ({ ...p, currency: val }));
-  };
+  // ✅ SearchSelect plain string value deta hai (react-select jaisa option object
+  //    nahi) — is liye alag chhote handlers. Country badalne par state/city reset
+  //    (warna purani value naye country ke saath save ho jati), state badalne par
+  //    city reset.
+  const handleCountryChange = (val) =>
+    setFormData((p) => ({ ...p, country: val, state: "", city: "" }));
+  const handleStateChange = (val) => setFormData((p) => ({ ...p, state: val, city: "" }));
+  const handleCityChange = (val) => setFormData((p) => ({ ...p, city: val }));
+  const handleCurrencyChange = (val) => setFormData((p) => ({ ...p, currency: val }));
 
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
@@ -555,44 +881,6 @@ export default function StoreInfoPage() {
     backgroundColor: "var(--bg-card)",
     border: "1px solid var(--border-color)",
     color: "var(--text-primary)",
-  };
-
-  const selectStyles = {
-    control: (base) => ({
-      ...base,
-      backgroundColor: "var(--bg-card)",
-      borderColor: "var(--border-color)",
-      minHeight: "36px",
-      borderRadius: "8px",
-      boxShadow: "none",
-      fontSize: "13px",
-      "&:hover": { borderColor: "var(--border-color)" },
-    }),
-    valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-    input: (base) => ({ ...base, color: "var(--text-primary)" }),
-    singleValue: (base) => ({ ...base, color: "var(--text-primary)", fontSize: "13px" }),
-    placeholder: (base) => ({ ...base, color: "var(--text-muted)", fontSize: "13px" }),
-    menu: (base) => ({
-      ...base,
-      backgroundColor: "var(--bg-card)",
-      border: "1px solid var(--border-color)",
-      borderRadius: "8px",
-      zIndex: 9999,
-      marginTop: "4px",
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isSelected
-        ? "var(--success-soft)"
-        : state.isFocused
-        ? "var(--bg-tertiary)"
-        : "transparent",
-      color: state.isSelected ? "var(--success-text)" : "var(--text-primary)",
-      fontSize: "13px",
-      padding: "8px 10px",
-    }),
-    dropdownIndicator: (base) => ({ ...base, color: "var(--text-muted)", padding: "0 8px" }),
-    indicatorSeparator: () => ({ display: "none" }),
   };
 
   const phoneCountryCode = formData.country?.toLowerCase() || "pk";
@@ -903,21 +1191,42 @@ export default function StoreInfoPage() {
                   <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
-                      <Select name="country" options={countryOptions}
-                        value={countryOptions.find((i) => i.value === formData.country) || null}
-                        onChange={handleSelectChange} styles={selectStyles} placeholder="Select country" isSearchable />
+                      <SearchSelect
+                        value={formData.country}
+                        options={countryOptions}
+                        onChange={handleCountryChange}
+                        placeholder="Select country"
+                        searchPlaceholder="Search country..."
+                      />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>State / Province</label>
-                      <Select name="state" options={stateOptions}
-                        value={stateOptions.find((i) => i.value === formData.state) || null}
-                        onChange={handleSelectChange} styles={selectStyles} placeholder="Select state" isSearchable isDisabled={!formData.country} />
+                      <SearchSelect
+                        value={formData.state}
+                        options={stateOptions}
+                        onChange={handleStateChange}
+                        placeholder={statePlaceholder}
+                        searchPlaceholder="Search state / province..."
+                        disabled={!formData.country}
+                        allowCustom={stateOptions.length === 0}
+                        customPrefix="Use state"
+                        emptyText="Is country ka state data dataset me nahi hai — apna state type karein"
+                      />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>City</label>
-                      <Select name="city" options={cityOptions}
-                        value={cityOptions.find((i) => i.value === formData.city) || null}
-                        onChange={handleSelectChange} styles={selectStyles} placeholder="Select city" isSearchable isDisabled={!formData.state} />
+                      <SearchSelect
+                        value={formData.city}
+                        options={cityOptions}
+                        onChange={handleCityChange}
+                        placeholder={cityPlaceholder}
+                        searchPlaceholder="Search city..."
+                        disabled={!formData.state}
+                        allowCustom
+                        customPrefix="Use city"
+                        emptyText="Is state ka city data nahi hai — apna city type karke Enter dabayein"
+                        hint={cityFallbackHint}
+                      />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Postal Code</label>
@@ -965,9 +1274,13 @@ export default function StoreInfoPage() {
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Currency</label>
-                      <Select name="currency" options={currencyOptions}
-                        value={currencyOptions.find((i) => i.value === formData.currency) || null}
-                        onChange={handleSelectChange} styles={selectStyles} placeholder="Select currency" isSearchable />
+                      <SearchSelect
+                        value={formData.currency}
+                        options={currencyOptions}
+                        onChange={handleCurrencyChange}
+                        placeholder="Select currency"
+                        searchPlaceholder="Search currency (e.g. PKR, USD)..."
+                      />
                     </div>
                     <div>
                       <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tax Rate (%)</label>

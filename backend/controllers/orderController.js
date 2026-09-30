@@ -15,6 +15,12 @@ const emitOrderEvent = (event, data) => {
   } catch (e) {}
 };
 
+// ✅ Live stock sync — order par stock kam/aur bar hone par manage-stock page
+//    socket se refresh ho jata hai (manual page refresh ki zaroorat nahi).
+const emitStockEvent = (data) => {
+  emitOrderEvent("stockUpdated", data);
+};
+
 const DELIVERY_FEE = 200;
 
 /// ==========================================
@@ -196,11 +202,18 @@ const placeOrder = async (req, res) => {
     }
 
     // ✅ Stock decrement = PAID + FREE (total ship hone wale)
+    const stockTouchedOnOrder = [];
     for (const oi of orderItems) {
       await Variant.updateOne(
         { _id: oi.variant_id },
         { $inc: { quantity: -(oi.qty + (oi.free_items || 0)) } }
       );
+      stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -(oi.qty + (oi.free_items || 0)) });
+    }
+
+    // ✅ Live update — order place hote hi manage-stock page apne aap refresh
+    if (stockTouchedOnOrder.length > 0) {
+      emitStockEvent({ variants: stockTouchedOnOrder, source: "order_placed" });
     }
 
     // ✅ Custom shipping method support:
@@ -630,13 +643,20 @@ const deleteOrder = async (req, res) => {
     }
 
     // ✅ Stock wapas restore = PAID + FREE (total jo ship hone wala tha)
+    const restoredVariants = [];
     for (const item of order.items) {
       if (item.variant_id) {
         await Variant.updateOne(
           { _id: item.variant_id },
           { $inc: { quantity: item.qty + (item.free_items || 0) } }
         );
+        restoredVariants.push({ variant_id: item.variant_id, change: item.qty + (item.free_items || 0) });
       }
+    }
+
+    // ✅ Live update — stock restore hote hi manage-stock page apne aap refresh
+    if (restoredVariants.length > 0) {
+      emitStockEvent({ variants: restoredVariants, source: "order_deleted" });
     }
 
     await Order.findByIdAndDelete(id);

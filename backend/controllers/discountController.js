@@ -35,6 +35,36 @@ const normalizeArray = (value) => {
   return value.filter(Boolean);
 };
 
+// ✅ TARGET NORMALIZATION — discount sirf usi type ke targets rakhta hai jis par wo apply hota hai.
+//    Pehle stale ids bachte thay: e.g. "Specific Brands" → "Specific Products" switch karne par
+//    purane brands DB me rehte the aur detail page par "Selected Brands" dikhte the, jabki wo
+//    discount un par apply hi nahi karta. Ab non-matching arrays hamesha clear hoti hain.
+//    Partial updates (jaise sirf status toggle) me matching array bachi rahti hai.
+const resolveTargetArrays = (applyTo, incoming = {}, existing = {}) => {
+  const pick = (incomingKey, existingKey) =>
+    incoming[incomingKey] !== undefined
+      ? normalizeArray(incoming[incomingKey])
+      : normalizeArray(existing[existingKey]);
+
+  return {
+    selectedProducts: applyTo === "specific_products" ? pick("selected_product_ids", "selectedProducts") : [],
+    selectedCategories: applyTo === "specific_categories" ? pick("selected_category_ids", "selectedCategories") : [],
+    selectedBrands: applyTo === "specific_brands" ? pick("selected_brand_ids", "selectedBrands") : [],
+    selectedTags: applyTo === "specific_tags" ? pick("selected_tag_ids", "selectedTags") : [],
+    selectedSizes: applyTo === "specific_sizes" ? pick("selected_size_ids", "selectedSizes") : [],
+  };
+};
+
+// ✅ Numeric fields 0 se kam kabhi nahi — pehla invalid field ka label return karta hai
+const findNegativeField = (entries) => {
+  for (const [label, raw] of entries) {
+    if (raw === undefined || raw === null || raw === "") continue;
+    const num = Number(raw);
+    if (!Number.isFinite(num) || num < 0) return label;
+  }
+  return "";
+};
+
 const getApplyTo = (targetType) => {
   switch (targetType) {
     case "all_products":
@@ -124,10 +154,32 @@ exports.createDiscount = async (req, res) => {
       return res.status(400).json({ message: "Discount value is required" });
     }
 
+    // ✅ Negative discount value allowed nahi — value kabhi 0 se kam nahi ho sakti
+    if (!Number.isFinite(Number(value)) || Number(value) < 0) {
+      return res.status(400).json({
+        message: "Discount value cannot be less than 0",
+      });
+    }
+
     // ✅ FIXED: Percentage validation updated to allow up to 100%
-    if (value_type === "percentage" && (Number(value) < 0 || Number(value) > 100)) {
+    if (value_type === "percentage" && Number(value) > 100) {
       return res.status(400).json({
         message: "Percentage discount must be between 0 and 100",
+      });
+    }
+
+    // ✅ Limits / amounts bhi 0 se kam nahi ho sakte
+    const negativeField = findNegativeField([
+      ["Minimum order amount", min_order_amount],
+      ["Minimum quantity", min_quantity],
+      ["Usage limit", usage_limit],
+      ["Per customer limit", usage_per_customer],
+      ["Max discount", max_discount],
+    ]);
+
+    if (negativeField) {
+      return res.status(400).json({
+        message: `${negativeField} cannot be less than 0`,
       });
     }
 
@@ -195,11 +247,14 @@ exports.createDiscount = async (req, res) => {
       value: Number(value),
       maxDiscountAmount: max_discount !== undefined && max_discount !== null && max_discount !== "" ? Number(max_discount) : null,
       applyTo,
-      selectedProducts: normalizeArray(selected_product_ids),
-      selectedCategories: normalizeArray(selected_category_ids),
-      selectedBrands: normalizeArray(selected_brand_ids),
-      selectedTags: normalizeArray(selected_tag_ids),
-      selectedSizes: normalizeArray(selected_size_ids),
+      // ✅ Sirf matching target type ki ids save hoti hain
+      ...resolveTargetArrays(applyTo, {
+        selected_product_ids,
+        selected_category_ids,
+        selected_brand_ids,
+        selected_tag_ids,
+        selected_size_ids,
+      }),
       priceMin: applyTo === "price_range" ? Number(price_min) : null,
       priceMax: applyTo === "price_range" ? Number(price_max) : null,
       minOrderValue: min_order_amount !== undefined && min_order_amount !== null && min_order_amount !== "" ? Number(min_order_amount) : 0,
@@ -338,39 +393,48 @@ exports.getDiscounts = async (req, res) => {
 };
 
 // =====================================================
+// ✅ SHARED RESPONSE BUILDER (populate + Employee fallback)
+// =====================================================
+// createdBy/updatedBy ka ref "User" hai lekin admin accounts Employee collection
+// mein hote hain — aise case mein .populate(...) null deta hai. GET aur PUT dono
+// ek hi resolved payload dein taake UI ko "Updated By" ke liye refresh na karna
+// pade (PUT/socket response pehle raw ObjectId de raha tha).
+const buildDiscountResponse = async (id) => {
+  // Raw ids — populate fail hone par fallback ke liye.
+  const raw = await Discount.findOne({ _id: id, is_deleted: false })
+    .select("createdBy updatedBy")
+    .lean();
+
+  const discount = await Discount.findOne({ _id: id, is_deleted: false })
+    .populate("selectedProducts", "name sku selling_price")
+    .populate("selectedCategories", "name")
+    .populate("selectedBrands", "name")
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email");
+
+  if (!discount) return null;
+
+  // Creator/editor Employee hai to populate null deta hai — properly resolve karo.
+  const obj = discount.toObject();
+  if (!obj.createdBy) {
+    obj.createdBy = await resolveCreatorInfo(raw?.createdBy);
+  }
+  if (!obj.updatedBy) {
+    obj.updatedBy = await resolveCreatorInfo(raw?.updatedBy);
+  }
+  return obj;
+};
+
+// =====================================================
 // GET SINGLE DISCOUNT
 // =====================================================
 
 exports.getDiscountById = async (req, res) => {
   try {
-    // createdBy/updatedBy ke raw ids (populate fail hone par fallback ke liye)
-    const raw = await Discount.findOne({
-      _id: req.params.id,
-      is_deleted: false,
-    }).select("createdBy updatedBy").lean();
+    const obj = await buildDiscountResponse(req.params.id);
 
-    const discount = await Discount.findOne({
-      _id: req.params.id,
-      is_deleted: false,
-    })
-      .populate("selectedProducts", "name sku selling_price")
-      .populate("selectedCategories", "name")
-      .populate("selectedBrands", "name")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
-
-    if (!discount) {
+    if (!obj) {
       return res.status(404).json({ message: "Discount not found" });
-    }
-
-    // Creator User nahi balki Employee hai to populate null deta hai —
-    // actual user name properly resolve karo (User -> Employee fallback).
-    const obj = discount.toObject();
-    if (!obj.createdBy) {
-      obj.createdBy = await resolveCreatorInfo(raw?.createdBy);
-    }
-    if (!obj.updatedBy) {
-      obj.updatedBy = await resolveCreatorInfo(raw?.updatedBy);
     }
 
     return res.status(200).json(obj);
@@ -444,6 +508,12 @@ exports.updateDiscount = async (req, res) => {
     }
 
     if (value !== undefined) {
+      // ✅ Update par bhi negative discount value allowed nahi
+      if (value === null || value === "" || !Number.isFinite(Number(value)) || Number(value) < 0) {
+        return res.status(400).json({
+          message: "Discount value cannot be less than 0",
+        });
+      }
       discount.value = Number(value);
     }
 
@@ -462,11 +532,22 @@ exports.updateDiscount = async (req, res) => {
     // TARGET ARRAYS
     // ===================================================
     discount.applyTo = applyTo;
-    if (selected_product_ids !== undefined) discount.selectedProducts = normalizeArray(selected_product_ids);
-    if (selected_category_ids !== undefined) discount.selectedCategories = normalizeArray(selected_category_ids);
-    if (selected_brand_ids !== undefined) discount.selectedBrands = normalizeArray(selected_brand_ids);
-    if (selected_tag_ids !== undefined) discount.selectedTags = normalizeArray(selected_tag_ids);
-    if (selected_size_ids !== undefined) discount.selectedSizes = normalizeArray(selected_size_ids);
+    // ✅ Target type change par purane (stale) ids clear ho jaate hain — sirf matching
+    //    type ki selection bachti hai. Partial update me existing ids safe rehti hain.
+    Object.assign(
+      discount,
+      resolveTargetArrays(
+        applyTo,
+        {
+          selected_product_ids,
+          selected_category_ids,
+          selected_brand_ids,
+          selected_tag_ids,
+          selected_size_ids,
+        },
+        discount
+      )
+    );
 
     // ===================================================
     // PRICE RANGE
@@ -486,6 +567,22 @@ exports.updateDiscount = async (req, res) => {
     // ===================================================
     // CONDITIONS & DATES & USAGE & RULES & STATUS
     // ===================================================
+
+    // ✅ Update mein bhi limits / amounts 0 se kam nahi ho sakte
+    const negativeField = findNegativeField([
+      ["Minimum order amount", min_order_amount],
+      ["Minimum quantity", min_quantity],
+      ["Usage limit", usage_limit],
+      ["Per customer limit", usage_per_customer],
+      ["Max discount", max_discount],
+    ]);
+
+    if (negativeField) {
+      return res.status(400).json({
+        message: `${negativeField} cannot be less than 0`,
+      });
+    }
+
     if (min_order_amount !== undefined) {
       discount.minOrderValue = min_order_amount === "" || min_order_amount === null ? 0 : Number(min_order_amount);
     }
@@ -540,12 +637,17 @@ exports.updateDiscount = async (req, res) => {
     // ===================================================
     // SOCKET
     // ===================================================
-    emitSocketEvent("discount:updated", updatedDiscount);
-    emitSocketEvent("discountUpdated", updatedDiscount);
+    // ✅ Wahi resolved payload (populated + Employee fallback) emit/return karo
+    // jo GET deta hai — pehle raw doc jata tha jisme updatedBy sirf ObjectId
+    // hota tha, isliye UI "Updated By" refresh ke baghair dikha nahi paata tha.
+    const payload = (await buildDiscountResponse(updatedDiscount._id)) || updatedDiscount.toObject();
+
+    emitSocketEvent("discount:updated", payload);
+    emitSocketEvent("discountUpdated", payload);
 
     return res.status(200).json({
       message: "Discount updated successfully",
-      data: updatedDiscount,
+      data: payload,
     });
   } catch (error) {
     console.error("Update Discount Error:", error);

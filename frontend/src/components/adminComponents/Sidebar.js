@@ -33,6 +33,7 @@ import {
   Truck,
   Percent,
   Boxes,
+  Star, // Added for Featured Products
   SlidersHorizontal, // Added for Attributes
 } from "lucide-react";
 
@@ -100,7 +101,7 @@ const sidebarSections = [
   },
   {
     title: "CATALOG",
-    items: ["Brands", "Categories", "Attributes", "Products"],
+    items: ["Brands", "Categories", "Attributes", "Products", "Featured Products"],
   },
   {
     title: "SALES & MARKETING",
@@ -135,6 +136,8 @@ const allMenuItems = [
     permissionKey: "attribute" 
   },
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
+  // ✅ Featured Products — products hi ek subset hai, is liye wahi "products" permission
+  { name: "Featured Products", icon: Star, path: "/admin/featured-products", permissionKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
   { name: "Discounts", icon: Percent, path: "/admin/discounts", permissionKey: "discounts" },
   { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },

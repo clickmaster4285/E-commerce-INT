@@ -183,6 +183,82 @@ function DataRow({ icon: Icon, label, value, highlight = false, mono = false }) 
   );
 }
 
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Real page ka same shell (header card + overview cards) render hota hai, sirf
+      values shimmer karti hain — is liye data aane par layout shift nahi hota.
+   ✅ Sirf loading state ke liye — real page design me koi change nahi.
+========================================================= */
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function SkeletonDataRows({ rows = 4 }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={`dl-row-${i}`} className="flex items-center justify-between gap-3 py-1.5">
+          <span className="skeleton inline-block h-2.5 w-[76px] rounded align-middle" />
+          <span className="skeleton inline-block h-2.5 rounded align-middle" style={{ width: `${40 + ((i * 19) % 40)}%` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DealDetailSkeleton() {
+  return (
+    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label="Loading deal details">
+      {/* HEADER CARD */}
+      <div className="rounded-2xl p-5 md:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <span className="skeleton mb-4 block h-3 w-28 rounded" />
+        <div className="flex flex-col lg:flex-row gap-5">
+          <span className="skeleton h-16 w-16 lg:h-20 lg:w-20 shrink-0 rounded-xl" />
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-3 mb-1">
+              <span className="skeleton block h-5 w-[220px] rounded" />
+              <span className="skeleton inline-block h-5 w-[70px]" style={SKELETON_ROUND} />
+            </div>
+            <span className="skeleton mb-3 block h-3 w-[60%] rounded" />
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <span key={`dl-meta-${i}`} className="skeleton inline-block h-2.5 w-[110px] rounded align-middle" />
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-start gap-2 shrink-0">
+            <span className="skeleton block h-9 w-[70px] rounded-lg" />
+            <span className="skeleton block h-9 w-[100px] rounded-lg" />
+            <span className="skeleton block h-9 w-[76px] rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      {/* OVERVIEW — left: Deal Information card, right: Quick Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
+        <div className="space-y-3 min-w-0">
+          <InfoCard icon={Tag} title="Deal Information">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+              {[0, 1, 2].map((col) => (
+                <div key={`dl-col-${col}`} className="space-y-4">
+                  {Array.from({ length: 4 }).map((_, r) => (
+                    <div key={`dl-field-${col}-${r}`} className="min-w-0">
+                      <span className="skeleton block h-2.5 w-[70px] rounded" />
+                      <span className="skeleton mt-2 block h-3 rounded" style={{ width: `${55 + ((col * 13 + r * 17) % 40)}%` }} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </InfoCard>
+        </div>
+        <InfoCard icon={Activity} title="Quick Summary"><SkeletonDataRows rows={7} /></InfoCard>
+      </div>
+
+      {/* HISTORY */}
+      <InfoCard icon={Activity} title="Recently Updated History"><SkeletonDataRows rows={4} /></InfoCard>
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
     <div className="min-w-0">
@@ -406,15 +482,10 @@ export default function DealDetailPage() {
     return allBrands.filter((b) => deal.brandIds.some((id) => getId(id) === getId(b)));
   }, [allBrands, deal]);
 
+  // ✅ Loading — spinner ki jagah skeleton (real shell: header card + overview cards),
+  //    is liye data aane par layout shift nahi hota.
   if (loading) {
-    return (
-      <div className="w-full flex items-center justify-center py-24">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-[var(--accent)] border-t-transparent animate-spin" />
-          <p className="text-[13px] font-medium" style={{ color: "var(--text-muted)" }}>Loading deal details...</p>
-        </div>
-      </div>
-    );
+    return <DealDetailSkeleton />;
   }
 
   if (!deal) {
@@ -502,25 +573,8 @@ export default function DealDetailPage() {
         </div>
       </div>
 
-      {/* SECTION TABS */}
-      <div className="flex items-center gap-6 overflow-x-auto border-b" style={{ borderColor: "var(--border-color)", scrollbarWidth: "none" }}>
-        {[
-          ["d-overview", "Overview"],
-          ...(deal.applyTo === "product" ? [["d-products", "Products"]] : []),
-          ...(deal.applyTo === "category" ? [["d-categories", "Categories"]] : []),
-          ...(deal.applyTo === "brand" ? [["d-brands", "Brands"]] : []),
-          ["d-usage", "Usage & Limits"],
-          ["d-history", "History"],
-        ].map(([sectionId, label]) => (
-          <button key={sectionId} type="button"
-            onClick={() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="relative pb-2.5 text-[12px] font-semibold whitespace-nowrap transition-colors hover:opacity-80"
-            style={{ color: "var(--text-muted)" }}>
-            {label}
-            <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ backgroundColor: "var(--border-color)" }} />
-          </button>
-        ))}
-      </div>
+      {/* ✅ Section tabs hata diye gaye — saare sections (Overview / Products|Categories|
+          Brands / Usage & Limits / History) ab ek hi page par continuously render hote hain */}
 
       {/* OVERVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">

@@ -9,6 +9,22 @@ export const dealApi = {
       return [];
     }),
 
+  // ✅ SERVER-SIDE PAGINATION — { deals, stats, pagination } poora response deta hai
+  //    (banners page ke deal picker ko getAll chahiye, is liye woh hataya nahi gaya).
+  getPaginated: (params = {}) =>
+    axiosInstance.get("/deals", { params }).then((res) => ({
+      deals: Array.isArray(res.data?.data) ? res.data.data : [],
+      stats: res.data?.stats || null,
+      pagination: res.data?.pagination || {
+        total: 0,
+        page: 1,
+        limit: params.limit || 20,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    })),
+
   getById: (id) =>
     axiosInstance.get(`/deals/${id}`).then((res) => res.data?.data || res.data),
 

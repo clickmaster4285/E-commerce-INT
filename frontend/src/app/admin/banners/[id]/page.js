@@ -177,6 +177,90 @@ function RailRow({ icon: Icon, label, value, mono = false }) {
   );
 }
 
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Real page ka same shell (breadcrumb + header card + quick facts + section cards)
+      render hota hai, sirf values shimmer karti hain — is liye layout shift nahi hota.
+   ✅ Sirf loading state ke liye — real page design me koi change nahi.
+========================================================= */
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function SkeletonInfoRows({ rows = 4 }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={`bk-row-${i}`} className="flex items-center justify-between gap-3 py-1.5">
+          <span className="skeleton inline-block h-2.5 w-[80px] rounded align-middle" />
+          <span className="skeleton inline-block h-2.5 rounded align-middle" style={{ width: `${40 + ((i * 17) % 45)}%` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BannerDetailSkeleton() {
+  return (
+    <div className="w-full space-y-4 pb-10" aria-busy="true" aria-label="Loading banner details">
+      {/* BREADCRUMB */}
+      <div className="flex items-center gap-1.5">
+        <span className="skeleton inline-block h-3 w-14 rounded align-middle" />
+        <span className="skeleton inline-block h-3 w-28 rounded align-middle" />
+      </div>
+
+      {/* HEADER */}
+      <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="skeleton shrink-0 rounded-lg" style={{ width: 38, height: 38 }} />
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="skeleton block h-4 w-[200px] rounded" />
+            <span className="skeleton inline-block h-6 w-[72px]" style={SKELETON_ROUND} />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="skeleton inline-block h-6 w-[72px]" style={SKELETON_ROUND} />
+          <span className="skeleton inline-block h-9 w-[74px] rounded-lg" />
+          <span className="skeleton inline-block h-9 w-[104px] rounded-lg" />
+          <span className="skeleton inline-block h-9 w-[82px] rounded-lg" />
+        </div>
+      </div>
+
+      {/* QUICK FACTS */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <InfoTile
+            key={`banner-tile-${i}`}
+            icon={Hash}
+            label={<span className="skeleton inline-block h-2.5 w-[56px] rounded align-middle" />}
+            value={<span className="skeleton inline-block h-3.5 w-[80px] rounded align-middle" />}
+          />
+        ))}
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-4">
+          <SectionCard icon={Eye} title="Banner Preview"><span className="skeleton block h-56 w-full rounded-lg" /></SectionCard>
+          <SectionCard icon={Info} title="Basic Information"><SkeletonInfoRows rows={5} /></SectionCard>
+          {/* section tabs */}
+          <div className="flex items-center gap-1 rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <span key={`banner-tab-${i}`} className="skeleton h-8 flex-1 rounded-lg" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SectionCard icon={Type} title="Banner Content"><SkeletonInfoRows rows={4} /></SectionCard>
+            <SectionCard icon={Link2} title="Buttons"><SkeletonInfoRows rows={3} /></SectionCard>
+          </div>
+        </div>
+        <aside className="min-w-0 space-y-4">
+          <SectionCard icon={User} title="Banner Information"><SkeletonInfoRows rows={4} /></SectionCard>
+          <SectionCard icon={History} title="History"><SkeletonInfoRows rows={4} /></SectionCard>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function InfoTile({ icon: Icon, label, value }) {
   return (
     <div className="card flex min-w-0 items-center gap-3 p-3.5">
@@ -271,12 +355,10 @@ export default function BannerDetailPage() {
     document.getElementById(tab.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // ✅ Loading — spinner ki jagah skeleton (breadcrumb + header + quick facts + section
+  //    cards), is liye data aane par layout shift nahi hota.
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-9 w-9 animate-spin rounded-full border-4 border-[var(--accent)] border-t-transparent" />
-      </div>
-    );
+    return <BannerDetailSkeleton />;
   }
 
   if (isError || !banner) {

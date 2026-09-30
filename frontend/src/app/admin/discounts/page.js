@@ -38,6 +38,8 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
+// ✅ Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 /* ==================== HELPERS ==================== */
 const normalizeArrayResponse = (response) => {
@@ -79,6 +81,37 @@ const formatValue = (discount) => {
   if (type === "fixed_price") return `Fixed Rs. ${value}`;
   return `Rs. ${value} OFF`;
 };
+
+// ✅ Discount form ke numeric fields 0 se kam kabhi nahi ho sakte.
+// "-" ya "+" type hi nahi ho sakta, paste hone par sign hata diya jata hai,
+// aur value kabhi bhi negative accept nahi hoti (integer=true par decimals bhi nahi).
+export const toNonNegative = (raw, integer = false) => {
+  const digitsOnly = String(raw ?? "").replace(integer ? /[^\d]/g : /[^\d.]/g, "");
+  let cleaned = digitsOnly;
+  if (!integer) {
+    const firstDot = cleaned.indexOf(".");
+    if (firstDot !== -1) {
+      cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+    }
+  }
+  if (cleaned === "" || cleaned === ".") return "";
+  const num = Number(cleaned);
+  if (!Number.isFinite(num) || num < 0) return "0";
+  // leading zeros trim (0.5 jaise value safe rehti hai)
+  return cleaned.replace(/^0+(?=\d)/, "");
+};
+
+// ✅ Numeric fields ka common validation — negative ya invalid value block hoti hai
+export const validateNonNegative = (entries) => {
+  for (const [label, raw] of entries) {
+    if (raw === "" || raw === null || raw === undefined) continue;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return `${label} must be a valid number`;
+    if (num < 0) return `${label} cannot be less than 0`;
+  }
+  return "";
+};
+
 
 const getDiscountStatus = (discount) => {
   // ✅ Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
@@ -141,7 +174,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
     if (next && buttonRef.current) {
       // Viewport-aware: open upward when there is not enough space below the trigger
       const rect = buttonRef.current.getBoundingClientRect();
-      const MENU_HEIGHT = 200; // max-h-48 (192px) + margin
+      const MENU_HEIGHT = 264; // max-h-64 (256px) + margin (rich rows ke sath)
       setDropUp(window.innerHeight - rect.bottom < MENU_HEIGHT && rect.top > MENU_HEIGHT);
     }
     setIsOpen(next);
@@ -149,28 +182,74 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
 
   const selectedOption = options.find(o => o.value === value);
   const displayValue = selectedOption ? selectedOption.label : (value || placeholder);
+  const SelectedIcon = selectedOption?.icon;
 
   return (
     <div className="relative w-full" ref={containerRef}>
       <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
-        className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 md:h-9 w-full items-center justify-between gap-2 rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
-        <span className="truncate">{displayValue}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {SelectedIcon && (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+              <SelectedIcon className="h-3 w-3" />
+            </span>
+          )}
+          <span className="truncate">{displayValue}</span>
+        </span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
+        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
           ) : (
-            options.map((opt) => (
-              <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
-                style={{ color: value === opt.value ? "var(--accent)" : "var(--text-primary)", backgroundColor: value === opt.value ? "var(--accent-soft)" : "transparent" }}>
-                {opt.label}
-              </button>
-            ))
+            options.map((opt) => {
+              const active = value === opt.value;
+              const OptionIcon = opt.icon;
+
+              // ✅ Plain option (icon/description na ho) — purana simple row
+              if (!OptionIcon && !opt.description) {
+                return (
+                  <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
+                    style={{ color: active ? "var(--accent)" : "var(--text-primary)", backgroundColor: active ? "var(--accent-soft)" : "transparent" }}>
+                    {opt.label}
+                  </button>
+                );
+              }
+
+              // ✅ Rich row — icon badge + title + example description + selected tick
+              return (
+                <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
+                  style={{
+                    backgroundColor: active ? "var(--accent-soft)" : "transparent",
+                    borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
+                  }}>
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
+                    style={{
+                      backgroundColor: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "var(--bg-tertiary)",
+                      border: "1px solid var(--border-color)",
+                      color: active ? "var(--accent)" : "var(--text-secondary)",
+                    }}>
+                    <OptionIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-semibold" style={{ color: active ? "var(--accent)" : "var(--text-primary)" }}>
+                      {opt.label}
+                    </span>
+                    {opt.description && (
+                      <span className="mt-0.5 block text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                        {opt.description}
+                      </span>
+                    )}
+                  </span>
+                  {active && <CheckIcon className="mt-1 h-3.5 w-3.5 shrink-0" style={{ color: "var(--accent)" }} />}
+                </button>
+              );
+            })
           )}
         </div>
       )}
@@ -208,11 +287,25 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "" }) => (
+const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, className = "", min, max, nonNegative = false, integer = false }) => (
   <input
     type={type}
     value={value || ""}
-    onChange={(e) => onChange(e.target.value)}
+    min={nonNegative ? (min ?? 0) : min}
+    max={max}
+    step={nonNegative && type === "number" ? (integer ? 1 : "any") : undefined}
+    inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
+    onChange={(e) => {
+      const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
+      // ✅ Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
+      const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
+      onChange(clamped);
+    }}
+    onKeyDown={nonNegative ? (e) => {
+      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+    } : undefined}
+    onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
     className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
@@ -230,6 +323,66 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
     style={style}
   />
 );
+
+/* =========================================================
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
+   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+      widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
+      par layout shift nahi hota (pehle yahan sirf spinner tha).
+   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+========================================================= */
+// `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
+const SKELETON_ROUND = { borderRadius: "9999px" };
+
+function DiscountRowsSkeleton({ rows = 10 }) {
+  return (
+    <tbody aria-busy="true" aria-label="Loading discounts">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
+          {/* checkbox */}
+          <td className="px-4 py-3"><span className="skeleton block h-4 w-4 rounded" /></td>
+          {/* discount — icon + name */}
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
+              <span className="skeleton inline-block h-3 w-[140px] rounded align-middle" />
+            </div>
+          </td>
+          {/* applies to */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[80px] rounded align-middle" /></td>
+          {/* value */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-3 w-[54px] rounded align-middle" /></td>
+          {/* status badge */}
+          <td className="px-4 py-3"><span className="skeleton inline-block h-5 w-[66px] align-middle" style={SKELETON_ROUND} /></td>
+          {/* actions */}
+          <td className="px-4 py-3 whitespace-nowrap w-1">
+            <div className="flex items-center justify-end"><span className="skeleton block h-[38px] w-[44px] rounded-md" /></div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function DiscountCardsSkeleton({ cards = 8, cardStyle }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading discounts">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={`discount-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
+          <div className="flex items-start justify-between">
+            <span className="skeleton h-10 w-10 shrink-0 rounded-lg" />
+            <span className="skeleton inline-block h-5 w-[66px]" style={SKELETON_ROUND} />
+          </div>
+          <span className="skeleton block h-3 w-[75%] rounded" />
+          <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
+            <span className="skeleton inline-block h-3 w-[52px] rounded align-middle" />
+            <span className="skeleton block h-[38px] w-[44px] rounded-md" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function StatCard({ title, value, valueStyle, cardStyle }) {
   return (<div className="rounded-lg p-4 flex flex-col justify-center" style={cardStyle}>
@@ -567,8 +720,19 @@ export default function DiscountsPage() {
       setFormErrors({ code: "Discount code is required." });
       return;
     }
-    if (formData.value === "" || Number(formData.value) < 0) return toast.error("Valid discount value is required");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
+    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
     if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+
+    // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
+    const nonNegativeError = validateNonNegative([
+      ["Discount value", formData.value],
+      ["Minimum order amount", formData.min_order_amount],
+      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
+      ["Total usage limit", formData.usage_limit],
+      ["Per customer limit", formData.usage_per_customer],
+    ]);
+    if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
     let applyTo = "all";
@@ -841,7 +1005,29 @@ export default function DiscountsPage() {
 
         {/* TABLE / GRID */}
         {isLoading ? (
-          <div className="rounded-lg py-14 flex justify-center items-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading discounts...</span></div>
+          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+             list view me wahi table shell + shimmer rows, grid view me shimmer cards */
+          viewMode === "list" ? (
+            <div className="rounded-lg overflow-hidden" style={cardStyle}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
+                    <tr>
+                      <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <DiscountRowsSkeleton rows={itemsPerPage} />
+                </table>
+              </div>
+            </div>
+          ) : (
+            <DiscountCardsSkeleton cards={8} cardStyle={cardStyle} />
+          )
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <TagIcon className="w-8 h-8 mb-3 opacity-50" />
@@ -1244,9 +1430,24 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                     value={formData.value_type}
                     onChange={(val) => setFormData({ ...formData, value_type: val })}
                     options={[
-                      { value: "percentage", label: "Percentage Discount (%)" },
-                      { value: "fixed_amount", label: "Fixed Amount (Rs.)" },
-                      { value: "fixed_price", label: "Fixed Price (Rs.)" },
+                      {
+                        value: "percentage",
+                        label: "Percentage Discount (%)",
+                        icon: PercentIcon,
+                        description: "Example: 10% off on the order total",
+                      },
+                      {
+                        value: "fixed_amount",
+                        label: "Fixed Amount Discount (Rs.)",
+                        icon: RupeeIcon,
+                        description: "Example: Rs. 1,000 off on the order total",
+                      },
+                      {
+                        value: "fixed_price",
+                        label: "Fixed Sale Price (Rs.)",
+                        icon: TagIcon,
+                        description: "Example: Sell at a fixed price, e.g. Rs. 7,000",
+                      },
                     ]}
                     placeholder="Select discount type"
                   />
@@ -1254,20 +1455,20 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label="Discount Percentage (%)" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label="Discount Percentage (%)" fullWidth hint="Value must be between 0 and 100 (max 100)">
+                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
-                    <FormField label="Discount Amount (Rs.)" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                    <FormField label="Discount Amount (Rs.)" fullWidth hint="Negative values are not allowed (minimum 0)">
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_price" && (
-                    <FormField label="Fixed Price (Rs.)" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 999" style={inputStyle} />
+                    <FormField label="Fixed Price (Rs.)" fullWidth hint="Negative values are not allowed (minimum 0)">
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 999" style={inputStyle} />
                     </FormField>
                   )}
                 </div>
@@ -1288,6 +1489,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                   <FormField label="Min Order Amount (Rs.)" hint="Leave empty for no minimum">
                     <TextInput 
                       type="number" 
+                      nonNegative
                       value={formData.min_order_amount} 
                       onChange={(v) => setFormData({ ...formData, min_order_amount: v })} 
                       placeholder="e.g., 1000" 
@@ -1326,6 +1528,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                     <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
                       <TextInput 
                         type="number" 
+                        nonNegative
+                        integer
                         value={formData.min_quantity} 
                         onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
                         placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
@@ -1353,6 +1557,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                   <FormField label="Total Usage Limit" hint="Leave empty for unlimited uses">
                     <TextInput 
                       type="number" 
+                      nonNegative
+                      integer
                       value={formData.usage_limit} 
                       onChange={(v) => setFormData({ ...formData, usage_limit: v })} 
                       placeholder="Unlimited" 
@@ -1362,6 +1568,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                   <FormField label="Per Customer Limit" hint="Leave empty for unlimited per user">
                     <TextInput 
                       type="number" 
+                      nonNegative
+                      integer
                       value={formData.usage_per_customer} 
                       onChange={(v) => setFormData({ ...formData, usage_per_customer: v })} 
                       placeholder="Unlimited" 

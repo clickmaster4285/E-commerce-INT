@@ -57,9 +57,11 @@ const toStockItem = (variant) => {
     product_name: product?.name || "Unknown Product",
     product_is_deleted: Boolean(product?.is_deleted),
     category_id: product?.category_id?._id || product?.category_id || null,
-    category_name: product?.category_id?.name || "Uncategorized",
+    // ✅ Fake labels ("Uncategorized" / "No brand") hataye — jab category/brand
+    //    assign nahi hai to khaali bhejte hain aur frontend wo line chhupa deta hai.
+    category_name: product?.category_id?.name || "",
     brand_id: product?.brand_id?._id || product?.brand_id || null,
-    brand_name: product?.brand_id?.name || "No brand",
+    brand_name: product?.brand_id?.name || "",
     brand_logo: product?.brand_id?.logo?.img_url || "",
   };
 };
@@ -228,7 +230,14 @@ const adjustStock = async (req, res) => {
       type,
       quantity,
       reason,
+      explanation,
     } = req.body;
+
+    // ✅ "Explanation" (adjust form ka notes) — pehle ye notes preset reason ke
+    // sath save hi nahi hote the, is liye Stock History mein dikhte nahi the.
+    // Ab frontend ise required bhejta hai, lekin backend par bhi safety check.
+    const explanationText = String(explanation || "").trim();
+    const reasonText = String(reason || "").trim();
 
     /* =====================================================
        VALIDATION
@@ -267,6 +276,16 @@ const adjustStock = async (req, res) => {
       return res.status(400).json({
         message:
           "Quantity must be greater than 0 for add or remove",
+      });
+    }
+
+    // ✅ "Explanation" ab required hai — jab tak admin justification na de,
+    // adjustment accept nahi hota. ("Other" reason mein bhi wahi text
+    // explanation ke tor par bheja jata hai, is liye har case cover hota hai.)
+    if (!explanationText) {
+      return res.status(400).json({
+        message:
+          "Explanation is required for stock adjustment",
       });
     }
 
@@ -354,7 +373,9 @@ const adjustStock = async (req, res) => {
 
         adjustment_type: type,
 
-        reason: reason || "",
+        reason: reasonText,
+
+        explanation: explanationText,
 
         performed_by: performerId,
 
@@ -392,7 +413,9 @@ const adjustStock = async (req, res) => {
 
           adjustmentType: type,
 
-          reason: reason || "",
+          reason: reasonText,
+
+          explanation: explanationText,
         },
       },
       performerId
