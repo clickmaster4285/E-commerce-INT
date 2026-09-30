@@ -277,7 +277,7 @@ export default function CartPage() {
     return (
     <div
       onClick={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
-      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${dealOpen ? "min-h-[260px] border-purple-500/40" : ""} ${
+      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${dealOpen ? "min-h-[16.25rem] border-purple-500/40" : ""} ${
       !isSelected ? "opacity-60" : ""
     } ${
       isDeal
@@ -313,7 +313,7 @@ export default function CartPage() {
                 <Package size={28} className="text-[var(--user-text-subtle)]" />
               </div>
             )}
-            <div className="absolute -top-1.5 -right-1.5 min-w-[24px] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[10px] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)] shadow-sm">
+            <div className="absolute -top-1.5 -right-1.5 min-w-[1.5rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)] shadow-sm">
               ×{row.qty}
             </div>
           </div>
@@ -323,40 +323,40 @@ export default function CartPage() {
           <Link href={`/product/${row.raw.productId || row.raw.id}`} className="text-sm sm:text-base font-bold text-[var(--user-text)] hover:text-[var(--user-accent)] transition-colors line-clamp-2 leading-snug">
             {row.name}
           </Link>
-          {row.brand && <p className="text-[10px] font-black uppercase tracking-wider text-[var(--user-text-subtle)] mt-1">{row.brand}</p>}
+          {row.brand && <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-subtle)] mt-1">{row.brand}</p>}
           {row.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>}
           
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             {/* ✅ Discount sirf EK dafa row pe: price-drop pill (-X%) already deal discount
                 dikha raha hai, to same "2% OFF" badge dubara mat render karo */}
             {isDeal && dealBadge && !(row.hasDiscount && row.originalPrice > row.displayPrice) && (
-              <span className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r ${getDealBadgeConfig(row.raw)?.color || "from-purple-500 to-pink-600"} text-white px-2 py-0.5 text-[10px] font-black shadow-sm`}>
+              <span className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r ${getDealBadgeConfig(row.raw)?.color || "from-purple-500 to-pink-600"} text-white px-2 py-0.5 text-[0.625rem] font-black shadow-sm`}>
                 <Sparkles size={10} /> {dealBadge}
               </span>
             )}
             {row.freeItems > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-success)]/15 text-[var(--user-success)] border border-[var(--user-success)]/20 px-2 py-0.5 text-[10px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-success)]/15 text-[var(--user-success)] border border-[var(--user-success)]/20 px-2 py-0.5 text-[0.625rem] font-black">
                 <Check size={10} /> {row.freeItems} FREE
               </span>
             )}
             {/* ✅ Bundle rules — auto-added FREE gift line */}
             {row.isGift && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30 px-2 py-0.5 text-[10px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 text-amber-600 border border-amber-400/30 px-2 py-0.5 text-[0.625rem] font-black">
                 🎁 FREE GIFT
               </span>
             )}
             {!row.isGift && row.bundleAppliedRule && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 text-[10px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 text-[0.625rem] font-black">
                 🔥 {row.bundleAppliedRule}
               </span>
             )}
             {!row.isGift && row.bundleProgress && !row.bundleAppliedRule && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] border border-[var(--user-border)] px-2 py-0.5 text-[10px] font-bold">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] border border-[var(--user-border)] px-2 py-0.5 text-[0.625rem] font-bold">
                 {row.bundleProgress}
               </span>
             )}
             {row.hasDiscount && row.originalPrice > row.displayPrice && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/20 px-2 py-0.5 text-[10px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/20 px-2 py-0.5 text-[0.625rem] font-black">
                 <TrendingUp size={10} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
               </span>
             )}
@@ -366,7 +366,7 @@ export default function CartPage() {
               onClick={(e) => { e.stopPropagation(); setOpenDealCardKey((prev) => (prev === row.key ? null : row.key)); }}
               aria-label="View available deals"
               aria-expanded={dealOpen}
-              className="inline-flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+              className="inline-flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
             >
               <BadgePercent size={11} />
               <span>Deals</span>
@@ -417,10 +417,10 @@ export default function CartPage() {
         <div className="text-right">
           <p className="text-lg font-black text-[var(--user-accent)]">{fmt(row.lineTotal)}</p>
           {row.freeItems > 0 && (
-            <p className="text-[10px] text-[var(--user-success)] font-semibold mt-0.5">{row.payableItems} paid + {row.freeItems} free</p>
+            <p className="text-[0.625rem] text-[var(--user-success)] font-semibold mt-0.5">{row.payableItems} paid + {row.freeItems} free</p>
           )}
           {row.savings > 0 && (
-            <p className="text-[10px] font-black text-[var(--user-success)] flex items-center justify-end gap-1 mt-0.5">
+            <p className="text-[0.625rem] font-black text-[var(--user-success)] flex items-center justify-end gap-1 mt-0.5">
               <Tag size={10} /> Save {fmt(row.savings * row.qty)}
             </p>
           )}
@@ -444,7 +444,7 @@ export default function CartPage() {
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
     <div className="hidden lg:block">
-    <main className="max-w-[1200px] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-32 md:pb-10">
+    <main className="max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-32 md:pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
@@ -482,7 +482,7 @@ export default function CartPage() {
             </span>
             <span className="text-sm font-bold text-[var(--user-text)]">Select All</span>
           </button>
-          <span className="text-[11px] sm:text-xs font-bold text-[var(--user-text-muted)] tabular-nums">
+          <span className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-text-muted)] tabular-nums">
             {selectedLineCount} of {cart.length} selected
           </span>
         </div>
@@ -534,7 +534,7 @@ export default function CartPage() {
                   />
                 </div>
                 {freeRemaining > 0 && (
-                  <p className="text-[10px] text-[var(--user-text-muted)] mt-1.5">
+                  <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-1.5">
                     {Math.round(freeProgress)}% of {fmt(freeOver)}
                   </p>
                 )}
@@ -568,10 +568,10 @@ export default function CartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-sm font-black text-[var(--user-text)] truncate">{dealGroup.dealName}</h3>
-                      <p className="text-[10px] font-black text-purple-600 uppercase tracking-wider">{dealGroup.dealBadge || "Active Deal"}</p>
+                      <p className="text-[0.625rem] font-black text-purple-600 uppercase tracking-wider">{dealGroup.dealBadge || "Active Deal"}</p>
                     </div>
                     {isCollapsed && (
-                      <span className="text-[10px] font-black text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-full">
+                      <span className="text-[0.625rem] font-black text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-full">
                         {dealGroup.items.length} {dealGroup.items.length === 1 ? "item" : "items"}
                       </span>
                     )}
@@ -636,12 +636,12 @@ export default function CartPage() {
                   <span className="flex items-center gap-1.5">
                     <Truck size={13} /> Shipping
                     {totals.freeShippingActiveForDefault && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[9px] font-black text-orange-600">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[0.5625rem] font-black text-orange-600">
                         <Truck size={9} /> Deal
                       </span>
                     )}
                     {shipping === 0 && (
-                      <span className="text-[9px] font-black text-[var(--user-success)] bg-[var(--user-success)]/15 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>
+                      <span className="text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/15 border border-[var(--user-success)]/30 px-1.5 py-0.5 rounded">FREE</span>
                     )}
                   </span>
                   <span className="font-bold text-[var(--user-text)]">
@@ -649,7 +649,7 @@ export default function CartPage() {
                   </span>
                 </div>
                 {shippingReason && (
-                  <p className="text-[10px] text-[var(--user-success)] font-semibold -mt-1">{shippingReason}</p>
+                  <p className="text-[0.625rem] text-[var(--user-success)] font-semibold -mt-1">{shippingReason}</p>
                 )}
                 {totals.tax > 0 && (
                   <div className="flex justify-between text-[var(--user-text-muted)]">
@@ -662,7 +662,7 @@ export default function CartPage() {
                   <span className="text-base font-black text-[var(--user-text)]">Total</span>
                   <div className="text-right">
                     <p className="text-2xl font-black text-[var(--user-accent)] leading-none">{fmt(grandTotal)}</p>
-                    <p className="text-[10px] text-[var(--user-text-muted)] mt-1">Including all taxes</p>
+                    <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-1">Including all taxes</p>
                   </div>
                 </div>
               </div>
@@ -677,13 +677,13 @@ export default function CartPage() {
               </button>
 
               <div className="mt-5 pt-5 border-t-2 border-[var(--user-border)] space-y-2">
-                <p className="flex items-center gap-2 text-[10px] text-[var(--user-text-muted)]">
+                <p className="flex items-center gap-2 text-[0.625rem] text-[var(--user-text-muted)]">
                   <Lock size={11} className="text-[var(--user-accent)]" /> Secure checkout with encrypted payment
                 </p>
-                <p className="flex items-center gap-2 text-[10px] text-[var(--user-text-muted)]">
+                <p className="flex items-center gap-2 text-[0.625rem] text-[var(--user-text-muted)]">
                   <ShieldCheck size={11} className="text-[var(--user-accent)]" /> 100% protected & guaranteed delivery
                 </p>
-                <p className="flex items-center gap-2 text-[10px] text-[var(--user-text-muted)]">
+                <p className="flex items-center gap-2 text-[0.625rem] text-[var(--user-text-muted)]">
                   <CreditCard size={11} className="text-[var(--user-accent)]" /> COD, Card & Bank transfer accepted
                 </p>
               </div>
@@ -697,7 +697,7 @@ export default function CartPage() {
         <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t-2 border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-[var(--user-text-muted)] font-bold">{count} items · {totals.freeShippingActiveForDefault || shipping === 0 ? "FREE shipping" : `Shipping ${fmt(shipping)}`}</p>
+              <p className="text-[0.625rem] text-[var(--user-text-muted)] font-bold">{count} items · {totals.freeShippingActiveForDefault || shipping === 0 ? "FREE shipping" : `Shipping ${fmt(shipping)}`}</p>
               <p className="text-lg font-black text-[var(--user-accent)]">{fmt(grandTotal)}</p>
             </div>
             <button
@@ -729,10 +729,10 @@ export default function CartPage() {
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-black text-[var(--user-text)] leading-none truncate">Cart</p>
-            <p className="text-[11px] text-[var(--user-text-muted)] mt-0.5">{count} {count === 1 ? "item" : "items"}</p>
+            <p className="text-[0.9375rem] font-black text-[var(--user-text)] leading-none truncate">Cart</p>
+            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{count} {count === 1 ? "item" : "items"}</p>
           </div>
-          <span className="text-[11px] font-bold text-[var(--user-text-muted)] tabular-nums">{fmt(grandTotal)}</span>
+          <span className="text-[0.6875rem] font-bold text-[var(--user-text-muted)] tabular-nums">{fmt(grandTotal)}</span>
         </div>
       </div>
 
@@ -744,9 +744,9 @@ export default function CartPage() {
               <ShoppingBag size={36} className="text-[var(--user-accent)]" />
             </div>
             <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Your cart is empty</h2>
-            <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[280px]">Looks like you haven&apos;t added anything yet. Let&apos;s find something great.</p>
+            <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">Looks like you haven&apos;t added anything yet. Let&apos;s find something great.</p>
             <Link
-              href="/product"
+              href="/"
               className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition"
             >
               Start Shopping <ArrowRight size={16} />
@@ -760,11 +760,11 @@ export default function CartPage() {
                   <div className="flex items-center gap-2 mb-1.5">
                     <Truck size={15} className="text-[var(--user-success)] shrink-0" />
                     {freeRemaining > 0 ? (
-                      <p className="text-[12px] font-bold text-[var(--user-text)]">
+                      <p className="text-[0.75rem] font-bold text-[var(--user-text)]">
                         Add <span className="text-[var(--user-success)]">{fmt(freeRemaining)}</span> more for FREE shipping!
                       </p>
                     ) : (
-                      <p className="text-[12px] font-black text-[var(--user-success)] flex items-center gap-1">
+                      <p className="text-[0.75rem] font-black text-[var(--user-success)] flex items-center gap-1">
                         <Check size={13} /> You&apos;ve unlocked FREE shipping!
                       </p>
                     )}
@@ -780,7 +780,7 @@ export default function CartPage() {
                 <div key={dealGroup.dealId} className="mb-3">
                   <div className="flex items-center gap-2 px-1 mb-1.5">
                     <Sparkles size={13} className="text-purple-500" />
-                    <span className="text-[11px] font-black uppercase tracking-wider text-purple-500">{dealGroup.dealBadge || dealGroup.dealName}</span>
+                    <span className="text-[0.6875rem] font-black uppercase tracking-wider text-purple-500">{dealGroup.dealBadge || dealGroup.dealName}</span>
                   </div>
                   {dealGroup.items.map((row) => (
                     <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} onApplyDeal={(deal) => applyDealToItem(row.key, deal)} openDealPicker={openDealCardKey === row.key} onToggleDealPicker={(force) => setOpenDealCardKey((prev) => force === false ? null : (prev === row.key ? null : row.key))} />
@@ -793,7 +793,7 @@ export default function CartPage() {
                 <div>
                   <div className="flex items-center gap-2 px-1 mb-1.5">
                     <Box size={13} className="text-[var(--user-text-muted)]" />
-                    <span className="text-[11px] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Items ({groupedItems.regular.length})</span>
+                    <span className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Items ({groupedItems.regular.length})</span>
                   </div>
                   {groupedItems.regular.map((row) => (
                     <MobileCartCard key={row.key} row={row} onDec={() => row.qty > 1 && updateQty(row.key, row.qty - 1)} onInc={() => updateQty(row.key, row.qty + 1)} onRemove={handleRemove} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} onApplyDeal={(deal) => applyDealToItem(row.key, deal)} openDealPicker={openDealCardKey === row.key} onToggleDealPicker={(force) => setOpenDealCardKey((prev) => force === false ? null : (prev === row.key ? null : row.key))} />
@@ -812,7 +812,7 @@ export default function CartPage() {
         >
           <div className="flex items-center gap-3 px-3 py-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-[var(--user-text-muted)] font-bold uppercase tracking-wider">
+              <p className="text-[0.625rem] text-[var(--user-text-muted)] font-bold uppercase tracking-wider">
                 Total
                 <span className={`ml-1 ${totals.freeShippingActiveForDefault || shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"}`}>
                   {totals.freeShippingActiveForDefault || shipping === 0 ? "FREE shipping" : "incl. shipping"}
@@ -842,7 +842,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
   return (
     <div
       onClick={() => onToggleDealPicker?.()}
-      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border p-3 mb-2 flex items-start gap-2 transition-all duration-200 ${openDealPicker ? "min-h-[240px] border-purple-500/40" : "border-[var(--user-border)]"} ${!isSelected ? "opacity-60" : ""}`}>
+      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border p-3 mb-2 flex items-start gap-2 transition-all duration-200 ${openDealPicker ? "min-h-[15rem] border-purple-500/40" : "border-[var(--user-border)]"} ${!isSelected ? "opacity-60" : ""}`}>
       {/* ✅ Selection checkbox (unchanged) */}
       <button
         type="button"
@@ -872,7 +872,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
       <div className="flex-1 min-w-0 flex flex-col">
         {/* ✅ Row 1 — Name (left) + DELETE icon (top-right) */}
         <div className="flex items-start gap-2">
-          <Link href={`/product/${row.raw.productId || row.raw.id}`} className="flex-1 min-w-0 text-[13px] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
+          <Link href={`/product/${row.raw.productId || row.raw.id}`} className="flex-1 min-w-0 text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
             {row.name}
           </Link>
           <button
@@ -886,7 +886,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
         </div>
 
         {row.variantTitle && (
-          <p className="text-[10px] text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>
+          <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>
         )}
 
         {(isDeal && dealBadge) || row.freeItems > 0 || row.hasDiscount ? (
@@ -894,17 +894,17 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
             {/* ✅ Discount sirf EK dafa row pe: price-drop pill (-X%) already deal discount
                 dikha raha hai, to same badge dubara mat render karo */}
             {isDeal && dealBadge && !(row.hasDiscount && row.originalPrice > row.displayPrice) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white px-1.5 py-0.5 text-[9px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white px-1.5 py-0.5 text-[0.5625rem] font-black">
                 <Sparkles size={8} /> {dealBadge}
               </span>
             )}
             {row.freeItems > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-success)]/15 text-[var(--user-success)] border border-[var(--user-success)]/25 px-1.5 py-0.5 text-[9px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-success)]/15 text-[var(--user-success)] border border-[var(--user-success)]/25 px-1.5 py-0.5 text-[0.5625rem] font-black">
                 <Check size={8} /> {row.freeItems} FREE
               </span>
             )}
             {row.hasDiscount && row.originalPrice > row.displayPrice && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/25 px-1.5 py-0.5 text-[9px] font-black">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)] border border-[var(--user-accent)]/25 px-1.5 py-0.5 text-[0.5625rem] font-black">
                 <TrendingUp size={8} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
               </span>
             )}
@@ -917,7 +917,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
           aria-label="View available deals"
           aria-expanded={openDealPicker}
-          className="inline-flex w-fit items-center gap-1 mt-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[9px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+          className="inline-flex w-fit items-center gap-1 mt-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[0.5625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
         >
           <BadgePercent size={10} />
           <span>Deals</span>
@@ -933,9 +933,9 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
         {/* ✅ Row 2 — Price (left) + QTY stepper (right) — neche wali line khatam */}
         <div className="flex items-center justify-between gap-2 mt-1.5">
           <div className="flex items-baseline gap-1.5 min-w-0">
-            <p className="text-[13px] font-black text-[var(--user-accent)]">{fmt(row.displayPrice)}</p>
+            <p className="text-[0.8125rem] font-black text-[var(--user-accent)]">{fmt(row.displayPrice)}</p>
             {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
-              <p className="text-[10px] text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
+              <p className="text-[0.625rem] text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
             )}
           </div>
           <div className="inline-flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-elevated)] overflow-hidden shrink-0">
@@ -948,7 +948,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
             >
               <Minus size={13} />
             </button>
-            <span className="w-7 text-center text-[12px] font-black tabular-nums text-[var(--user-text)]">{row.qty}</span>
+            <span className="w-7 text-center text-[0.75rem] font-black tabular-nums text-[var(--user-text)]">{row.qty}</span>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onInc(); }}

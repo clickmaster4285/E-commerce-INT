@@ -168,7 +168,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                     <p className="text-sm font-semibold text-[var(--user-text)] truncate">
                       {p.name}
                     </p>
-                    <p className="text-[11px] text-[var(--user-text-muted)] capitalize truncate">
+                    <p className="text-[0.6875rem] text-[var(--user-text-muted)] capitalize truncate">
                       {p.brand_id?.name || p.brand || ""}
                     </p>
                   </div>
@@ -418,7 +418,7 @@ export default function Header() {
       >
         <div className="absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md pointer-events-none" />
 
-        <div className="relative max-w-[1400px] mx-auto px-4 lg:px-6">
+        <div className="relative w-full max-w-none px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
           <div className="h-14 lg:h-16 flex items-center gap-1.5 lg:gap-3">
             <div className="flex items-center gap-0.5 lg:gap-1.5 shrink-0">
               <button
@@ -479,7 +479,7 @@ export default function Header() {
                 {wishlistCount > 0 && (
                   <span
                     key={wishlistCount}
-                    className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    className="absolute top-0.5 right-0.5 min-w-[0.9375rem] h-[0.9375rem] px-1 rounded-full bg-[var(--user-danger)] text-white text-[0.5625rem] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {wishlistCount}
@@ -499,7 +499,7 @@ export default function Header() {
                 {count > 0 && (
                   <span
                     key={count}
-                    className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
+                    className="absolute top-0.5 right-0.5 min-w-[0.9375rem] h-[0.9375rem] px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-bold flex items-center justify-center border-2 border-[var(--user-bg-elevated)]"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {count}
@@ -601,7 +601,7 @@ export default function Header() {
       </header>
 
       <div
-        className={`fixed top-0 left-0 h-full w-[85%] max-w-[340px] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-[85%] max-w-[21.25rem] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ transformOrigin: "left center" }}
@@ -636,7 +636,7 @@ export default function Header() {
                 <span className="font-black text-sm tracking-wide text-[var(--user-text)] block leading-tight truncate">
                   {storeName}
                 </span>
-                <span className="text-[9px] font-semibold text-[var(--user-text-muted)] uppercase tracking-wider">
+                <span className="text-[0.5625rem] font-semibold text-[var(--user-text-muted)] uppercase tracking-wider">
                   Shop Premium
                 </span>
               </div>
@@ -705,7 +705,7 @@ export default function Header() {
                   <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center relative">
                     <Heart size={18} className="text-[var(--user-accent)]" />
                     {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--user-danger)] text-white text-[9px] font-bold flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full bg-[var(--user-danger)] text-white text-[0.5625rem] font-bold flex items-center justify-center">
                         {wishlistCount}
                       </span>
                     )}
@@ -738,7 +738,7 @@ export default function Header() {
 
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
+              <h3 className="text-[0.6875rem] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
                 Top Categories
               </h3>
             </div>
@@ -746,7 +746,7 @@ export default function Header() {
               {topCategories.map((category, idx) => (
                 <Link
                   key={category._id}
-                  href={`/category/${category._id}`}
+                  href={`/?category=${category._id}`}
                   onClick={() => setOpen(false)}
                   className="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
                   style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
@@ -758,7 +758,7 @@ export default function Header() {
                     <span className="text-sm font-semibold text-[var(--user-text)] group-hover:text-[var(--user-accent)] transition-colors capitalize block truncate">
                       {category.name}
                     </span>
-                    <span className="text-[10px] text-[var(--user-text-muted)]">
+                    <span className="text-[0.625rem] text-[var(--user-text-muted)]">
                       {category.count} products
                     </span>
                   </div>
@@ -773,7 +773,7 @@ export default function Header() {
 
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
+              <h3 className="text-[0.6875rem] font-black uppercase tracking-[0.2em] text-[var(--user-text)]">
                 Top Brands
               </h3>
             </div>
@@ -785,7 +785,7 @@ export default function Header() {
                 return (
                   <Link
                     key={brand._id}
-                    href={`/brand/${brand._id}`}
+                    href={`/?brand=${brand._id}`}
                     onClick={() => setOpen(false)}
                     className="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
                     style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
@@ -807,7 +807,7 @@ export default function Header() {
                       <span className="text-sm font-semibold text-[var(--user-text)] group-hover:text-[var(--user-accent)] transition-colors capitalize block truncate">
                         {brand.name}
                       </span>
-                      <span className="text-[10px] text-[var(--user-text-muted)]">
+                      <span className="text-[0.625rem] text-[var(--user-text-muted)]">
                         {productCount} products
                       </span>
                     </div>
@@ -823,7 +823,7 @@ export default function Header() {
         </div>
 
         <div className="p-4 border-t border-[var(--user-border)] shrink-0 bg-[var(--user-bg-card)]">
-          <p className="text-[10px] text-[var(--user-text-subtle)] text-center">
+          <p className="text-[0.625rem] text-[var(--user-text-subtle)] text-center">
             © 2026 {storeName}. All rights reserved.
           </p>
         </div>

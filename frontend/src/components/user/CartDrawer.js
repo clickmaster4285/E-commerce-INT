@@ -324,7 +324,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     };
 
        const goCheckout = () => { setIsCartOpen(false); router.push("/checkout"); };
-    const startShopping = () => { setIsCartOpen(false); router.push("/product"); };
+    const startShopping = () => { setIsCartOpen(false); router.push("/"); };
 
     // ✅ CLEAR CART — two-tap confirm (ghalti se clear na ho)
     const handleClearCart = () => {
@@ -350,7 +350,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
       <>
         <div aria-hidden="true" onClick={() => setIsCartOpen(false)} className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${isCartOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Shopping cart" className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] shadow-[var(--user-shadow-lg)] outline-none transition-transform duration-300 ease-in-out sm:w-[420px] md:w-[460px] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Shopping cart" className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] shadow-[var(--user-shadow-lg)] outline-none transition-transform duration-300 ease-in-out sm:w-[26.25rem] md:w-[28.75rem] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
           <span className="sr-only" aria-live="polite">{count} {count === 1 ? "item" : "items"} in cart</span>
 
           <header className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] px-5 py-3 sm:px-6">
@@ -400,12 +400,12 @@ import { shippingApi } from "@/apis/user/shippingApi";
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-bold text-[var(--user-text)] truncate">{dealGroup.dealName}</h3>
-                          <p className="text-[10px] text-purple-600 font-semibold truncate">{dealGroup.dealBadge || "Active Deal"}</p>
+                          <p className="text-[0.625rem] text-purple-600 font-semibold truncate">{dealGroup.dealBadge || "Active Deal"}</p>
                         </div>
 
                         {/* ✅ Items count jab collapsed ho */}
                         {isCollapsed && (
-                          <span className="text-[10px] font-bold text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-full shrink-0">
+                          <span className="text-[0.625rem] font-bold text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-full shrink-0">
                             {dealGroup.items.length} {dealGroup.items.length === 1 ? "item" : "items"}
                           </span>
                         )}
@@ -476,7 +476,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                   <ShoppingBag size={36} aria-hidden="true" className="text-[var(--user-text-subtle)]" />
                 </div>
                 <h3 className="text-xl font-bold text-[var(--user-text)]">Your cart is empty</h3>
-                <p className="mt-1.5 max-w-[260px] text-sm leading-relaxed text-[var(--user-text-muted)]">Add some products to get started.</p>
+                <p className="mt-1.5 max-w-[16.25rem] text-sm leading-relaxed text-[var(--user-text-muted)]">Add some products to get started.</p>
                 <button type="button" onClick={startShopping} className="mt-6 rounded-xl bg-[var(--user-accent)] px-8 py-3 text-sm font-bold text-[var(--user-accent-text)] transition-all duration-200 hover:scale-[1.02] hover:bg-[var(--user-accent-hover)] active:scale-[0.98]">
                   Start Shopping
                 </button>
@@ -502,7 +502,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                     </span>
                     <span className="text-xs font-bold text-[var(--user-text)]">Select All</span>
                   </button>
-                  <span className="text-[11px] font-bold text-[var(--user-text-muted)] tabular-nums">
+                  <span className="text-[0.6875rem] font-bold text-[var(--user-text-muted)] tabular-nums">
                     {selectedLineCount} of {cart.length} selected
                   </span>
                 </div>
@@ -524,13 +524,13 @@ import { shippingApi } from "@/apis/user/shippingApi";
                     <span className="flex items-center gap-1.5 font-medium text-[var(--user-text-muted)]">
                       Shipping
                       {totals.freeShippingActiveForDefault && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[9px] font-bold text-orange-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[0.5625rem] font-bold text-orange-600">
                           <Truck size={9} /> Deal
                         </span>
                       )}
                     </span>
                     {totals.shipping === 0 ? (
-                      <span className="rounded border border-[var(--user-success)]/30 bg-[var(--user-success)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--user-success)]">FREE</span>
+                      <span className="rounded border border-[var(--user-success)]/30 bg-[var(--user-success)]/10 px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-success)]">FREE</span>
                     ) : (
                       <span className="font-semibold text-[var(--user-text)]">{fmt(totals.shipping)}</span>
                     )}
@@ -552,7 +552,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                     type="button"
                     onClick={handleClearCart}
                     aria-label="Clear cart"
-                                      className={`h-11 px-3.5 shrink-0 rounded-lg border text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                                      className={`h-11 px-3.5 shrink-0 rounded-lg border text-[0.6875rem] font-bold flex items-center gap-1.5 transition active:scale-95 ${
                       confirmClear
                         ? "bg-[var(--user-danger)] border-[var(--user-danger)] text-white"
                         : "border-[var(--user-border)] text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10"
@@ -567,7 +567,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                     type="button"
                     onClick={goCheckout}
                     disabled={!hasItems || selectedLineCount === 0}
-                    className="flex-1 h-9 rounded-lg bg-[var(--user-accent)] text-[11px] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                    className="flex-1 h-9 rounded-lg bg-[var(--user-accent)] text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                   >
                     {selectedLineCount === 0 && hasItems ? "Select items" : "Proceed to Checkout"}
                     <ArrowRight size={13} aria-hidden="true" />
@@ -584,7 +584,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
   function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
     const { applyDealToItem } = useCart();
     return (
-      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${openDealPicker ? "min-h-[240px] border-purple-500/40" : ""} ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
+      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${openDealPicker ? "min-h-[15rem] border-purple-500/40" : ""} ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
         {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
         <button
           type="button"
@@ -606,9 +606,9 @@ import { shippingApi } from "@/apis/user/shippingApi";
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-start justify-between gap-1.5">
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-[13px] font-semibold leading-tight text-[var(--user-text)]">{row.name}</h3>
-              {row.variantTitle && (<p className="mt-0.5 truncate text-[10px] text-[var(--user-text-muted)]">{row.variantTitle}</p>)}
-              {row.brand && (<p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--user-text-subtle)] truncate">{row.brand}</p>)}
+              <h3 className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--user-text)]">{row.name}</h3>
+              {row.variantTitle && (<p className="mt-0.5 truncate text-[0.625rem] text-[var(--user-text-muted)]">{row.variantTitle}</p>)}
+              {row.brand && (<p className="mt-0.5 text-[0.625rem] font-medium uppercase tracking-wider text-[var(--user-text-subtle)] truncate">{row.brand}</p>)}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(row); }} aria-label={`Remove ${row.name} from cart`} className="-mr-1 -mt-0.5 rounded-lg p-1.5 text-[var(--user-text-subtle)] transition-colors hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)]">
               <Trash2 size={14} aria-hidden="true" />
@@ -617,12 +617,12 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
           {isDeal && dealBadge && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-bold text-purple-600">
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-purple-600">
                 <Sparkles size={9} aria-hidden="true" />
                 {dealBadge}
               </span>
               {row.freeItems > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[10px] font-bold text-green-600">
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-green-600">
                   <Check size={9} aria-hidden="true" />
                   {row.freeItems} FREE
                 </span>
@@ -634,17 +634,17 @@ import { shippingApi } from "@/apis/user/shippingApi";
           {(row.isGift || row.bundleAppliedRule || (!row.isGift && row.bundleProgress)) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {row.isGift && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[0.625rem] font-bold text-amber-600">
                   🎁 FREE GIFT
                 </span>
               )}
               {!row.isGift && row.bundleAppliedRule && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-indigo-500">
                   🔥 {row.bundleAppliedRule}
                 </span>
               )}
               {!row.isGift && !row.bundleAppliedRule && row.bundleProgress && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--user-text-muted)]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[var(--user-text-muted)]">
                   {row.bundleProgress}
                 </span>
               )}
@@ -663,23 +663,23 @@ import { shippingApi } from "@/apis/user/shippingApi";
             </div>
 
             <div className="text-right leading-tight relative">
-              <p className="text-[13px] font-bold text-[var(--user-accent)]">
+              <p className="text-[0.8125rem] font-bold text-[var(--user-accent)]">
                 {row.isGift ? "FREE" : fmt(row.lineTotal)}
                 {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
-                  <span className="ml-1.5 text-[10px] font-medium text-[var(--user-text-muted)] line-through align-middle">
+                  <span className="ml-1.5 text-[0.625rem] font-medium text-[var(--user-text-muted)] line-through align-middle">
                     {fmt(row.originalPrice * row.qty)}
                   </span>
                 )}
               </p>
 
               {row.freeItems > 0 && (
-                <p className="mt-0.5 text-[10px] text-[var(--user-text-muted)]">
+                <p className="mt-0.5 text-[0.625rem] text-[var(--user-text-muted)]">
                   {row.payableItems} paid + {row.freeItems} FREE
                 </p>
               )}
 
               {row.savings > 0 && (
-                <p className="mt-0.5 flex items-center justify-end gap-0.5 text-[10px] font-semibold text-[var(--user-success)]">
+                <p className="mt-0.5 flex items-center justify-end gap-0.5 text-[0.625rem] font-semibold text-[var(--user-success)]">
                   <Tag size={9} aria-hidden="true" />
                   Save {fmt(row.savings * row.qty)}
                 </p>
@@ -692,7 +692,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
             type="button"
             onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
             aria-label="View available deals"
-            className="absolute bottom-2.5 left-2.5 z-20 flex h-6 items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
+            className="absolute bottom-2.5 left-2.5 z-20 flex h-6 items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
           >
             <BadgePercent size={10} />
             <span>Deals</span>

@@ -53,7 +53,7 @@ function MobileNav() {
               <span className="relative">
                 <Heart size={20} className={isActive("/wishlist") ? "fill-current" : ""} />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-danger)] text-white text-[9px] font-bold min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-danger)] text-white text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
                     {wishlistCount}
                   </span>
                 )}
@@ -70,7 +70,7 @@ function MobileNav() {
               <span className="relative">
                 <ShoppingCart size={20} />
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[9px] font-bold min-w-[14px] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
                     {count}
                   </span>
                 )}
@@ -99,7 +99,7 @@ function NavItem({ icon, label, active }) {
       <span className={`transition-transform duration-200 ${active ? "text-[var(--user-accent)] scale-110" : "text-[var(--user-text-muted)]"}`}>
         {icon}
       </span>
-      <span className={`text-[9px] font-bold ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>
+      <span className={`text-[0.5625rem] font-bold ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>
         {label}
       </span>
     </span>

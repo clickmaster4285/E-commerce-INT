@@ -170,7 +170,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
       <div className="flex shrink-0 items-center justify-between border-b border-purple-500/15 bg-gradient-to-r from-purple-500/10 to-pink-500/10 px-2.5 py-1.5">
         <div className="flex items-center gap-1.5">
           <Sparkles size={11} className="text-purple-600" />
-          <span className="text-[10px] font-black uppercase tracking-wider text-purple-600">Available Offers</span>
+          <span className="text-[0.625rem] font-black uppercase tracking-wider text-purple-600">Available Offers</span>
         </div>
         <div className="flex items-center gap-1">
           {availableDeals.length > 1 && (
@@ -218,7 +218,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
               role="option"
               aria-selected={isSelected}
               onClick={() => handleSelect(deal)}
-              className={`snap-start shrink-0 flex flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all min-w-[90px] ${
+              className={`snap-start shrink-0 flex flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all min-w-[5.625rem] ${
                 isSelected
                   ? "border-[var(--user-accent)]/40 bg-[var(--user-accent)]/10"
                   : "border-[var(--user-border)] hover:border-purple-500/30 hover:bg-purple-500/5"
@@ -231,22 +231,22 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
               >
                 {isSelected ? <Check size={13} strokeWidth={3} className="text-white" /> : <Icon size={13} className="text-white" />}
               </span>
-              <span className={`line-clamp-2 text-[10px] font-bold leading-tight ${isSelected ? "text-[var(--user-accent)]" : "text-[var(--user-text)]"}`}>
+              <span className={`line-clamp-2 text-[0.625rem] font-bold leading-tight ${isSelected ? "text-[var(--user-accent)]" : "text-[var(--user-text)]"}`}>
                 {deal.name}
               </span>
               {badgeText ? (
-                <span className={`rounded-full bg-gradient-to-r px-1.5 py-px text-[8px] font-black text-white ${color}`}>
+                <span className={`rounded-full bg-gradient-to-r px-1.5 py-px text-[0.5rem] font-black text-white ${color}`}>
                   {badgeText}
                 </span>
               ) : null}
               {savingsText && (
-                <span className="text-[8px] font-bold text-[var(--user-success)]">{savingsText}</span>
+                <span className="text-[0.5rem] font-bold text-[var(--user-success)]">{savingsText}</span>
               )}
               {!meetsMin && (
-                <span className="text-[8px] font-semibold text-orange-500">+{gap} more</span>
+                <span className="text-[0.5rem] font-semibold text-orange-500">+{gap} more</span>
               )}
               {isSelected && (
-                <span className="text-[8px] font-black uppercase text-[var(--user-accent)]">Applied</span>
+                <span className="text-[0.5rem] font-black uppercase text-[var(--user-accent)]">Applied</span>
               )}
             </button>
           );
@@ -257,7 +257,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
         <button
           type="button"
           onClick={() => { onApplyDeal?.(null); onClose?.(); }}
-          className="w-full shrink-0 border-t border-[var(--user-border)] px-2.5 py-1.5 text-center text-[10px] font-bold text-red-500 transition hover:bg-red-500/10"
+          className="w-full shrink-0 border-t border-[var(--user-border)] px-2.5 py-1.5 text-center text-[0.625rem] font-bold text-red-500 transition hover:bg-red-500/10"
         >
           Remove Deal
         </button>

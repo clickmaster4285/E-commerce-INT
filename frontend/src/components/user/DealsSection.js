@@ -99,7 +99,7 @@ function matchDealProducts(deal, products) {
   return out;
 }
 
-export default function DealsSection() {
+export default function DealsSection({ embedded = false }) {
   const { data: deals = [], isLoading } = useQuery({
     queryKey: ["activeDeals"],
     queryFn: dealApi.getActive,
@@ -107,11 +107,11 @@ export default function DealsSection() {
     refetchInterval: 3 * 60 * 1000,
   });
 
-  if (isLoading) return <DealsSkeleton />;
+  if (isLoading) return <DealsSkeleton embedded={embedded} />;
   if (!deals || deals.length === 0) return null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-10">
+    <section className={embedded ? "w-full" : "user-shell mx-auto px-3 lg:px-6 py-5 lg:py-10"}>
       <style>{`
         @keyframes dealShine { 0% { transform: translateX(-150%) skewX(-20deg); } 60%, 100% { transform: translateX(400%) skewX(-20deg); } }
         @keyframes dealFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -155,6 +155,22 @@ function DealEngine({ deals }) {
   };
   const goPrev = () => goTo((current - 1 + deals.length) % deals.length);
   const goNext = () => goTo((current + 1) % deals.length);
+
+  // Live deals 600+ ho sakte hain (seeded data) — saare dots render karne se
+  // poora indicator strip card se bahar chala jata tha aur prev/next arrows
+  // bhi off-screen ho jate the. Isliye current ke aas paas ke dots dikhate
+  // hain + "x / total" counter.
+  const MAX_DOTS = 7;
+  const dotWindow =
+    deals.length <= MAX_DOTS
+      ? deals.map((_, index) => index)
+      : (() => {
+          const start = Math.max(
+            0,
+            Math.min(current - Math.floor(MAX_DOTS / 2), deals.length - MAX_DOTS),
+          );
+          return Array.from({ length: MAX_DOTS }, (_, index) => start + index);
+        })();
 
   // ✅ Full product list for deal matching
   const { data: allProducts = [] } = useQuery({
@@ -235,12 +251,12 @@ function DealEngine({ deals }) {
                 Deals
               </span>
             </h2>
-            <span className="hidden sm:block text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--user-text)] opacity-50 mt-1">
+            <span className="hidden sm:block text-[0.5625rem] font-bold uppercase tracking-[0.18em] text-[var(--user-text)] opacity-50 mt-1">
               Best offers · limited time
             </span>
           </div>
           <span
-            className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full"
+            className="inline-flex items-center gap-1.5 text-[0.625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-full"
             style={{ backgroundColor: `${cfg.hex}18`, color: cfg.hex, border: `1px solid ${cfg.hex}45` }}
           >
             <span className="relative flex w-1.5 h-1.5">
@@ -253,13 +269,6 @@ function DealEngine({ deals }) {
             {deals.length} Live
           </span>
         </div>
-        <Link
-          href="/deals"
-          className="group inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full transition-all hover:gap-2.5 hover:shadow-md"
-          style={{ color: cfg.hex, backgroundColor: `${cfg.hex}14`, border: `1px solid ${cfg.hex}40` }}
-        >
-          View All <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
-        </Link>
       </div>
 
       {/* ✅ FEATURED STOREFRONT */}
@@ -345,7 +354,7 @@ function DealEngine({ deals }) {
                     {badgeText && (
                       <span
                         style={{ color: "#0a0a0a" }}
-                        className="relative overflow-hidden bg-white px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm font-black uppercase tracking-wide shadow-xl ring-2 ring-white/40 whitespace-nowrap"
+                        className="relative overflow-hidden bg-white px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[0.625rem] sm:text-sm font-black uppercase tracking-wide shadow-xl ring-2 ring-white/40 whitespace-nowrap"
                       >
                         <span
                           className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-black/15 to-transparent"
@@ -362,14 +371,14 @@ function DealEngine({ deals }) {
 
                   {/* ✅ Perks row */}
                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2.5 sm:mt-4">
-                    <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black text-white uppercase tracking-wider bg-black/20 backdrop-blur border border-white/20 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+                    <span className="flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black text-white uppercase tracking-wider bg-black/20 backdrop-blur border border-white/20 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
                       <Package size={12} /> {products.length} Products
                     </span>
-                    <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black text-white uppercase tracking-wider bg-black/20 backdrop-blur border border-white/20 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+                    <span className="flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black text-white uppercase tracking-wider bg-black/20 backdrop-blur border border-white/20 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
                       <Clock size={12} /> Ends {endsLabel}
                     </span>
                     {activeDeal.isFeatured && (
-                      <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black text-yellow-200 uppercase tracking-wider bg-yellow-400/20 backdrop-blur border border-yellow-300/40 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
+                      <span className="flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black text-yellow-200 uppercase tracking-wider bg-yellow-400/20 backdrop-blur border border-yellow-300/40 rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5">
                         <Sparkles size={12} /> Featured
                       </span>
                     )}
@@ -394,7 +403,7 @@ function DealEngine({ deals }) {
                     }}
                   >
                     <span
-                      className="flex items-center gap-1.5 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em]"
+                      className="flex items-center gap-1.5 text-[0.5rem] sm:text-[0.5625rem] font-black uppercase tracking-[0.2em]"
                       style={{ color: urgency === "normal" ? "rgba(255,255,255,0.7)" : "#fff" }}
                     >
                       {urgency === "normal" ? (
@@ -439,7 +448,7 @@ function DealEngine({ deals }) {
             {!time.expired && timePct !== null && (
               <div className="mt-4 rounded-2xl border border-white/15 bg-black/20 backdrop-blur-md px-3.5 sm:px-4 py-2.5 sm:py-3">
                 <div className="flex items-center justify-between gap-3 mb-2">
-                  <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white/90">
+                  <span className="flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-wider text-white/90">
                     <Clock size={12} style={{ color: urgencyHex }} />
                     {urgency === "critical"
                       ? "Almost over — grab it now"
@@ -448,7 +457,7 @@ function DealEngine({ deals }) {
                         : `Sale live · ends ${endsLabel}`}
                   </span>
                   <span
-                    className="text-[10px] sm:text-[11px] font-black tabular-nums whitespace-nowrap"
+                    className="text-[0.625rem] sm:text-[0.6875rem] font-black tabular-nums whitespace-nowrap"
                     style={{ color: urgencyHex }}
                   >
                     {time.d}d {time.h}h {time.m}m left
@@ -472,7 +481,7 @@ function DealEngine({ deals }) {
                 {/* ✅ Stock pressure — only when running low (real variant quantities) */}
                 {totalStock > 0 && totalStock <= 15 && (
                   <div className="flex items-center gap-2.5 mt-2.5">
-                    <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-200 bg-amber-400/15 border border-amber-300/40 rounded-full px-2.5 py-1 whitespace-nowrap">
+                    <span className="flex items-center gap-1.5 text-[0.625rem] font-black uppercase tracking-wider text-amber-200 bg-amber-400/15 border border-amber-300/40 rounded-full px-2.5 py-1 whitespace-nowrap">
                       <Flame size={11} /> Only {totalStock} left
                     </span>
                     <div className="flex-1 h-1.5 rounded-full bg-white/15 overflow-hidden">
@@ -483,7 +492,7 @@ function DealEngine({ deals }) {
                         }}
                       />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-red-300 whitespace-nowrap">
+                    <span className="text-[0.5625rem] font-black uppercase tracking-wider text-red-300 whitespace-nowrap">
                       Selling fast
                     </span>
                   </div>
@@ -509,7 +518,7 @@ function DealEngine({ deals }) {
                     <ChevronLeft size={16} className="transition-transform group-hover/arrow:-translate-x-0.5" />
                   </button>
                   <div className="flex items-center gap-1.5">
-                    {deals.map((_, idx) => (
+                    {dotWindow.map((idx) => (
                       <button
                         key={idx}
                         type="button"
@@ -522,6 +531,11 @@ function DealEngine({ deals }) {
                         }`}
                       />
                     ))}
+                    {deals.length > MAX_DOTS ? (
+                      <span className="pl-1 text-[0.625rem] font-black tabular-nums text-white/80">
+                        {current + 1}/{deals.length}
+                      </span>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -532,15 +546,6 @@ function DealEngine({ deals }) {
                     <ChevronRight size={16} className="transition-transform group-hover/arrow:translate-x-0.5" />
                   </button>
                 </div>
-                {!paused && (
-                  <div className="h-0.5 w-28 sm:w-40 rounded-full bg-white/20 overflow-hidden">
-                    <div
-                      key={current}
-                      className="h-full origin-left bg-white/90"
-                      style={{ animation: "dealProgress 4s linear forwards" }}
-                    />
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -658,10 +663,10 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
   return (
     <div className={theme.wrap}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className={`flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${theme.label}`}>
+        <span className={`flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-wider ${theme.label}`}>
           <Layers size={12} /> {items.length}-Product Combo
         </span>
-        <span className={`text-[11px] sm:text-xs font-bold ${theme.price}`}>
+        <span className={`text-[0.6875rem] sm:text-xs font-bold ${theme.price}`}>
           Total value Rs. {totalValue.toLocaleString()}
         </span>
       </div>
@@ -670,7 +675,7 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
       {ruleLabel && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-2.5">
           <span
-            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide border ${
+            className={`px-2.5 py-1 rounded-full text-[0.625rem] font-black uppercase tracking-wide border ${
               isGiftRule
                 ? "bg-amber-400/95 text-black border-amber-200/60"
                 : theme.neutralBadge
@@ -680,7 +685,7 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
             {ruleLabel}
           </span>
           {requiredQty > 0 && (
-            <span className={`text-[10px] sm:text-[11px] font-semibold ${theme.hint}`}>
+            <span className={`text-[0.625rem] sm:text-[0.6875rem] font-semibold ${theme.hint}`}>
               Requires {requiredQty} {requiredQty === 1 ? "item" : "items"} — reward is
               applied automatically in the cart.
             </span>
@@ -692,13 +697,13 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
         <button
           type="button"
           onClick={handleAdd}
-          className={`inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider shadow-lg hover:scale-[1.03] active:scale-95 transition ${theme.cta}`}
+          className={`inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl text-[0.6875rem] sm:text-xs font-black uppercase tracking-wider shadow-lg hover:scale-[1.03] active:scale-95 transition ${theme.cta}`}
         >
           <ShoppingCart size={15} />
           {added ? "Added ✓" : `Add all ${items.length} products to cart`}
         </button>
 
-        <p className={`text-[10px] sm:text-[11px] font-semibold ${theme.hint}`}>
+        <p className={`text-[0.625rem] sm:text-[0.6875rem] font-semibold ${theme.hint}`}>
           Add the combo, then increase the quantity to meet the offer condition.
         </p>
       </div>
@@ -709,7 +714,7 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
 function TimeChip({ v, l, pulse = false, accent = null }) {
   return (
     <div
-      className={`flex flex-col items-center backdrop-blur-md rounded-xl px-2 sm:px-2.5 py-1.5 min-w-[46px] sm:min-w-[54px] shadow-lg ${pulse ? "animate-pulse" : ""}`}
+      className={`flex flex-col items-center backdrop-blur-md rounded-xl px-2 sm:px-2.5 py-1.5 min-w-[2.875rem] sm:min-w-[3.375rem] shadow-lg ${pulse ? "animate-pulse" : ""}`}
       style={{
         backgroundColor: accent ? `${accent}30` : "rgba(255,255,255,0.10)",
         border: `1px solid ${accent || "rgba(255,255,255,0.25)"}`,
@@ -721,7 +726,7 @@ function TimeChip({ v, l, pulse = false, accent = null }) {
       <span className="text-lg sm:text-2xl font-black text-white tabular-nums leading-none drop-shadow">
         {String(v).padStart(2, "0")}
       </span>
-      <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.12em] text-white/75 mt-1">
+      <span className="text-[0.5rem] sm:text-[0.5625rem] font-black uppercase tracking-[0.12em] text-white/75 mt-1">
         {l}
       </span>
     </div>
@@ -731,6 +736,11 @@ function TimeChip({ v, l, pulse = false, accent = null }) {
 /* =====================================================
    PRODUCTS ROW
 ===================================================== */
+/* Ek category-wide deal me 100+ products match ho sakte hain — home page ki
+   strip ko halka rakhne ke liye sirf pehle kuch cards render karte hain.
+   Poori list deal detail page (/deals/[id]) par mojood rehti hai. */
+const MAX_DEAL_CARDS = 12;
+
 function ProductsRow({ products, deal, hex }) {
   const scrollRef = useRef(null);
   const [canScrollL, setCanScrollL] = useState(false);
@@ -770,15 +780,30 @@ function ProductsRow({ products, deal, hex }) {
     );
   }
 
+  const visibleProducts =
+    products.length > MAX_DEAL_CARDS ? products.slice(0, MAX_DEAL_CARDS) : products;
+
   return (
     <div className="relative">
       <div className="flex items-center justify-between mb-3 px-0.5">
-        <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: hex }}>
+        <h4 className="text-[0.6875rem] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: hex }}>
           <Package size={13} />
           Products in this deal
         </h4>
-        <span className="text-[10px] sm:text-[11px] font-bold" style={{ color: `${hex}cc` }}>
-          {products.length} {products.length === 1 ? "item" : "items"}
+        <span className="flex items-center gap-3">
+          <span className="text-[0.625rem] sm:text-[0.6875rem] font-bold" style={{ color: `${hex}cc` }}>
+            {products.length} {products.length === 1 ? "item" : "items"}
+          </span>
+          {products.length > MAX_DEAL_CARDS ? (
+            <Link
+              href={`/deals/${deal._id}`}
+              className="inline-flex items-center gap-1 text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-wider transition-opacity hover:opacity-80"
+              style={{ color: hex }}
+            >
+              View all
+              <ArrowRight size={12} />
+            </Link>
+          ) : null}
         </span>
       </div>
 
@@ -808,15 +833,18 @@ function ProductsRow({ products, deal, hex }) {
         className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory pb-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {products.map((product) => (
+        {/* Full-width responsive — har screen par poori chaudai me cards:
+            mobile 2 → sm 3 → md 4 → lg 5 → xl 6 → 2xl 7 cards per view */}
+        {visibleProducts.map((product) => (
           <div
             key={product._id || product.id}
-            className="group/deal flex-shrink-0 w-[47%] sm:w-[30%] lg:w-[19.2%] snap-start"
+            className="group/deal flex-shrink-0 w-[47%] sm:w-[31%] md:w-[23.5%] lg:w-[19%] xl:w-[15.8%] 2xl:w-[13.5%] 4xl:w-[12%] 5xl:w-[10.5%] snap-start"
             style={{ "--deal-hex": hex }}
           >
-            <div className="relative h-full rounded-2xl transition-all duration-300 group-hover/deal:-translate-y-1.5 group-hover/deal:shadow-[0_20px_44px_-20px_rgba(0,0,0,0.5)] group-hover/deal:ring-2 group-hover/deal:ring-[color:var(--deal-hex)]">
-              <ProductCard product={product} deal={deal} dealId={deal._id} showDealPricing />
-            </div>
+            {/* Card bilkul wahi ProductCard hai jo regular listing me use hota
+                hai — koi extra chrome nahi, sirf deal context (deal badge +
+                deal pricing) ke sath. */}
+            <ProductCard product={product} deal={deal} dealId={deal._id} showDealPricing />
           </div>
         ))}
       </div>
@@ -827,14 +855,13 @@ function ProductsRow({ products, deal, hex }) {
 /* =====================================================
    SKELETON
 ===================================================== */
-function DealsSkeleton() {
+function DealsSkeleton({ embedded = false }) {
   return (
-    <section className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-10">
+    <section className={embedded ? "w-full" : "user-shell mx-auto px-3 lg:px-6 py-5 lg:py-10"}>
       <div className="animate-pulse space-y-4">
         <div className="flex items-center justify-between px-2.5 sm:px-4 py-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/70 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-[var(--user-bg-card)]" />
-            <div className="h-6 w-32 bg-[var(--user-bg-card)] rounded-lg" />
           </div>
           <div className="h-7 w-20 rounded-full bg-[var(--user-bg-card)]" />
         </div>
@@ -842,7 +869,7 @@ function DealsSkeleton() {
           <div className="h-24 sm:h-30 bg-[var(--user-bg-card)]" />
           <div className="flex gap-4 p-5">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="w-[19.2%] h-60 bg-[var(--user-bg-card)] rounded-2xl" />
+              <div key={i} className="w-[19.2%] 4xl:w-[15.5%] 5xl:w-[12.8%] h-60 bg-[var(--user-bg-card)] rounded-2xl" />
             ))}
           </div>
         </div>

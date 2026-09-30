@@ -69,12 +69,12 @@ function BrandContent({ brandId }) {
   return (
     <>
       {/* BREADCRUMB */}
-      <nav className="flex items-center gap-1.5 text-[11px] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
+      <nav className="flex items-center gap-1.5 text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
         <Link href="/" className="hover:text-[var(--user-accent)] transition">
           Home
         </Link>
         <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
-        <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[180px] sm:max-w-[220px]">
+        <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[11.25rem] sm:max-w-[13.75rem]">
           {brand?.name || "Brand"}
         </span>
       </nav>
@@ -109,11 +109,11 @@ function BrandContent({ brandId }) {
       {!isLoading && !isError && sorted.length > 1 && (
         <div className="flex items-center justify-end mb-5 lg:mb-6 pb-4 lg:pb-5 border-b border-[var(--user-border)]">
           <div className="flex items-center gap-2">
-            <SlidersHorizontal size={13} className="text-[var(--user-text-muted)] lg:w-[14px] lg:h-[14px]" />
+            <SlidersHorizontal size={13} className="text-[var(--user-text-muted)] lg:w-[0.875rem] lg:h-[0.875rem]" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="h-10 lg:h-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full lg:rounded-lg px-3 lg:px-3 py-1.5 lg:py-2 text-[11px] lg:text-xs font-bold text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
+              className="h-10 lg:h-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full lg:rounded-lg px-3 lg:px-3 py-1.5 lg:py-2 text-[0.6875rem] lg:text-xs font-bold text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
             >
               <option value="featured">Featured</option>
               <option value="newest">Newest Arrivals</option>
@@ -126,7 +126,7 @@ function BrandContent({ brandId }) {
 
       {/* LOADING */}
       {isLoading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2 lg:gap-5">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="space-y-2 lg:space-y-3">
               <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
@@ -161,7 +161,7 @@ function BrandContent({ brandId }) {
 
       {/* PRODUCTS */}
       {!isLoading && !isError && sorted.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2 lg:gap-5">
           {sorted.map((product) => (
             <ProductCard key={product._id} product={product} />
           ))}

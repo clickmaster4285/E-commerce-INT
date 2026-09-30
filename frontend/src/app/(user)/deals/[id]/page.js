@@ -2,12 +2,12 @@
 
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Clock, Flame, Tag, Package, Zap, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Clock, Flame, Tag, Package, Zap } from "lucide-react";
 import { dealApi } from "@/apis/user/dealApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
+import PaginationBar from "@/components/user/PaginationBar";
 import { BundleDealPanel } from "@/components/user/DealsSection";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -45,20 +45,24 @@ function TimeBox({ value, label }) {
       <p className="text-2xl font-black text-[var(--user-text)] tabular-nums leading-none">
         {String(value).padStart(2, "0")}
       </p>
-      <p className="text-[10px] font-bold text-[var(--user-text-subtle)] uppercase mt-1">{label}</p>
+      <p className="text-[0.625rem] font-bold text-[var(--user-text-subtle)] uppercase mt-1">{label}</p>
     </div>
   );
 }
 
+/* Client-side pagination: har page par 20 products. Deal ke saare products
+   ek hi request me aa jate hain, is liye page number click karne par URL /
+   route change nahi hota — pehle 20 ki jagah agle 20 render ho jate hain. */
+const PAGE_SIZE = 20;
+const DEAL_FETCH_LIMIT = 2000;
+
 export default function DealDetailPage({ params }) {
   const { id } = use(params);
-  const searchParams = useSearchParams();
-  const currentPage = Number(searchParams.get("page")) || 1;
-  const limit = 20;
+  const [page, setPage] = useState(1);
 
   const { data: deal, isLoading, isError, refetch } = useQuery({
-    queryKey: ["deal", id, currentPage],
-    queryFn: () => dealApi.getById(id, currentPage, limit),
+    queryKey: ["deal", id],
+    queryFn: () => dealApi.getById(id, 1, DEAL_FETCH_LIMIT),
     retry: 2,
   });
 
@@ -73,7 +77,7 @@ export default function DealDetailPage({ params }) {
 
   if (isLoading) {
     return (
-      <div className="max-w-[1400px] mx-auto px-4 py-20 text-center">
+      <div className="user-shell mx-auto px-4 py-20 text-center">
         <div className="animate-pulse space-y-8">
           <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -86,7 +90,7 @@ export default function DealDetailPage({ params }) {
 
   if (isError) {
     return (
-      <div className="max-w-[600px] mx-auto px-4 py-20 text-center">
+      <div className="max-w-[37.5rem] mx-auto px-4 py-20 text-center">
         <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
           <Flame size={32} className="text-red-500" />
         </div>
@@ -96,8 +100,8 @@ export default function DealDetailPage({ params }) {
           <button onClick={() => refetch()} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
             Retry
           </button>
-          <Link href="/deals" className="inline-flex items-center gap-2 border-2 border-[var(--user-border)] text-[var(--user-text-muted)] px-6 py-3 rounded-xl text-sm font-bold hover:border-[var(--user-accent)]/40 transition">
-            <ArrowLeft size={16} /> Back to Deals
+          <Link href="/" className="inline-flex items-center gap-2 border-2 border-[var(--user-border)] text-[var(--user-text-muted)] px-6 py-3 rounded-xl text-sm font-bold hover:border-[var(--user-accent)]/40 transition">
+            <ArrowLeft size={16} /> Back to Home
           </Link>
         </div>
       </div>
@@ -106,13 +110,13 @@ export default function DealDetailPage({ params }) {
 
   if (!deal) {
     return (
-      <div className="max-w-[600px] mx-auto px-4 py-20 text-center">
+      <div className="max-w-[37.5rem] mx-auto px-4 py-20 text-center">
         <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
           <Flame size={32} className="text-red-500" />
         </div>
         <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Deal Not Found</h1>
-        <Link href="/deals" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
-          <ArrowLeft size={16} /> Back to All Deals
+        <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
+          <ArrowLeft size={16} /> Back to Home
         </Link>
       </div>
     );
@@ -125,6 +129,14 @@ export default function DealDetailPage({ params }) {
     return (id && allProductsById.get(id)) || p;
   });
 
+  // ✅ Client-side pagination — 20 products per page
+  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageProducts = products.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
   // ✅ Bundle deal ke liye poore combo products (pagination se independent)
   const bundleProducts = (Array.isArray(deal.productIds) ? deal.productIds : [])
     .map((p) => {
@@ -132,7 +144,6 @@ export default function DealDetailPage({ params }) {
       return allProductsById.get(pid) || p;
     })
     .filter((p) => p && (p._id || p.id));
-  const totalPages = deal.totalPages || 1;
   const badgeText = deal.type === "percentage" ? `${deal.discountValue}% OFF` : `Rs. ${deal.discountValue} OFF`;
 
   const imgUrl = getImageUrl(deal.image) || getImageUrl(products[0]?.images?.[0]?.img_url) || getImageUrl(products[0]?.images?.[0]);
@@ -149,9 +160,9 @@ export default function DealDetailPage({ params }) {
   const Icon = visual.icon;
 
   return (
-    <main className="max-w-[1400px] mx-auto px-3 lg:px-6 py-5 lg:py-12">
-      <Link href="/deals" className="inline-flex items-center gap-2 text-xs lg:text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] mb-5 lg:mb-8 transition">
-        <ArrowLeft size={14} className="lg:w-4 lg:h-4" /> Back to All Deals
+    <main className="user-shell mx-auto px-3 lg:px-6 py-5 lg:py-12">
+      <Link href="/" className="inline-flex items-center gap-2 text-xs lg:text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] mb-5 lg:mb-8 transition">
+        <ArrowLeft size={14} className="lg:w-4 lg:h-4" /> Back to Home
       </Link>
 
       {/* Deal Header Card */}
@@ -179,7 +190,7 @@ export default function DealDetailPage({ params }) {
                 <Icon size={12} /> {deal.type.replace(/_/g, " ")}
               </span>
               {deal.isFeatured && (
-                <span className="text-[10px] font-black uppercase tracking-wider text-orange-600 bg-orange-500/10 border-2 border-orange-500/30 px-3 py-1 rounded-full flex items-center gap-1">
+                <span className="text-[0.625rem] font-black uppercase tracking-wider text-orange-600 bg-orange-500/10 border-2 border-orange-500/30 px-3 py-1 rounded-full flex items-center gap-1">
                   <Flame size={10} /> Featured
                 </span>
               )}
@@ -237,55 +248,25 @@ export default function DealDetailPage({ params }) {
 
         {products.length > 0 ? (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4 mb-8">
-             {products.map((product) => (
-  <ProductCard 
-    key={product._id} 
-    product={product} 
-    deal={deal} 
-    dealId={String(deal._id)}
-    showDealPricing
-  />
-))}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-3 lg:gap-4 mb-8">
+              {pageProducts.map((product) => (
+                <ProductCard
+                  key={product._id || product.id}
+                  product={product}
+                  deal={deal}
+                  dealId={String(deal._id)}
+                  showDealPricing
+                />
+              ))}
             </div>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
-                <Link
-                  href={`/deals/${id}?page=${currentPage - 1}`}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold transition ${
-                    currentPage === 1 ? "opacity-50 cursor-not-allowed pointer-events-none" : "hover:border-orange-500/50 hover:text-orange-500"
-                  }`}
-                >
-                  <ChevronLeft size={16} /> Previous
-                </Link>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <Link
-                      key={pageNum}
-                      href={`/deals/${id}?page=${pageNum}`}
-                      className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-bold transition ${
-                        currentPage === pageNum
-                          ? "bg-orange-500 text-white shadow-lg"
-                          : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text)] hover:border-orange-500/50"
-                      }`}
-                    >
-                      {pageNum}
-                    </Link>
-                  ))}
-                </div>
-
-                <Link
-                  href={`/deals/${id}?page=${currentPage + 1}`}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold transition ${
-                    currentPage === totalPages ? "opacity-50 cursor-not-allowed pointer-events-none" : "hover:border-orange-500/50 hover:text-orange-500"
-                  }`}
-                >
-                  Next <ChevronRight size={16} />
-                </Link>
-              </div>
-            )}
+            <PaginationBar
+              page={currentPage}
+              totalPages={totalPages}
+              total={products.length}
+              perPage={PAGE_SIZE}
+              onPageChange={setPage}
+            />
           </>
         ) : (
           <div className="text-center py-16 rounded-2xl border-2 border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)]">

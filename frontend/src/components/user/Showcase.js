@@ -46,13 +46,13 @@ function ArrowBtn({ dir, onClick, disabled, onHover }) {
 // ✅ Loading skeleton row
 function RowSkeleton() {
   return (
-    <div className="max-w-[1400px] mx-auto px-4 lg:px-6">
+    <div className="user-shell mx-auto px-4 lg:px-6">
       <div className="h-6 w-40 bg-[var(--user-bg-card)] rounded-full animate-pulse mb-4" />
       <div className="flex gap-3 lg:gap-4 overflow-hidden">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="w-[160px] sm:w-[200px] lg:w-[230px] shrink-0 aspect-[3/4] rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]"
+            className="w-[10rem] sm:w-[12.5rem] lg:w-[14.375rem] shrink-0 aspect-[3/4] rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]"
           />
         ))}
       </div>
@@ -172,7 +172,7 @@ function ProductRow({ title, subtitle, href, products }) {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-3 lg:px-6">
+    <section className="user-shell mx-auto px-3 lg:px-6">
       <div className="flex items-center justify-between mb-3 lg:mb-4 gap-2">
         <div className="min-w-0">
           <Link href={href} className="group inline-block">
@@ -181,12 +181,12 @@ function ProductRow({ title, subtitle, href, products }) {
             </h2>
           </Link>
           {subtitle && (
-            <p className="text-[11px] lg:text-xs text-[var(--user-text-muted)] mt-0.5">
+            <p className="text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)] mt-0.5">
               {subtitle}
             </p>
           )}
         </div>
-        <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[11px] lg:text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">
+        <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[0.6875rem] lg:text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">
           See all <ChevronRight size={12} />
         </Link>
       </div>
@@ -203,7 +203,7 @@ function ProductRow({ title, subtitle, href, products }) {
           className="scrollbar-hide flex gap-3 lg:gap-4 overflow-x-auto scroll-smooth pb-1"
         >
           {products.map((p) => (
-            <div key={p._id} className="w-[150px] sm:w-[200px] lg:w-[230px] shrink-0">
+            <div key={p._id} className="w-[9.375rem] sm:w-[12.5rem] lg:w-[14.375rem] shrink-0">
               <ProductCard product={p} />
             </div>
           ))}
@@ -277,7 +277,7 @@ export function CategoryShowcase() {
           key={cat._id}
           title={cat.name}
           subtitle={`${cat.count} products`}
-          href={`/category/${cat._id}`}
+          href={`/?category=${cat._id}`}
           products={products.filter((p) => safeIdCompare(p.category_id, cat._id))}
         />
       ))}
@@ -343,7 +343,7 @@ export function BrandShowcase() {
           key={brand._id}
           title={brand.name}
           subtitle={`${brand.count} products`}
-          href={`/brand/${brand._id}`}
+          href={`/?brand=${brand._id}`}
           products={products.filter((p) => safeIdCompare(p.brand_id, brand._id))}
         />
       ))}
