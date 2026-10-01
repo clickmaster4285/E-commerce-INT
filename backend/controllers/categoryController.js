@@ -6,7 +6,6 @@ const Employee = require("../models/Employee");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
-const { CATEGORY_ATTRIBUTE_SEED } = require("../utils/categoryAttributeSeed");
 
 // createdby/updatedby creator User ya Employee dono ho sakta hai.
 // Model ref Employee hai, isliye populate fail hone par User se resolve karo.
