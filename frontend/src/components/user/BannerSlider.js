@@ -44,6 +44,7 @@ export default function BannerSlider() {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef(null);
+  const touchStartX = useRef(null);
 
   // ✅ Auto-play 4s (pause on hover)
   useEffect(() => {
@@ -53,6 +54,20 @@ export default function BannerSlider() {
     }, 4000);
     return () => clearInterval(timerRef.current);
   }, [slides.length, paused]);
+
+  // ✅ Mobile swipe — arrows mobile par hidden hain, is liye touch se slide
+  const handleTouchStart = (event) => {
+    touchStartX.current = event.touches?.[0]?.clientX ?? null;
+  };
+  const handleTouchEnd = (event) => {
+    if (touchStartX.current === null) return;
+    const endX = event.changedTouches?.[0]?.clientX ?? touchStartX.current;
+    const delta = endX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 40 || slides.length <= 1) return;
+    if (delta < 0) goNext();
+    else goPrev();
+  };
 
   // Banners kam hone par index range ke andar rakho (stale index se bachne ke liye)
   const active = slides.length ? current % slides.length : 0;
@@ -90,7 +105,9 @@ export default function BannerSlider() {
           is liye bari screen par hero apne aap proportion me barhta hai */}
       <div
         className="relative w-full h-[13.125rem] sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto overflow-hidden bg-[var(--user-bg-card)]"
-        style={{ minHeight: "13.125rem" }}
+        style={{ minHeight: "13.125rem", touchAction: "pan-y" }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* SLIDES */}
         {slides.map((banner, i) => {

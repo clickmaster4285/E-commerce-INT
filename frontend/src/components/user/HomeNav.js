@@ -7,23 +7,35 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { productApi } from "@/apis/user/productApi";
 import CategoryIcon from "./CategoryIcon";
 import {
-  getCategoryCounts,
   idOf,
   isTopLevelCategory,
   sortByPopularity,
 } from "@/utils/homeCatalog";
 
+/* Nav tabs — Best Offers / New Arrivals click par neeche Featured section
+   me scroll + wahi tab select hota hai (FeaturedProducts sunta hai:
+   "featured-tab-select" event + ?tab= URL param). */
+export const FEATURED_TAB_EVENT = "featured-tab-select";
+
+export function scrollToFeatured() {
+  try {
+    document
+      .getElementById("featured-products")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch {}
+}
+
 const NAV_LINKS = [
-  { label: "Home", href: "/", isActive: (path) => path === "/" },
-  { label: "Best Sellers", href: "/?sort=price-desc", isActive: () => false },
-  { label: "New Arrivals", href: "/?sort=newest", isActive: () => false },
+  { label: "Home", href: "/", tab: null, isActive: (path, activeTab) => path === "/" && !activeTab },
+  { label: "Best Offers", href: "/?tab=offers", tab: "offers", isActive: (_path, activeTab) => activeTab === "offers" },
+  { label: "New Arrivals", href: "/?tab=new", tab: "new", isActive: (_path, activeTab) => activeTab === "new" },
 ];
 
 const PARENT_LIMIT = 3;
@@ -111,6 +123,9 @@ function CategoryRow({ category, count = 0, onPick }) {
 
 export default function HomeNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams?.get("tab");
   const [panel, setPanel] = useState(null);
   const [panelStyle, setPanelStyle] = useState(null);
   const moreRef = useRef(null);
@@ -122,13 +137,22 @@ export default function HomeNav() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+  // ✅ Counts server facets se (direct, nav parity) — full catalog nahi.
+  // Key ["shopFacets","global"] home page ke saath shared (ek hi request).
+  const { data: facets = null } = useQuery({
+    queryKey: ["shopFacets", "global"],
+    queryFn: () => productApi.getFacets({}),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
-  const counts = useMemo(() => getCategoryCounts(products), [products]);
+  const counts = useMemo(() => {
+    const map = {};
+    (facets?.categoryDirect || []).forEach((c) => {
+      map[String(c._id)] = c.count || 0;
+    });
+    return map;
+  }, [facets]);
   const sortedCategories = useMemo(
     () => sortByPopularity(categories, counts),
     [categories, counts],
@@ -160,6 +184,48 @@ export default function HomeNav() {
 
   const closePanel = () => setPanel(null);
 
+  /* Best Offers / New Arrivals: ?tab= URL me set + Featured section tak
+     smooth scroll + wahi tab select (event se, taake same-page click par
+     bhi foran kaam kare). Home: tab clear + top par scroll. */
+  const handleNavClick = useCallback(
+    (event, link) => {
+      if (link.tab) {
+        event.preventDefault();
+        try {
+          const sp = new URLSearchParams(searchParams?.toString() || "");
+          sp.set("tab", link.tab);
+          router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+        } catch {}
+        try {
+          window.dispatchEvent(
+            new CustomEvent(FEATURED_TAB_EVENT, { detail: link.tab }),
+          );
+        } catch {}
+        requestAnimationFrame(() => scrollToFeatured());
+      } else {
+        // Home — tab param hatao aur top par le jao
+        if (activeTab) {
+          event.preventDefault();
+          try {
+            const sp = new URLSearchParams(searchParams?.toString() || "");
+            sp.delete("tab");
+            const query = sp.toString();
+            router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+          } catch {}
+          try {
+            window.dispatchEvent(
+              new CustomEvent(FEATURED_TAB_EVENT, { detail: "featured" }),
+            );
+          } catch {}
+          try {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } catch {}
+        }
+      }
+    },
+    [pathname, router, searchParams, activeTab],
+  );
+
   useEffect(() => {
     if (!panel) return undefined;
     const reposition = () => positionPanel(panel);
@@ -189,12 +255,13 @@ export default function HomeNav() {
     <nav className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
       <div className="w-full max-w-none px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
         <div className="flex h-11 items-center justify-center gap-0.5 overflow-x-auto scrollbar-hide lg:h-12 lg:gap-1.5">
-          {/* PLAIN LINKS — no dropdowns */}
+          {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
           {NAV_LINKS.map((link) => (
             <Link
               key={link.label}
               href={link.href}
-              className={itemClass(link.isActive(pathname))}
+              onClick={(event) => handleNavClick(event, link)}
+              className={itemClass(link.isActive(pathname, activeTab))}
             >
               {link.label}
             </Link>

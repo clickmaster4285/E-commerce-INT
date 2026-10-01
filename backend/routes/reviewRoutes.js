@@ -13,6 +13,7 @@ const {
   reviewMediaUpload,
   saveReviewMedia,
 } = require("../middleware/reviewUploadMiddleware");
+const { limiters } = require("../middleware/rateLimit");
 
 const router = express.Router();
 
@@ -38,6 +39,7 @@ router.post(
   authMiddleware,
   (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
   saveReviewMedia,
+  limiters.reviewCreate,
   createReview,
 );
 router.put("/:id", authMiddleware, updateReview);

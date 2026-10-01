@@ -62,12 +62,27 @@ export default function BundleCard({ bundle, className = "" }) {
   const [showItems, setShowItems] = useState(false);
   const { addBundleToCart } = useCart();
 
+  // ✅ Sirf is bundle ke products (ids se, variants/prices/images ke saath).
+  // Full catalog fetch nahi — bundle me 2-6 items hote hain (cap 50).
+  const bundleProductIds = useMemo(() => {
+    const ids = [];
+    (bundle?.products || []).forEach((entry) => {
+      const rawId = entry?.product?._id || entry?.product || entry?.productId;
+      const pid = rawId ? String(rawId) : "";
+      if (pid && !ids.includes(pid)) ids.push(pid);
+    });
+    return ids.slice(0, 50);
+  }, [bundle]);
+
   // ✅ Cart lines banane ke liye products (variants / prices / images) chahiye
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ["bundle-products"],
-    queryFn: productApi.getAll,
+  const { data: bundleProductsData, isLoading } = useQuery({
+    queryKey: ["bundle-products", bundle?._id || bundle?.id, bundleProductIds.join(",")],
+    queryFn: () =>
+      productApi.getAllPaginated({ page: 1, limit: 50, ids: bundleProductIds }),
+    enabled: bundleProductIds.length > 0,
     staleTime: 60 * 1000,
   });
+  const products = bundleProductsData?.products || [];
 
   const items = useMemo(
     () => resolveBundleItems(bundle, products),

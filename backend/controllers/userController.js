@@ -946,8 +946,42 @@ const updatePhone = async (req, res) => {
 // ==========================================
 const getWishlist = async (req, res) => {
   try {
-    const wishlistDoc = await Wishlist.findOne({ user_id: req.user._id }).populate("products");
-    res.json({ success: true, wishlist: wishlistDoc?.products || [] });
+    const wishlistDoc = await Wishlist.findOne({ user_id: req.user._id }).populate({
+      path: "products",
+      match: { is_deleted: { $ne: true } },
+      populate: [
+        { path: "category_id", select: "name" },
+        { path: "brand_id", select: "name" },
+      ],
+    });
+    const products = (wishlistDoc?.products || []).filter(Boolean);
+    // ✅ Variants + price attach (getProducts legacy item shape jaisa) —
+    // storefront ko hydrate ke liye full catalog fetch ki zaroorat nahi
+    let withVariants = products;
+    if (products.length) {
+      const Variant = require("../models/Variant");
+      const variants = await Variant.find({
+        product_id: { $in: products.map((p) => p._id) },
+        is_deleted: { $ne: true },
+      })
+        .sort({ created_at: 1, _id: 1 })
+        .lean();
+      const variantsMap = {};
+      variants.forEach((v) => {
+        const pid = String(v.product_id);
+        (variantsMap[pid] = variantsMap[pid] || []).push(v);
+      });
+      withVariants = products.map((p) => {
+        const plain = typeof p.toObject === "function" ? p.toObject() : { ...p };
+        const vs = variantsMap[String(plain._id)] || [];
+        return {
+          ...plain,
+          variants: vs,
+          price: Number(vs[0]?.selling_price) || 0,
+        };
+      });
+    }
+    res.json({ success: true, wishlist: withVariants });
   } catch (error) {
     console.error("getWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });

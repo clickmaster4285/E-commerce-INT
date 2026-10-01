@@ -14,14 +14,21 @@
    - Parent har filter change par naya `key` deta hai → remount → page 1.
    ========================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ListFilter, PackageSearch, RotateCcw, X } from "lucide-react";
 import ProductCard from "./ProductCard";
 import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { STOCK_STATES, formatPrice, idOf } from "@/utils/homeCatalog";
+import { useShopProducts, scrollToListTop } from "@/hooks/useShopProducts";
 
 const PER_PAGE = 20;
+
+const safePageParam = (raw) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+};
 
 /* FeaturedProducts wali grid — dono jagah cards ek jaisi chaudai me */
 const GRID =
@@ -44,9 +51,8 @@ function Chip({ label, onRemove }) {
 }
 
 export default function FilterResults({
-  products = [],
-  isLoading = false,
   filters,
+  sortBy = "featured",
   categories = [],
   brands = [],
   deals = [],
@@ -55,7 +61,61 @@ export default function FilterResults({
   /* Sidebar me deal select ho to heading me us deal ka naam (page.js se). */
   titleOverride = null,
 }) {
-  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const sectionRef = useRef(null);
+  // ✅ Server page seedha URL se (?page= — refresh/share safe, duplicate state nahi)
+  const page = safePageParam(searchParams.get("page"));
+
+  const filtersKey = useMemo(() => JSON.stringify({ filters, sortBy }), [filters, sortBy]);
+
+  // ✅ Filter/sort badle to page 1 (sirf URL — external sync, state nahi)
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(searchParams.toString());
+      if (!sp.has("page")) return;
+      sp.delete("page");
+      const query = sp.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
+
+  const bands = useMemo(() => {
+    const list = [...(filters?.discountBands || [])];
+    if ((filters?.discountBand ?? null) !== null) list.push(filters.discountBand);
+    return [...new Set(list.map(Number).filter((n) => Number.isFinite(n)))];
+  }, [filters]);
+
+  // ✅ Server grid (admin pattern: placeholderData, queryKey me sab)
+  const { products, total, pagination, isLoading, isFetching, isError, refetch } = useShopProducts({
+    page,
+    limit: PER_PAGE,
+    sort: sortBy,
+    brandIds: filters?.brandIds || [],
+    categoryIds: filters?.categoryIds || [],
+    minPrice: filters?.minPrice ?? null,
+    maxPrice: filters?.maxPrice ?? null,
+    stockStates: filters?.stockStates || [],
+    dealIds: filters?.dealIds || [],
+    discountBands: bands,
+  });
+
+  const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
+  const currentPage = pagination?.page || Math.min(page, totalPages);
+
+  const goToPage = (next) => {
+    const value = Math.min(Math.max(1, next), totalPages);
+    try {
+      const sp = new URLSearchParams(searchParams.toString());
+      if (value <= 1) sp.delete("page");
+      else sp.set("page", String(value));
+      const query = sp.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    } catch {}
+    scrollToListTop(sectionRef);
+  };
 
   /* ---------- Active filter chips (har chip apna filter hatati hai) ---------- */
   const chips = useMemo(() => {
@@ -139,13 +199,6 @@ export default function FilterResults({
     return list;
   }, [filters, categories, brands, deals, onChange]);
 
-  const totalPages = Math.max(1, Math.ceil(products.length / PER_PAGE));
-  const currentPage = Math.min(page, totalPages);
-  const pageItems = useMemo(
-    () => products.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE),
-    [products, currentPage],
-  );
-
   if (isLoading && !products.length) {
     return (
       <section aria-label="Filter results">
@@ -166,14 +219,38 @@ export default function FilterResults({
     );
   }
 
+  if (isError) {
+    return (
+      <section
+        aria-label="Filter results"
+        className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
+      >
+        <SectionHeading title={titleOverride || "Filter Results"} subtitle="Something went wrong" icon={ListFilter} />
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
+          <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
+          <p className="text-sm font-bold text-[var(--user-text)]">Could not load products</p>
+          <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Please check your connection and try again.</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
+      ref={sectionRef}
       aria-label="Filter results"
-      className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
+      className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4 scroll-mt-24"
     >
       <SectionHeading
         title={titleOverride || "Filter Results"}
-        subtitle={`${products.length} ${products.length === 1 ? "product" : "products"} match your filters`}
+        subtitle={`${total} ${total === 1 ? "product" : "products"} match your filters${isFetching ? "…" : ""}`}
         icon={ListFilter}
       >
         <button
@@ -195,7 +272,7 @@ export default function FilterResults({
         </div>
       ) : null}
 
-      {products.length === 0 ? (
+      {total === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
           <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
           <p className="text-sm font-bold text-[var(--user-text)]">No products match these filters</p>
@@ -213,7 +290,7 @@ export default function FilterResults({
       ) : (
         <>
           <div className={GRID}>
-            {pageItems.map((product) => (
+            {products.map((product) => (
               <ProductCard key={idOf(product._id) || product.name} product={product} />
             ))}
           </div>
@@ -221,9 +298,9 @@ export default function FilterResults({
           <PaginationBar
             page={currentPage}
             totalPages={totalPages}
-            total={products.length}
+            total={total}
             perPage={PER_PAGE}
-            onPageChange={setPage}
+            onPageChange={goToPage}
           />
         </>
       )}

@@ -14,23 +14,20 @@ import { useMemo, useState } from "react";
 import { ArrowRight, ImageOff, LayoutGrid, RotateCcw } from "lucide-react";
 import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
-import { formatPrice, popularCategories } from "@/utils/homeCatalog";
+import { formatPrice } from "@/utils/homeCatalog";
 
 const PER_PAGE = 12;
 
 export default function AllCategoriesResults({
-  categories = [],
-  products = [],
+  tiles = [],
   isLoading = false,
   onClear,
   onSelectCategory,
 }) {
   const [page, setPage] = useState(1);
 
-  const list = useMemo(
-    () => popularCategories(categories, products, 1000),
-    [categories, products],
-  );
+  // ✅ Tiles server se (count + fromPrice + image) — master data, client pages
+  const list = useMemo(() => [...(tiles || [])], [tiles]);
 
   const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE));
   const currentPage = Math.min(page, totalPages);

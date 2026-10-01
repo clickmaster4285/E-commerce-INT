@@ -8,16 +8,16 @@
      - total products count (parent + children sab mila kar)
    ========================================================== */
 
-import { useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, ImageOff } from "lucide-react";
 import SectionHeading from "./SectionHeading";
-import { formatPrice, popularCategories } from "@/utils/homeCatalog";
+import { formatPrice } from "@/utils/homeCatalog";
 
 const LIMIT = 12;
 
-export default function PopularCategories({ categories = [], products = [], isLoading = false }) {
-  const list = useMemo(() => popularCategories(categories, products, LIMIT), [categories, products]);
+export default function PopularCategories({ tiles = [], isLoading = false }) {
+  // ✅ Tiles server se (count + fromPrice + image) — full catalog nahi
+  const list = (tiles || []).slice(0, LIMIT);
 
   if (isLoading && !list.length) {
     return (

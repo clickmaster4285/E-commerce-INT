@@ -12,10 +12,9 @@
    Facet counts baaki active filters ke hisaab se update hote hain.
    ========================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgePercent,
-  Boxes,
   Check,
   ChevronDown,
   Flame,
@@ -29,12 +28,9 @@ import {
 import CategoryIcon from "./CategoryIcon";
 import {
   formatPrice,
-  getBrandCounts,
-  getCategorySubtreeCounts,
   getDealBadgeText,
   idOf,
   isTopLevelCategory,
-  priceBounds,
   sortByPopularity,
 } from "@/utils/homeCatalog";
 
@@ -149,7 +145,7 @@ const THUMB_CLASS =
   "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full " +
   "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--user-accent)]";
 
-function PriceRangeSlider({ min, max, value, onChange }) {
+function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
   const span = max - min;
   if (span <= 0) return null;
 
@@ -158,7 +154,11 @@ function PriceRangeSlider({ min, max, value, onChange }) {
   const highPercent = Math.min(100, Math.max(0, percent(value[1])));
 
   return (
-    <div className="relative h-6 select-none">
+    <div
+      className="relative h-6 select-none"
+      onMouseUp={onRelease}
+      onTouchEnd={onRelease}
+    >
       <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--user-border)]" />
       <div
         className="pointer-events-none absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--user-accent)]"
@@ -168,9 +168,11 @@ function PriceRangeSlider({ min, max, value, onChange }) {
         type="range"
         min={min}
         max={max}
-        step={1}
+        step={step}
         value={value[0]}
         onChange={(event) => onChange([Math.min(Number(event.target.value), value[1]), value[1]])}
+        onKeyUp={onRelease}
+        onBlur={onRelease}
         aria-label="Minimum price"
         className={THUMB_CLASS}
         style={{ zIndex: lowPercent > 70 ? 30 : 10 }}
@@ -179,9 +181,11 @@ function PriceRangeSlider({ min, max, value, onChange }) {
         type="range"
         min={min}
         max={max}
-        step={1}
+        step={step}
         value={value[1]}
         onChange={(event) => onChange([value[0], Math.max(Number(event.target.value), value[0])])}
+        onKeyUp={onRelease}
+        onBlur={onRelease}
         aria-label="Maximum price"
         className={THUMB_CLASS}
         style={{ zIndex: 20 }}
@@ -190,33 +194,168 @@ function PriceRangeSlider({ min, max, value, onChange }) {
   );
 }
 
-/* Min / max input box — uncontrolled (value sirf commit par apply hoti hai,
-   external value badalne par parent `key` change kar ke input reset karta hai) */
-function PriceInput({ label, defaultValue, onCommit }) {
-  const [draft, setDraft] = useState(() => String(defaultValue ?? ""));
+/* ---------- Price filter (Amazon style) ----------
+   - Min / Max inputs + Go button: type karo, Go/Enter dabao → EK baar filter.
+   - Slider: drag karte waqt sirf LOCAL move hota hai (koi refetch nahi),
+     chhodne (release) par ek baar apply.
+   - Inputs kabhi remount nahi hote (stable keys + focused-hote-hue external
+     sync nahi) → click/type par focus nahi toot-ta. */
+function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
+  const externalMin = filterMin ?? bounds.min;
+  const externalMax = filterMax ?? bounds.max;
+
+  const [minDraft, setMinDraft] = useState(String(externalMin ?? ""));
+  const [maxDraft, setMaxDraft] = useState(String(externalMax ?? ""));
+  const [sliderDraft, setSliderDraft] = useState(null);
+  const sliderDraftRef = useRef(null);
+  const focusedRef = useRef({ min: false, max: false });
+
+  // External value (slider commit / Clear All / URL) sirf tab sync ho jab
+  // us field me typing/focus na ho — is liye focus kabhi nahi toot-ta.
+  useEffect(() => {
+    if (!focusedRef.current.min) setMinDraft(String(externalMin ?? ""));
+  }, [externalMin]);
+  useEffect(() => {
+    if (!focusedRef.current.max) setMaxDraft(String(externalMax ?? ""));
+  }, [externalMax]);
+
+  const span = (bounds.max ?? 0) - (bounds.min ?? 0);
+  // Bari range par chhota step slider ko bekaar-sensitive banata hai
+  const sliderStep = span > 50000 ? 500 : span > 10000 ? 100 : span > 1000 ? 10 : 1;
+
+  const shownLow = sliderDraft ? sliderDraft[0] : externalMin;
+  const shownHigh = sliderDraft ? sliderDraft[1] : externalMax;
+
+  const applyRange = (lowRaw, highRaw) => {
+    const lo = Number(bounds.min) || 0;
+    const hi = Number(bounds.max) || 0;
+    let low = Number(lowRaw);
+    let high = Number(highRaw);
+    if (!Number.isFinite(low)) low = lo;
+    if (!Number.isFinite(high)) high = hi;
+    low = Math.round(low);
+    high = Math.round(high);
+    if (low > high) [low, high] = [high, low];
+    low = Math.min(Math.max(low, lo), hi);
+    high = Math.min(Math.max(high, lo), hi);
+    sliderDraftRef.current = null;
+    setSliderDraft(null);
+    onApply({
+      minPrice: low <= lo ? null : low,
+      maxPrice: high >= hi ? null : high,
+    });
+  };
+
+  const setDraft = (value) => {
+    sliderDraftRef.current = value;
+    setSliderDraft(value);
+  };
+
+  const commitSlider = () => {
+    const pending = sliderDraftRef.current;
+    if (!pending) return;
+    applyRange(pending[0], pending[1]);
+  };
+
+  if (span <= 0) {
+    return (
+      <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">
+        No price data yet.
+      </p>
+    );
+  }
+
+  const inputClass =
+    "min-w-0 flex-1 bg-transparent text-[0.75rem] font-semibold tabular-nums text-[var(--user-text)] outline-none";
 
   return (
-    <label className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2.5 focus-within:border-[var(--user-accent)]">
-      <span className="shrink-0 text-[0.625rem] font-bold uppercase text-[var(--user-text-subtle)]">{label}</span>
-      <input
-        type="number"
-        inputMode="numeric"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => onCommit(draft)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") onCommit(draft);
-        }}
-        className="min-w-0 flex-1 bg-transparent text-[0.75rem] font-semibold tabular-nums text-[var(--user-text)] outline-none"
+    <div>
+      <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-bold text-[var(--user-text)]">
+        <span className="tabular-nums">
+          {formatPrice(shownLow)} — {formatPrice(shownHigh)}
+        </span>
+      </p>
+
+      <PriceRangeSlider
+        min={bounds.min}
+        max={bounds.max}
+        step={sliderStep}
+        value={[shownLow, shownHigh]}
+        onChange={setDraft}
+        onRelease={commitSlider}
       />
-    </label>
+
+      <div className="mt-3 flex items-center gap-2">
+        <label className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2.5 focus-within:border-[var(--user-accent)]">
+          <span className="shrink-0 text-[0.625rem] font-bold uppercase text-[var(--user-text-subtle)]">Min</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={bounds.min}
+            max={bounds.max}
+            value={minDraft}
+            onChange={(event) => setMinDraft(event.target.value)}
+            onFocus={() => {
+              focusedRef.current.min = true;
+            }}
+            onBlur={() => {
+              focusedRef.current.min = false;
+              applyRange(minDraft, maxDraft);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+            aria-label="Minimum price"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2.5 focus-within:border-[var(--user-accent)]">
+          <span className="shrink-0 text-[0.625rem] font-bold uppercase text-[var(--user-text-subtle)]">Max</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={bounds.min}
+            max={bounds.max}
+            value={maxDraft}
+            onChange={(event) => setMaxDraft(event.target.value)}
+            onFocus={() => {
+              focusedRef.current.max = true;
+            }}
+            onBlur={() => {
+              focusedRef.current.max = false;
+              applyRange(minDraft, maxDraft);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+            aria-label="Maximum price"
+            className={inputClass}
+          />
+        </label>
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => applyRange(minDraft, maxDraft)}
+          className="h-9 shrink-0 rounded-lg bg-[var(--user-accent)] px-3.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+        >
+          Go
+        </button>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between text-[0.625rem] font-semibold text-[var(--user-text-subtle)]">
+        <span>{formatPrice(bounds.min)}</span>
+        <span>{formatPrice(bounds.max)}</span>
+      </div>
+      <p className="mt-1.5 text-[0.625rem] font-medium leading-relaxed text-[var(--user-text-subtle)]">
+        Discount ke baad wali (final) qeemat par lagta hai.
+      </p>
+    </div>
   );
 }
 
 export default function HomeSidebar({
   categories = [],
   brands = [],
-  products = [],
   deals = [],
   dealFacet = [],
   dealsLoading = false,
@@ -227,7 +366,10 @@ export default function HomeSidebar({
   filtersActive = false,
   stockFacet = [],
   discountFacet = [],
+  // ✅ Server facet counts + bounds (products full load ki jagah)
+  facets = null,
   isLoading = false,
+  facetsLoading = false,
   scrollable = false,
   className = "",
   showAllDealsView = false,
@@ -238,8 +380,21 @@ export default function HomeSidebar({
   const [brandQuery, setBrandQuery] = useState("");
   const [showAllBrands, setShowAllBrands] = useState(false);
 
-  const categoryCounts = useMemo(() => getCategorySubtreeCounts(categories, products), [categories, products]);
-  const brandCounts = useMemo(() => getBrandCounts(products), [products]);
+  // ✅ Counts server se (facets endpoint) — full catalog browser me nahi ata
+  const categoryCounts = useMemo(() => {
+    const map = {};
+    (facets?.categories || []).forEach((c) => {
+      map[idOf(c._id)] = c.count || 0;
+    });
+    return map;
+  }, [facets]);
+  const brandCounts = useMemo(() => {
+    const map = {};
+    (facets?.brands || []).forEach((b) => {
+      map[idOf(b._id)] = b.count || 0;
+    });
+    return map;
+  }, [facets]);
 
   /* Selected ids (strings me normalize) — select hote hi wo item apne
      section me TOP par ajata hai (neeche sort me selected-first). Plain
@@ -248,7 +403,6 @@ export default function HomeSidebar({
   const selectedCategorySet = strSet(filters?.categoryIds);
   const selectedBrandSet = strSet(filters?.brandIds);
   const selectedDealSet = strSet(filters?.dealIds);
-  const selectedStockSet = strSet(filters?.stockStates);
   const selectedBandSet = strSet([
     ...(filters?.discountBands || []),
     ...(filters?.discountBand ?? null) !== null ? [filters.discountBand] : [],
@@ -287,17 +441,18 @@ export default function HomeSidebar({
     [brands, brandCounts, filters],
   );
 
-  const bounds = useMemo(() => priceBounds(products), [products]);
+  const bounds = useMemo(
+    () => ({
+      min: Number(facets?.bounds?.min) || 0,
+      max: Number(facets?.bounds?.max) || 0,
+    }),
+    [facets],
+  );
 
   const filterMin = filters?.minPrice ?? null;
   const filterMax = filters?.maxPrice ?? null;
 
-  // Controlled value — filter state hi single source of truth hai
-  // (isliye koi effect/derived-state sync ki zaroorat nahi).
-  const sliderValue = [filterMin ?? bounds.min, filterMax ?? bounds.max];
-
   const selectedBrandIds = filters?.brandIds || [];
-  const selectedStock = filters?.stockStates || [];
   // discountBand (singular — sidebar likhta hai) + discountBands (plural) dono support
   const selectedBand = filters?.discountBand ?? null;
   const selectedDealIds = (filters?.dealIds || []).map(idOf).filter(Boolean);
@@ -343,14 +498,6 @@ export default function HomeSidebar({
     });
   };
 
-  const toggleStock = (id) => {
-    onChange({
-      stockStates: selectedStock.includes(id)
-        ? selectedStock.filter((item) => item !== id)
-        : [...selectedStock, id],
-    });
-  };
-
   const toggleBand = (band) => {
     onChange({
       discountBand: selectedBand === band ? null : band,
@@ -371,28 +518,7 @@ export default function HomeSidebar({
     });
   };
 
-  const handleSlider = ([low, high]) => {
-    const minValue = Math.min(Math.max(low, bounds.min), bounds.max);
-    const maxValue = Math.max(Math.min(high, bounds.max), minValue);
-    onChange({
-      minPrice: minValue <= bounds.min ? null : Math.round(minValue),
-      maxPrice: maxValue >= bounds.max ? null : Math.round(maxValue),
-    });
-  };
-
-  const commitMin = (raw) => {
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value <= bounds.min) return onChange({ minPrice: null });
-    onChange({ minPrice: Math.min(Math.round(value), filterMax ?? bounds.max) });
-  };
-
-  const commitMax = (raw) => {
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value >= bounds.max) return onChange({ maxPrice: null });
-    onChange({ maxPrice: Math.max(Math.round(value), filterMin ?? bounds.min) });
-  };
-
-  if (isLoading && !products.length) {
+  if (isLoading) {
     return (
       <aside className={`overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
         <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5">
@@ -470,42 +596,15 @@ export default function HomeSidebar({
           ) : null}
         </Section>
 
-        {/* PRICE RANGE */}
+        {/* PRICE RANGE — Amazon style: Min/Max + Go, slider release par apply.
+            Discount ke baad wali final qeemat par filter hota hai (backend). */}
         <Section title="Price Range" icon={Wallet}>
-          <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-bold text-[var(--user-text)]">
-            <span className="tabular-nums">
-              {formatPrice(sliderValue[0])} — {formatPrice(sliderValue[1])}
-            </span>
-          </p>
-
-          {bounds.max > bounds.min ? (
-            <PriceRangeSlider
-              min={bounds.min}
-              max={bounds.max}
-              value={sliderValue}
-              onChange={handleSlider}
-            />
-          ) : null}
-
-          <div className="mt-3 flex items-center gap-2">
-            <PriceInput
-              key={`min-${sliderValue[0]}`}
-              label="Min"
-              defaultValue={sliderValue[0]}
-              onCommit={commitMin}
-            />
-            <PriceInput
-              key={`max-${sliderValue[1]}`}
-              label="Max"
-              defaultValue={sliderValue[1]}
-              onCommit={commitMax}
-            />
-          </div>
-
-          <div className="mt-2 flex items-center justify-between text-[0.625rem] font-semibold text-[var(--user-text-subtle)]">
-            <span>{formatPrice(bounds.min)}</span>
-            <span>{formatPrice(bounds.max)}</span>
-          </div>
+          <PriceFilter
+            bounds={bounds}
+            filterMin={filterMin}
+            filterMax={filterMax}
+            onApply={(patch) => onChange(patch)}
+          />
         </Section>
 
         {/* TOP BRANDS */}
@@ -629,25 +728,6 @@ export default function HomeSidebar({
               ) : null}
             </>
           )}
-        </Section>
-        {/* AVAILABILITY — selected state sab se upar */}
-        <Section title="Availability" icon={Boxes}>
-          <div className="space-y-0.5">
-            {stockFacet.length === 0
-              ? <LoadingRows count={3} />
-              : [...stockFacet]
-                  .sort((a, b) => selectedFirst(selectedStockSet, a.id, b.id))
-                  .map((state) => (
-                    <CheckRow
-                      key={state.id}
-                      checked={selectedStock.includes(state.id)}
-                      label={state.label}
-                      count={state.count}
-                      disabled={state.count === 0 && !selectedStock.includes(state.id)}
-                      onClick={() => toggleStock(state.id)}
-                    />
-                  ))}
-          </div>
         </Section>
 
         {/* DISCOUNT — selected band sab se upar */}

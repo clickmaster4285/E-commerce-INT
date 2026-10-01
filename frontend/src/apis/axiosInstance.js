@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "sonner";
 
 // ==========================================
 // 🔥 DYNAMIC BASE URL — Current hostname use karta hai
@@ -55,6 +56,16 @@ axiosInstance.interceptors.response.use(
 
   async (error) => {
     const originalRequest = error.config;
+
+    // 🚦 429 — rate limit: global toast (OTP card ka apna retryAfter cooldown flow alag se chalta rehta hai)
+    if (error.response?.status === 429) {
+      const retryAfter = Number(error.response?.data?.retryAfter);
+      toast.error(
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? `${retryAfter} seconds baad try karein`
+          : "Too many requests. Please try again later.",
+      );
+    }
 
     // 🛑 Public auth requests par refresh-token logic skip karo
     // (OTP verify endpoints 400/429 dete hain — unpar redirect nahi hona chahiye)

@@ -51,6 +51,10 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = Number(process.env.PORT) || 5000;
+// ✅ TRUST_PROXY default blank/off — production me env se set hoga (e.g. "1")
+if (String(process.env.TRUST_PROXY || "").trim()) {
+  app.set("trust proxy", String(process.env.TRUST_PROXY).trim());
+}
 const HOST = process.env.HOST || "0.0.0.0";
 const CLIENT_URL = process.env.CLIENT_URL || "";
 const API_PREFIX = process.env.API_PREFIX || "/api";
@@ -113,6 +117,13 @@ app.use("/uploads", express.static(uploadDir, { maxAge: UPLOAD_CACHE_MAX_AGE, et
 
 const io = initSocket(server);
 app.use((req, res, next) => { req.io = io; next(); });
+
+// ✅ GLOBAL RATE LIMIT — poori /api par (health check skip, static /uploads waise hi bahar)
+const { limiters } = require("./middleware/rateLimit");
+app.use(API_PREFIX, (req, res, next) => {
+  if (req.path === "/health") return next();
+  return limiters.global(req, res, next);
+});
 
 // ==========================================
 // ROUTES

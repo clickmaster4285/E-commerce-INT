@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { useWishlist } from "@/components/user/WishlistContext";
-import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import { Heart, Loader2, ShoppingBag } from "lucide-react";
+
+// ✅ Ek waqt me kitne dikhein (load more — khatam ho to button hide)
+const PAGE_SIZE = 20;
 
 /* WishlistPage — /wishlist route ka full page AUR account ke Wishlist tab
    ka reused view (dono jagah EXACT same design).
@@ -14,21 +15,21 @@ import { Heart, Loader2, ShoppingBag } from "lucide-react";
    hide — sirf loading / empty / grid render hota hai. */
 export default function WishlistPage({ compact = false }) {
   const { wishlist, count, loading } = useWishlist();
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [seenCount, setSeenCount] = useState(count);
 
-  // Full product data (same source as home page) — images + prices ke liye
-  const { data: allProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
-    staleTime: 5 * 60 * 1000,
-  });
+  // ✅ Wishlist items backend se populated + variants/price ke saath aate hain —
+  // full catalog fetch ki zaroorat nahi
+  const allItems = wishlist || [];
+  // ✅ Count badle (add/remove) to dobara pehle page se (render me adjust — effect nahi)
+  if (seenCount !== count) {
+    setSeenCount(count);
+    setVisible(PAGE_SIZE);
+  }
+  const shownItems = allItems.slice(0, visible);
+  const hasMore = visible < allItems.length;
 
-  // Wishlist items ko full products se match karo
-  const allItems = wishlist.map((w) => {
-    const id = (w._id || w.id)?.toString();
-    return allProducts.find((p) => (p._id || p.id)?.toString() === id) || w;
-  });
-
-  const isLoading = loading || (count > 0 && productsLoading);
+  const isLoading = loading;
 
   return (
     <main className={compact ? "" : "max-w-[75rem] mx-auto px-3 lg:px-6 py-4 lg:py-10 pb-24 md:pb-10"}>
@@ -81,10 +82,21 @@ export default function WishlistPage({ compact = false }) {
         <>
           {/* Wishlist Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
-            {allItems.map((item) => (
+            {shownItems.map((item) => (
               <ProductCard key={item._id || item.id} product={item} />
             ))}
           </div>
+          {hasMore ? (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                className="h-11 px-6 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)] transition active:scale-95"
+              >
+                Show more ({allItems.length - visible} remaining)
+              </button>
+            </div>
+          ) : null}
         </>
       )}
     </main>

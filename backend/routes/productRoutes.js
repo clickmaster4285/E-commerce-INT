@@ -4,6 +4,8 @@ const {
   createProduct,
   getProducts,
   getProductStats,
+  getProductFacets,
+  getCategoryTiles,
   getProductById,
   updateProduct,
   deleteProduct,
@@ -30,6 +32,9 @@ router.get("/", getProducts);
 // ✅ Summary stats (stat cards) — list se alag route, taake independently load ho sake.
 //    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
 router.get("/stats", getProductStats);
+// ✅ Storefront shop facets + category tiles — "/:id" se PEHLE (warna id match ho jayega)
+router.get("/facets", getProductFacets);
+router.get("/category-tiles", getCategoryTiles);
 router.get("/:id", getProductById);
 
 // ==========================================

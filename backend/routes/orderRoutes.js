@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
+const { limiters } = require("../middleware/rateLimit");
 const { 
   placeOrder, 
   getMyOrders, 
@@ -17,7 +18,7 @@ const {
 const router = express.Router();
 
 // User Routes
-router.post("/", authMiddleware, placeOrder);
+router.post("/", authMiddleware, limiters.orderCreate, placeOrder);
 router.get("/my", authMiddleware, getMyOrders);
 router.get("/:id", authMiddleware, getOrderById);
 // ✅ User ke apne orders ke liye (edit + delete)

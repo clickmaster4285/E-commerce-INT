@@ -1,11 +1,11 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { Suspense, use, useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Clock, Flame, Tag, Package, Zap } from "lucide-react";
+import { ArrowLeft, Clock, Flame, Tag, Package, Zap, Loader2 } from "lucide-react";
 import { dealApi } from "@/apis/user/dealApi";
-import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import PaginationBar from "@/components/user/PaginationBar";
 import { BundleDealPanel } from "@/components/user/DealsSection";
@@ -50,28 +50,59 @@ function TimeBox({ value, label }) {
   );
 }
 
-/* Client-side pagination: har page par 20 products. Deal ke saare products
-   ek hi request me aa jate hain, is liye page number click karne par URL /
-   route change nahi hota — pehle 20 ki jagah agle 20 render ho jate hain. */
+/* Server-side pagination: har page par 20 products (backend se) — 2000
+   items wali fetch band. Page URL me (?page=) taake refresh/share chale. */
 const PAGE_SIZE = 20;
-const DEAL_FETCH_LIMIT = 2000;
+
+const safePageParam = (raw) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+};
 
 export default function DealDetailPage({ params }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="user-shell mx-auto px-4 py-20 text-center">
+          <div className="animate-pulse space-y-8">
+            <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl" />
+          </div>
+        </div>
+      }
+    >
+      <DealDetailContent params={params} />
+    </Suspense>
+  );
+}
+
+function DealDetailContent({ params }) {
   const { id } = use(params);
-  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const gridTopRef = useRef(null);
+  // ✅ Page seedha URL se (duplicate state nahi — back/refresh safe)
+  const page = safePageParam(searchParams.get("page"));
 
-  const { data: deal, isLoading, isError, refetch } = useQuery({
-    queryKey: ["deal", id],
-    queryFn: () => dealApi.getById(id, 1, DEAL_FETCH_LIMIT),
+  const { data: deal, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ["deal", id, page],
+    queryFn: () => dealApi.getById(id, page, PAGE_SIZE),
     retry: 2,
+    placeholderData: (previousData) => previousData,
+    staleTime: 60 * 1000,
   });
 
-  // ✅ Full product data (variants/images/prices + populated brand) — same source as main page
-  const { data: allProducts = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
-    staleTime: 5 * 60 * 1000,
-  });
+  const goToPage = (next) => {
+    const value = Math.max(1, next);
+    const sp = new URLSearchParams(searchParams.toString());
+    if (value <= 1) sp.delete("page");
+    else sp.set("page", String(value));
+    const query = sp.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    requestAnimationFrame(() => {
+      gridTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const time = useCountdown(deal?.endDate);
 
@@ -122,28 +153,16 @@ export default function DealDetailPage({ params }) {
     );
   }
 
-  const rawProducts = deal.resolvedProducts || deal.productIds || [];
-  const allProductsById = new Map(allProducts.map((p) => [p._id, p]));
-  const products = rawProducts.map((p) => {
-    const id = typeof p === 'string' ? p : p?._id;
-    return (id && allProductsById.get(id)) || p;
-  });
+  // ✅ Server page (backend se variants+price ke saath — full catalog nahi)
+  const products = deal.resolvedProducts || [];
+  const totalProducts = deal.totalProducts ?? products.length;
+  const totalPages = deal.totalPages || Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
+  const currentPage = deal.currentPage || page;
 
-  // ✅ Client-side pagination — 20 products per page
-  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageProducts = products.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
-
-  // ✅ Bundle deal ke liye poore combo products (pagination se independent)
+  // ✅ Bundle deal ke liye poore combo products (pagination se independent —
+  // backend populated productIds ab variants ke saath aate hain)
   const bundleProducts = (Array.isArray(deal.productIds) ? deal.productIds : [])
-    .map((p) => {
-      const pid = String(typeof p === "object" ? p?._id || p?.id : p);
-      return allProductsById.get(pid) || p;
-    })
-    .filter((p) => p && (p._id || p.id));
+    .filter((p) => p && typeof p === "object" && (p._id || p.id));
   const badgeText = deal.type === "percentage" ? `${deal.discountValue}% OFF` : `Rs. ${deal.discountValue} OFF`;
 
   const imgUrl = getImageUrl(deal.image) || getImageUrl(products[0]?.images?.[0]?.img_url) || getImageUrl(products[0]?.images?.[0]);
@@ -231,25 +250,26 @@ export default function DealDetailPage({ params }) {
           <BundleDealPanel
             deal={deal}
             products={bundleProducts}
-            allProducts={allProducts}
+            allProducts={bundleProducts}
             variant="light"
           />
         </div>
       )}
 
       {/* Products Grid with Pagination */}
-      <div>
+      <div ref={gridTopRef} className="scroll-mt-24">
         <h2 className="text-2xl font-black text-[var(--user-text)] mb-6 flex items-center gap-2">
           Products in this Deal
           <span className="text-sm my-4 font-normal text-[var(--user-text-muted)]">
             (Page {currentPage} of {totalPages})
           </span>
+          {isFetching && <Loader2 size={16} className="animate-spin text-[var(--user-text-subtle)]" />}
         </h2>
 
         {products.length > 0 ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-3 lg:gap-4 mb-8">
-              {pageProducts.map((product) => (
+              {products.map((product) => (
                 <ProductCard
                   key={product._id || product.id}
                   product={product}
@@ -263,9 +283,9 @@ export default function DealDetailPage({ params }) {
             <PaginationBar
               page={currentPage}
               totalPages={totalPages}
-              total={products.length}
+              total={totalProducts}
               perPage={PAGE_SIZE}
-              onPageChange={setPage}
+              onPageChange={goToPage}
             />
           </>
         ) : (

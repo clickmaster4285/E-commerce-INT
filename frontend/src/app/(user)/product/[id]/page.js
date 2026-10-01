@@ -85,8 +85,28 @@ function useProductDetail(productId) {
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ["product", productId], queryFn: () => productApi.getById(productId), enabled: !!productId, retry: false,
   });
-  const { data: allProducts = [] } = useQuery({ queryKey: ["products"], queryFn: productApi.getAll, staleTime: 5 * 60 * 1000 });
-  return { product, allProducts, isLoading, isError };
+  return { product, isLoading, isError };
+}
+
+// ✅ Related — same category, server se (khud ko filter karke 8 tak)
+function useRelatedProducts(product, categoryId) {
+  const { data } = useQuery({
+    queryKey: ["relatedProducts", product?._id || product?.id, categoryId],
+    queryFn: () =>
+      productApi.getAllPaginated({
+        page: 1,
+        limit: MAX_RELATED + 1,
+        category_id: categoryId || undefined,
+      }),
+    enabled: !!product && !!categoryId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  const pid = String(product?._id || product?.id || "");
+  return useMemo(() => {
+    const list = data?.products || [];
+    return list.filter((p) => String(p._id) !== pid).slice(0, MAX_RELATED);
+  }, [data, pid]);
 }
 
 function useVariant(variants = []) {
@@ -435,7 +455,7 @@ function ProductDetailContent({ params }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { product, allProducts, isLoading, isError } = useProductDetail(id);
+  const { product, isLoading, isError } = useProductDetail(id);
 
   const { data: store = null } = useQuery({ queryKey: ["storeInfo"], queryFn: storeApi.getPublic, staleTime: 5 * 60 * 1000 });
   const storeName = store?.store_name || "";
@@ -563,10 +583,7 @@ function ProductDetailContent({ params }) {
   const shortDescription = product?.short_description || "";
   const highlightEntries = attrEntries(currentVariant?.attributes, 3);
 
-  const related = useMemo(() => {
-    if (!product || !allProducts.length) return [];
-    return allProducts.filter((p) => { const pCat = extractId(p.category_id); return p._id !== product._id && (!categoryId || pCat === categoryId); }).slice(0, MAX_RELATED);
-  }, [product, allProducts, categoryId]);
+  const related = useRelatedProducts(product, categoryId);
 
   const stockStatus = getStockStatus(stock);
   const productId = product?._id || product?.id;

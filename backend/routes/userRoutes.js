@@ -25,6 +25,7 @@ const {
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
+const { limiters } = require("../middleware/rateLimit");
 const {
   sendEmailVerificationOtp,
   verifyEmailVerificationOtp,
@@ -39,13 +40,13 @@ const router = express.Router();
 // ==========================================
 //  PUBLIC ROUTES
 // ==========================================
-router.post("/register", createUser);
-router.post("/login", loginUser);
-router.post("/admin/login", loginAdmin);
+router.post("/register", limiters.register, createUser);
+router.post("/login", limiters.login, loginUser);
+router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
 router.post("/logout", logoutUser);
-router.post("/google-login", googleLogin);
-router.post("/google-customer-login", googleCustomerLogin);
+router.post("/google-login", limiters.adminLogin, googleLogin);
+router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);
 
 // ==========================================
 // 📧 EMAIL HEALTH (SMTP diagnose — bina DB ke bhi chalega)
@@ -55,15 +56,15 @@ router.get("/email-health", getEmailHealth);
 // ==========================================
 // 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
 // ==========================================
-router.post("/send-email-otp", sendEmailVerificationOtp);
-router.post("/verify-email-otp", verifyEmailVerificationOtp);
+router.post("/send-email-otp", limiters.sendEmailOtp, sendEmailVerificationOtp);
+router.post("/verify-email-otp", limiters.verifyEmailOtp, verifyEmailVerificationOtp);
 
 // ==========================================
 // 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
 // ==========================================
-router.post("/forgot-password", sendForgotPasswordOtp);
-router.post("/verify-reset-otp", verifyForgotPasswordOtp);
-router.post("/reset-password", resetPasswordWithOtp);
+router.post("/forgot-password", limiters.forgotPassword, sendForgotPasswordOtp);
+router.post("/verify-reset-otp", limiters.verifyResetOtp, verifyForgotPasswordOtp);
+router.post("/reset-password", limiters.resetPassword, resetPasswordWithOtp);
 
 // ==========================================
 // 🔒 PROTECTED ROUTES

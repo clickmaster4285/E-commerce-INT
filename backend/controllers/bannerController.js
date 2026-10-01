@@ -83,11 +83,16 @@ exports.getAllBanners = async (req, res) => {
 exports.getActiveBanners = async (req, res) => {
   try {
     const now = new Date();
-    const banners = await Banner.find({
+    // ✅ Optional ?limit= (user cap 50) — na bhejo to purana full-array response
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0;
+    const query = Banner.find({
       status: "active",
       $or: [{ startDate: null }, { startDate: { $lte: now } }],
       $or: [{ endDate: null }, { endDate: { $gte: now } }],
     }).sort({ position: 1 });
+    if (limit) query.limit(limit);
+    const banners = await query.lean();
     res.json({ success: true, data: banners });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
