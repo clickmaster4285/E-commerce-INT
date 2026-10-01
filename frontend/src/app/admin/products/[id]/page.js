@@ -9,7 +9,7 @@ import {
   Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
   Sparkles, AlertTriangle, FolderOpen, Store, Hash, Tag as TagIcon,
-  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText,
+  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText, Info,
   Ban, ChevronLeft, ZoomIn, Search // Added ZoomIn and ChevronLeft for gallery
 } from "lucide-react";
 import { toast } from "sonner";
@@ -60,8 +60,12 @@ function tago(d) {
   return dy < 30 ? `${dy}d ago` : fd(d);
 }
 
+// Initials for an avatar circle. Returns "" when there is nothing to derive them
+// from, so a missing name can never surface as a literal "?" placeholder — the
+// caller decides what to show instead (see Avatar / the Brand card).
 function ini(n) {
-  return n ? n.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() : "??";
+  if (!n) return "";
+  return String(n).trim().split(/\s+/).map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
 // ==================== MODERN COMPONENTS ====================
@@ -114,17 +118,22 @@ function DataRow({ label, value, mono, highlight, icon: Icon }) {
   );
 }
 
-function Avatar({ user, size = "md", color = "emerald" }) {
+function Avatar({ user, name, size = "md", color = "emerald" }) {
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
+  const iconSizes = { sm: "w-3.5 h-3.5", md: "w-4 h-4", lg: "w-5 h-5" };
   const colors = {
     emerald: { bg: "var(--success-soft)", text: "var(--success)" },
     blue: { bg: "var(--info-soft)", text: "var(--info)" },
     purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
   };
   const c = colors[color] || colors.emerald;
+  // `name` wins when the caller already resolved it (actorInfo). When nothing is
+  // known the circle falls back to a neutral glyph — never "?" or "??".
+  const label = String(name || user?.name || user?.email || "").trim();
   return (
-    <div className={`${sizes[size]} rounded-full flex items-center justify-center font-bold shrink-0`} style={{ backgroundColor: c.bg, color: c.text }}>
-      {ini(user?.name || user?.email || "?")}
+    <div className={`${sizes[size]} rounded-full flex items-center justify-center font-bold shrink-0`}
+      style={{ backgroundColor: c.bg, color: c.text }} title={label || undefined}>
+      {label ? ini(label) : <User className={iconSizes[size]} />}
     </div>
   );
 }
@@ -378,49 +387,101 @@ const attrValueOf = (raw) => {
 };
 
 // ==================== ACTIVITY TIMELINE ====================
-// Every entry is derived from persistent audit data (Product / Variant
-// createdby + updatedby, Tag createdAt + createdby), so the history survives
-// page reloads. Live socket events are merged on top as a "LIVE" overlay.
+// Strictly an audit trail: every row below is backed by a timestamp the backend
+// itself wrote at the moment the change happened. Nothing is inferred from the
+// product's current values, so an action that never ran can never show up.
+//   • Product  → created_at / updated_at (+ createdby / updatedby)
+//   • Variant  → created_at / updated_at (+ createdby / updatedby)
+// Tag documents are deliberately excluded — a tag's own createdAt / updatedAt
+// belong to the shared tag library and say nothing about when it was attached to
+// *this* product, so listing them here would invent events that never happened.
+// Live socket events are merged on top so a change made in another tab appears
+// immediately, before the refetch lands.
 const ACTIVITY_TYPES = {
   "product-created": { group: "product", label: "Product Created", icon: Plus, bg: "var(--success-soft)", fg: "var(--success)", avatar: "emerald" },
   "product-updated": { group: "product", label: "Product Updated", icon: Pencil, bg: "var(--info-soft)", fg: "var(--info)", avatar: "blue" },
   "variant-created": { group: "variant", label: "Variant Created", icon: Layers3, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
   "variant-updated": { group: "variant", label: "Variant Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
-  "tag-created": { group: "tag", label: "Tag Created", icon: TagIcon, bg: "var(--accent-soft)", fg: "var(--accent)", avatar: "emerald" },
-  "tag-updated": { group: "tag", label: "Tag Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
 };
 
 const activityMetaOf = (type) => ACTIVITY_TYPES[type] || ACTIVITY_TYPES["product-updated"];
 
-// Audit users arrive either populated ({ name, email }) or as a raw id / null.
-const actorName = (user) => {
-  if (!user) return "";
-  if (typeof user === "string") return user;
-  return user.name || user.email || "";
+// Audit users arrive populated ({ name, email }), as a bare id, or as null — the
+// UI must never assume one shape. A raw ObjectId is an identifier, NOT a person,
+// so it resolves to "unknown" instead of printing 24 characters of hex as a name.
+const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
+// "admin" → "Admin"; deliberate capitals (McDonald, SKU codes) are left intact.
+const titleCase = (value) => String(value).replace(/(^|[\s._-])\S/g, (c) => c.toUpperCase());
+
+const UNKNOWN_ACTOR = Object.freeze({ known: false, name: "", email: "", initials: "" });
+
+// Single source of truth for naming whoever made a change. Returns
+// { known, name, email, initials } so no caller can accidentally render a blank
+// row, a raw ObjectId, or the old "?" placeholder.
+const actorInfo = (raw) => {
+  if (!raw) return UNKNOWN_ACTOR;
+
+  if (typeof raw === "string") {
+    const value = raw.trim();
+    if (!value || OBJECT_ID_RE.test(value)) return UNKNOWN_ACTOR;
+    const name = titleCase(value);
+    return { known: true, name, email: "", initials: ini(name) };
+  }
+  if (typeof raw !== "object") return UNKNOWN_ACTOR;
+
+  const storedName = String(raw.name || raw.username || "").trim();
+  const email = String(raw.email || "").trim();
+  if (!storedName && !email) return UNKNOWN_ACTOR;
+
+  // Prefer the real name; fall back to the email's local part so an entry whose
+  // name never reached the audit record is still labelled usefully.
+  const name = storedName ? titleCase(storedName) : titleCase(email.split("@")[0]);
+  return { known: true, name, email, initials: ini(name) };
 };
-const actorEmail = (user) => (user && typeof user === "object" ? user.email || "" : "");
 
-// A product / variant / tag is only reported as "updated" when its audit
-// timestamp is measurably later than creation (not the creation itself).
-const hasRealUpdate = (createdAt, updatedAt) =>
-  !!createdAt && !!updatedAt &&
-  new Date(updatedAt).getTime() - new Date(createdAt).getTime() > 60000;
+// Mongoose stamps created_at and updated_at off the same clock on insert, so
+// for a record that was never edited the two are identical. The backend only
+// saves a product / variant when isModified() is true, so any gap larger than
+// this 1-second insert-jitter guard is a genuine edit — there is no arbitrary
+// "ignore the first minute" fudge factor hiding real changes.
+const hasRealUpdate = (createdAt, updatedAt) => {
+  if (!createdAt || !updatedAt) return false;
+  const delta = new Date(updatedAt).getTime() - new Date(createdAt).getTime();
+  return Number.isFinite(delta) && delta > 1000;
+};
 
-// Sockets can echo the same change the refetched document already contains,
-// so events of the same type from the same minute are treated as duplicates.
-const activityBucket = (type, date) => `${type}|${Math.floor(new Date(date).getTime() / 60000)}`;
+// A socket broadcast and the refetched document describe the same save with the
+// same millisecond, so an exact stamp is the reliable duplicate test. Bucketing
+// by minute would wrongly swallow two genuine edits made in the same minute.
+const activityStamp = (type, date) => `${type}|${new Date(date).getTime()}`;
+
+// Day headers ("Today", "Yesterday", weekday, or full date) for the timeline.
+const startOfDay = (value) => {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+};
+const dayBucketOf = (value) => startOfDay(value);
+const dayLabelOf = (value) => {
+  const date = new Date(value);
+  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(value)) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString("en-US", { weekday: "long" });
+  return date.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+};
+// Wall-clock only — the day header above each group already carries the date.
+const clockOf = (value) =>
+  new Date(value).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+// Full, unambiguous timestamp used as the hover title on every timeline row, so
+// the exact moment of a change is always one hover away.
+const fullStampOf = (value) =>
+  value ? new Date(value).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" }) : "";
 
 const variantLabelOf = (variant) => {
   const attrValues = Object.values(variant?.attributes || {}).map(attrValueOf).filter(Boolean);
   return variant?.title || attrValues.join(" / ") || variant?.sku || "Variant";
 };
-
-const variantAttrSummary = (variant) =>
-  Object.entries(variant?.attributes || {})
-    .map(([name, raw]) => { const value = attrValueOf(raw); return value ? `${name}: ${value}` : ""; })
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" · ");
 
 // ==================== COMPACT 3-DOT MENU ====================
 
@@ -1615,16 +1676,6 @@ export default function ProductDetailPage() {
   // Tags tab ki tarah product + variants ka union dikhao.
   const overviewTagNames = allAssignedTags.map(tagNameOf).filter(Boolean);
 
-  // Build lookup from existing global tag records (with resolved createdby) by lowercase name and by id
-  const tagRecordLookup = {};
-  (globalTags || []).forEach((gt) => {
-    if (gt && (gt.name || gt._id)) {
-      tagRecordLookup[String(gt.name || gt).trim().toLowerCase()] = gt;
-      if (gt._id) tagRecordLookup[String(gt._id).trim().toLowerCase()] = gt;
-      if (gt.name) tagRecordLookup[String(gt.name || gt).trim()] = gt;
-    }
-  });
-
   // Source / Variant mapping for tag display (keys lowercased for case-insensitive lookup)
   const tagSourceInfo = {};
   (product.tag_ids || []).forEach(tagId => {
@@ -1671,17 +1722,23 @@ export default function ProductDetailPage() {
   const tagCount = allAssignedTags.length;
 
   // ==================== PERSISTED ACTIVITY TIMELINE ====================
-  // Merges every audit trail available for this product:
-  //   • Product   → created_at / updated_at  (+ createdby / updatedby)
-  //   • Variants  → created_at / updated_at  (+ createdby / updatedby)
-  //   • Tags      → createdAt / updatedAt    (+ createdby / updatedby)
-  // plus a live socket overlay for changes that arrive before the refetch.
+  // Builds the History list from audit timestamps only. Every event here maps to
+  // a real write the backend performed, so the tab can never show an action that
+  // did not happen:
+  //   • Product  → created_at / updated_at  (+ createdby / updatedby)
+  //   • Variant  → created_at / updated_at  (+ createdby / updatedby)
+  // The backend only bumps those stamps when isModified() is true, so untouched
+  // records produce no event. Tag documents are intentionally not treated as
+  // product activity — a tag's own timestamps belong to the shared tag library.
   const activityTimeline = (() => {
     const events = [];
     const push = (event) => {
       const meta = activityMetaOf(event?.type);
+      // No valid timestamp → no proven event, so it is never rendered.
       if (!event?.date || !meta) return;
-      events.push({ ...event, group: meta.group });
+      const time = new Date(event.date).getTime();
+      if (!Number.isFinite(time)) return;
+      events.push({ ...event, group: meta.group, time });
     };
 
     /* ---------------- Product ---------------- */
@@ -1689,7 +1746,6 @@ export default function ProductDetailPage() {
       key: `product-created-${product._id}`,
       type: "product-created",
       actor: product.createdby || null,
-      actionLabel: "Created",
       description: "Product was added to the catalog",
       date: product.created_at,
     });
@@ -1699,13 +1755,8 @@ export default function ProductDetailPage() {
         key: `product-updated-${product._id}`,
         type: "product-updated",
         actor: product.updatedby || null,
-        actionLabel: "Updated",
         description: "Product details were modified",
         date: product.updated_at,
-        meta: [
-          { label: "Name", value: product.name || "—" },
-          { label: "Status", value: product.status === "inactive" ? "Inactive" : "Active" },
-        ],
       });
     }
 
@@ -1713,20 +1764,18 @@ export default function ProductDetailPage() {
     (variants || []).forEach((variant, index) => {
       const variantKey = String(variant._id || index);
       const label = variantLabelOf(variant);
-      const attrSummary = variantAttrSummary(variant);
-      const baseMeta = [
-        { label: "SKU", value: variant.sku || "—", mono: true },
-        ...(attrSummary ? [{ label: "Attributes", value: attrSummary }] : []),
-      ];
+      // SKU identifies the variant in every event. Deliberately NOT a list of the
+      // current price / stock / status — those are the values *right now* and would
+      // wrongly imply they were the fields that changed.
+      const subject = [{ label: "SKU", value: variant.sku || "—", mono: true }];
 
       push({
         key: `variant-created-${variantKey}`,
         type: "variant-created",
         actor: variant.createdby || null,
-        actionLabel: "Created",
         description: `Variant "${label}" was added to this product`,
         date: variant.created_at,
-        meta: baseMeta,
+        subject,
       });
 
       if (hasRealUpdate(variant.created_at, variant.updated_at)) {
@@ -1734,66 +1783,24 @@ export default function ProductDetailPage() {
           key: `variant-updated-${variantKey}`,
           type: "variant-updated",
           actor: variant.updatedby || null,
-          actionLabel: "Updated",
-          description: `Variant "${label}" details were modified`,
+          description: `Variant "${label}" was edited`,
           date: variant.updated_at,
-          meta: [
-            ...baseMeta,
-            { label: "Price", value: `Rs. ${Number(variant.selling_price || 0).toLocaleString()}` },
-            { label: "Stock", value: `${Number(variant.quantity || 0)} units` },
-            { label: "Status", value: variant.status === "inactive" ? "Inactive" : "Active" },
-          ],
-        });
-      }
-    });
-
-    /* ---------------- Tags (assigned to product or its variants) ---------------- */
-    (allAssignedTags || []).forEach((tag, index) => {
-      const name = String(tagNameOf(tag) || "").trim();
-      if (!name) return;
-
-      const lowerName = name.toLowerCase();
-      const record =
-        tagRecordLookup[lowerName] ||
-        (tag?._id ? tagRecordLookup[String(tag._id).trim().toLowerCase()] : null) ||
-        tag;
-
-      const createdAt = record?.createdAt || record?.created_at;
-      const updatedAt = record?.updatedAt || record?.updated_at;
-
-      push({
-        key: `tag-created-${lowerName}-${index}`,
-        type: "tag-created",
-        actor: record?.createdby || null,
-        actionLabel: "Created",
-        description: `Tag "${name}" was created and assigned to this product`,
-        date: createdAt,
-        meta: [{ label: "Tag", value: name }],
-      });
-
-      if (hasRealUpdate(createdAt, updatedAt)) {
-        push({
-          key: `tag-updated-${lowerName}-${index}`,
-          type: "tag-updated",
-          actor: record?.updatedby || null,
-          actionLabel: "Updated",
-          description: `Tag "${name}" was renamed or modified`,
-          date: updatedAt,
-          meta: [{ label: "Tag", value: name }],
+          subject,
         });
       }
     });
 
     /* ---------------- Live socket overlay (deduped against DB entries) ---------------- */
-    const persistedBuckets = new Set(events.map((e) => activityBucket(e.type, e.date)));
+    // The refetched document and the socket broadcast describe the same save with
+    // the same millisecond, so an exact stamp match drops only true duplicates.
+    const persistedStamps = new Set(events.map((e) => activityStamp(e.type, e.date)));
     (liveEvents || []).forEach((liveEvent) => {
       const type = liveEvent.type === "created" ? "product-created" : "product-updated";
-      if (persistedBuckets.has(activityBucket(type, liveEvent.date))) return;
+      if (persistedStamps.has(activityStamp(type, liveEvent.date))) return;
       push({
         key: liveEvent.key,
         type,
         actor: liveEvent.user || null,
-        actionLabel: liveEvent.type === "created" ? "Created" : "Updated",
         description: liveEvent.type === "created"
           ? "Product was added to the catalog"
           : "Product details were modified",
@@ -1803,26 +1810,55 @@ export default function ProductDetailPage() {
     });
 
     // Newest first: the most recent action always sits on top.
-    return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return events.sort((a, b) => b.time - a.time);
   })();
 
+  // Grouped into day buckets (Today / Yesterday / date) for the timeline header.
+  const filteredActivity = activityFilter === "all"
+    ? activityTimeline
+    : activityTimeline.filter((e) => e.group === activityFilter);
+
+  const activityGroups = (() => {
+    const buckets = new Map();
+    filteredActivity.forEach((ev) => {
+      const bucket = dayBucketOf(ev.date);
+      if (!buckets.has(bucket)) buckets.set(bucket, []);
+      buckets.get(bucket).push(ev);
+    });
+    return [...buckets.entries()].map(([bucket, items]) => ({
+      bucket,
+      label: dayLabelOf(items[0].date),
+      items,
+    }));
+  })();
+
+  const productEventCount = activityTimeline.filter((e) => e.group === "product").length;
+  const variantCreateCount = activityTimeline.filter((e) => e.type === "variant-created").length;
+  const variantUpdateCount = activityTimeline.filter((e) => e.type === "variant-updated").length;
+  // Entries the backend never attributed to a user. Surfaced so the empty actor
+  // rows are explained instead of looking like a rendering fault.
+  const unattributedCount = activityTimeline.filter((e) => !actorInfo(e.actor).known).length;
+
+  // Resolved once so the "Created By" / "Updated By" cards and the timeline all
+  // agree on the same naming rules (and so a raw ObjectId can never be mistaken
+  // for a person just because the field is truthy).
+  const createdByInfo = actorInfo(product.createdby);
+  const updatedByInfo = actorInfo(product.updatedby);
+
+  // Every number below is derived from a timestamp the backend itself wrote —
+  // nothing here counts an action that was never recorded.
   const activitySummary = [
-    { id: "product-events", label: "Product Events", icon: Package, soft: "var(--success-soft)", color: "var(--success)", value: activityTimeline.filter((e) => e.group === "product").length, hint: "Created & updated" },
-    { id: "variants-added", label: "Variants Added", icon: Layers3, soft: "var(--purple-soft)", color: "var(--purple)", value: activityTimeline.filter((e) => e.type === "variant-created").length, hint: `${totalVariants} variant${totalVariants === 1 ? "" : "s"} live` },
-    { id: "variant-updates", label: "Variant Updates", icon: Pencil, soft: "var(--warning-soft)", color: "var(--warning)", value: activityTimeline.filter((e) => e.type === "variant-updated").length, hint: "Edits recorded" },
-    { id: "tag-events", label: "Tag Events", icon: TagIcon, soft: "var(--accent-soft)", color: "var(--accent)", value: activityTimeline.filter((e) => e.group === "tag").length, hint: `${tagCount} tag${tagCount === 1 ? "" : "s"} assigned` },
+    { id: "total-events", label: "Recorded Changes", icon: Activity, soft: "var(--accent-soft)", color: "var(--accent)", value: activityTimeline.length, hint: "All activity on this product" },
+    { id: "product-events", label: "Product Changes", icon: Package, soft: "var(--success-soft)", color: "var(--success)", value: productEventCount, hint: "Created & later edited" },
+    { id: "variants-added", label: "Variants Added", icon: Layers3, soft: "var(--purple-soft)", color: "var(--purple)", value: variantCreateCount, hint: "Recorded variant creations" },
+    { id: "variant-updates", label: "Variants Edited", icon: Pencil, soft: "var(--warning-soft)", color: "var(--warning)", value: variantUpdateCount, hint: "Recorded variant edits" },
   ];
 
   const activityFilters = [
     { id: "all", label: "All Activity", count: activityTimeline.length },
-    { id: "product", label: "Product", count: activityTimeline.filter((e) => e.group === "product").length },
-    { id: "variant", label: "Variants", count: activityTimeline.filter((e) => e.group === "variant").length },
-    { id: "tag", label: "Tags", count: activityTimeline.filter((e) => e.group === "tag").length },
+    { id: "product", label: "Product", count: productEventCount },
+    { id: "variant", label: "Variants", count: variantCreateCount + variantUpdateCount },
   ];
-
-  const filteredActivity = activityFilter === "all"
-    ? activityTimeline
-    : activityTimeline.filter((e) => e.group === activityFilter);
 
   // Helper to open gallery
   const openGallery = (index) => {
@@ -2171,7 +2207,7 @@ export default function ProductDetailPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[12px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--accent)" }}>
-                    {ini(product.brand_id?.name)}
+                    {product.brand_id?.name ? ini(product.brand_id.name) : <Store className="w-4 h-4" />}
                   </div>
                   <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
                     {product.brand_id?.name || "—"}
@@ -2434,20 +2470,20 @@ export default function ProductDetailPage() {
                         <h3 className="text-sm font-bold text-[var(--text-primary)]">Created By</h3>
                       </div>
                       <div className="p-3">
-                        {product.createdby ? (
+                        {createdByInfo.known ? (
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-3">
-                              <Avatar user={product.createdby} size="md" color="emerald" />
+                              <Avatar name={createdByInfo.name} size="md" color="emerald" />
                               <div>
-                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{product.createdby.name || product.createdby.email}</p>
-                                <p className="text-[11px] text-[var(--text-muted)]">{product.createdby.email || "—"}</p>
+                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{createdByInfo.name}</p>
+                                <p className="text-[11px] text-[var(--text-muted)]">{createdByInfo.email || "—"}</p>
                               </div>
                             </div>
                             <p className="text-[11px] text-[var(--text-muted)] mt-1">Created At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at)}</span></p>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">—</p>
+                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">Not recorded</p>
                             <p className="text-[11px] text-[var(--text-muted)]">Created At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at)}</span></p>
                           </div>
                         )}
@@ -2463,13 +2499,13 @@ export default function ProductDetailPage() {
                           <h3 className="text-sm font-bold text-[var(--text-primary)]">Updated By</h3>
                         </div>
                         <div className="p-3">
-                          {product.updatedby ? (
+                          {updatedByInfo.known ? (
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-3">
-                                <Avatar user={product.updatedby} size="md" color="blue" />
+                                <Avatar name={updatedByInfo.name} size="md" color="blue" />
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{actorName(product.updatedby) || "Not recorded"}</p>
-                                  <p className="text-[11px] text-[var(--text-muted)]">{actorEmail(product.updatedby) || "—"}</p>
+                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{updatedByInfo.name}</p>
+                                  <p className="text-[11px] text-[var(--text-muted)]">{updatedByInfo.email || "—"}</p>
                                 </div>
                               </div>
                               <p className="text-[11px] text-[var(--text-muted)] mt-1">Updated At: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at)}</span></p>
@@ -2683,81 +2719,146 @@ export default function ProductDetailPage() {
                     })}
                   </div>
 
-                  {/* Timeline */}
+                  {/* Explains blank actor rows honestly instead of leaving them
+                      looking like a rendering fault. Shown only when relevant. */}
+                  {unattributedCount > 0 && (
+                    <div className="flex items-start gap-2 rounded-lg px-3 py-2.5"
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--text-muted)" }} />
+                      <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                        {unattributedCount} of {activityTimeline.length} {unattributedCount === 1 ? "entry has" : "entries have"} no user on record
+                        — the database stored no audit user for {unattributedCount === 1 ? "it" : "them"}. Every edit saved from now on
+                        shows who made it.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Timeline — grouped by day, newest first. Only real audit events. */}
                   {filteredActivity.length === 0 ? (
-                    <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                      <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                      <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl"
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+                        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                        <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
+                      </div>
+                      <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
+                        {activityTimeline.length === 0 ? "No changes recorded yet" : "Nothing in this filter"}
+                      </h4>
+                      <p className="text-[11px] mt-1 max-w-sm" style={{ color: "var(--text-muted)" }}>
                         {activityTimeline.length === 0
-                          ? "No activity recorded yet for this product."
-                          : "No activity matches the selected filter."}
-                      </span>
+                          ? "This product has only its original creation entry. Every edit you save from now on is listed here."
+                          : "No recorded changes match the selected filter. Try “All Activity” to see everything."}
+                      </p>
                     </div>
                   ) : (
-                    <div>
-                      {filteredActivity.map((ev, i) => {
-                      const meta = activityMetaOf(ev.type);
-                      const EventIcon = meta.icon;
-                      const actor = actorName(ev.actor);
-                      const email = actorEmail(ev.actor);
-                      return (
-                        <div key={ev.key} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: meta.bg, color: meta.fg }}>
-                              <EventIcon className="w-4 h-4" />
-                            </div>
-                            {i < filteredActivity.length - 1 && <div className="w-px flex-1 my-2" style={{ backgroundColor: "var(--border-color)" }} />}
+                    <div className="space-y-6">
+                      {activityGroups.map((group) => (
+                        <div key={group.bucket}>
+                          {/* Day header */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <Calendar className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }} />
+                            <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                              {group.label}
+                            </span>
+                            <span className="text-[10px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+                              {group.items.length} {group.items.length === 1 ? "change" : "changes"}
+                            </span>
+                            <div className="flex-1 h-px" style={{ backgroundColor: "var(--border-color)" }} />
                           </div>
-                          <div className="flex-1 min-w-0 pb-6">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{meta.label}</h4>
-                                  <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
-                                    style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
-                                    {meta.group}
-                                  </span>
-                                  {ev.live && (
-                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{ev.description}</p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>{fd(ev.date)}</p>
-                                <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date)}</p>
-                              </div>
-                            </div>
 
-                            {ev.meta && ev.meta.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {ev.meta.map((m, mi) => (
-                                  <span key={`${ev.key}-meta-${mi}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px]"
-                                    style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                                    <span style={{ color: "var(--text-muted)" }}>{m.label}</span>
-                                    <span className={m.mono ? "font-mono font-semibold" : "font-semibold"} style={{ color: "var(--text-primary)" }}>{m.value}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                          {/* Events for this day */}
+                          <div>
+                            {group.items.map((ev, i) => {
+                              const meta = activityMetaOf(ev.type);
+                              const EventIcon = meta.icon;
+                              const who = actorInfo(ev.actor);
+                              const isLast = i === group.items.length - 1;
+                              return (
+                                <div key={ev.key} className="flex gap-3.5">
+                                  {/* Rail */}
+                                  <div className="flex flex-col items-center shrink-0">
+                                    <div className="w-9 h-9 rounded-full flex items-center justify-center"
+                                      style={{ backgroundColor: meta.bg, color: meta.fg, border: `1px solid ${meta.fg}33` }}>
+                                      <EventIcon className="w-4 h-4" />
+                                    </div>
+                                    {!isLast && <div className="w-px flex-1 my-1.5" style={{ backgroundColor: "var(--border-color)" }} />}
+                                  </div>
 
-                            <div className="mt-2.5 flex items-center gap-2.5 p-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                              {ev.actor && typeof ev.actor === "object" ? (
-                                <Avatar user={ev.actor} size="sm" color={meta.avatar} />
-                              ) : (
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
-                                  <User className="w-3.5 h-3.5" />
+                                  {/* Card */}
+                                  <div className={`flex-1 min-w-0 ${isLast ? "" : "pb-4"}`}>
+                                    <div className="rounded-lg overflow-hidden flex" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+                                      {/* Colour rail — lets the eye tell product rows from variant rows instantly */}
+                                      <span className="w-[3px] shrink-0" style={{ backgroundColor: meta.fg, opacity: 0.7 }} />
+
+                                      <div className="flex-1 min-w-0 p-3">
+                                      <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <h4 className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{meta.label}</h4>
+                                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                                              style={{ backgroundColor: meta.bg, color: meta.fg }}>
+                                              {meta.group}
+                                            </span>
+                                            {ev.live && (
+                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                                                style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>LIVE</span>
+                                            )}
+                                          </div>
+                                          <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>{ev.description}</p>
+                                        </div>
+                                        {/* Day is in the group header, so only the time here */}
+                                        <div className="text-right shrink-0" title={fullStampOf(ev.date)}>
+                                          <p className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{clockOf(ev.date)}</p>
+                                          <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date)}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Subject — identifies which variant this event belongs to */}
+                                      {ev.subject && ev.subject.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                          {ev.subject.map((m, mi) => (
+                                            <span key={`${ev.key}-subject-${mi}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px]"
+                                              style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                                              <span style={{ color: "var(--text-muted)" }}>{m.label}</span>
+                                              <span className={m.mono ? "font-mono font-semibold" : "font-semibold"} style={{ color: "var(--text-primary)" }}>{m.value}</span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Actor — names a user only when the backend
+                                          actually stored one; otherwise it says so
+                                          plainly instead of a broken placeholder. */}
+                                      <div className="mt-2.5 flex items-center gap-2 pt-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
+                                        {who.known ? (
+                                          <>
+                                            <Avatar name={who.name} size="sm" color={meta.avatar} />
+                                            <div className="min-w-0">
+                                              <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{who.name}</p>
+                                              {who.email && (
+                                                <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{who.email}</p>
+                                              )}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                                              style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
+                                              <User className="w-3.5 h-3.5" />
+                                            </div>
+                                            <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>No user recorded for this change</p>
+                                          </>
+                                        )}
+                                      </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                              )}
-                              <div className="min-w-0">
-                                <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{actor || "Not recorded"}</p>
-                                <p className="text-[9px] truncate" style={{ color: "var(--text-muted)" }}>{email || `${ev.actionLabel} — no user on record`}</p>
-                              </div>
-                            </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
                     </div>
                   )}
 

@@ -143,6 +143,8 @@ export default function ProfilePage() {
 
   // ✅ CHANGE 1: Track permissions from server
   const [hasProfilePermission, setHasProfilePermission] = useState(true);
+  // ✅ 'store' permission wala hi Store Name / Address badal sakta hai
+  const [hasStorePermission, setHasStorePermission] = useState(true);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -155,7 +157,14 @@ export default function ProfilePage() {
   /* ── build data from any user object ── */
   const buildData = useCallback((user) => {
     if (!user) return null;
-    const store = user.store || user.storeId || {};
+    // ✅ Employee login par backend kabhi store:{} bhej sakta tha —
+    // empty object ko ignore karke asli store (storeId / store_name) uthao
+    const hasStoreData = (s) =>
+      s && typeof s === "object" && (s.store_name || s.address || s.email || s._id);
+    const store =
+      (hasStoreData(user.store) && user.store) ||
+      (hasStoreData(user.storeId) && user.storeId) ||
+      {};
     return {
       name: user.name || "Admin User",
       username: user.username || "admin",
@@ -180,7 +189,9 @@ export default function ProfilePage() {
             })
           : "N/A",
       lastLogin: user.last_login || user.lastLogin || "Today",
-      storeName: store.store_name || user.store_name || "My Store",
+      // ✅ store_name har possible key se uthao taake employee login par remove na ho
+      storeName:
+        store.store_name || user.store_name || user.storeName || "My Store",
       address: user.address || store.address || "",
       storeStatus: store.store_status || "Active",
       // ✅ CHANGE 1 continued: Extract permissions
@@ -192,6 +203,9 @@ export default function ProfilePage() {
   const fetchProfile = useCallback(() => {
     if (!socket || !isConnected) return;
     socket.emit("getProfile");
+    // ✅ Employee ke liye store alag se bhi mangwa lo —
+    // agar profile me store blank aaye to ye fallback merge ho jayega
+    socket.emit("getStoreInfo");
   }, [socket, isConnected]);
 
   /* ── socket listeners ── */
@@ -225,8 +239,11 @@ export default function ProfilePage() {
           // Admin always has permission, staff needs permissions.profile
           if (role === "admin") {
             setHasProfilePermission(true);
+            setHasStorePermission(true);
           } else {
             setHasProfilePermission(perms.profile !== false);
+            // ✅ Store Name / Address sirf 'store' permission par
+            setHasStorePermission(!!perms.store);
           }
           setLoading(false);
           setError("");
@@ -253,28 +270,36 @@ export default function ProfilePage() {
 
     const handleStoreInfoChanged = (storeData) => {
       if (!storeData) return;
-      setProfile((prev) => {
+      // ✅ Store page / getStoreInfo se aaya data — khaali values se purana data overwrite na ho
+      const incoming = storeData.data || storeData;
+      if (!incoming || typeof incoming !== "object") return;
+      if (!incoming.store_name && !incoming.address && !incoming.email && !incoming.phone) return;
+      // ✅ Sirf missing/blank fields bhara karo — employee login par store remove na ho
+      const mergeStore = (prev) => {
         if (!prev) return prev;
+        const isGenericStore =
+          !prev.storeName || prev.storeName === "My Store";
         return {
           ...prev,
-          storeName: storeData.store_name || prev.storeName,
-          address: storeData.address || prev.address,
-          email: storeData.email || prev.email,
-          phone: storeData.phone || prev.phone,
-          storeStatus: storeData.store_status || prev.storeStatus,
+          storeName:
+            incoming.store_name ||
+            (!isGenericStore ? prev.storeName : "My Store"),
+          address: prev.address || incoming.address || prev.address,
+          email: prev.email || incoming.email || prev.email,
+          phone: prev.phone || incoming.phone || prev.phone,
+          storeStatus: incoming.store_status || prev.storeStatus,
         };
-      });
-      setEditForm((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          storeName: storeData.store_name || prev.storeName,
-          address: storeData.address || prev.address,
-          email: storeData.email || prev.email,
-          phone: storeData.phone || prev.phone,
-        };
-      });
-      toast.info("Store info synced from Store page!");
+      };
+      setProfile((prev) => mergeStore(prev));
+      setEditForm((prev) => mergeStore(prev));
+    };
+
+    // ✅ getStoreInfo ka jawab (silent fallback — toast nahi)
+    const handleStoreInfoFallback = (res) => {
+      const incoming = res?.data || res;
+      if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) return;
+      if (!incoming.store_name && !incoming.address) return;
+      handleStoreInfoChanged(incoming);
     };
 
     const handleProfileError = (err) => {
@@ -283,13 +308,18 @@ export default function ProfilePage() {
 
     socket.on("profileData", handleProfileData);
     socket.on("profileUpdated", handleProfileUpdated);
-    socket.on("storeInfoChangedForProfile", handleStoreInfoChanged);
+    socket.on("storeInfoChangedForProfile", (d) => {
+      handleStoreInfoChanged(d);
+      toast.info("Store info synced from Store page!");
+    });
+    socket.on("storeInfo", handleStoreInfoFallback);
     socket.on("profileError", handleProfileError);
 
     return () => {
       socket.off("profileData", handleProfileData);
       socket.off("profileUpdated", handleProfileUpdated);
-      socket.off("storeInfoChangedForProfile", handleStoreInfoChanged);
+      socket.off("storeInfoChangedForProfile");
+      socket.off("storeInfo", handleStoreInfoFallback);
       socket.off("profileError", handleProfileError);
     };
   }, [socket, isConnected, buildData, fetchProfile]);
@@ -314,12 +344,16 @@ export default function ProfilePage() {
       name: editForm.name || "",
       email: editForm.email || "",
       phone: editForm.phone || "",
-      address: editForm.address || "",
-      store_name: editForm.storeName || "",
     };
+    // ✅ Store fields sirf 'store' permission par bhejo —
+    // warna backend storeSkipped message deta hai
+    if (hasStorePermission) {
+      payload.address = editForm.address || "";
+      payload.store_name = editForm.storeName || "";
+    }
     socket.emit("updateProfile", payload, (res) => {
       if (res?.success) {
-        toast.success("Profile updated successfully!");
+        toast.success(res.storeSkipped ? res.message : "Profile updated successfully!");
         setIsEditing(false);
         const userData = res.data || res.user || res;
         if (userData && (userData.name || userData._id)) {
@@ -750,6 +784,7 @@ export default function ProfilePage() {
                           value={editForm.storeName || ""}
                           onChange={(e) => setEditForm({ ...editForm, storeName: e.target.value })}
                           icon={Store}
+                          disabled={!hasStorePermission}
                         />
                         <InputField
                           label="Email"
@@ -768,7 +803,13 @@ export default function ProfilePage() {
                           value={editForm.address || ""}
                           onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                           icon={MapPin}
+                          disabled={!hasStorePermission}
                         />
+                        {!hasStorePermission && (
+                          <p className="text-[11px] sm:col-span-2" style={{ color: "var(--text-muted)" }}>
+                            Store name / address change karne ke liye &apos;store&apos; permission chahiye — admin ya kisi authorized staff member se rabta karein.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-1">

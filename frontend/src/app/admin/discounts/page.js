@@ -118,7 +118,7 @@ const getDiscountStatus = (discount) => {
   const end = discount?.end_at || discount?.endDate;
   const isExpired = end && new Date(end) < new Date();
   if (discount?.isActive === false) return "inactive";
-  if (["inactive", "disabled", "draft"].includes(discount?.status)) return "inactive";
+  if (["inactive", "disabled", "draft", "scheduled", "expired"].includes(discount?.status)) return "inactive";
   if (isExpired) return "inactive";
   return "active";
 };
@@ -661,11 +661,25 @@ export default function DiscountsPage() {
   const totalPages = pagination.pages || 1;
   const totalDiscounts = pagination.total || discounts.length;
 
-  const stats = useMemo(() => ({
-    total: discounts.length,
-    active: discounts.filter((d) => getDiscountStatus(d) === "active").length,
-    inactive: discounts.filter((d) => getDiscountStatus(d) === "inactive").length,
-  }), [discounts]);
+  // ✅ Stats server se aate hain (poora dataset — search respect, status se independent).
+  //    Purana response (stats missing) ho to current page se fallback.
+  const serverStats = paginatedDiscountsData?.stats || null;
+  const stats = useMemo(() => {
+    if (serverStats) {
+      return {
+        total: Number(serverStats.total) || 0,
+        active: Number(serverStats.active) || 0,
+        inactive: serverStats.inactive !== undefined && serverStats.inactive !== null
+          ? Number(serverStats.inactive) || 0
+          : Math.max(0, (Number(serverStats.total) || 0) - (Number(serverStats.active) || 0)),
+      };
+    }
+    return {
+      total: discounts.length,
+      active: discounts.filter((d) => getDiscountStatus(d) === "active").length,
+      inactive: discounts.filter((d) => getDiscountStatus(d) === "inactive").length,
+    };
+  }, [serverStats, discounts]);
 
   const openEdit = (discount) => {
     const rawTarget = discount?.target_type || discount?.applyTo || "all_products";
@@ -694,7 +708,9 @@ export default function DiscountsPage() {
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
-      status: discount?.status === "active" ? "active" : "inactive",
+      // ✅ Form options "active"/"disabled" hain — prefill usi value me karo
+      // warna select khaali (placeholder) dikhta hai
+      status: discount?.status === "active" ? "active" : "disabled",
     });
     setEditingDiscount(discount);
     setActiveFormType(type);
@@ -789,8 +805,7 @@ export default function DiscountsPage() {
 
   const handleToggleStatus = (discount) => {
     const id = discount?._id || discount?.id;
-    const status = getDiscountStatus(discount);
-    const isActive = status === "active" || status === "scheduled";
+    const isActive = getDiscountStatus(discount) === "active";
     toggleStatusMutation.mutate({ id, newStatus: isActive ? "disabled" : "active" });
   };
 

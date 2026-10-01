@@ -13,7 +13,7 @@
 
    ⚠️ Koi hardcoded data nahi — har value API se aati hai:
         GET /users/profile   → name, username, email, phone, dob,
-                               avatar, provider, twoFactorEnabled,
+                               avatar, provider,
                                preferences, created_at / updated_at
         GET /orders/my       → orders + status counts
         GET /addresses       → saved addresses

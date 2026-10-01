@@ -9,7 +9,6 @@ const {
   getMe,
   updateProfile,
   changePassword,
-  toggle2FA,
   googleLogin,
   googleCustomerLogin,
   updatePhone,
@@ -56,7 +55,6 @@ router.put(
   checkPermission("profile"),
   changePassword,
 );
-router.put("/2fa", authMiddleware, checkPermission("profile"), toggle2FA);
 router.put("/phone", authMiddleware, updatePhone);
 
 // ✅ MULTIPLE CHECKOUT DRAFTS

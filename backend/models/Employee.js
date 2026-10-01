@@ -28,11 +28,12 @@ const employeeSchema = new mongoose.Schema(
   
 
     // --- Permissions (same structure as User) ---
+    // ✅ Sab permissions by default true — admin chahe to baad me off kar sakta hai
     permissions: {
       products: { type: Boolean, default: true },
       brands: { type: Boolean, default: true },
       categories: { type: Boolean, default: true },
-      users: { type: Boolean, default: false },
+      users: { type: Boolean, default: true },
       orders: { type: Boolean, default: true },
       settings: { type: Boolean, default: true },
       profile: { type: Boolean, default: true },
@@ -40,10 +41,10 @@ const employeeSchema = new mongoose.Schema(
       discounts: { type: Boolean, default: true },
       deals: { type: Boolean, default: true },
       bundles: { type: Boolean, default: true },
-      store: { type: Boolean, default: false },
+      store: { type: Boolean, default: true },
       banners: { type: Boolean, default: true },
-      manageStock: { type: Boolean, default: false },
-      shipping: { type: Boolean, default: false },
+      manageStock: { type: Boolean, default: true },
+      shipping: { type: Boolean, default: true },
       order: { type: Boolean, default: true },
       attribute: { type: Boolean, default: true },
     },
@@ -59,6 +60,9 @@ const employeeSchema = new mongoose.Schema(
 
    
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
+
+    // --- Address (profile page par employee ke liye bhi show ho) ---
+    address: { type: String, default: "", trim: true },
 
     // --- HR & Organizational Details ---
     employeeCode: { type: String, default: "", trim: true },

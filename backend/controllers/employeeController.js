@@ -116,13 +116,13 @@ const fixPermissions = (oldPerms = {}) => ({
   brands: oldPerms?.brands ?? true,
   categories: oldPerms?.categories ?? true,
   profile: oldPerms?.profile ?? true,
-  store: oldPerms?.store ?? false,
+  store: oldPerms?.store ?? true,
   discounts: oldPerms?.discounts ?? true,
   deals: oldPerms?.deals ?? true,
   bundles: oldPerms?.bundles ?? true,
   banners: oldPerms?.banners ?? true,
-  manageStock: oldPerms?.manageStock ?? false,
-  shipping: oldPerms?.shipping ?? false,
+  manageStock: oldPerms?.manageStock ?? true,
+  shipping: oldPerms?.shipping ?? true,
   order: oldPerms?.order ?? true,
   attribute: oldPerms?.attribute ?? true,
 });
@@ -351,7 +351,6 @@ exports.createEmployee = async (req, res) => {
       username,
       avatar,
       preferences,
-      twoFactorEnabled,
     } = req.body;
 
     if (!name || !email || !password) {
@@ -401,6 +400,15 @@ exports.createEmployee = async (req, res) => {
 
     const count = await Employee.countDocuments({});
 
+    // ✅ Naye employee ko default store se link karo
+    // taake uski profile me store name / address blank na aaye
+    let defaultStoreId = null;
+    try {
+      const Store = require("../models/Store");
+      const defaultStore = await Store.findOne().select("_id").lean();
+      if (defaultStore) defaultStoreId = defaultStore._id;
+    } catch (e) { /* ignore */ }
+
     const newEmployee = await Employee.create({
       name,
       email: normalizedEmail,
@@ -412,9 +420,9 @@ exports.createEmployee = async (req, res) => {
       avatar: avatar || "",
       permissions: fixPermissions(permissions || {}),
       preferences: preferences || { darkMode: true, notifications: { email: true, push: true, weekly: true } },
-      twoFactorEnabled: twoFactorEnabled || false,
       employeeCode: `EMP-${String(count + 1).padStart(5, "0")}`,
       department: department || "",
+      storeId: defaultStoreId,
       createdby: performerId,
     });
 

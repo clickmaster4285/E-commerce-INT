@@ -5,11 +5,14 @@ const paginated = (res, fallbackLimit) => {
   if (Array.isArray(d)) {
     return {
       items: d,
+      stats: null,
       pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
     };
   }
   return {
     items: Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [],
+    // ✅ Backend server-side stats bhejta hai (poora dataset) — inhe aage pass karo
+    stats: d?.stats || null,
     pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
   };
 };

@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 
 import { useSocket } from "@/hooks/useSocket";
+import { useQuery } from "@tanstack/react-query";
+import axiosInstance from "@/apis/axiosInstance";
 
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
@@ -485,6 +487,24 @@ export default function StoreInfoPage() {
   const [logoError, setLogoError] = useState(false);
   const [isLogoDragOver, setIsLogoDragOver] = useState(false);
 
+  // ✅ Current user — 'store' permission wala hi edit kar sakta hai (admin bypass)
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/users/profile");
+      return res.data?.user || res.data;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const isCurrentAdmin = String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  const canEditStore = isCurrentAdmin || !!currentUserProfile?.permissions?.store;
+  const denyStoreAccess = () =>
+    toast.error("Access denied. You don't have 'store' permission.", {
+      duration: 5000,
+      description: "Contact an administrator or another staff member to grant you store access.",
+    });
+
   // ====================================================
   // LOCATION / CURRENCY DATA
   // ====================================================
@@ -725,6 +745,8 @@ export default function StoreInfoPage() {
   };
 
   const handleRemoveLogo = () => {
+    // ✅ 'store' permission ke baghair logo remove nahi
+    if (!canEditStore) return denyStoreAccess();
     // Case 1: bas nayi file select ki hai (save nahi hui) — selection wapas le lo
     if (logoFile) {
       setLogoFile(null);
@@ -754,7 +776,11 @@ export default function StoreInfoPage() {
     });
   };
 
-  const handleEdit = () => setIsEditing(true);
+  const handleEdit = () => {
+    // ✅ 'store' permission ke baghair edit mode nahi
+    if (!canEditStore) return denyStoreAccess();
+    setIsEditing(true);
+  };
 
   const handleCancel = () => {
     setIsEditing(false);
@@ -774,6 +800,12 @@ export default function StoreInfoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // ✅ 'store' permission ke baghair save nahi
+    if (!canEditStore) {
+      denyStoreAccess();
+      return;
+    }
 
     // ✅ Check socket connection first
     if (!socket || !isConnected) {

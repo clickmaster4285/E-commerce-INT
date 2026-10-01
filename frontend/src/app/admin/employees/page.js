@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
+import axiosInstance from "@/apis/axiosInstance";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 const ITEMS_PER_PAGE = 20;
@@ -218,6 +219,25 @@ export default function EmployeesPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // ✅ Current user (role + permissions) — actions isi par gate honge
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/users/profile");
+      return res.data?.user || res.data;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const isCurrentAdmin = String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  // ✅ Jis ko 'employees' permission hai wahi add/edit/delete kar sakta hai
+  const canManageEmployees = isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
+  const denyEmployeesAccess = () =>
+    toast.error("Access denied. You don't have 'employees' permission.", {
+      duration: 5000,
+      description: "Contact an administrator or another staff member to grant you access.",
+    });
+
   // Phone validation state for tooltip
   const [phoneError, setPhoneError] = useState("");
 
@@ -351,6 +371,7 @@ export default function EmployeesPage() {
   };
 
   const openAddModal = () => {
+    if (!canManageEmployees) return denyEmployeesAccess();
     setEditingEmployee(null);
     setFormData({
       name: "",
@@ -370,6 +391,7 @@ export default function EmployeesPage() {
   };
 
   const openEditModal = (emp) => {
+    if (!canManageEmployees) return denyEmployeesAccess();
     setEditingEmployee(emp);
     setFormData({
       name: emp.userId?.name || emp.name || "",
@@ -447,10 +469,12 @@ export default function EmployeesPage() {
   };
 
   const handleToggleStatus = (employee) => {
+    if (!canManageEmployees) return denyEmployeesAccess();
     toggleStatusMutation.mutate(employee._id);
   };
 
   const handleBulkDelete = () => {
+    if (!canManageEmployees) return denyEmployeesAccess();
     if (selectedIds.length === 0) return;
     setShowBulkDeleteModal(true);
   };
@@ -648,14 +672,14 @@ export default function EmployeesPage() {
               <MenuItem
                 icon={<Pencil className="w-4 h-4" />}
                 label="Edit Employee"
-                onClick={() => { setActionMenu(null); openEditModal(employee); }}
+                onClick={() => { setActionMenu(null); if (!canManageEmployees) return denyEmployeesAccess(); openEditModal(employee); }}
               />
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<Trash2 className="w-4 h-4" />}
                 label="Delete"
                 danger
-                onClick={() => { setActionMenu(null); setEmployeeToDelete(employee); setShowDeleteModal(true); }}
+                onClick={() => { setActionMenu(null); if (!canManageEmployees) return denyEmployeesAccess(); setEmployeeToDelete(employee); setShowDeleteModal(true); }}
               />
             </div>
           </>

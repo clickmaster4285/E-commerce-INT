@@ -39,12 +39,10 @@ function fdt(date) {
 }
 
 function getDealStatus(deal) {
-  if (!deal?.isActive) return "disabled";
-  const now = new Date();
-  const start = deal?.startDate ? new Date(deal.startDate) : null;
+  // ✅ Sirf Active/Inactive model — off (isActive false) ya expired sab "inactive"
+  if (!deal?.isActive) return "inactive";
   const end = deal?.endDate ? new Date(deal.endDate) : null;
-  if (start && start > now) return "scheduled";
-  if (end && end < now) return "expired";
+  if (end && end < new Date()) return "inactive";
   return "active";
 }
 
@@ -123,13 +121,15 @@ const dateToISO = (value) => {
    UI COMPONENTS
 ========================================================= */
 function StatusBadge({ status }) {
+  // ✅ Sirf Active/Inactive — purani values bhi inactive
   const config = {
     active: { bg: "var(--success-soft)", color: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)", label: "ACTIVE" },
-    scheduled: { bg: "var(--info-soft)", color: "var(--info)", border: "color-mix(in srgb, var(--info) 28%, transparent)", label: "SCHEDULED" },
-    expired: { bg: "var(--warning-soft)", color: "var(--warning)", border: "color-mix(in srgb, var(--warning) 28%, transparent)", label: "EXPIRED" },
-    disabled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "DISABLED" },
+    inactive: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
+    scheduled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
+    expired: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
+    disabled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
   };
-  const c = config[status] || config.disabled;
+  const c = config[status] || config.inactive;
   return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide shrink-0"
       style={{ backgroundColor: c.bg, color: c.color, border: `1px solid ${c.border}` }}>
@@ -337,16 +337,14 @@ export default function DealDetailPage() {
 
   const toggleMutation = useMutation({
     mutationFn: () => {
-      const st = getDealStatus(deal);
-      const currentlyOn = st === "active" || st === "scheduled";
+      const currentlyOn = getDealStatus(deal) === "active";
       return dealApi.update(dealId, { isActive: !currentlyOn });
     },
     onMutate: () => markSelfAction("update"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
-      const st = deal ? getDealStatus(deal) : "active";
-      const wasOn = st === "active" || st === "scheduled";
+      const wasOn = deal ? getDealStatus(deal) === "active" : true;
       toast.success(wasOn ? "Deal deactivated" : "Deal activated");
     },
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
@@ -389,7 +387,7 @@ export default function DealDetailPage() {
       end_at: toDateInput(d?.endDate),
       usage_limit: d?.usageLimit ?? "",
       per_user_limit: d?.perUserLimit ?? "",
-      status: d?.isActive ? "active" : "disabled",
+      status: d?.isActive ? "active" : "inactive",
       is_featured: Boolean(d?.isFeatured),
     });
     setEditingDeal(d);
@@ -460,7 +458,7 @@ export default function DealDetailPage() {
   };
 
   const status = deal ? getDealStatus(deal) : "unknown";
-  const isActive = status === "active" || status === "scheduled";
+  const isActive = status === "active";
   const hasUpdates = Boolean(
     deal && (deal.updated_at || deal.updatedAt) &&
     (deal.created_at || deal.createdAt) &&
