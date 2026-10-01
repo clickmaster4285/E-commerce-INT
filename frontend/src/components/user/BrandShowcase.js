@@ -14,12 +14,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "./ProductCard";
 import SectionHeading from "./SectionHeading";
 import SlideArrow from "./SlideArrow";
+import { productApi } from "@/apis/user/productApi";
 import {
-  getBrandCounts,
   idOf,
   imageUrl,
   sortByPopularity,
@@ -110,20 +111,34 @@ function BrandRow({ brand, items }) {
   );
 }
 
-export default function BrandShowcase({ brands = [], products = [], isLoading = false }) {
+/* Ek brand row ke products — server (?brand_id=, cap 30 slider headroom) */
+function useBrandRowItems(brandId) {
+  const { data } = useQuery({
+    queryKey: ["brandRowProducts", brandId],
+    queryFn: () =>
+      productApi.getAllPaginated({ page: 1, limit: 30, brand_id: brandId }),
+    enabled: !!brandId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  return data?.products || [];
+}
+
+function BrandRowData({ brand }) {
+  const items = useBrandRowItems(idOf(brand._id));
+  if (!items.length) return null;
+  return <BrandRow brand={brand} items={items} />;
+}
+
+export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading = false }) {
+  // ✅ Top brands server counts se (>=6 wali), items per-brand query se
   const rows = useMemo(() => {
-    const counts = getBrandCounts(products);
+    const counts = brandCounts || {};
     return sortByPopularity(brands, counts)
       .map((brand) => ({ ...brand, count: counts[idOf(brand._id)] || 0 }))
-      .filter((brand) => brand.count > 0)
-      .map((brand) => ({
-        brand,
-        items: (products || []).filter((product) => idOf(product?.brand_id) === idOf(brand._id)),
-      }))
-      /* SIRF woh brands jin me 6 ya 6 se zyada products hon */
-      .filter((row) => row.items.length >= 6)
+      .filter((brand) => brand.count >= 6)
       .slice(0, BRAND_LIMIT);
-  }, [brands, products]);
+  }, [brands, brandCounts]);
 
   if (isLoading && !rows.length) {
     return (
@@ -161,7 +176,7 @@ export default function BrandShowcase({ brands = [], products = [], isLoading = 
 
       <div className="space-y-3 lg:space-y-4">
         {rows.map((row) => (
-          <BrandRow key={idOf(row.brand._id)} brand={row.brand} items={row.items} />
+          <BrandRowData key={idOf(row._id)} brand={row} />
         ))}
       </div>
     </section>

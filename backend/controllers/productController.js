@@ -5,6 +5,8 @@ const Variant = require("../models/Variant");
 const Tag = require("../models/Tag");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
+const Deal = require("../models/Deal");
+const Discount = require("../models/Discount");
 // ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
 const loadBrandModel = () => {
   const paths = [
@@ -203,9 +205,49 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 // ✅ Products list aur Products summary stats — dono same filter use karte hain
 //    (search / category / brand / status) taake dono ka data consistent rahe.
 // ======================================================
+const collectIds = (value) => {
+  const arr = Array.isArray(value) ? value : String(value || "").split(",");
+  const out = [];
+  for (const raw of arr) {
+    const id = String(raw || "").trim();
+    if (id && id !== "all" && mongoose.Types.ObjectId.isValid(id) && !out.includes(id)) {
+      out.push(id);
+    }
+  }
+  return out;
+};
+
+// ✅ Category subtree expand (homeCatalog.categorySubtreeIds parity) —
+// parent select ho to uske saare children bhi match hote hain
+const expandCategorySubtrees = async (rootIds) => {
+  if (!rootIds.length) return [];
+  const cats = await Category.find({ is_deleted: false }).select("parent_category_id").lean();
+  const childrenOf = new Map();
+  cats.forEach((c) => {
+    const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
+    if (!pid) return;
+    if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+    childrenOf.get(pid).push(String(c._id));
+  });
+  const set = new Set(rootIds.map(String));
+  let grew = true;
+  while (grew) {
+    grew = false;
+    set.forEach((sid) => {
+      (childrenOf.get(sid) || []).forEach((child) => {
+        if (!set.has(child)) {
+          set.add(child);
+          grew = true;
+        }
+      });
+    });
+  }
+  return [...set];
+};
+
 const buildProductFilter = async (query = {}) => {
-  const brandId = query.brand_id;
-  const categoryId = query.category_id;
+  const brandIds = collectIds(query.brand_ids ?? query.brand_id);
+  const categoryIds = collectIds(query.category_ids ?? query.category_id);
   const statusFilter = String(query.status || "").trim();
   const search = String(query.search || query.q || "").trim();
   // ✅ Featured Products page — sirf "?featured=true" bheje tab filter lagta hai
@@ -216,8 +258,12 @@ const buildProductFilter = async (query = {}) => {
   // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
   //     sirf tab apply hote hain jab explicitly bheja jaye.
   const filter = { is_deleted: { $ne: true } };
-  if (brandId) filter.brand_id = brandId;
-  if (categoryId && categoryId !== "all") filter.category_id = categoryId;
+  if (brandIds.length === 1) filter.brand_id = brandIds[0];
+  else if (brandIds.length > 1) filter.brand_id = { $in: brandIds };
+  if (categoryIds.length) {
+    const expanded = await expandCategorySubtrees(categoryIds);
+    filter.category_id = { $in: expanded.length ? expanded : categoryIds };
+  }
   if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
   if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
   else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
@@ -240,6 +286,388 @@ const buildProductFilter = async (query = {}) => {
   }
 
   return { filter, search };
+};
+
+// ======================================================
+// 🛍️ SHOP FACETS (storefront server-side filtering)
+// Client semantics (homeCatalog.js) ka exact port:
+//  - price: FIRST variant (created_at:1) ki selling_price; variant na ho to 0
+//  - stock: variant quantities ka sum (na ho to 0); out<1, low<5, else in
+//  - deal: dealMatchesProduct jaisa (direct category/brand match)
+//  - discount %: DiscountContext engine jaisa (public discounts only,
+//    percentage/fixed, best price, Math.round parity; fixed_price ignored)
+// ======================================================
+const SHOP_STOCK_STATES = ["in", "low", "out"];
+const LOW_STOCK_THRESHOLD = 5;
+
+const toIdList = (value, cap = 100) => {
+  const arr = Array.isArray(value) ? value : String(value || "").split(",");
+  const out = [];
+  for (const raw of arr) {
+    const id = String(raw || "").trim();
+    if (id && mongoose.Types.ObjectId.isValid(id) && !out.includes(id)) out.push(id);
+    if (out.length >= cap) break;
+  }
+  return out;
+};
+
+const numOrNull = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+// ✅ Sanitized shop params — invalid/negative/NaN → safe default/ignore
+const parseShopParams = (query = {}) => {
+  let minPrice = numOrNull(query.minPrice);
+  let maxPrice = numOrNull(query.maxPrice);
+  if (minPrice !== null && minPrice < 0) minPrice = 0;
+  if (maxPrice !== null && maxPrice < 0) maxPrice = 0;
+  if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
+    [minPrice, maxPrice] = [maxPrice, minPrice];
+  }
+  const stockStates = toIdList(query.stockStates ?? query.stock, 10).filter((s) =>
+    SHOP_STOCK_STATES.includes(s),
+  );
+  // ✅ discount bands (?discount=10&discount=20) + single (?discountBand=20) + threshold (?minDiscount=)
+  const bandNums = toIdList(query.discount ?? query.discounts ?? [], 10)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const singleBand = numOrNull(query.discountBand);
+  if (singleBand !== null && singleBand > 0) bandNums.push(singleBand);
+  const threshold = numOrNull(query.minDiscount);
+  if (threshold !== null && threshold > 0) bandNums.push(threshold);
+  const minDiscountBand = bandNums.length ? Math.min(...bandNums) : null;
+  const dealIds = toIdList(query.dealIds ?? query.deal, 50).filter((id) =>
+    mongoose.Types.ObjectId.isValid(id),
+  );
+  const ids = toIdList(query.ids, 50);
+  const hasShopFilters =
+    minPrice !== null ||
+    maxPrice !== null ||
+    stockStates.length > 0 ||
+    minDiscountBand !== null ||
+    dealIds.length > 0;
+  return { minPrice, maxPrice, stockStates, minDiscountBand, dealIds, ids, hasShopFilters };
+};
+
+// ✅ Ek aggregation me first-variant price + stock sum (Variant index se)
+const variantStatsMap = async (productIds) => {
+  const map = new Map();
+  if (!productIds.length) return map;
+  const rows = await Variant.aggregate([
+    { $match: { product_id: { $in: productIds }, is_deleted: { $ne: true } } },
+    // ✅ _id tie-break: same-millisecond seeds par $first hamesha find()[0] jaisa
+    { $sort: { created_at: 1, _id: 1 } },
+    {
+      $group: {
+        _id: "$product_id",
+        price: { $first: "$selling_price" },
+        stock: { $sum: { $ifNull: ["$quantity", 0] } },
+      },
+    },
+  ]);
+  rows.forEach((r) => {
+    map.set(String(r._id), {
+      price: Number(r.price) || 0,
+      stock: Number(r.stock) || 0,
+    });
+  });
+  return map;
+};
+
+const stockStateOf = (stock) => {
+  if (!(stock >= 1)) return "out";
+  if (stock < LOW_STOCK_THRESHOLD) return "low";
+  return "in";
+};
+
+// ✅ Active public discounts — getPublicDiscounts wali query (matching set same)
+const activePublicDiscounts = async () => {
+  const now = new Date();
+  return Discount.find({
+    is_deleted: false,
+    isActive: true,
+    status: "active",
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+  })
+    .select("type value applyTo selectedProducts selectedCategories selectedBrands isActive")
+    .lean();
+};
+
+const discountAppliesTo = (disc, pid, cid, bid) => {
+  const inList = (list, value) =>
+    (list || []).some((entry) => String(entry?._id || entry) === value);
+  if (disc.applyTo === "all") return true;
+  if (disc.applyTo === "product" || disc.applyTo === "specific_products") {
+    const ids = disc.productIds || disc.selectedProducts || [];
+    return inList(ids, pid);
+  }
+  if (disc.applyTo === "category" || disc.applyTo === "specific_categories") {
+    const ids = disc.categoryIds || disc.selectedCategories || [];
+    return cid && inList(ids, cid);
+  }
+  if (disc.applyTo === "brand" || disc.applyTo === "specific_brands") {
+    const ids = disc.brandIds || disc.selectedBrands || [];
+    return bid && inList(ids, bid);
+  }
+  return false;
+};
+
+// ✅ DiscountContext engine ka exact math (first-variant price basis)
+const discountPercentFor = (price, pid, cid, bid, discounts) => {
+  if (!(price > 0)) return 0;
+  let best = price;
+  for (const disc of discounts || []) {
+    if (!disc.isActive) continue;
+    if (!discountAppliesTo(disc, pid, cid, bid)) continue;
+    let final = price;
+    const val = Number(disc.value ?? disc.discountValue) || 0;
+    if (disc.type === "percentage") {
+      final = price * (1 - val / 100);
+    } else if (disc.type === "fixed" || disc.type === "fixed_amount") {
+      final = Math.max(0, price - val);
+    }
+    if (final < best) best = final;
+  }
+  if (!(best < price)) return 0;
+  const discounted = Math.round(best);
+  if (!(discounted < price)) return 0;
+  return Math.round(((price - discounted) / price) * 100);
+};
+
+// ✅ dealMatchesProduct (homeCatalog) ka exact port — direct category/brand match
+const dealMatchesIds = (deal, pid, cid, bid) => {
+  if (!deal || !pid) return false;
+  const inList = (list, value) =>
+    (list || []).some((entry) => String(entry?._id || entry || "") === value);
+  switch (deal.applyTo) {
+    case "product":
+      return inList(deal.productIds, pid);
+    case "category":
+      return inList(deal.categoryIds, cid);
+    case "brand":
+      return inList(deal.brandIds, bid);
+    case "all":
+    case "collection":
+    default:
+      return (deal.productIds || []).length ? inList(deal.productIds, pid) : true;
+  }
+};
+
+const activeDealsByIds = async (dealIds) => {
+  if (!dealIds.length) return [];
+  const now = new Date();
+  const docs = await Deal.find({ _id: { $in: dealIds } })
+    .select("name type applyTo productIds categoryIds brandIds isActive startDate endDate")
+    .lean();
+  // ✅ Client parity: sirf active window wali deals participate karti hain;
+  // stale/expired id ho to koi filtering nahi (sab pass)
+  return docs.filter(
+    (d) => d.isActive && new Date(d.startDate) <= now && new Date(d.endDate) >= now,
+  );
+};
+
+// ✅ Product refs (deal/discount matching ke liye) — ek query me
+const productRefsMap = async (ids) => {
+  if (!ids.length) return new Map();
+  const refs = await Product.find({ _id: { $in: ids } })
+    .select("category_id brand_id")
+    .lean();
+  return new Map(
+    refs.map((r) => [
+      String(r._id),
+      {
+        cid: String(r.category_id?._id || r.category_id || ""),
+        bid: String(r.brand_id?._id || r.brand_id || ""),
+      },
+    ]),
+  );
+};
+
+// ✅ Active deals (sidebar counts + deal facet) — window check ke saath
+const allActiveDeals = async () => {
+  const now = new Date();
+  return Deal.find({ isActive: true, startDate: { $lte: now }, endDate: { $gte: now } })
+    .select("name type applyTo productIds categoryIds brandIds isActive startDate endDate")
+    .lean();
+};
+
+// ✅ Indexed match structures — 600+ deals / 400+ discounts par double-loop
+// ki jagah single pass (facets endpoint seconds se ms me).
+const buildDiscountIndex = (discounts) =>
+  (discounts || []).map((disc) => ({
+    disc,
+    val: Number(disc.value ?? disc.discountValue) || 0,
+    all: disc.applyTo === "all",
+    pSet: new Set(
+      (disc.productIds || disc.selectedProducts || []).map((e) => String(e?._id || e || "")),
+    ),
+    cSet: new Set(
+      (disc.categoryIds || disc.selectedCategories || []).map((e) => String(e?._id || e || "")),
+    ),
+    bSet: new Set(
+      (disc.brandIds || disc.selectedBrands || []).map((e) => String(e?._id || e || "")),
+    ),
+  }));
+
+const discountPctIndexed = (price, pid, cid, bid, idx) => {
+  if (!(price > 0)) return 0;
+  let best = price;
+  for (const entry of idx) {
+    const disc = entry.disc;
+    if (!disc.isActive) continue;
+    let applies = false;
+    if (entry.all) applies = true;
+    else if (disc.applyTo === "product" || disc.applyTo === "specific_products") applies = entry.pSet.has(pid);
+    else if (disc.applyTo === "category" || disc.applyTo === "specific_categories") applies = !!cid && entry.cSet.has(cid);
+    else if (disc.applyTo === "brand" || disc.applyTo === "specific_brands") applies = !!bid && entry.bSet.has(bid);
+    if (!applies) continue;
+    let final = price;
+    if (disc.type === "percentage") final = price * (1 - entry.val / 100);
+    else if (disc.type === "fixed" || disc.type === "fixed_amount") final = Math.max(0, price - entry.val);
+    if (final < best) best = final;
+  }
+  if (!(best < price)) return 0;
+  const discounted = Math.round(best);
+  if (!(discounted < price)) return 0;
+  return Math.round(((price - discounted) / price) * 100);
+};
+
+// ✅ Final (discounted) price — DiscountContext/calculateProductDiscount parity
+// (regular listing: Discount collection hi lagta hai, deals alag filter hain).
+// Koi discount na ho → original price (rounded). Example: 100 par 30% off → 70,
+// is liye price-range filter/bounds/sort isi FINAL price par chalte hain.
+const finalPriceIndexed = (price, pid, cid, bid, idx) => {
+  if (!(price > 0)) return 0;
+  let best = price;
+  for (const entry of idx) {
+    const disc = entry.disc;
+    if (!disc.isActive) continue;
+    let applies = false;
+    if (entry.all) applies = true;
+    else if (disc.applyTo === "product" || disc.applyTo === "specific_products") applies = entry.pSet.has(pid);
+    else if (disc.applyTo === "category" || disc.applyTo === "specific_categories") applies = !!cid && entry.cSet.has(cid);
+    else if (disc.applyTo === "brand" || disc.applyTo === "specific_brands") applies = !!bid && entry.bSet.has(bid);
+    if (!applies) continue;
+    let final = price;
+    if (disc.type === "percentage") final = price * (1 - entry.val / 100);
+    else if (disc.type === "fixed" || disc.type === "fixed_amount") final = Math.max(0, price - entry.val);
+    if (final < best) best = final;
+  }
+  return Math.round(best);
+};
+
+const buildDealIndex = (deals) => {
+  const byProduct = new Map();
+  const byCategory = new Map();
+  const byBrand = new Map();
+  const openAll = [];
+  const push = (map, key, deal) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(deal);
+  };
+  (deals || []).forEach((deal) => {
+    const hasP = (deal.productIds || []).length > 0;
+    if (deal.applyTo === "product" && hasP) {
+      deal.productIds.forEach((e) => push(byProduct, String(e?._id || e || ""), deal));
+    } else if (deal.applyTo === "category") {
+      (deal.categoryIds || []).forEach((e) => push(byCategory, String(e?._id || e || ""), deal));
+    } else if (deal.applyTo === "brand") {
+      (deal.brandIds || []).forEach((e) => push(byBrand, String(e?._id || e || ""), deal));
+    } else if (deal.applyTo === "all" || deal.applyTo === "collection") {
+      if (hasP) deal.productIds.forEach((e) => push(byProduct, String(e?._id || e || ""), deal));
+      else openAll.push(deal);
+    }
+  });
+  return { byProduct, byCategory, byBrand, openAll };
+};
+
+// ✅ Ek product se match hone wali deals (candidates only — dealMatchesIds parity)
+const matchingDealsIndexed = (dealIdx, pid, cid, bid) => {
+  const out = new Set(dealIdx.openAll);
+  (dealIdx.byProduct.get(pid) || []).forEach((d) => out.add(d));
+  if (cid) (dealIdx.byCategory.get(cid) || []).forEach((d) => out.add(d));
+  if (bid) (dealIdx.byBrand.get(bid) || []).forEach((d) => out.add(d));
+  return [...out].filter((deal) => dealMatchesIds(deal, pid, cid, bid));
+};
+
+// ✅ Shop facets apply — matching product _ids (ObjectId) ya null (koi facet nahi)
+// exclude: "price" | "stock" | "discount" | "deal" (leave-one-out counts ke liye)
+// pre: { stats, refsMap, discountDocs, dealDocs } — dobara fetch se bachne ke liye
+const applyShopFacets = async (baseFilter, shop, exclude = null, pre = null) => {
+  const usePrice = exclude !== "price" && (shop.minPrice !== null || shop.maxPrice !== null);
+  const useStock = exclude !== "stock" && shop.stockStates.length > 0;
+  const useDiscount = exclude !== "discount" && shop.minDiscountBand !== null;
+  const useDeal = exclude !== "deal" && shop.dealIds.length > 0;
+  if (!usePrice && !useStock && !useDiscount && !useDeal) return null;
+
+  const baseDocs = await Product.find(baseFilter).select("_id").lean();
+  let working = baseDocs.map((d) => d._id);
+  if (!working.length) return [];
+
+  let stats = null;
+  if (usePrice || useStock || useDiscount) {
+    stats = pre?.stats || (await variantStatsMap(working));
+  }
+
+  // ✅ Price range FINAL (discounted) price par — refs + discounts isi liye
+  // yahin chahiye (pehle sirf deal/discount filter mangte the).
+  let refsMap = null;
+  let discountIdx = null;
+  if (usePrice || useDeal || useDiscount) {
+    refsMap = pre?.refsMap || (await productRefsMap(working));
+  }
+  if (usePrice || useDiscount) {
+    const discounts = pre?.discountDocs || (await activePublicDiscounts());
+    discountIdx = buildDiscountIndex(discounts);
+  }
+
+  if (usePrice) {
+    working = working.filter((id) => {
+      const pid = String(id);
+      const price = stats.get(pid)?.price || 0;
+      const refs = refsMap.get(pid) || { cid: "", bid: "" };
+      const final = finalPriceIndexed(price, pid, refs.cid, refs.bid, discountIdx);
+      if (shop.minPrice !== null && final < shop.minPrice) return false;
+      if (shop.maxPrice !== null && final > shop.maxPrice) return false;
+      return true;
+    });
+    if (!working.length) return [];
+  }
+
+  if (useStock) {
+    working = working.filter((id) =>
+      shop.stockStates.includes(stockStateOf(stats.get(String(id))?.stock || 0)),
+    );
+    if (!working.length) return [];
+  }
+
+  if (useDeal) {
+    const deals = pre?.dealDocs || (await activeDealsByIds(shop.dealIds));
+    // ✅ Client parity: valid deal na mile to filtering off (sab pass)
+    if (deals.length) {
+      const dealIdx = buildDealIndex(deals);
+      working = working.filter((id) => {
+        const pid = String(id);
+        const refs = refsMap.get(pid) || { cid: "", bid: "" };
+        return matchingDealsIndexed(dealIdx, pid, refs.cid, refs.bid).length > 0;
+      });
+      if (!working.length) return [];
+    }
+  }
+
+  if (useDiscount) {
+    working = working.filter((id) => {
+      const pid = String(id);
+      const price = stats.get(pid)?.price || 0;
+      const refs = refsMap.get(pid) || { cid: "", bid: "" };
+      return discountPctIndexed(price, pid, refs.cid, refs.bid, discountIdx) >= shop.minDiscountBand;
+    });
+  }
+
+  return working;
 };
 
 // ======================================================
@@ -303,14 +731,24 @@ const getProducts = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limitRaw = parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50; admin 20 bhejta hai)
     const sort = String(req.query.sort || "newest");
 
     // ---- Filter build ----
     // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
     const { filter } = await buildProductFilter(req.query);
+    // ✅ Shop facets (storefront) + BundleCard ids — legacy callers inhe bhejte hi nahi
+    const shop = parseShopParams(req.query);
+    if (shop.ids.length) {
+      filter._id = { $in: shop.ids };
+    } else if (shop.hasShopFilters) {
+      const facetIds = await applyShopFacets(filter, shop);
+      filter._id = { $in: facetIds && facetIds.length ? facetIds : [new mongoose.Types.ObjectId()] };
+    }
 
     const isPriceSort = sort === "price-asc" || sort === "price-desc";
+    // ✅ Best-offers tab — engine-identical discount % ke hisaab se desc
+    const isDiscountSort = sort === "discount-desc";
     // ✅ Sirf Featured Products page ye sort bhejta hai (?sort=featured-recent).
     //    Baaki sab callers ke liye PRODUCT_LIST_SORT wala purana order same rehta hai.
     const isFeaturedRecent = sort === "featured-recent";
@@ -332,7 +770,8 @@ const getProducts = async (req, res) => {
       const variants = await Variant.find({
         product_id: { $in: products.map((p) => p._id) },
         is_deleted: { $ne: true },
-      }).sort({ created_at: 1 }).lean();
+        // ✅ _id tie-break taake [0] hamesha agg $first jaisa ho
+      }).sort({ created_at: 1, _id: 1 }).lean();
 
       const variantsMap = {};
       variants.forEach((v) => {
@@ -364,6 +803,69 @@ const getProducts = async (req, res) => {
 
     let pageIds = [];
 
+    if (isDiscountSort) {
+      // ✅ Discount % desc — % sab matched products par compute hota hai (engine parity)
+      const matched = await Product.find(filter).select("category_id brand_id").lean();
+      const docMap = new Map(matched.map((d) => [String(d._id), d]));
+      const midList = matched.map((d) => d._id);
+      const stats = await variantStatsMap(midList);
+      const discounts = await activePublicDiscounts();
+      const scored = midList
+        .map((id) => {
+          const pid = String(id);
+          const doc = docMap.get(pid);
+          const price = stats.get(pid)?.price || 0;
+          const cid = String(doc?.category_id?._id || doc?.category_id || "");
+          const bid = String(doc?.brand_id?._id || doc?.brand_id || "");
+          return { id, pct: discountPercentFor(price, pid, cid, bid, discounts) };
+        })
+        .filter((s) => (shop.minDiscountBand !== null ? s.pct >= shop.minDiscountBand : true));
+      // ✅ Deterministic order (_id tie-break)
+      scored.sort((a, b) => b.pct - a.pct || (String(a.id) < String(b.id) ? -1 : 1));
+      // ✅ total/safePage isi sorted set par (filter count nahi)
+      const dTotal = scored.length;
+      const dPages = Math.max(1, Math.ceil(dTotal / limit));
+      const dSafe = Math.min(page, dPages);
+      pageIds = scored.slice((dSafe - 1) * limit, dSafe * limit).map((s) => s.id);
+      const dProducts = pageIds.length
+        ? await Product.find({ _id: { $in: pageIds } })
+            .populate("category_id", "name")
+            .populate("brand_id", "name")
+            .populate("tag_ids", "name")
+            .populate("createdby", "name email")
+            .populate("updatedby", "name email")
+            .lean()
+        : [];
+      const dOrder = new Map(pageIds.map((id, i) => [String(id), i]));
+      dProducts.sort((a, b) => dOrder.get(String(a._id)) - dOrder.get(String(b._id)));
+      const dVariants = await Variant.find({
+        product_id: { $in: pageIds },
+        is_deleted: { $ne: true },
+      })
+        .sort({ created_at: 1, _id: 1 })
+        .lean();
+      const dMap = {};
+      dVariants.forEach((v) => {
+        const pid = String(v.product_id);
+        (dMap[pid] = dMap[pid] || []).push(v);
+      });
+      return res.status(200).json({
+        products: dProducts.map((p) => ({
+          ...p,
+          variants: dMap[String(p._id)] || [],
+          price: Number((dMap[String(p._id)] || [])[0]?.selling_price) || 0,
+        })),
+        pagination: {
+          total: dTotal,
+          page: dSafe,
+          limit,
+          pages: dPages,
+          hasNext: dSafe < dPages,
+          hasPrev: dSafe > 1,
+        },
+      });
+    }
+
     if (isPriceSort) {
       // ✅ Base order deterministic (_id tie-break) — JS sort stable hai, is liye
       //    equal price wale products bhi har request par same order me rahenge.
@@ -372,13 +874,23 @@ const getProducts = async (req, res) => {
       if (ids.length) {
         const priceDocs = await Variant.aggregate([
           { $match: { is_deleted: { $ne: true }, product_id: { $in: ids } } },
-          { $sort: { created_at: 1 } },
+          { $sort: { created_at: 1, _id: 1 } },
           { $group: { _id: "$product_id", p: { $first: "$selling_price" } } },
         ]);
         const priceMap = new Map(priceDocs.map((d) => [String(d._id), Number(d.p) || 0]));
+        // ✅ Price sort bhi FINAL (discounted) price par — filter se consistency.
+        const sortRefs = await productRefsMap(ids);
+        const sortDiscounts = await activePublicDiscounts();
+        const sortDiscountIdx = buildDiscountIndex(sortDiscounts);
+        const finalOf = (id) => {
+          const pid = String(id);
+          const price = priceMap.get(pid) || 0;
+          const refs = sortRefs.get(pid) || { cid: "", bid: "" };
+          return finalPriceIndexed(price, pid, refs.cid, refs.bid, sortDiscountIdx);
+        };
         ids.sort((a, b) => {
-          const pa = priceMap.get(String(a)) || 0;
-          const pb = priceMap.get(String(b)) || 0;
+          const pa = finalOf(a);
+          const pb = finalOf(b);
           return sort === "price-asc" ? pa - pb : pb - pa;
         });
         pageIds = ids.slice(skip, skip + limit);
@@ -417,7 +929,7 @@ const getProducts = async (req, res) => {
     const variants = await Variant.find({
       product_id: { $in: pageIds },
       is_deleted: { $ne: true },
-    }).sort({ created_at: 1 }).lean();
+    }).sort({ created_at: 1, _id: 1 }).lean();
 
     const variantsMap = {};
     variants.forEach((v) => {
@@ -465,6 +977,268 @@ const getProductStats = async (req, res) => {
     return res.status(500).json({ message: error.message || "Failed to fetch product stats" });
   }
 };
+// ======================================================
+// 🛍️ SHOP FACETS (storefront sidebar + counts)
+// Same filter params as grid; leave-one-out per group (client parity):
+// stock/discount/deals apne group ko exclude karke, categories/brands/bounds global.
+// ======================================================
+const DISCOUNT_BANDS = [10, 20, 30, 50];
+
+const getProductFacets = async (req, res) => {
+  try {
+    const { filter } = await buildProductFilter(req.query);
+    const shop = parseShopParams(req.query);
+
+    // ✅ GLOBAL groups (client parity — full catalog, no filters)
+    const globalBase = { is_deleted: { $ne: true } };
+    const [catGroups, brandGroups, allIdsDocs, categories] = await Promise.all([
+      Product.aggregate([
+        { $match: globalBase },
+        { $group: { _id: "$category_id", count: { $sum: 1 } } },
+      ]),
+      Product.aggregate([
+        { $match: globalBase },
+        { $group: { _id: "$brand_id", count: { $sum: 1 } } },
+      ]),
+      Product.find(globalBase).select("_id").lean(),
+      Category.find({ is_deleted: false }).select("_id parent_category_id").lean(),
+    ]);
+    const allIds = allIdsDocs.map((d) => d._id);
+    const globalStats = await variantStatsMap(allIds);
+    // ✅ Bounds FINAL (discounted) price par — neeche discounts load hone ke
+    // baad compute hota hai (globalRefs + globalDiscountIdx se).
+    // ✅ Subtree sums (client getCategorySubtreeCounts parity)
+    const directCat = new Map(catGroups.map((g) => [String(g._id), g.count]));
+    const childrenOf = new Map();
+    categories.forEach((c) => {
+      const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
+      if (!pid) return;
+      if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+      childrenOf.get(pid).push(String(c._id));
+    });
+    const subtreeCount = (id, seen = new Set()) => {
+      if (seen.has(id)) return 0;
+      seen.add(id);
+      let sum = directCat.get(id) || 0;
+      (childrenOf.get(id) || []).forEach((child) => {
+        sum += subtreeCount(child, seen);
+      });
+      return sum;
+    };
+    const categoryCounts = categories.map((c) => ({
+      _id: c._id,
+      count: subtreeCount(String(c._id)),
+    }));
+    const brandCounts = brandGroups.map((g) => ({ _id: g._id, count: g.count }));
+
+    // ✅ Shared pieces (ek baar fetch) + indexed counting (single pass)
+    const baseIdDocs = await Product.find(filter).select("_id").lean();
+    const baseIds = baseIdDocs.map((d) => d._id);
+    const [statsAll, refsAll, discountDocs, activeDeals] = await Promise.all([
+      variantStatsMap(baseIds),
+      productRefsMap(baseIds),
+      activePublicDiscounts(),
+      allActiveDeals(),
+    ]);
+    const pre = { stats: statsAll, refsMap: refsAll, discountDocs, dealDocs: activeDeals };
+    const discountIdx = buildDiscountIndex(discountDocs);
+    const dealIdx = buildDealIndex(activeDeals);
+
+    // ✅ Global bounds — FINAL price ka min/max (discount ke baad wali qeemat).
+    // Koi discount na ho to original hi final hai.
+    let bounds = { min: 0, max: 0 };
+    {
+      const globalRefs = await productRefsMap(allIds);
+      let lo = Infinity;
+      let hi = 0;
+      globalStats.forEach(({ price }, key) => {
+        if (!(price > 0)) return;
+        const refs = globalRefs.get(String(key)) || { cid: "", bid: "" };
+        const final = finalPriceIndexed(price, String(key), refs.cid, refs.bid, discountIdx);
+        if (!(final > 0)) return;
+        if (final < lo) lo = final;
+        if (final > hi) hi = final;
+      });
+      if (hi > 0) bounds = { min: Math.floor(lo), max: Math.ceil(hi) };
+    }
+
+    // ✅ Grid total (saare filters)
+    const totalIds = await applyShopFacets(filter, shop, null, pre);
+    const total = totalIds === null ? await Product.countDocuments(filter) : totalIds.length;
+
+    // ✅ LEAVE-ONE-OUT groups (baaki filters applied)
+    const looIds = async (exclude) => {
+      const ids = await applyShopFacets(filter, shop, exclude, pre);
+      return ids !== null ? ids : baseIds;
+    };
+    const [stockIds, discountIds, dealIds] = await Promise.all([
+      looIds("stock"),
+      looIds("discount"),
+      looIds("deal"),
+    ]);
+
+    const stock = [
+      { id: "in", count: 0 },
+      { id: "low", count: 0 },
+      { id: "out", count: 0 },
+    ];
+    stockIds.forEach((id) => {
+      const state = stockStateOf(statsAll.get(String(id))?.stock || 0);
+      stock.find((s) => s.id === state).count += 1;
+    });
+
+    const bandCounts = DISCOUNT_BANDS.map((band) => ({ band, count: 0 }));
+    discountIds.forEach((id) => {
+      const pid = String(id);
+      const price = statsAll.get(pid)?.price || 0;
+      const refs = refsAll.get(pid) || { cid: "", bid: "" };
+      const pct = discountPctIndexed(price, pid, refs.cid, refs.bid, discountIdx);
+      bandCounts.forEach((b) => {
+        if (pct >= b.band) b.count += 1;
+      });
+    });
+
+    // ✅ Per-deal counts — single pass (candidates only)
+    const dealHits = new Map(activeDeals.map((d) => [String(d._id), 0]));
+    dealIds.forEach((id) => {
+      const pid = String(id);
+      const refs = refsAll.get(pid) || { cid: "", bid: "" };
+      matchingDealsIndexed(dealIdx, pid, refs.cid, refs.bid).forEach((deal) => {
+        const key = String(deal._id);
+        dealHits.set(key, (dealHits.get(key) || 0) + 1);
+      });
+    });
+    const deals = activeDeals.map((deal) => ({ _id: deal._id, count: dealHits.get(String(deal._id)) || 0 }));
+
+    return res.status(200).json({
+      success: true,
+      total,
+      bounds,
+      categories: categoryCounts,
+      // ✅ Direct (non-subtree) counts — nav sorting parity ke liye
+      categoryDirect: catGroups.map((g) => ({ _id: g._id, count: g.count })),
+      brands: brandCounts,
+      stock,
+      discounts: bandCounts,
+      deals,
+    });
+  } catch (error) {
+    console.error("❌ [getProductFacets] Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch facets" });
+  }
+};
+
+// ======================================================
+// 🛍️ CATEGORY TILES (PopularCategories + HomeCategories)
+// Top-level categories: count + fromPrice + sample image. Sirf limit tak.
+// ======================================================
+const getCategoryTiles = async (req, res) => {
+  try {
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 12;
+    const categories = await Category.find({ is_deleted: false })
+      .select("name description parent_category_id sort_order")
+      .sort({ sort_order: 1, name: 1 })
+      .lean();
+    const isTop = (c) => !c.parent_category_id;
+    const topCats = categories.filter(isTop);
+    if (!topCats.length) return res.status(200).json({ success: true, data: [] });
+
+    const childrenOf = new Map();
+    categories.forEach((c) => {
+      const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
+      if (!pid) return;
+      if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+      childrenOf.get(pid).push(String(c._id));
+    });
+    const subtreeOf = (id) => {
+      const set = new Set([String(id)]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        set.forEach((sid) => {
+          (childrenOf.get(sid) || []).forEach((child) => {
+            if (!set.has(child)) {
+              set.add(child);
+              grew = true;
+            }
+          });
+        });
+      }
+      return [...set];
+    };
+
+    const subtrees = new Map(topCats.map((c) => [String(c._id), subtreeOf(c._id)]));
+    const allSubIds = [...new Set([...subtrees.values()].flat())];
+    const [directGroups, recent] = await Promise.all([
+      Product.aggregate([
+        { $match: { is_deleted: { $ne: true }, category_id: { $in: allSubIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+        { $group: { _id: "$category_id", count: { $sum: 1 } } },
+      ]),
+      Product.find({ is_deleted: { $ne: true }, category_id: { $in: allSubIds } })
+        .select("category_id")
+        .sort({ created_at: -1 })
+        .limit(200)
+        .lean(),
+    ]);
+    const directMap = new Map(directGroups.map((g) => [String(g._id), g.count]));
+    const recentVariantMap = new Map();
+    if (recent.length) {
+      const vs = await Variant.find({
+        product_id: { $in: recent.map((p) => p._id) },
+        is_deleted: { $ne: true },
+      })
+        .select("product_id images")
+        .lean();
+      vs.forEach((v) => {
+        const pid = String(v.product_id);
+        if (!recentVariantMap.has(pid) && v.images?.length) {
+          recentVariantMap.set(pid, v.images[0]?.img_url || null);
+        }
+      });
+    }
+
+    const tiles = topCats
+      .map((c) => {
+        const sub = subtrees.get(String(c._id)) || [];
+        let count = 0;
+        sub.forEach((sid) => {
+          count += directMap.get(sid) || 0;
+        });
+        return { ...c, count, fromPrice: 0, image: null, _sub: sub };
+      })
+      .filter((t) => t.count > 0)
+      .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))
+      .slice(0, limit);
+
+    // ✅ fromPrice + image (tiles tak mehdood — bounded queries)
+    for (const t of tiles) {
+      const inSub = await Product.find({
+        is_deleted: { $ne: true },
+        category_id: { $in: t._sub },
+      })
+        .select("_id")
+        .lean();
+      const pstats = await variantStatsMap(inSub.map((p) => p._id));
+      let lo = Infinity;
+      pstats.forEach(({ price }) => {
+        if (price > 0 && price < lo) lo = price;
+      });
+      t.fromPrice = lo === Infinity ? 0 : Math.round(lo);
+      const cand = recent.find(
+        (p) => t._sub.includes(String(p.category_id?._id || p.category_id)) && recentVariantMap.has(String(p._id)),
+      );
+      t.image = cand ? recentVariantMap.get(String(cand._id)) : null;
+      delete t._sub;
+    }
+
+    return res.status(200).json({ success: true, data: tiles });
+  } catch (error) {
+    console.error("❌ [getCategoryTiles] Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch category tiles" });
+  }
+};
+
 // ======================================================
 // GET PRODUCT BY ID
 // ======================================================
@@ -540,9 +1314,33 @@ const getProductById = async (req, res) => {
       console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
     }
 
+    // ⭐ Rating summary — for the stars + count on the detail page (reviews come from a separate endpoint)
+    let ratingSummary = { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+    try {
+      const Review = require("../models/Review");
+      const ratings = await Review.find({
+        product_id: product._id,
+        status: "active",
+        is_deleted: { $ne: true },
+      })
+        .select("rating")
+        .lean();
+      let sum = 0;
+      ratings.forEach((r) => {
+        const rating = Number(r.rating) || 0;
+        sum += rating;
+        if (ratingSummary.distribution[rating] !== undefined) ratingSummary.distribution[rating] += 1;
+      });
+      ratingSummary.count = ratings.length;
+      ratingSummary.avg = ratings.length ? Math.round((sum / ratings.length) * 10) / 10 : 0;
+    } catch (summaryErr) {
+      console.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+    }
+
     return res.status(200).json({
       ...product,
       variants,
+      ratingSummary,
     });
   } catch (error) {
     console.error("❌ [getProductById] Error:", error);
@@ -1410,6 +2208,8 @@ module.exports = {
   createProduct,
   getProducts,
   getProductStats,
+  getProductFacets,
+  getCategoryTiles,
   getProductById,
   updateProduct,
   deleteProduct,

@@ -493,8 +493,7 @@ const getActiveDeals = async (req, res) => {
   try {
     const now = new Date();
     const limitRaw = parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50)
 
     const query = {
       isActive: true,
@@ -556,8 +555,13 @@ const getActiveDeals = async (req, res) => {
 const getActiveDealById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    // ✅ Sanitized pagination — user cap 50, safe page clamp, deterministic order
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 20;
+    const pageRaw = parseInt(req.query.page, 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
     const Product = require("../models/Product");
+    const Variant = require("../models/Variant");
 
     console.log("🔍 Fetching deal with ID:", id);
 
@@ -574,40 +578,71 @@ const getActiveDealById = async (req, res) => {
 
     console.log("✅ Deal found:", deal.name, "| applyTo:", deal.applyTo);
 
-    let productsQuery = { is_deleted: false, status: "active" };
-    
+    let productsQuery = { is_deleted: { $ne: true }, status: "active" };
+
     if (deal.applyTo === "category" && deal.categoryIds && deal.categoryIds.length > 0) {
       const categoryIds = deal.categoryIds.map(c => c._id || c);
       productsQuery.category_id = { $in: categoryIds };
-    } 
+    }
     else if (deal.applyTo === "brand" && deal.brandIds && deal.brandIds.length > 0) {
       const brandIds = deal.brandIds.map(b => b._id || b);
       productsQuery.brand_id = { $in: brandIds };
-    } 
+    }
     else if (deal.applyTo === "product" && deal.productIds && deal.productIds.length > 0) {
       const productIds = deal.productIds.map(p => p._id || p);
       productsQuery._id = { $in: productIds };
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    
-    // ✅ NO .populate('variants') - kyunki schema mein nahi hai
-    const [productsToShow, totalProducts] = await Promise.all([
+    const totalProducts = await Product.countDocuments(productsQuery);
+    const totalPages = Math.max(1, Math.ceil(totalProducts / limit));
+    const safePage = Math.min(page, totalPages);
+    const skip = (safePage - 1) * limit;
+
+    // ✅ Deterministic order (_id tie-break) taake pages overlap na hon
+    const [productsToShow] = await Promise.all([
       Product.find(productsQuery)
-        .sort({ createdAt: -1 })
+        .populate("category_id", "name")
+        .populate("brand_id", "name")
+        .sort({ created_at: -1, _id: -1 })
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limit)
         .lean(),
-      Product.countDocuments(productsQuery)
     ]);
+
+    // ✅ Variants + price attach (getProducts legacy item shape jaisa) —
+    // storefront ko full catalog fetch ki zaroorat nahi rehti
+    const pageIds = productsToShow.map((p) => p._id);
+    const comboIds = (deal.productIds || []).map((p) => p?._id || p).filter(Boolean);
+    const variantProductIds = [...new Set([...pageIds, ...comboIds].map(String))];
+    const dealVariants = await Variant.find({
+      product_id: { $in: variantProductIds },
+      is_deleted: { $ne: true },
+    })
+      .sort({ created_at: 1, _id: 1 })
+      .lean();
+    const variantsMap = {};
+    dealVariants.forEach((v) => {
+      const pid = String(v.product_id);
+      (variantsMap[pid] = variantsMap[pid] || []).push(v);
+    });
+    const withVariants = (p) => {
+      const vs = variantsMap[String(p._id || p.id)] || p.variants || [];
+      return {
+        ...p,
+        variants: vs,
+        price: Number(vs[0]?.selling_price) || Number(p.price) || 0,
+      };
+    };
 
     console.log("📦 Products found:", productsToShow.length, "out of total", totalProducts);
 
     const dealObj = deal.toObject();
-    dealObj.resolvedProducts = productsToShow;
+    dealObj.productIds = (dealObj.productIds || []).map(withVariants);
+    dealObj.resolvedProducts = productsToShow.map(withVariants);
     dealObj.totalProducts = totalProducts;
-    dealObj.currentPage = Number(page);
-    dealObj.totalPages = Math.ceil(totalProducts / Number(limit));
+    dealObj.currentPage = safePage;
+    dealObj.totalPages = totalPages;
+    dealObj.hasNext = safePage < totalPages;
 
     res.status(200).json({ success: true, data: dealObj });
   } catch (error) {

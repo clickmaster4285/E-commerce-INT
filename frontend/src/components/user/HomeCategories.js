@@ -14,11 +14,7 @@ import Link from "next/link";
 import CategoryIcon from "./CategoryIcon";
 import SectionHeading from "./SectionHeading";
 import SlideArrow from "./SlideArrow";
-import {
-  getCategorySubtreeCounts,
-  idOf,
-  isTopLevelCategory,
-} from "@/utils/homeCatalog";
+
 
 /* Ek waqt me kitni tiles nazar aayen — screen size ke hisaab se
    (desktop par 7, tablet par 4, mobile par 3) */
@@ -38,19 +34,12 @@ function useVisibleCount() {
   return count;
 }
 
-export default function HomeCategories({ categories = [], products = [], isLoading = false }) {
+export default function HomeCategories({ tiles = [], totalProducts = 0, isLoading = false }) {
   const [start, setStart] = useState(0);
   const visibleCount = useVisibleCount();
 
-  const allTiles = useMemo(() => {
-    const counts = getCategorySubtreeCounts(categories, products);
-    const parents = categories.filter(isTopLevelCategory);
-    const list = (parents.length ? parents : categories)
-      .map((category) => ({ ...category, count: counts[idOf(category._id)] || 0 }))
-      .filter((category) => category.count > 0)
-      .sort((a, b) => b.count - a.count || String(a?.name || "").localeCompare(String(b?.name || "")));
-    return list;
-  }, [categories, products]);
+  // ✅ Tiles server se (count order me) — full catalog nahi
+  const allTiles = useMemo(() => [...(tiles || [])], [tiles]);
 
   const maxStart = Math.max(0, allTiles.length - visibleCount);
   const safeStart = Math.min(start, maxStart);
@@ -88,7 +77,7 @@ export default function HomeCategories({ categories = [], products = [], isLoadi
       `}</style>
 
       <div className="mb-3.5">
-        <SectionHeading title="Shop by Category" subtitle={`${categories.length} categories · ${products.length} products`} />
+        <SectionHeading title="Shop by Category" subtitle={`${allTiles.length} categories · ${totalProducts} products`} />
       </div>
 
       <div className="relative w-full">

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, Fragment, useRef } from "react";
+import { Suspense, useEffect, useState, Fragment, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
@@ -409,18 +409,102 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
    compact=true (account tab): page chrome (desktop title header, mobile
    sticky app bar, login redirect, page paddings, scroll-to-top) hide —
    sirf toolbar + orders list + pagination render hota hai. */
+const ORDER_STATUSES = ["all", "draft", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+const ORDER_SORTS = ["newest", "oldest", "total_high", "total_low"];
+const ORDER_RANGES = ["all", "30", "90", "180", "365"];
+
+const pickParam = (sp, key, fallback, valid) => {
+  const raw = sp.get(key);
+  if (raw === null || raw === "") return fallback;
+  return valid.includes(raw) ? raw : fallback;
+};
+
+const safeOrderPage = (raw) => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : 1;
+};
+
 export default function OrdersPage({ compact = false }) {
+  return (
+    <Suspense fallback={null}>
+      <OrdersContent compact={compact} />
+    </Suspense>
+  );
+}
+
+function OrdersContent({ compact = false }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { restoreItems } = useCart();
   const { calculateProductDiscount } = useDiscounts();
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [timeRange, setTimeRange] = useState("all");
+
+  // ✅ Full page me page/filter/sort/search/range URL me (refresh/share safe);
+  // account tab (compact) me local state (URL nahi chhedte)
+  const [local, setLocal] = useState({
+    filter: "all",
+    search: "",
+    sortBy: "newest",
+    timeRange: "all",
+    page: 1,
+  });
+  const fromUrl = !compact;
+  const filter = fromUrl
+    ? pickParam(searchParams, "status", "all", ORDER_STATUSES)
+    : local.filter;
+  const sortBy = fromUrl
+    ? pickParam(searchParams, "sort", "newest", ORDER_SORTS)
+    : local.sortBy;
+  const timeRange = fromUrl
+    ? pickParam(searchParams, "range", "all", ORDER_RANGES)
+    : local.timeRange;
+  const urlSearch = fromUrl ? (searchParams.get("q") || "") : local.search;
+  const page = fromUrl ? safeOrderPage(searchParams.get("page")) : local.page;
+
+  const writeUrl = (patch) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    const apply = (key, value, fallback) => {
+      if (value === fallback || value === "" || value === 1) sp.delete(key);
+      else sp.set(key, String(value));
+    };
+    if ("filter" in patch) apply("status", patch.filter, "all");
+    if ("sortBy" in patch) apply("sort", patch.sortBy, "newest");
+    if ("timeRange" in patch) apply("range", patch.timeRange, "all");
+    if ("search" in patch) apply("q", patch.search, "");
+    if ("page" in patch) apply("page", patch.page, 1);
+    const query = sp.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const patchLocal = (patch) => setLocal((prev) => ({ ...prev, ...patch }));
+  const setFilter = (v) =>
+    fromUrl ? writeUrl({ filter: v, page: 1 }) : patchLocal({ filter: v, page: 1 });
+  const setSortBy = (v) =>
+    fromUrl ? writeUrl({ sortBy: v, page: 1 }) : patchLocal({ sortBy: v, page: 1 });
+  const setTimeRange = (v) =>
+    fromUrl ? writeUrl({ timeRange: v, page: 1 }) : patchLocal({ timeRange: v, page: 1 });
+  const setPage = (v) => (fromUrl ? writeUrl({ page: v }) : patchLocal({ page: v }));
+
+  // ✅ Search: textbox local (typing smooth), query + URL 400ms debounce par
+  const [searchInput, setSearchInput] = useState(urlSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      if (fromUrl) writeUrl({ search: searchInput.trim(), page: 1 });
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+  const search = fromUrl ? debouncedSearch : searchInput;
+  const setSearch = (v) => {
+    setSearchInput(v);
+    if (!fromUrl) patchLocal({ search: v, page: 1 });
+  };
+
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [page, setPage] = useState(1);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -467,10 +551,7 @@ export default function OrdersPage({ compact = false }) {
 
   const hasDrafts = drafts.length > 0;
 
-  // ✅ Reset page to 1 when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [filter, search, sortBy, timeRange]);
+  // ✅ Page reset setters me hota hai (filter/sort/search/range badle to page 1, URL समेत)
 
   const totalPages = Math.max(1, isDraftFilter ? 1 : (pagination.pages || 1));
 

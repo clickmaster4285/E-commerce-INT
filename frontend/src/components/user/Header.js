@@ -327,33 +327,33 @@ export default function Header() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
+  // ✅ Counts server facets se (direct counts) — full catalog nahi.
+  // Key ["shopFacets","global"] home page ke saath shared (ek hi request).
+  const { data: countFacets = null } = useQuery({
+    queryKey: ["shopFacets", "global"],
+    queryFn: () => productApi.getFacets({}),
     staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   const topCategories = useMemo(() => {
     const counts = {};
-    products.forEach((p) => {
-      const id =
-        typeof p.category_id === "object" ? p.category_id?._id : p.category_id;
-      if (id) counts[id] = (counts[id] || 0) + 1;
+    (countFacets?.categoryDirect || []).forEach((c) => {
+      counts[String(c._id)] = c.count || 0;
     });
     return categories
       .map((c) => ({ ...c, count: counts[c._id] || 0 }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-  }, [categories, products]);
+  }, [categories, countFacets]);
 
   const brandCounts = useMemo(() => {
     const counts = {};
-    products.forEach((p) => {
-      const id = typeof p.brand_id === "object" ? p.brand_id?._id : p.brand_id;
-      if (id) counts[id] = (counts[id] || 0) + 1;
+    (countFacets?.brands || []).forEach((b) => {
+      counts[String(b._id)] = b.count || 0;
     });
     return counts;
-  }, [products]);
+  }, [countFacets]);
 
   const topBrands = useMemo(() => {
     return [...brands]
@@ -361,13 +361,26 @@ export default function Header() {
       .slice(0, 5);
   }, [brands, brandCounts]);
 
-  const searchResults = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (q.length < 1) return [];
-    return products
-      .filter((p) => (p.name || "").toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [searchTerm, products]);
+  // ✅ Search suggestions — server (?search=, 8 tak, 400ms debounce)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const { data: searchData } = useQuery({
+    queryKey: ["headerSearch", debouncedSearch],
+    queryFn: () =>
+      productApi.getAllPaginated({ page: 1, limit: 8, search: debouncedSearch }),
+    enabled: debouncedSearch.length >= 1,
+    staleTime: 60 * 1000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
+  });
+  const searchResults = useMemo(
+    () => (debouncedSearch.length >= 1 ? searchData?.products || [] : []),
+    [debouncedSearch, searchData],
+  );
 
   const handlePick = (p) => {
     setSearchTerm("");
@@ -385,7 +398,14 @@ export default function Header() {
     window.location.href = "/";
   };
 
-  const handleSearch = () => {};
+  // ✅ Enter/Search button → search results page
+  const handleSearch = () => {
+    const q = searchTerm.trim();
+    if (!q) return;
+    setSearchTerm("");
+    setMobileSearchOpen(false);
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+  };
 
   const getLogoUrl = (logo) => {
     const raw = typeof logo === "string" ? logo : logo?.img_url;

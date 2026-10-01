@@ -23,23 +23,83 @@ const paginated = (res, fallbackLimit) => {
 };
 
 export const productApi = {
-  // ✅ PUBLIC — bina login (User GUI) — legacy full list
+  // ✅ PUBLIC — bina login (User GUI) — legacy full list (purane callers ke liye)
   getAll: () => axiosInstance.get("/products").then(list),
 
-  // ✅ NEW — server-side paginated list (User GUI)
-  getAllPaginated: ({ page = 1, limit = 12, search = "", sort = "newest", brand_id, category_id } = {}) =>
+  // ✅ Server-side paginated list (User GUI shop/facets/search/brand/related)
+  // Backend: ?page&limit&search&sort&brand_id&category_id&minPrice&maxPrice
+  //   &stock=&deal=&discount=&minDiscount=&featured=&ids=
+  //   sort: "featured" (default order) | "newest" | "price-asc" | "price-desc" | "discount-desc"
+  // Response: { products: [...], pagination: { total, page, limit, pages, hasNext, hasPrev } }
+  getAllPaginated: ({
+    page = 1,
+    limit = 12,
+    search = "",
+    sort = "featured",
+    brand_id,
+    category_id,
+    minPrice = null,
+    maxPrice = null,
+    stock = [],
+    deal = [],
+    discount = [],
+    minDiscount = null,
+    featured = "",
+    ids = [],
+  } = {}) =>
     axiosInstance
       .get("/products", {
         params: {
           page,
           limit,
           search: search || undefined,
-          sort,
-          brand_id: brand_id || undefined,
-          category_id: category_id || undefined,
+          sort: sort && sort !== "featured" ? sort : undefined,
+          brand_ids: brand_id || undefined,
+          category_ids: category_id || undefined,
+          minPrice: minPrice ?? undefined,
+          maxPrice: maxPrice ?? undefined,
+          stockStates: (stock || []).length ? stock.join(",") : undefined,
+          dealIds: (deal || []).length ? deal.join(",") : undefined,
+          discount: (discount || []).length ? discount.join(",") : undefined,
+          minDiscount: minDiscount ?? undefined,
+          featured: featured || undefined,
+          ids: (ids || []).length ? ids.join(",") : undefined,
         },
       })
       .then((res) => paginated(res, limit)),
+
+  // ✅ Shop facets (sidebar counts + bounds + grid total) — same filter params
+  // Response: { success, total, bounds, categories, brands, stock, discounts, deals }
+  getFacets: ({
+    search = "",
+    brand_id,
+    category_id,
+    minPrice = null,
+    maxPrice = null,
+    stock = [],
+    deal = [],
+    discount = [],
+  } = {}) =>
+    axiosInstance
+      .get("/products/facets", {
+        params: {
+          search: search || undefined,
+          brand_id: brand_id || undefined,
+          category_id: category_id || undefined,
+          minPrice: minPrice ?? undefined,
+          maxPrice: maxPrice ?? undefined,
+          stockStates: (stock || []).length ? stock.join(",") : undefined,
+          dealIds: (deal || []).length ? deal.join(",") : undefined,
+          discount: (discount || []).length ? discount.join(",") : undefined,
+        },
+      })
+      .then((res) => res.data),
+
+  // ✅ Category tiles (PopularCategories + HomeCategories) — count + fromPrice + image
+  getCategoryTiles: ({ limit = 12 } = {}) =>
+    axiosInstance
+      .get("/products/category-tiles", { params: { limit } })
+      .then((res) => res.data?.data || []),
 
   getById: (id) =>
     axiosInstance.get(`/products/${id}`).then((res) => res.data?.data || res.data),

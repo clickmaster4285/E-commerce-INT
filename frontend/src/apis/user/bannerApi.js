@@ -1,8 +1,9 @@
 import axiosInstance from "../axiosInstance";
 
 export const bannerApi = {
-  getActive: () =>
-    axiosInstance.get("/banners/active").then((res) => {
+  // ✅ ?limit= bhejo to server utne hi bhejta hai (600+ fetch band); na bhejo to legacy full
+  getActive: ({ limit = 12 } = {}) =>
+    axiosInstance.get("/banners/active", { params: { limit: limit || undefined } }).then((res) => {
       const d = res.data;
       if (Array.isArray(d?.data)) return d.data;
       if (Array.isArray(d)) return d;

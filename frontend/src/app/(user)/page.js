@@ -29,6 +29,8 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { productApi } from "@/apis/user/productApi";
 import { SlidersHorizontal, X } from "lucide-react";
 import HomeNav from "@/components/user/HomeNav";
 import HomeSidebar from "@/components/user/HomeSidebar";
@@ -59,7 +61,9 @@ export default function Home() {
           style={HOME_THEME}
           className="min-h-screen w-full min-w-0 pb-2 text-[var(--user-text)]"
         >
-          <HomeNav />
+          {/* Static nav placeholder — HomeNav yahan nahi (useSearchParams
+              Suspense mangta hai, fallback me crash karta hai) */}
+          <div className="sticky top-14 z-40 h-11 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16 lg:h-12" />
           <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
             <div className="h-7 w-48 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
           </div>
@@ -157,7 +161,6 @@ function HomeParamsSync({ filters, updateFilter, sortBy, setSortBy, closeDealsVi
 
 function HomeContent() {
   const {
-    products,
     categories,
     brands,
     deals,
@@ -166,14 +169,45 @@ function HomeContent() {
     filters,
     updateFilter,
     clearFilters,
-    filteredProducts,
+    facets,
+    matchCount,
     filtersActive,
     activeFilterCount,
     stockFacet,
     discountFacet,
-    getDiscountPercent,
     isLoading,
   } = useHomeCatalog();
+
+  // ✅ Category tiles (Popular/Home/All-cats rails — count + fromPrice + image, server)
+  const { data: categoryTiles = [] } = useQuery({
+    queryKey: ["categoryTiles", 100],
+    queryFn: () => productApi.getCategoryTiles({ limit: 100 }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ✅ Global total (HomeCategories subtitle — filters se unaffected, HomeNav key shared)
+  const { data: globalFacets = null } = useQuery({
+    queryKey: ["shopFacets", "global"],
+    queryFn: () => productApi.getFacets({}),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  const totalProducts = globalFacets?.total ?? matchCount;
+
+  // ✅ Brand counts map (BrandStrip/Showcase — server facets)
+  const brandCounts = useMemo(() => {
+    const map = {};
+    (facets?.brands || []).forEach((b) => {
+      map[String(b._id)] = b.count || 0;
+    });
+    return map;
+  }, [facets]);
+
+  // ✅ Offers tab: koi discounted product ho tabhi (server counts)
+  const hasOffers = useMemo(
+    () => (facets?.discounts || []).some((b) => (b.count || 0) > 0),
+    [facets],
+  );
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showAllDealsView, setShowAllDealsView] = useState(false);
@@ -314,35 +348,20 @@ function HomeContent() {
   /* Any filter/sort change resets the top results grid back to page 1. */
   const filtersKey = useMemo(() => `${JSON.stringify(filters)}|${sortBy}`, [filters, sortBy]);
 
-  /* ?sort= (Best Sellers / New Arrivals) — top FilterResults isi order me. */
-  const sortedFilteredProducts = useMemo(() => {
-    const arr = [...filteredProducts];
-    switch (sortBy) {
-      case "newest":
-        return arr.sort((a, b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
-      case "price-asc":
-        return arr.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-      case "price-desc":
-        return arr.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
-      default:
-        return arr;
-    }
-  }, [filteredProducts, sortBy]);
-
   const sidebarProps = {
     categories,
     brands,
-    products,
     deals,
     dealFacet,
     dealsLoading,
     filters,
     onChange: handleFilterChange,
     onClear: handleClearAll,
-    matchCount: filteredProducts.length,
+    matchCount,
     filtersActive,
     stockFacet,
     discountFacet,
+    facets,
     isLoading,
     showAllDealsView,
     onToggleAllDealsView: handleToggleAllDealsView,
@@ -414,7 +433,7 @@ function HomeContent() {
                   ? `${categories.length} categories`
                   : showAllDealsView
                     ? `${deals.length} deals`
-                    : `${filteredProducts.length} products`}
+                    : `${matchCount} products`}
               </span>
             </div>
 
@@ -425,8 +444,7 @@ function HomeContent() {
               <div ref={topResultsRef} className="scroll-mt-[7.5rem] lg:scroll-mt-[8.5rem]">
                 <AllCategoriesResults
                   key={`all-cats-${categories.length}`}
-                  categories={categories}
-                  products={products}
+                  tiles={categoryTiles}
                   isLoading={isLoading}
                   onClear={handleClearAll}
                   onSelectCategory={handleSelectCategoryCard}
@@ -456,9 +474,8 @@ function HomeContent() {
               <div ref={topResultsRef} className="scroll-mt-[7.5rem] lg:scroll-mt-[8.5rem]">
                 <FilterResults
                   key={filtersKey}
-                  products={sortedFilteredProducts}
-                  isLoading={isLoading}
                   filters={filters}
+                  sortBy={sortBy}
                   categories={categories}
                   brands={brands}
                   deals={dealFacet.length ? dealFacet : deals}
@@ -475,31 +492,23 @@ function HomeContent() {
             </div>
 
             {/* CATEGORY TILES */}
-            <HomeCategories categories={categories} products={products} isLoading={isLoading} />
+            <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
 
             {/* TODAY'S DEALS */}
             <DealsSection embedded />
 
-            {/* FEATURED PRODUCTS — hamesha FULL catalog (filter se untouched),
-                taake neeche home page waisa hi lage jaisa baghair filter ke */}
-            <FeaturedProducts
-              products={products}
-              isLoading={isLoading}
-              filtersActive={false}
-              onClear={handleClearAll}
-              getDiscountPercent={getDiscountPercent}
-              resetKey="featured-full"
-            />
+            {/* FEATURED PRODUCTS — server tabs (filter se untouched) */}
+            <FeaturedProducts hasOffers={hasOffers} />
 
             {/* POPULAR CATEGORIES */}
-            <PopularCategories categories={categories} products={products} isLoading={isLoading} />
+            <PopularCategories tiles={categoryTiles} isLoading={isLoading} />
 
             {/* BRANDS */}
-            <BrandStrip brands={brands} products={products} isLoading={isLoading} />
+            <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
 
             {/* BRAND SPOTLIGHT (LAST) — top brands ki 2-column sliding rows,
                 arrows ek-ek product slide karte hain */}
-            <BrandShowcase brands={brands} products={products} isLoading={isLoading} />
+            <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
           </div>
         </div>
       </div>

@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import Link from "next/link";
 import SectionHeading from "./SectionHeading";
 import {
-  getBrandCounts,
   idOf,
   imageUrl,
   sortByPopularity,
@@ -17,14 +16,15 @@ import {
 
 const LIMIT = 14;
 
-export default function BrandStrip({ brands = [], products = [], isLoading = false }) {
+export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = false }) {
+  // ✅ Counts server facets se — full catalog nahi
   const list = useMemo(() => {
-    const counts = getBrandCounts(products);
+    const counts = brandCounts || {};
     return sortByPopularity(brands, counts)
       .map((brand) => ({ ...brand, count: counts[idOf(brand._id)] || 0 }))
       .filter((brand) => brand.count > 0)
       .slice(0, LIMIT);
-  }, [brands, products]);
+  }, [brands, brandCounts]);
 
   if (isLoading && !list.length) return null;
   if (!list.length) return null;

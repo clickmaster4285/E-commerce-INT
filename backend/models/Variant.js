@@ -119,4 +119,8 @@ const variantSchema = new mongoose.Schema(
   }
 );
 
+// ✅ Shop facets (price/stock) + price sort: pehle variant + stock sums
+// isi index se serve hote hain.
+variantSchema.index({ product_id: 1, is_deleted: 1, created_at: 1 });
+
 module.exports = mongoose.model("Variant", variantSchema);

@@ -51,4 +51,7 @@ const bannerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// ✅ Active hero list (status + position order) isi index se serve hoti hai.
+bannerSchema.index({ status: 1, position: 1 });
+
 module.exports = mongoose.model("Banner", bannerSchema);

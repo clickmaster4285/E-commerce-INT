@@ -39,6 +39,7 @@ const bannerScheduler = require("./utils/bannerScheduler");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const stockRoutes = require("./routes/stockRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 const shippingRoutes = require("./routes/shippingRoutes");
 const attributeRoutes = require("./routes/attributeRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -50,6 +51,10 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = Number(process.env.PORT) || 5000;
+// ✅ TRUST_PROXY default blank/off — production me env se set hoga (e.g. "1")
+if (String(process.env.TRUST_PROXY || "").trim()) {
+  app.set("trust proxy", String(process.env.TRUST_PROXY).trim());
+}
 const HOST = process.env.HOST || "0.0.0.0";
 const CLIENT_URL = process.env.CLIENT_URL || "";
 const API_PREFIX = process.env.API_PREFIX || "/api";
@@ -113,6 +118,13 @@ app.use("/uploads", express.static(uploadDir, { maxAge: UPLOAD_CACHE_MAX_AGE, et
 const io = initSocket(server);
 app.use((req, res, next) => { req.io = io; next(); });
 
+// ✅ GLOBAL RATE LIMIT — poori /api par (health check skip, static /uploads waise hi bahar)
+const { limiters } = require("./middleware/rateLimit");
+app.use(API_PREFIX, (req, res, next) => {
+  if (req.path === "/health") return next();
+  return limiters.global(req, res, next);
+});
+
 // ==========================================
 // ROUTES
 // ==========================================
@@ -132,6 +144,7 @@ app.use(`${API_PREFIX}/banners`, bannerRoutes);
 app.use(`${API_PREFIX}/orders`, orderRoutes);
 app.use(`${API_PREFIX}/cart`, cartRoutes);
 app.use(`${API_PREFIX}/stock`, stockRoutes);
+app.use(`${API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${API_PREFIX}/attributes`, attributeRoutes);
 app.use(`${API_PREFIX}/shipping`, shippingRoutes);
 app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
@@ -153,6 +166,9 @@ const createUploadDirectories = () => {
   // ✅ Bundle cover images
   const bundleUploadDir = path.join(uploadDir, "bundles");
   if (!fs.existsSync(bundleUploadDir)) fs.mkdirSync(bundleUploadDir, { recursive: true });
+  // ✅ Review media (images + video)
+  const reviewUploadDir = path.join(uploadDir, "reviews");
+  if (!fs.existsSync(reviewUploadDir)) fs.mkdirSync(reviewUploadDir, { recursive: true });
 };
 
 const seedDefaultData = async () => {
@@ -246,6 +262,22 @@ const startServer = async () => {
     
     if (typeof bannerScheduler === 'function') bannerScheduler();
     else if (bannerScheduler?.start) bannerScheduler.start();
+
+    // 📧 SMTP status — OTP email jayegi ya sirf console par aayegi, start par hi pata chal jaye
+    try {
+      const { isSmtpConfigured, verifySmtpConnection, getSmtpConfig } = require("./utils/sendEmail");
+      if (!isSmtpConfigured()) {
+        console.warn("⚠️ SMTP not configured — OTP emails console par print hongi, inbox mein NAHI jayengi.");
+        console.warn("💡 Fix: backend/.env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+      } else {
+        const cfg = getSmtpConfig();
+        await verifySmtpConnection();
+        console.log(`✅ SMTP OK — OTP emails ${cfg.host}:${cfg.port} (${cfg.user}) se jayengi`);
+      }
+    } catch (smtpError) {
+      console.error("❌ SMTP check failed:", smtpError.message);
+      console.error("💡 Gmail: 16-char App Password use karein (spaces hata kar), 2-Step Verification ON rakhein.");
+    }
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {

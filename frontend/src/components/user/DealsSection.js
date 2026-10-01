@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Flame, Clock, ArrowRight, ChevronLeft, ChevronRight, Package, Zap, Sparkles, Layers, ShoppingCart } from "lucide-react";
 import { dealApi } from "@/apis/user/dealApi";
-import { productApi } from "@/apis/user/productApi";
+
 import { useCart } from "./CartContext";
 import {
   round2,
@@ -69,36 +69,6 @@ function calcTime(endDate) {
   };
 }
 
-const idMatch = (arr, id) =>
-  (arr || []).some((x) => String(typeof x === "object" ? x?._id : x) === String(id));
-
-function matchDealProducts(deal, products) {
-  if (!deal || !products?.length) return [];
-  let out = [];
-  switch (deal.applyTo) {
-    case "product":
-      out = products.filter((p) => idMatch(deal.productIds, p._id));
-      break;
-    case "category":
-      out = products.filter((p) =>
-        idMatch(deal.categoryIds, typeof p.category_id === "object" ? p.category_id?._id : p.category_id)
-      );
-      break;
-    case "brand":
-      out = products.filter((p) =>
-        idMatch(deal.brandIds, typeof p.brand_id === "object" ? p.brand_id?._id : p.brand_id)
-      );
-      break;
-    case "all":
-    default:
-      out = (deal.productIds || []).length
-        ? products.filter((p) => idMatch(deal.productIds, p._id))
-        : products;
-      break;
-  }
-  return out;
-}
-
 export default function DealsSection({ embedded = false }) {
   const { data: deals = [], isLoading } = useQuery({
     queryKey: ["activeDeals"],
@@ -137,7 +107,7 @@ function DealEngine({ deals }) {
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setCurrent((p) => (p + 1) % deals.length);
-    }, 4000);
+    }, 8000);
   }, [deals.length]);
 
   useEffect(() => {
@@ -172,18 +142,25 @@ function DealEngine({ deals }) {
           return Array.from({ length: MAX_DOTS }, (_, index) => start + index);
         })();
 
-  // ✅ Full product list for deal matching
-  const { data: allProducts = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: productApi.getAll,
-    staleTime: 5 * 60 * 1000,
-  });
-
   const activeDeal = deals[current];
+  const activeDealId = activeDeal?._id || activeDeal?.id || null;
+
+  // ✅ Carousel deal ke products — server (12 tak, variants ke saath).
+  // Full catalog fetch ki jagah per-deal query (cached).
+  const { data: activeDealDetail = null } = useQuery({
+    queryKey: ["deal", activeDealId, "preview"],
+    queryFn: () => dealApi.getById(activeDealId, 1, 12),
+    enabled: !!activeDealId,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
   const cfg = getDealConfig(activeDeal.type);
   const badgeText = getDealBadgeText(activeDeal);
   const time = useCountdown(activeDeal.endDate);
-  const products = useMemo(() => matchDealProducts(activeDeal, allProducts), [activeDeal, allProducts]);
+  const products = useMemo(
+    () => activeDealDetail?.resolvedProducts || [],
+    [activeDealDetail],
+  );
 
   const stripImg =
     getImageUrl(activeDeal.image) ||
@@ -365,7 +342,9 @@ function DealEngine({ deals }) {
                     )}
                   </div>
 
-                  <p className="hidden sm:block text-white/90 text-xs sm:text-base max-w-xl line-clamp-2 leading-relaxed">
+                  {/* Fixed 2-line jagah (sm+) — 1-line wali deal par section
+                      chhota nahi hota. Mobile par description hidden hai. */}
+                  <p className="hidden sm:block text-white/90 text-xs sm:text-base max-w-xl line-clamp-2 leading-relaxed sm:min-h-[3.25rem] lg:min-h-[3.75rem]">
                     {activeDeal.description || "Limited-time offer — grab it before it's gone"}
                   </p>
 
@@ -500,12 +479,12 @@ function DealEngine({ deals }) {
               </div>
             )}
 
-            {/* ✅ BUNDLE DEAL — combo price + quantity rules + add to cart */}
-            {activeDeal.type === "bundle" && products.length > 0 && (
-              <BundleDealPanel deal={activeDeal} products={products} allProducts={allProducts} />
-            )}
+            {/* NOTE: bundle-type deals bhi simple deals jese hi dikhte hain
+                (same header + countdown + products row) — koi alag bundle
+                section/panel nahi. BundleDealPanel sirf deal detail page
+                (/deals/[id]) par use hota hai. */}
 
-            {/* Dots + prev/next + autoplay progress */}
+            {/* Dots + prev/next + 8s autoplay progress */}
             {deals.length > 1 && (
               <div className="flex flex-col items-center gap-2.5 mt-5">
                 <div className="flex items-center gap-1.5 bg-black/15 backdrop-blur-md border border-white/15 px-2 py-1.5 rounded-full">
@@ -546,14 +525,27 @@ function DealEngine({ deals }) {
                     <ChevronRight size={16} className="transition-transform group-hover/arrow:translate-x-0.5" />
                   </button>
                 </div>
+                {/* 8s change timer — deal badalne par dobara chalti hai,
+                    hover-pause par ruk jati hai */}
+                <div className="h-0.5 w-40 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    key={current}
+                    className="h-full w-full origin-left bg-white/80"
+                    style={{
+                      animation: "dealProgress 8s linear forwards",
+                      animationPlayState: paused ? "paused" : "running",
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* ═══════ PRODUCTS AREA ═══════ */}
+        {/* ═══════ PRODUCTS AREA — fixed min-height: products hon ya na hon,
+            section ki height same rehti hai (deal badalne par jump nahi) ═══════ */}
         <div
-          className="relative p-3 sm:p-5 lg:p-6 border-t border-[var(--user-border)]"
+          className="relative p-3 sm:p-5 lg:p-6 border-t border-[var(--user-border)] min-h-[23rem] sm:min-h-[25rem] lg:min-h-[23rem]"
           key={activeDeal._id}
           style={{ animation: "dealFadeIn .45s ease-out" }}
         >
@@ -774,9 +766,11 @@ function ProductsRow({ products, deal, hex }) {
 
   if (products.length === 0) {
     return (
-      <p className="text-sm text-[var(--user-text-muted)] py-6 text-center">
-        No products attached to this deal yet.
-      </p>
+      <div className="flex min-h-[16rem] sm:min-h-[18rem] items-center justify-center text-center">
+        <p className="text-sm text-[var(--user-text-muted)] py-6">
+          No products attached to this deal yet.
+        </p>
+      </div>
     );
   }
 
@@ -830,7 +824,7 @@ function ProductsRow({ products, deal, hex }) {
 
       <div
         ref={scrollRef}
-        className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory pb-1"
+        className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {/* Full-width responsive — har screen par poori chaudai me cards:
