@@ -31,8 +31,7 @@ const resolveAvatarUrl = (value) => {
   if (/^(https?:|data:|blob:)/i.test(value)) return value;
   const serverUrl =
     process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
-    "";
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "");
   return `${serverUrl}/${value.replace(/^\//, "")}`;
 };
 

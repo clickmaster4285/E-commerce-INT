@@ -10,13 +10,13 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 
 // ==========================================
-// ⚙️ OTP CONFIG (env se, sensible defaults)
+// ⚙️ OTP CONFIG (sirf env se — koi hardcoded fallback nahi)
 // ==========================================
-const OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES) || 5;
-const OTP_MAX_ATTEMPTS = Number(process.env.EMAIL_OTP_MAX_ATTEMPTS) || 5;
-const OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS) || 60;
-const OTP_LENGTH = 6;
-const RESET_TOKEN_EXPIRE_MINUTES = 10;
+const OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
+const OTP_MAX_ATTEMPTS = Number(process.env.EMAIL_OTP_MAX_ATTEMPTS);
+const OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS);
+const OTP_LENGTH = Number(process.env.OTP_LENGTH);
+const RESET_TOKEN_EXPIRE_MINUTES = Number(process.env.RESET_TOKEN_EXPIRE_MINUTES);
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
@@ -30,25 +30,25 @@ const setAuthCookies = (res, userId, role) => {
   const accessToken = jwt.sign(
     { userId, role, type: "user" },
     process.env.JWT_SECRET,
-    { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10}m` },
+    { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m` },
   );
   const refreshToken = jwt.sign(
     { userId, role, type: "user" },
     process.env.JWT_SECRET,
-    { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d` },
+    { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d` },
   );
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
-    maxAge: Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10) * 60 * 1000,
+    maxAge: Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES) * 60 * 1000,
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
     maxAge:
-      Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30) * 24 * 60 * 60 * 1000,
+      Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS) * 24 * 60 * 60 * 1000,
   });
 };
 

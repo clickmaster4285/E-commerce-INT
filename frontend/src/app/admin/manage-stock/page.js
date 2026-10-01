@@ -6,7 +6,7 @@ import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
 import { useStockSocketSync } from "@/hooks/useStockSocketSync";
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) return url;

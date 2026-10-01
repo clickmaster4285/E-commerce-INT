@@ -9,9 +9,10 @@ const getBaseURL = () => {
     // SSR (server-side render) — env se lo
     return process.env.NEXT_PUBLIC_SERVERURL ;
   }
-  // Client — jis host par frontend khula hai, wahi use karo
+  // Client — jis host par frontend khula hai, wahi use karo (port sirf env se)
   const hostname = window.location.hostname;
-  return `http://${hostname}:5000/api`;
+  const serverPort = process.env.NEXT_PUBLIC_SERVER_PORT;
+  return `http://${hostname}:${serverPort}/api`;
 };
 
 const axiosInstance = axios.create({

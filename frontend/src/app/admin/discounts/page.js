@@ -408,7 +408,7 @@ const getInitials = (name) => {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 };
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getProductImage = (product) => {
   if (!product) return null;
   const raw = product?.variants?.[0]?.images?.[0]?.img_url;

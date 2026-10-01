@@ -29,7 +29,7 @@ import { productApi } from "@/apis/admin/productApi";
 
 const PER_PAGE = 20;
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (path) => {
   if (!path) return "";
   if (/^(https?:|blob:|data:)/.test(path)) return path;

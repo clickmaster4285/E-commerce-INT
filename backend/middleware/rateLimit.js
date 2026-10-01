@@ -4,22 +4,20 @@ const jwt = require("jsonwebtoken");
 // ==========================================
 // 🚦 DYNAMIC RATE LIMITING (.env based)
 // ==========================================
-// Saari limits RATE_LIMIT_* env vars se aati hain (koi DB/admin panel nahi).
-// Window sab par RATE_LIMIT_WINDOW_MINUTES (default 5).
-// 429 format OTP errors jaisa: { success:false, message, retryAfter } + Retry-After header.
+// Saari limits sirf RATE_LIMIT_* env vars se aati hain (koi hardcoded fallback nahi).
 
-const num = (value, fallback) => {
+const num = (value) => {
   const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+  return n;
 };
 
-const WINDOW_MINUTES = num(process.env.RATE_LIMIT_WINDOW_MINUTES, 5);
+const WINDOW_MINUTES = num(process.env.RATE_LIMIT_WINDOW_MINUTES);
 const WINDOW_MS = Math.max(1, WINDOW_MINUTES) * 60 * 1000;
 
-const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER, 2);
-const ADMIN_MULTIPLIER = num(process.env.RATE_LIMIT_ADMIN_MULTIPLIER, 0);
+const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER);
+const ADMIN_MULTIPLIER = num(process.env.RATE_LIMIT_ADMIN_MULTIPLIER);
 
-const WHITELIST_IPS = String(process.env.RATE_LIMIT_WHITELIST_IPS || "")
+const WHITELIST_IPS = String(process.env.RATE_LIMIT_WHITELIST_IPS)
   .split(",")
   .map((ip) => ip.trim())
   .filter(Boolean);
@@ -29,7 +27,7 @@ let sharedStore;
 const getStore = () => {
   if (sharedStore !== undefined) return sharedStore;
   sharedStore = null;
-  const redisUrl = String(process.env.REDIS_URL || "").trim();
+  const redisUrl = String(process.env.REDIS_URL).trim();
   if (redisUrl) {
     try {
       const { RedisStore } = require("rate-limit-redis");
@@ -158,7 +156,7 @@ const tooManyHandler = (req, res) => {
 // multiplier 0 (admin default) = unlimited → request skip hoti hai.
 // ==========================================
 const createRateLimiter = ({ name, max, windowMs = WINDOW_MS, keyBy = "ip", roleBased = false }) => {
-  const baseMax = Math.max(1, Math.round(num(max, 100)));
+  const baseMax = Math.max(1, Math.round(num(max)));
   return rateLimit({
     windowMs,
     // ✅ roleBased par limit request ke role se decide hoti hai
@@ -188,63 +186,63 @@ const createRateLimiter = ({ name, max, windowMs = WINDOW_MS, keyBy = "ip", role
 const limiters = {
   global: createRateLimiter({
     name: "global",
-    max: num(process.env.RATE_LIMIT_GLOBAL_MAX, 100),
+    max: num(process.env.RATE_LIMIT_GLOBAL_MAX),
     keyBy: "ip",
     roleBased: true,
   }),
   login: createRateLimiter({
     name: "login",
-    max: num(process.env.RATE_LIMIT_LOGIN_MAX, 5),
+    max: num(process.env.RATE_LIMIT_LOGIN_MAX),
     keyBy: "ip+email",
   }),
   register: createRateLimiter({
     name: "register",
-    max: num(process.env.RATE_LIMIT_REGISTER_MAX, 5),
+    max: num(process.env.RATE_LIMIT_REGISTER_MAX),
     keyBy: "ip",
   }),
   sendEmailOtp: createRateLimiter({
     name: "send-email-otp",
-    max: num(process.env.RATE_LIMIT_SEND_EMAIL_OTP_MAX, 3),
+    max: num(process.env.RATE_LIMIT_SEND_EMAIL_OTP_MAX),
     keyBy: "email",
   }),
   verifyEmailOtp: createRateLimiter({
     name: "verify-email-otp",
-    max: num(process.env.RATE_LIMIT_VERIFY_EMAIL_OTP_MAX, 10),
+    max: num(process.env.RATE_LIMIT_VERIFY_EMAIL_OTP_MAX),
     keyBy: "email",
   }),
   forgotPassword: createRateLimiter({
     name: "forgot-password",
-    max: num(process.env.RATE_LIMIT_FORGOT_PASSWORD_MAX, 3),
+    max: num(process.env.RATE_LIMIT_FORGOT_PASSWORD_MAX),
     keyBy: "email",
   }),
   verifyResetOtp: createRateLimiter({
     name: "verify-reset-otp",
-    max: num(process.env.RATE_LIMIT_VERIFY_RESET_OTP_MAX, 10),
+    max: num(process.env.RATE_LIMIT_VERIFY_RESET_OTP_MAX),
     keyBy: "email",
   }),
   resetPassword: createRateLimiter({
     name: "reset-password",
-    max: num(process.env.RATE_LIMIT_RESET_PASSWORD_MAX, 5),
+    max: num(process.env.RATE_LIMIT_RESET_PASSWORD_MAX),
     keyBy: "email",
   }),
   googleLogin: createRateLimiter({
     name: "google-login",
-    max: num(process.env.RATE_LIMIT_GOOGLE_LOGIN_MAX, 10),
+    max: num(process.env.RATE_LIMIT_GOOGLE_LOGIN_MAX),
     keyBy: "ip",
   }),
   adminLogin: createRateLimiter({
     name: "admin-login",
-    max: num(process.env.RATE_LIMIT_ADMIN_LOGIN_MAX, 5),
+    max: num(process.env.RATE_LIMIT_ADMIN_LOGIN_MAX),
     keyBy: "ip",
   }),
   orderCreate: createRateLimiter({
     name: "order-create",
-    max: num(process.env.RATE_LIMIT_ORDER_CREATE_MAX, 10),
+    max: num(process.env.RATE_LIMIT_ORDER_CREATE_MAX),
     keyBy: "user",
   }),
   reviewCreate: createRateLimiter({
     name: "review-create",
-    max: num(process.env.RATE_LIMIT_REVIEW_CREATE_MAX, 5),
+    max: num(process.env.RATE_LIMIT_REVIEW_CREATE_MAX),
     keyBy: "user",
   }),
 };

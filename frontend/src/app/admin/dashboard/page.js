@@ -44,7 +44,7 @@ import { useStoreSocketSync } from "../../../hooks/useStoreSocketSync";
 import { useSocket } from "../../../hooks/useSocket";
 
 /* ==================== HELPERS ==================== */
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
 const fmt = (n) => `Rs. ${Math.round(Number(n) || 0).toLocaleString()}`;
 

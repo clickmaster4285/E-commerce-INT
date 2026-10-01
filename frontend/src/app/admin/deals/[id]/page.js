@@ -77,7 +77,7 @@ const getId = (item) => {
 };
 
 // Resolve product thumbnail (variant images, same as deals list page)
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getProductImage = (product) => {
   if (!product) return null;
   const raw = product?.variants?.[0]?.images?.[0]?.img_url;
