@@ -453,6 +453,16 @@ const getMe = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
+    // ✅ Employee ka storeId null ho to default store fallback
+    let storeDoc = entity.storeId || null;
+    if (!storeDoc || !storeDoc.store_name) {
+      try {
+        storeDoc = storeDoc?._id
+          ? await Store.findById(storeDoc._id).lean()
+          : await Store.findOne().lean();
+      } catch (e) { /* ignore, fallback below */ }
+      if (!storeDoc) storeDoc = entity.storeId || {};
+    }
     res.json({
       success: true,
       user: {
@@ -464,15 +474,16 @@ const getMe = async (req, res) => {
         role: entity.role,
         status: entity.is_deleted ? "Inactive" : "Active",
         avatar: entity.avatar || null,
-        twoFactorEnabled: entity.twoFactorEnabled || false,
         permissions: entity.permissions || {
           products: true, brands: true, categories: true,
-          employees: true, discounts: true, profile: true, store: false
+          employees: true, discounts: true, deals: true, banners: true,
+          manageStock: true, shipping: true, order: true, attribute: true,
+          profile: true, store: true, bundles: true
         },
         preferences: entity.preferences || {
           darkMode: true, notifications: { email: true, push: true, weekly: true },
         },
-        store: entity.storeId || {},
+        store: storeDoc || {},
       },
     });
   } catch (error) {
@@ -500,18 +511,23 @@ const updateProfile = async (req, res) => {
     // ✅ Sirf jo fields actually aayi hain unhi ko update karo
     // (pehle name/username bhejne par username silently drop ho jata tha
     //  kyunki updateProfileREST route kabhi match hi nahi hota tha)
-    // ⚠️ role/status yahan JAANBOOZH kar update nahi kiye — privilege escalation hoti
+    // ⚠️ role/status/permissions yahan JAANBOOZH kar update nahi kiye —
+    // privilege escalation hoti (koi apni permission khud nahi badha sakta;
+    // permissions sirf dusra authorized staff updateEmployee se change kar sakta hai)
     const update = { updatedby: userId };
     if (name !== undefined) update.name = name;
     if (username !== undefined) update.username = username;
     if (email !== undefined) update.email = String(email).toLowerCase().trim();
     if (phone !== undefined) update.phone = phone;
     if (dob !== undefined) update.dob = dob;
-    if (permissions !== undefined) update.permissions = permissions;
     if (preferences !== undefined) update.preferences = preferences;
 
     await Model.findByIdAndUpdate(userId, update);
-    if (store && req.user.storeId) {
+    // ✅ Store fields sirf 'store' permission par (admin bypass)
+    const canEditStoreHere =
+      String(req.user?.role || "").toLowerCase() === "admin" ||
+      !!req.user?.permissions?.store;
+    if (store && req.user.storeId && canEditStoreHere) {
       await Store.findByIdAndUpdate(req.user.storeId, {
         store_name: store.name,
         email: store.email,
@@ -572,21 +588,6 @@ const changePassword = async (req, res) => {
   }
 };
 
-const toggle2FA = async (req, res) => {
-  try {
-    const { enabled } = req.body;
-    const Model = req.userType === "employee" ? Employee : User;
-    await Model.findByIdAndUpdate(req.user._id, {
-      twoFactorEnabled: enabled,
-      updatedby: req.user._id,
-    });
-    res.json({ success: true, message: "✅ 2FA setting updated!" });
-  } catch (error) {
-    console.error("toggle2FA error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 const getProfileInfo = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -601,7 +602,17 @@ const getProfileInfo = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    const store = user.storeId || {};
+    // ✅ Employee ka storeId null ho to default store fallback
+    // taake employee login par store name / address blank na ho
+    let store = user.storeId && user.storeId.store_name ? user.storeId : null;
+    if (!store) {
+      try {
+        store = user.storeId?._id
+          ? await Store.findById(user.storeId._id).lean()
+          : await Store.findOne().lean();
+      } catch (e) { /* ignore */ }
+      if (!store) store = user.storeId || {};
+    }
     const profileData = {
       _id: user._id,
       name: user.name,
@@ -614,10 +625,11 @@ const getProfileInfo = async (req, res) => {
       created_at: user.created_at,
       website: user.website || store.website || "",
       address: user.address || store.address || "",
-      twoFactorEnabled: user.twoFactorEnabled || false,
       permissions: user.permissions || {
-        products: true, brands: true, categories: true, 
-        employees: true, discounts: true, profile: true, store: false
+        products: true, brands: true, categories: true,
+        employees: true, discounts: true, deals: true, banners: true,
+        manageStock: true, shipping: true, order: true, attribute: true,
+        profile: true, store: true, bundles: true
       },
       preferences: user.preferences || {
         darkMode: true,
@@ -649,6 +661,21 @@ const updateProfileInfo = async (req, res) => {
       name, email, phone, website, address,
       store_name, tagline, currency, country, city, state, zip_code, store_status
     } = req.body;
+    // ✅ Store fields sirf tab jab 'store' permission ho (admin bypass).
+    // Socket path par req.user.permissions stale ho sakte hain — fresh load karo.
+    let requesterRole = req.user?.role || "";
+    let requesterStorePerm = req.user?.permissions?.store;
+    if (String(requesterRole).toLowerCase() !== "admin" && requesterStorePerm === undefined) {
+      try {
+        const reqDoc = await Model.findById(userId).select("role permissions").lean();
+        if (reqDoc) {
+          requesterRole = reqDoc.role || requesterRole;
+          requesterStorePerm = reqDoc.permissions?.store;
+        }
+      } catch (e) { /* ignore — neeche deny hoga */ }
+    }
+    const canEditStore =
+      String(requesterRole).toLowerCase() === "admin" || !!requesterStorePerm;
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
     if (email !== undefined)
@@ -668,6 +695,7 @@ const updateProfileInfo = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
     let updatedStore = null;
+    let storeSkipped = false;
     const storeUpdateFields = {};
     if (store_name !== undefined) storeUpdateFields.store_name = store_name;
     if (tagline !== undefined) storeUpdateFields.tagline = tagline;
@@ -682,7 +710,11 @@ const updateProfileInfo = async (req, res) => {
     if (phone !== undefined) storeUpdateFields.phone = phone;
     if (address !== undefined) storeUpdateFields.address = address;
     if (website !== undefined) storeUpdateFields.website = website;
-    if (Object.keys(storeUpdateFields).length > 0) {
+    if (Object.keys(storeUpdateFields).length > 0 && !canEditStore) {
+      // ✅ 'store' permission nahi — personal fields save hongi, store untouched rahega
+      storeSkipped = true;
+    }
+    if (Object.keys(storeUpdateFields).length > 0 && canEditStore) {
       let store = updatedUser.storeId
         ? await Store.findById(updatedUser.storeId)
         : null;
@@ -700,9 +732,12 @@ const updateProfileInfo = async (req, res) => {
     }
     return res.json({
       success: true,
-      message: "Profile updated successfully",
+      message: storeSkipped
+        ? "Profile updated successfully (store changes skipped — no 'store' permission)"
+        : "Profile updated successfully",
       store: updatedStore || updatedUser.storeId || null,
       storeUpdated: !!updatedStore,
+      storeSkipped,
     });
   } catch (error) {
     console.error("❌ Update Profile Info Error:", error);
@@ -1221,7 +1256,6 @@ module.exports = {
   getMe,
   updateProfile,
   changePassword,
-  toggle2FA,
   getProfileInfo,
   updateProfileInfo,
   changePasswordSocket,

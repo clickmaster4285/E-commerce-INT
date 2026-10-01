@@ -21,10 +21,9 @@ const userSchema = new mongoose.Schema(
     role: { type: String, default: "user", enum: ["user", "admin", "staff"] },
 
     // ✅ Account page fields — ye pehle schema mein the hi nahi,
-    // isliye avatar save, 2FA toggle aur preferences silently drop ho rahe the
+    // isliye avatar save aur preferences silently drop ho rahe the
     avatar: { type: String, default: null },
     dob: { type: String, default: "" }, // YYYY-MM-DD (input type="date" se aata hai)
-    twoFactorEnabled: { type: Boolean, default: false },
     preferences: {
       emailNotifications: { type: Boolean, default: true },
       smsNotifications: { type: Boolean, default: true },

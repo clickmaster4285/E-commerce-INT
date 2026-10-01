@@ -334,17 +334,61 @@ exports.getDiscounts = async (req, res) => {
     const status = String(req.query.status || "all").trim();
 
     const filter = { is_deleted: false };
+    const andClauses = [];
 
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { code: { $regex: search, $options: "i" } },
-      ];
+      andClauses.push({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { code: { $regex: search, $options: "i" } },
+        ],
+      });
     }
 
-    if (status && status !== "all") {
-      filter.status = status;
-    }
+    // ✅ Frontend sirf Active/Inactive model use karta hai (getDiscountStatus) —
+    //    neeche wale clauses uski EXACT copy hain taake filter aur badge kabhi
+    //    disagree na karein (pehle mix show hota tha):
+    //    inactive = isActive false YA status list me YA expired, baaki sab active.
+    //    Purani exact values (draft/scheduled/disabled) backward-compat ke liye waise hi.
+    const now = new Date();
+    const INACTIVE_STATUSES = ["inactive", "disabled", "draft", "scheduled", "expired"];
+    const notExpiredClause = { $or: [{ endDate: { $gte: now } }, { endDate: null }] };
+    const statusClauseFor = (s) => {
+      if (s === "active") {
+        return {
+          $and: [
+            { isActive: { $ne: false } },
+            { status: { $nin: INACTIVE_STATUSES } },
+            notExpiredClause,
+          ],
+        };
+      }
+      if (s === "inactive") {
+        return {
+          $or: [
+            { isActive: false },
+            { status: { $in: INACTIVE_STATUSES } },
+            { endDate: { $lt: now } },
+          ],
+        };
+      }
+      if (s && s !== "all") return { status: s };
+      return null;
+    };
+    const listClause = statusClauseFor(status);
+    if (listClause) andClauses.push(listClause);
+
+    if (andClauses.length) filter.$and = andClauses;
+
+    // ✅ Server-side stats — poore dataset par (search respect, status se independent),
+    //    taake stat cards current page tak mehdood na hon
+    const baseAnd = andClauses.filter((c) => c !== listClause);
+    const baseQuery = { is_deleted: false, ...(baseAnd.length ? { $and: baseAnd } : {}) };
+    const withStatus = (s) => {
+      const c = statusClauseFor(s);
+      const all = [...baseAnd, ...(c ? [c] : [])];
+      return { is_deleted: false, ...(all.length ? { $and: all } : {}) };
+    };
 
     // ---- LEGACY MODE (no limit) -> exact old behavior ----
     if (!limit) {
@@ -364,19 +408,30 @@ exports.getDiscounts = async (req, res) => {
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const discounts = await Discount.find(filter)
-      .populate("selectedProducts", "name sku selling_price")
-      .populate("selectedCategories", "name")
-      .populate("selectedBrands", "name")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [baseTotal, activeCount, inactiveCount, discounts] = await Promise.all([
+      Discount.countDocuments(baseQuery),
+      Discount.countDocuments(withStatus("active")),
+      Discount.countDocuments(withStatus("inactive")),
+      Discount.find(filter)
+        .populate("selectedProducts", "name sku selling_price")
+        .populate("selectedCategories", "name")
+        .populate("selectedBrands", "name")
+        .populate("createdBy", "name email")
+        .populate("updatedBy", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+    ]);
 
     return res.status(200).json({
       success: true,
       data: discounts,
+      // ✅ Stat cards inhi numbers par bante hain (poora dataset, sirf current page nahi)
+      stats: {
+        total: baseTotal,
+        active: activeCount,
+        inactive: inactiveCount,
+      },
       pagination: {
         total,
         page: safePage,
