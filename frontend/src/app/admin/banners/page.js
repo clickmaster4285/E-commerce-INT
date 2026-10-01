@@ -1143,8 +1143,7 @@ export default function BannersPage() {
             <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="all">All Status</option>
               <option value="active">Active</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="draft">Draft</option>
+              <option value="inactive">Inactive</option>
               <option value="expired">Expired</option>
             </SelectFilter>
             <SelectFilter value={filterType} onChange={(e) => setFilterType(e.target.value)}>
