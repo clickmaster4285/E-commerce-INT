@@ -50,22 +50,23 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const app = express();
 const server = http.createServer(app);
 
-const PORT = Number(process.env.PORT) || 5000;
-// ✅ TRUST_PROXY default blank/off — production me env se set hoga (e.g. "1")
-if (String(process.env.TRUST_PROXY || "").trim()) {
+
+const PORT = Number(process.env.PORT);
+// TRUST_PROXY sirf env se — blank/off ho to proxy trust nahi hota
+if (String(process.env.TRUST_PROXY).trim()) {
   app.set("trust proxy", String(process.env.TRUST_PROXY).trim());
 }
-const HOST = process.env.HOST || "0.0.0.0";
-const CLIENT_URL = process.env.CLIENT_URL || "";
-const API_PREFIX = process.env.API_PREFIX || "/api";
-const NODE_ENV = process.env.NODE_ENV || "development";
-const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
-const REQUEST_SIZE_LIMIT = process.env.REQUEST_SIZE_LIMIT || "20mb";
-const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE || "7d";
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "uploads";
-const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR || "store";
-const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE || "admin";
-const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE || "Backend server is running";
+const HOST = process.env.HOST;
+const CLIENT_URL = process.env.CLIENT_URL;
+const API_PREFIX = process.env.API_PREFIX;
+const NODE_ENV = process.env.NODE_ENV;
+const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS);
+const REQUEST_SIZE_LIMIT = process.env.REQUEST_SIZE_LIMIT;
+const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE;
+const UPLOAD_DIR = process.env.UPLOAD_DIR;
+const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
+const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE;
+const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
 // ==========================================
 // MIDDLEWARES
@@ -191,7 +192,7 @@ const seedDefaultData = async () => {
           zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
           address: process.env.DEFAULT_STORE_ADDRESS,
           currency: process.env.DEFAULT_STORE_CURRENCY,
-          tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE) || 0,
+          tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE),
           weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
           store_status: process.env.DEFAULT_STORE_STATUS,
         });
@@ -206,8 +207,8 @@ const seedDefaultData = async () => {
         if (!admin) {
           const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
           await Employee.create({
-            name: process.env.DEFAULT_ADMIN_NAME || "Admin",
-            username: process.env.DEFAULT_ADMIN_USERNAME || "admin",
+            name: process.env.DEFAULT_ADMIN_NAME,
+            username: process.env.DEFAULT_ADMIN_USERNAME,
             email: adminEmail,
             password: hashedPassword,
             role: DEFAULT_ADMIN_ROLE,

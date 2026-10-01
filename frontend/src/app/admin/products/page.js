@@ -65,7 +65,7 @@ function buildPageList(currentPage, totalPages, MID = 5) {
   return pages;
 }
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
 /* Parent Category lock hone ki wajah professional alert ke roop mein —
    dropdown disabled kyun hai ye user ko turant clear ho jata hai. */

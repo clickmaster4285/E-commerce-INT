@@ -15,8 +15,8 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   const mimeType = mimeMatch[1];
   const rawBuffer = Buffer.from(mimeMatch[2], "base64");
 
-  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB || "8", 10) * 1024 * 1024;
-  if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${process.env.MAX_UPLOAD_SIZE_MB || 8}MB)`);
+  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) * 1024 * 1024;
+  if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${process.env.MAX_UPLOAD_SIZE_MB}MB)`);
 
   const storeDir = path.join(__dirname, "../uploads/store");
   if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
@@ -86,8 +86,8 @@ const processEmployeeAvatar = async (base64Data) => {
   const rawBuffer = Buffer.from(mimeMatch[2], "base64");
   if (!rawBuffer.length) throw new Error("empty image data");
 
-  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB || "8", 10) * 1024 * 1024;
-  if (rawBuffer.length > maxSize) throw new Error(`too large (max ${process.env.MAX_UPLOAD_SIZE_MB || 8}MB)`);
+  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) * 1024 * 1024;
+  if (rawBuffer.length > maxSize) throw new Error(`too large (max ${process.env.MAX_UPLOAD_SIZE_MB}MB)`);
 
   const sharp = require("sharp");
   const optimized = await sharp(rawBuffer)
@@ -175,7 +175,9 @@ const initSocket = (server) => {
   const storeUploadDir = path.join(uploadDir, "store");
   if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
 
-  const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || "";
+  const allowedOriginsEnv = [process.env.ALLOWED_ORIGINS, process.env.CLIENT_URL]
+    .filter(Boolean)
+    .join(",");
   const allowedOrigins = allowedOriginsEnv.split(",").map(u => u.trim()).filter(Boolean);
 
   io = new Server(server, {
@@ -192,7 +194,7 @@ const initSocket = (server) => {
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: true,
     },
-    maxHttpBufferSize: parseInt(process.env.SOCKET_MAX_BUFFER_MB || "15", 10) * 1024 * 1024,
+    maxHttpBufferSize: parseInt(process.env.SOCKET_MAX_BUFFER_MB, 10) * 1024 * 1024,
     pingTimeout: 60000,
     pingInterval: 25000,
     transports: ["polling", "websocket"],

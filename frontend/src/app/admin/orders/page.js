@@ -30,7 +30,7 @@ const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 /* ==================== HELPERS ==================== */
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
-const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
 const getImageUrl = (itemOrPath) => {
   const img = typeof itemOrPath === "string" ? itemOrPath : itemOrPath?.image || itemOrPath?.product_image || "";

@@ -12,15 +12,14 @@ const trimEnv = (value) => String(value || "").trim().replace(/^["']|["']$/g, ""
 const getSmtpConfig = () => {
   let host = trimEnv(process.env.SMTP_HOST);
   const user = trimEnv(process.env.SMTP_USER);
-  const pass = trimEnv(process.env.SMTP_PASS || "").replace(/\s+/g, "");
-  const port = Number(trimEnv(process.env.SMTP_PORT) || 587);
+  const pass = trimEnv(process.env.SMTP_PASS).replace(/\s+/g, "");
+  const port = Number(trimEnv(process.env.SMTP_PORT));
   const from = trimEnv(process.env.SMTP_FROM);
 
-  // ✅ Gmail smart default — user ne sirf gmail + app password diya to host auto set
-  if (!host && /@gmail\.com$/i.test(user)) host = "smtp.gmail.com";
+  // Gmail host sirf env se aata hai (SMTP_HOST) — yahan koi hardcoded default nahi
 
-  // ✅ Port 465 = implicit TLS (secure true), 587/25 = STARTTLS (secure false)
-  let secure = String(process.env.SMTP_SECURE || "").toLowerCase();
+  // Port 465 = implicit TLS (secure true), 587/25 = STARTTLS (secure false) — sirf env se
+  let secure = String(process.env.SMTP_SECURE).toLowerCase();
   if (secure === "true") secure = true;
   else if (secure === "false") secure = false;
   else secure = port === 465;
@@ -130,7 +129,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
   }
 
   const { user, from } = getSmtpConfig();
-  const storeName = trimEnv(process.env.DEFAULT_STORE_NAME) || "Our Store";
+  const storeName = trimEnv(process.env.DEFAULT_STORE_NAME);
   // ✅ "Name <email>" format — Gmail/spam filter ke liye behtar
   const fromAddress = from || user;
   const fromHeader = /</.test(fromAddress)
@@ -163,9 +162,9 @@ const PURPOSE_COPY = {
   },
 };
 
-const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresInMinutes = 5 }) => {
+const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresInMinutes }) => {
   const copy = PURPOSE_COPY[purpose] || PURPOSE_COPY.email_verification;
-  const storeName = process.env.DEFAULT_STORE_NAME || "Our Store";
+  const storeName = process.env.DEFAULT_STORE_NAME;
   const safeStore = escapeHtml(storeName);
   const safeOtp = escapeHtml(otp);
 

@@ -11,9 +11,9 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 
-// ✅ OTP config (.env se, otpController ke same defaults)
-const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES) || 5;
-const REGISTER_OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS) || 60;
+// ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
+const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
+const REGISTER_OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS);
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -21,10 +21,10 @@ const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "
 
 const generateTokens = (userId, role, type = 'user') => {
   const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 60}m`,
+    expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m`,
   });
   const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d`,
+    expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d`,
   });
   return { accessToken, refreshToken };
 };
@@ -820,24 +820,24 @@ const googleLogin = async (req, res) => {
     const accessToken = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10}m` },
+      { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m` },
     );
     const refreshToken = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30}d` },
+      { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d` },
     );
     res.cookie("accessToken", accessToken, {
       httpOnly: true,
       sameSite: "lax",
       maxAge:
-        Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES || 10) * 60 * 1000,
+        Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES) * 60 * 1000,
     });
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       sameSite: "lax",
       maxAge:
-        Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS || 30) *
+        Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS) *
         24 *
         60 *
         60 *

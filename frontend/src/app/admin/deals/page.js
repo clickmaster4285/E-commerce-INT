@@ -1234,7 +1234,7 @@ const getInitials = (name) => {
 };
 
 // ✅ Resolve an image URL from a product (uses variant images as per existing API)
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getProductImage = (product) => {
   if (!product) return null;
   const raw = product?.variants?.[0]?.images?.[0]?.img_url;

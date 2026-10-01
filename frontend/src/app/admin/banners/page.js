@@ -15,7 +15,7 @@ import { brandApi } from "../../../apis/admin/brandApi";
 // ==========================================
 // API SETUP
 // ==========================================
-const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || "";
+const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const API_URL = `${API_BASE}/api`;
 
 const bannerAxios = axios.create({

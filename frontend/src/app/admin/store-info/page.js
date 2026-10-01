@@ -53,8 +53,7 @@ import cc from "currency-codes";
 const getServerUrl = () => {
   return (
     process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-    "http://localhost:5000"
+    process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "")
   );
 };
 
@@ -150,7 +149,7 @@ const getLogoUrl = (storeData) => {
       return imgUrl;
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+    const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
 
     // 2. FIX: Agar "/home/...", "/Users/..." ya koi absolute system path hai
     if ((imgUrl.startsWith("/") && !imgUrl.startsWith("/uploads"))) {
@@ -177,7 +176,7 @@ const getLogoUrl = (storeData) => {
         return possibleUrl;
       }
       
-      const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:5000";
+      const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
       
       // Apply the same absolute path FIX for fallback properties
       if ((possibleUrl.startsWith("/") && !possibleUrl.startsWith("/uploads")) && possibleUrl.includes("/uploads/store/")) {

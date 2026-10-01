@@ -7,10 +7,10 @@ let hasLoggedError = false; // ✅ Spam rokne ke liye
 
 const getSocketURL = () => {
   if (typeof window === "undefined") {
+    // SSR — sirf env se (koi hardcoded fallback nahi)
     return (
       process.env.NEXT_PUBLIC_SOCKET_URL ||
-      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-      null
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "")
     );
   }
   // Client: axios ke dynamic baseURL (getBaseURL) jaisa hi socket ka host decide karo.
@@ -26,7 +26,7 @@ const getSocketURL = () => {
       // env URL galat hai to neeche wala dynamic URL use hoga
     }
   }
-  return `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT || 5000}`;
+  return `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT}`;
 };
 
 function cleanupOldSocket() {
