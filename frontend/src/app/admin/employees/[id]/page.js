@@ -51,7 +51,8 @@ import axiosInstance from "@/apis/axiosInstance";
 import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 // ==========================================
-// ✅ ALLOWED PERMISSIONS
+// ✅ ALLOWED PERMISSIONS — sab by default true
+// (admin chahe to koi bhi toggle off kar sakta hai)
 // ==========================================
 const ALLOWED_PERMISSIONS = {
   employees: { label: "Employees", default: true },
@@ -60,11 +61,12 @@ const ALLOWED_PERMISSIONS = {
   categories: { label: "Categories", default: true },
   discounts: { label: "Discounts", default: true },
   deals: { label: "Deals", default: true },
+  bundles: { label: "Bundles", default: true },
   profile: { label: "Profile", default: true },
-  store: { label: "Store", default: false },
+  store: { label: "Store", default: true },
   banners: { label: "Banners", default: true }, // ✅ Added Banners Permission
-  manageStock: { label: "Manage Stock", default: false }, // ✅ Manage Stock module
-  shipping: { label: "Shipping", default: false },
+  manageStock: { label: "Manage Stock", default: true }, // ✅ Manage Stock module
+  shipping: { label: "Shipping", default: true },
   order: { label: "Order", default: true },
   attribute: { label: "Attribute", default: true },
 };
@@ -1214,7 +1216,7 @@ export default function EmployeeDetailPage() {
     });
 
   // ==========================================
-  // ✅ PERMISSIONS STATE (BANNERS ADDED)
+  // ✅ PERMISSIONS STATE — sab by default true
   // ==========================================
   const [
     permissionsData,
@@ -1226,11 +1228,12 @@ export default function EmployeeDetailPage() {
     categories: true,
     discounts: true,
     deals: true,
+    bundles: true,
     profile: true,
-    store: false,
+    store: true,
     banners: true,
-    manageStock: false,
-    shipping: false,
+    manageStock: true,
+    shipping: true,
     order: true,
     attribute: true,
   });
@@ -1259,6 +1262,18 @@ export default function EmployeeDetailPage() {
   const currentUser = currentUserProfile
     ? { _id: currentUserProfile._id || currentUserProfile.id }
     : null;
+
+  // ✅ Jis ko 'employees' permission hai wahi dusre employee ko edit / permission de sakta hai
+  // (admin bypass). Khud ki permission change karna waise bhi blocked hai (neeche + backend).
+  const isCurrentAdmin =
+    String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  const canManageEmployees =
+    isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
+  const denyEmployeesAccess = () =>
+    toast.error("Access denied. You don't have 'employees' permission.", {
+      duration: 5000,
+      description: "Contact an administrator or another staff member to grant you access.",
+    });
 
   // ==========================================
   // GET EMPLOYEE
@@ -1348,6 +1363,13 @@ export default function EmployeeDetailPage() {
       mutationFn: async (
         newPermissions
       ) => {
+
+        // ✅ 'employees' permission ke baghair koi permission change nahi kar sakta
+        if (!canManageEmployees) {
+          throw new Error(
+            "Access denied. You don't have 'employees' permission."
+          );
+        }
 
         const currentStaffId =
           currentUser?._id || null;
@@ -1463,6 +1485,11 @@ export default function EmployeeDetailPage() {
   // OPEN EDIT MODAL
   // ==========================================
   const openEditModal = (emp) => {
+    // ✅ 'employees' permission ke baghair edit nahi
+    if (!canManageEmployees) {
+      denyEmployeesAccess();
+      return;
+    }
     const userData =
       emp.userId || {};
 
@@ -1807,7 +1834,7 @@ export default function EmployeeDetailPage() {
         ));
 
   const canEditPermissions =
-    !isSelfView;
+    !isSelfView && canManageEmployees;
 
   // ==========================================
   // TABS

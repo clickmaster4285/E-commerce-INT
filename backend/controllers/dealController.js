@@ -216,10 +216,14 @@ const getDeals = async (req, res) => {
       return clauses.length ? { $and: clauses } : {};
     };
 
-    // ✅ STATUS SEMANTICS frontend ke getDealStatus() ke exactly match:
-    //    disabled = isActive false, baaki sab isActive true + date checks.
+    // ✅ STATUS SEMANTICS frontend ke getDealStatus() ki EXACT copy —
+    //    active = switch ON + expired nahi, inactive = baaki sab (switch OFF YA expired).
+    //    Taake Active filter me kabhi Inactive badge wala item na aaye (mix bug).
+    //    (upcoming/expired/disabled clauses backward-compat ke liye rakhe hain)
+    const notExpiredDeal = { $or: [{ endDate: { $gte: now } }, { endDate: null }] };
     const statusClauses = {
-      active: [{ isActive: true }, { startDate: { $lte: now } }, { endDate: { $gte: now } }],
+      active: [{ isActive: true }, notExpiredDeal],
+      inactive: [{ $or: [{ isActive: { $ne: true } }, { endDate: { $lt: now } }] }],
       upcoming: [{ isActive: true }, { startDate: { $gt: now } }],
       expired: [{ isActive: true }, { endDate: { $lt: now } }],
       disabled: [{ isActive: false }],
@@ -243,7 +247,7 @@ const getDeals = async (req, res) => {
     // GET DATA (+ server-side stats)
     // ==========================================
 
-    const [deals, total, baseTotal, activeCount, scheduledCount, expiredCount, disabledCount] =
+    const [deals, total, baseTotal, activeCount, inactiveCount, scheduledCount, expiredCount, disabledCount] =
       await Promise.all([
         Deal.find(query)
           .populate("productIds", "name sku images selling_price")
@@ -263,6 +267,7 @@ const getDeals = async (req, res) => {
         Deal.countDocuments(query),
         Deal.countDocuments(buildQuery()),
         Deal.countDocuments(buildQuery(statusClauses.active)),
+        Deal.countDocuments(buildQuery(statusClauses.inactive)),
         Deal.countDocuments(buildQuery(statusClauses.upcoming)),
         Deal.countDocuments(buildQuery(statusClauses.expired)),
         Deal.countDocuments(buildQuery(statusClauses.disabled)),
@@ -275,6 +280,7 @@ const getDeals = async (req, res) => {
       stats: {
         total: baseTotal,
         active: activeCount,
+        inactive: inactiveCount,
         scheduled: scheduledCount,
         expired: expiredCount,
         disabled: disabledCount,

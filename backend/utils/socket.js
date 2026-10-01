@@ -130,8 +130,8 @@ const getDefaultPermissions = () => {
   } catch (e) {}
   return {
     employees: true, products: true, brands: true, categories: true,
-    profile: true, store: false, discounts: true, deals: true, bundles: true, banners: true,
-    manageStock: false, shipping: false, order: true, attribute: true
+    profile: true, store: true, discounts: true, deals: true, bundles: true, banners: true,
+    manageStock: true, shipping: true, order: true, attribute: true
   };
 };
 
@@ -302,6 +302,73 @@ const initSocket = (server) => {
     return true;
   };
 
+  // ==========================================
+  // ✅ PERMISSION GUARD (fresh DB permissions)
+  // JWT me permissions stale/missing ho sakte hain — is liye
+  // DB se fresh permissions load karke check karo.
+  // - admin: hamesha allow
+  // - staff/manager: permission key par allow
+  // - strict (store jaisi sensitive cheez): sirf === true par allow
+  // - non-strict (REST checkPermission jaisa): sirf === false par deny
+  // - NOTE: khud ki permission change karna updateEmployee me alag se blocked hai
+  // ==========================================
+  const STAFF_ROLES = ["admin", "staff", "manager"];
+
+  const requireSocketPermission = async (socket, permissionKey, callback, opts = {}) => {
+    const role = String(socket.userRole || "guest").toLowerCase();
+    if (!STAFF_ROLES.includes(role)) {
+      const err = { success: false, message: "Unauthorized — admin/employee access only" };
+      if (typeof callback === "function") callback(err);
+      return { allowed: false };
+    }
+    if (role === "admin") {
+      return { allowed: true, permissions: socket.userPermissions || {}, name: socket.userName };
+    }
+    try {
+      const Model = socket.userType === "employee"
+        ? require("../models/Employee")
+        : require("../models/User");
+      const doc = await Model.findById(socket.userId).select("name permissions").lean();
+      if (!doc) {
+        const err = { success: false, message: "User not found" };
+        if (typeof callback === "function") callback(err);
+        return { allowed: false };
+      }
+      const perms = doc.permissions || {};
+      const ok = opts.strict
+        ? perms[permissionKey] === true
+        : perms[permissionKey] !== false;
+      if (!ok) {
+        const err = {
+          success: false,
+          message: `Access denied. You don't have '${permissionKey}' permission. Please contact an administrator or another staff member to grant you access.`,
+        };
+        if (typeof callback === "function") callback(err);
+        return { allowed: false };
+      }
+      return { allowed: true, permissions: perms, name: doc.name || socket.userName };
+    } catch (e) {
+      const err = { success: false, message: "Permission check failed" };
+      if (typeof callback === "function") callback(err);
+      return { allowed: false };
+    }
+  };
+
+  // Fresh-permission wala req (controllers dobara check karte hain)
+  function createPermittedReq(socket, gate, body = {}, params = {}) {
+    return {
+      user: {
+        _id: socket.userId,
+        id: socket.userId,
+        role: socket.userRole,
+        name: gate.name || socket.userName,
+        permissions: gate.permissions || {},
+      },
+      storeId: socket.storeId,
+      body, params, io, socket,
+    };
+  }
+
   function createReq(socket, body = {}, params = {}) {
     return {
       user: {
@@ -420,7 +487,9 @@ const initSocket = (server) => {
     });
 
     socket.on("updateStoreInfo", async (payload, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ Jis staff ko 'store' permission hai woh update kar sakta hai (sirf admin nahi)
+      const gate = await requireSocketPermission(socket, "store", callback, { strict: true });
+      if (!gate.allowed) return;
       try {
         const { updateStoreInfo } = require("../controllers/storeController");
         let logoFile = null;
@@ -430,7 +499,7 @@ const initSocket = (server) => {
         }
         const { logoBase64, logoFileName, logoMimeType, ...bodyData } = payload || {};
         const req = {
-          user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
+          user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: gate.name || socket.userName, permissions: gate.permissions || {} },
           body: bodyData, file: logoFile, io
         };
         const res = {
@@ -442,7 +511,9 @@ const initSocket = (server) => {
     });
 
     socket.on("deleteStoreLogo", async (_, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ 'store' permission wala staff bhi logo hata sakta hai
+      const gate = await requireSocketPermission(socket, "store", callback, { strict: true });
+      if (!gate.allowed) return;
       try {
         await deleteOldLogo();
         const Store = require("../models/Store");
@@ -470,13 +541,24 @@ const initSocket = (server) => {
           permissions = fixPermissions(permissions);
           await Model.findByIdAndUpdate(socket.userId, { permissions });
         }
-        const store = user.storeId || {};
+        // ✅ Employee ka storeId null ho to default store fallback lo
+        // taake profile me store name / address kabhi blank na ho
+        let store = user.storeId && user.storeId.store_name ? user.storeId : null;
+        if (!store) {
+          try {
+            const Store = require("../models/Store");
+            store = (user.storeId && user.storeId._id)
+              ? await Store.findById(user.storeId._id || user.storeId).lean()
+              : await Store.findOne().lean();
+          } catch (e) { store = user.storeId || {}; }
+          if (!store) store = {};
+        }
         const profileData = {
           _id: user._id, name: user.name, username: user.username || "",
           email: user.email || store.email || "", phone: user.phone || store.phone || "",
           role: user.role, status: user.status || (user.is_deleted ? "Inactive" : "Active"),
           avatar: user.avatar || null, created_at: user.created_at || user.createdAt,
-          address: user.address || store.address || "", twoFactorEnabled: user.twoFactorEnabled || false,
+          address: user.address || store.address || "",
           permissions, preferences: user.preferences || {}, store,
           store_name: store.store_name || "",
           stats: { logins: user.loginCount || 0, roles: 1, sessions: user.sessionCount || 0 },
@@ -546,7 +628,9 @@ const initSocket = (server) => {
     });
 
     socket.on("createEmployee", async (payload, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ Jis staff ko 'employees' permission hai woh add kar sakta hai (sirf admin nahi)
+      const gate = await requireSocketPermission(socket, "employees", callback);
+      if (!gate.allowed) return;
       try {
         const { createEmployee } = require("../controllers/employeeController");
         const { avatarBase64, avatarFileName, ...data } = payload || {};
@@ -559,7 +643,7 @@ const initSocket = (server) => {
             return;
           }
         }
-        const req = createReq(socket, data);
+        const req = createPermittedReq(socket, gate, data);
         const res = createRes(socket, "employeeCreated", callback);
         await createEmployee(req, res);
       } catch (e) {
@@ -569,7 +653,10 @@ const initSocket = (server) => {
     });
 
     socket.on("updateEmployee", async (payload, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ 'employees' permission wala staff update kar sakta hai;
+      // khud ki permission change karna controller me blocked hai
+      const gate = await requireSocketPermission(socket, "employees", callback);
+      if (!gate.allowed) return;
       try {
         const { updateEmployee } = require("../controllers/employeeController");
         const { id, avatarBase64, avatarFileName, ...data } = payload || {};
@@ -581,7 +668,7 @@ const initSocket = (server) => {
             return;
           }
         }
-        const req = createReq(socket, data, { id });
+        const req = createPermittedReq(socket, gate, data, { id });
         const res = createRes(socket, "employeeUpdated", callback);
         await updateEmployee(req, res);
       } catch (e) {
@@ -591,10 +678,12 @@ const initSocket = (server) => {
     });
 
     socket.on("deleteEmployee", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ 'employees' permission wala staff delete kar sakta hai
+      const gate = await requireSocketPermission(socket, "employees", callback);
+      if (!gate.allowed) return;
       try {
         const { deleteEmployee } = require("../controllers/employeeController");
-        const req = createReq(socket, {}, { id });
+        const req = createPermittedReq(socket, gate, {}, { id });
         const res = createRes(socket, "employeeDeleted", callback);
         await deleteEmployee(req, res);
       } catch (e) {
@@ -604,10 +693,12 @@ const initSocket = (server) => {
     });
 
     socket.on("toggleEmployeeStatus", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin"], callback)) return;
+      // ✅ 'employees' permission wala staff status toggle kar sakta hai
+      const gate = await requireSocketPermission(socket, "employees", callback);
+      if (!gate.allowed) return;
       try {
         const { toggleStatus } = require("../controllers/employeeController");
-        const req = createReq(socket, {}, { id });
+        const req = createPermittedReq(socket, gate, {}, { id });
         const res = createRes(socket, "employeeStatusToggled", callback);
         await toggleStatus(req, res);
       } catch (e) {

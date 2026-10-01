@@ -71,12 +71,10 @@ const getName = (item, type) => {
 };
 
 const getDealStatus = (deal) => {
-  if (!deal?.isActive) return "disabled";
-  const now = new Date();
-  const start = deal?.startDate ? new Date(deal.startDate) : null;
+  // ✅ Sirf Active/Inactive model — off (isActive false) ya expired sab "inactive"
+  if (!deal?.isActive) return "inactive";
   const end = deal?.endDate ? new Date(deal.endDate) : null;
-  if (start && start > now) return "scheduled";
-  if (end && end < now) return "expired";
+  if (end && end < new Date()) return "inactive";
   return "active";
 };
 
@@ -139,14 +137,16 @@ const dateToISO = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
+  // ✅ Sirf Active/Inactive — purani values (scheduled/expired/disabled) bhi inactive
   const config = {
     active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    scheduled: { text: "Scheduled", bg: "var(--info-soft)", color: "var(--info-text)", border: "color-mix(in srgb, var(--info) 28%, transparent)" },
-    expired: { text: "Expired", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
-    disabled: { text: "Disabled", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    draft: { text: "Draft", bg: "rgba(148,163,184,0.10)", color: "var(--text-muted)", border: "rgba(148,163,184,0.25)" },
+    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    scheduled: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    expired: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    disabled: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    draft: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
-  const item = config[status] || config.disabled;
+  const item = config[status] || config.inactive;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
@@ -411,15 +411,16 @@ export default function DealsPage() {
       return {
         total: Number(serverStats.total) || 0,
         active: Number(serverStats.active) || 0,
-        expired: Number(serverStats.expired) || 0,
-        disabled: Number(serverStats.disabled) || 0,
+        // ✅ Backend ab 'inactive' bhejta hai; purana response ho to baaqi se derive karo
+        inactive: serverStats.inactive !== undefined && serverStats.inactive !== null
+          ? Number(serverStats.inactive) || 0
+          : Math.max(0, (Number(serverStats.total) || 0) - (Number(serverStats.active) || 0)),
       };
     }
     return {
       total: deals.length,
       active: deals.filter((d) => getDealStatus(d) === "active").length,
-      expired: deals.filter((d) => getDealStatus(d) === "expired").length,
-      disabled: deals.filter((d) => getDealStatus(d) === "disabled").length,
+      inactive: deals.filter((d) => getDealStatus(d) === "inactive").length,
     };
   }, [serverStats, deals]);
 
@@ -485,7 +486,7 @@ export default function DealsPage() {
       end_at: toDateInput(deal?.endDate),
       usage_limit: deal?.usageLimit ?? "",
       per_user_limit: deal?.perUserLimit ?? "",
-      status: deal?.isActive ? "active" : "disabled",
+      status: deal?.isActive ? "active" : "inactive",
       is_featured: Boolean(deal?.isFeatured),
     });
     setEditingDeal(deal);
@@ -625,8 +626,7 @@ export default function DealsPage() {
 
   const handleToggleStatus = (deal) => {
     const id = deal?._id || deal?.id;
-    const status = getDealStatus(deal);
-    const isActive = status === "active" || status === "scheduled";
+    const isActive = getDealStatus(deal) === "active";
     toggleStatusMutation.mutate({ id, newActive: !isActive });
   };
 
@@ -705,9 +705,9 @@ export default function DealsPage() {
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled") ? "Deactivate" : "Activate"}
-                danger={(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
-                success={!(getDealStatus(deal) === "active" || getDealStatus(deal) === "scheduled")}
+                label={getDealStatus(deal) === "active" ? "Deactivate" : "Activate"}
+                danger={getDealStatus(deal) === "active"}
+                success={getDealStatus(deal) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(deal); }}
               />
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
@@ -760,11 +760,10 @@ export default function DealsPage() {
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           <StatCard title="Total Deals" value={stats.total} cardStyle={cardStyle} />
           <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
-          <StatCard title="Disabled" value={stats.disabled} valueClass="text-red-400" cardStyle={cardStyle} />
-          <StatCard title="Expired" value={stats.expired} valueClass="text-amber-500" cardStyle={cardStyle} />
+          <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
         </div>
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -785,7 +784,7 @@ export default function DealsPage() {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["scheduled", "Scheduled"], ["disabled", "Disabled"], ["expired", "Expired"]]} />
+            <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["inactive", "Inactive"]]} />
             <Select value={targetFilter} onChange={(v) => { setTargetFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
           </div>
         </div>
@@ -1790,7 +1789,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                     <CustomModalSelect
                       value={formData.status}
                       onChange={(val) => setFormData({ ...formData, status: val })}
-                      options={[{ value: "active", label: "Active" }, { value: "disabled", label: "Disabled" }]}
+                      options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
                       placeholder="Select Status"
                     />
                   </FormField>
