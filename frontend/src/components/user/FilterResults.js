@@ -53,6 +53,9 @@ function Chip({ label, onRemove }) {
 export default function FilterResults({
   filters,
   sortBy = "featured",
+  /* Shop page se free-text search (?q=) — grid isi se filter hota hai.
+     Home se ye prop nahi aata (undefined = purana behavior same). */
+  search = "",
   categories = [],
   brands = [],
   deals = [],
@@ -60,6 +63,9 @@ export default function FilterResults({
   onClear,
   /* Sidebar me deal select ho to heading me us deal ka naam (page.js se). */
   titleOverride = null,
+  /* Shop par bina-filter state ("All Products") me empty copy alag ho —
+     "remove a filter" wali line ka matlab nahi banta. Home false bhejta hai. */
+  cleanMode = false,
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -68,7 +74,7 @@ export default function FilterResults({
   // ✅ Server page seedha URL se (?page= — refresh/share safe, duplicate state nahi)
   const page = safePageParam(searchParams.get("page"));
 
-  const filtersKey = useMemo(() => JSON.stringify({ filters, sortBy }), [filters, sortBy]);
+  const filtersKey = useMemo(() => JSON.stringify({ filters, sortBy, search }), [filters, sortBy, search]);
 
   // ✅ Filter/sort badle to page 1 (sirf URL — external sync, state nahi)
   useEffect(() => {
@@ -93,6 +99,7 @@ export default function FilterResults({
     page,
     limit: PER_PAGE,
     sort: sortBy,
+    search,
     brandIds: filters?.brandIds || [],
     categoryIds: filters?.categoryIds || [],
     minPrice: filters?.minPrice ?? null,
@@ -277,9 +284,13 @@ export default function FilterResults({
       {total === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
           <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">No products match these filters</p>
+          <p className="text-sm font-bold text-[var(--user-text)]">
+            {cleanMode ? "No products found" : "No products match these filters"}
+          </p>
           <p className="text-[0.6875rem] text-[var(--user-text-muted)]">
-            Try removing a filter or clear them all.
+            {cleanMode
+              ? "Try a different search or filter."
+              : "Try removing a filter or clear them all."}
           </p>
           <button
             type="button"
