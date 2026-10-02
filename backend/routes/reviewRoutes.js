@@ -3,6 +3,9 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 const {
   getProductReviews,
+  getMyReviews,
+  getAdminReviews,
+  getAdminReviewById,
   createReview,
   updateReview,
   deleteReview,
@@ -18,9 +21,22 @@ const { limiters } = require("../middleware/rateLimit");
 const router = express.Router();
 
 // ==========================================
+// 🛡️ ADMIN — saari reviews (paginated + stats)
+// ✅ "/:id" routes se PEHLE — warna "admin" ko id samajh liya jayega.
+// ==========================================
+router.get("/admin/all", authMiddleware, checkPermission("products"), getAdminReviews);
+router.get("/admin/:id", authMiddleware, checkPermission("products"), getAdminReviewById);
+
+// ==========================================
 // 🌐 PUBLIC — reviews + summary for one product
 // ==========================================
 router.get("/product/:productId", getProductReviews);
+
+// ==========================================
+// 🔒 CUSTOMER — current user ki apni reviews (product_id → rating map)
+// ✅ "/:id" routes se PEHLE — warna "my" ko id samajh liya jayega.
+// ==========================================
+router.get("/my", authMiddleware, getMyReviews);
 
 // ==========================================
 // 🔒 CUSTOMER — write a review (images + video go to uploads/reviews/)
@@ -42,7 +58,13 @@ router.post(
   limiters.reviewCreate,
   createReview,
 );
-router.put("/:id", authMiddleware, updateReview);
+router.put(
+  "/:id",
+  authMiddleware,
+  (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
+  saveReviewMedia,
+  updateReview,
+);
 router.delete("/:id", authMiddleware, deleteReview);
 router.post("/:id/helpful", authMiddleware, toggleHelpful);
 

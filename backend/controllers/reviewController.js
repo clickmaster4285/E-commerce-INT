@@ -114,6 +114,32 @@ const getProductReviews = async (req, res) => {
 };
 
 // ==========================================
+// 🔒 MY REVIEWS — current user ki saari reviews
+// GET /api/reviews/my
+// ==========================================
+// Order pages + product page isse dekhte hain ke user ne kis product ko
+// already rate kiya hai (product_id → review map).
+const getMyReviews = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Login required" });
+    }
+    const reviews = await Review.find({
+      user_id: toObjectId(userId),
+      is_deleted: { $ne: true },
+    })
+      .select("product_id rating title comment images videos status created_at updated_at")
+      .sort({ created_at: -1 })
+      .lean();
+    return res.status(200).json({ success: true, reviews });
+  } catch (error) {
+    console.error("❌ [getMyReviews] Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to fetch your reviews" });
+  }
+};
+
+// ==========================================
 // 🔒 CREATE — login + delivered order required
 // POST /api/reviews (multipart: images max 5, videos max 1)
 // ==========================================
@@ -134,12 +160,7 @@ const createReview = async (req, res) => {
     const cleanComment = String(comment || "").trim();
     const cleanTitle = String(title || "").trim().slice(0, 120);
     const media = req.reviewMedia || { images: [], videos: [] };
-    if (!cleanComment && !media.images.length && !media.videos.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Please add a comment or a photo/video with your review",
-      });
-    }
+    // ✅ Rating-only allowed — comment/photo/video optional rahenge.
 
     const product = await Product.findOne({
       _id: product_id,
@@ -237,12 +258,15 @@ const updateReview = async (req, res) => {
     }
     if (title !== undefined) review.title = String(title || "").trim().slice(0, 120);
     if (comment !== undefined) review.comment = String(comment || "").trim();
-    if (!review.comment && !review.images.length && !review.videos.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Please add a comment or a photo/video with your review",
-      });
+    // ✅ Rating-only allowed — comment/photo/video optional rahenge.
+
+    // ✅ NEW: Edit karte waqt nayi photos/video bhi add ho sakti hain (limits: 5 images, 1 video).
+    const media = req.reviewMedia || { images: [], videos: [] };
+    if ((media.images && media.images.length) || (media.videos && media.videos.length)) {
+      review.images = [...(review.images || []), ...(media.images || [])].slice(0, 5);
+      review.videos = [...(review.videos || []), ...(media.videos || [])].slice(0, 1);
     }
+
     await review.save();
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -365,8 +389,110 @@ const setReviewStatus = async (req, res) => {
   }
 };
 
+// ==========================================
+// 🛡️ ADMIN — paginated review list
+// GET /api/reviews/admin/all?page=&limit=&search=&rating=&status=&sort=
+// ==========================================
+const getAdminReviews = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const search = String(req.query.search || "").trim();
+    const ratingParam = parseInt(req.query.rating, 10);
+    const statusParam = String(req.query.status || "all");
+    const sortKey = String(req.query.sort || "newest");
+    const sortMap = {
+      newest: { created_at: -1 },
+      oldest: { created_at: 1 },
+      helpful: { helpfulCount: -1, created_at: -1 },
+      high: { rating: -1, created_at: -1 },
+      low: { rating: 1, created_at: -1 },
+    };
+    const sort = sortMap[sortKey] || sortMap.newest;
+
+    const filter = { is_deleted: { $ne: true } };
+    if (["active", "hidden"].includes(statusParam)) filter.status = statusParam;
+    if (Number.isInteger(ratingParam) && ratingParam >= 1 && ratingParam <= 5) {
+      filter.rating = ratingParam;
+    }
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ title: rx }, { comment: rx }];
+    }
+
+    const total = await Review.countDocuments(filter);
+    const reviews = await Review.find(filter)
+      .populate("user_id", "name avatar email")
+      .populate("product_id", "name")
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    // ✅ Whole-dataset stats (current filters / page se independent) — dashboard stat cards ke liye
+    const statsAgg = await Review.aggregate([
+      { $match: { is_deleted: { $ne: true } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          visible: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
+          hidden: { $sum: { $cond: [{ $eq: ["$status", "hidden"] }, 1, 0] } },
+          five: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
+          ratingSum: { $sum: { $ifNull: ["$rating", 0] } },
+        },
+      },
+    ]);
+    const agg = statsAgg[0] || { total: 0, visible: 0, hidden: 0, five: 0, ratingSum: 0 };
+    const stats = {
+      total: agg.total,
+      visible: agg.visible,
+      hidden: agg.hidden,
+      five: agg.five,
+      avg: agg.total ? Math.round((agg.ratingSum / agg.total) * 10) / 10 : 0,
+    };
+
+    return res.status(200).json({
+      success: true,
+      reviews,
+      stats,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.max(1, Math.ceil(total / limit)),
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [getAdminReviews] Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to fetch reviews" });
+  }
+};
+
+const getAdminReviewById = async (req, res) => {
+  try {
+    if (!toObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid review ID" });
+    }
+    const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .populate("user_id", "name avatar email")
+      .populate("product_id", "name")
+      .lean();
+    if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    return res.status(200).json({ success: true, review });
+  } catch (error) {
+    console.error("[getAdminReviewById] Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to fetch review" });
+  }
+};
+
 module.exports = {
   getProductReviews,
+  getMyReviews,
+  getAdminReviews,
+  getAdminReviewById,
   createReview,
   updateReview,
   deleteReview,

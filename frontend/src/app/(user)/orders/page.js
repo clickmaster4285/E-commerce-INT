@@ -1,12 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState, Fragment, useRef } from "react";
+import { Suspense, useEffect, useState, Fragment, useRef, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
+import { reviewApi } from "@/apis/user/reviewApi";
+import ProductRating from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
@@ -180,7 +182,7 @@ const OrderProgress = ({ status }) => {
 };
 
 /* ============ PRODUCT SCROLL LIST ============ */
-const ProductScrollList = ({ items, idPrefix }) => {
+const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) => {
   const scrollRef = useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -225,6 +227,8 @@ const ProductScrollList = ({ items, idPrefix }) => {
           const isOpen = openIndex === index;
           const panelId = `qty-breakdown-${idPrefix || "ord"}-${index}`;
           const qtyLabel = `Qty ${q.paidQty}${q.freeQty > 0 ? ` +${q.freeQty} free` : ""} — ${q.totalQty} unit${q.totalQty > 1 ? "s" : ""} in total. Tap for deal details`;
+          const pid = String(item.product_id?._id || item.product_id || "");
+          const itemReview = rateable && pid ? (reviewsMap && reviewsMap.get(pid)) || null : null;
           return (
                        <div key={index} className="flex-shrink-0 w-44 sm:w-72">
               <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-accent)]/40 transition-all">
@@ -301,6 +305,11 @@ const ProductScrollList = ({ items, idPrefix }) => {
                   )}
                 </div>
 
+                {rateable && (
+                  <div className="pt-1.5 mt-1.5 border-t border-dashed border-[var(--user-border)]">
+                    <ProductRating productId={pid} productName={item.name} review={itemReview} variant="compact" />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -511,6 +520,22 @@ function OrdersContent({ compact = false }) {
     queryFn: async () => { const res = await axiosInstance.get("/users/profile"); return res.data?.user || res.data; },
     retry: false,
   });
+
+  // ✅ User ki apni ratings — delivered order items par "Rate" / rated badge dikhane ke liye.
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ["myReviews"],
+    queryFn: reviewApi.mine,
+    enabled: !!user,
+    retry: false,
+  });
+  const reviewsMap = useMemo(() => {
+    const map = new Map();
+    (myReviews || []).forEach((r) => {
+      const pid = String(r.product_id?._id || r.product_id || "");
+      if (pid) map.set(pid, r);
+    });
+    return map;
+  }, [myReviews]);
 
   // ✅ SERVER-SIDE PAGINATION query (for non-draft orders)
   const isDraftFilter = filter === "draft";
@@ -829,7 +854,7 @@ function OrdersContent({ compact = false }) {
                       </div>
                     </div>
                   )}
-                  <ProductScrollList items={order.items} idPrefix={order._id} />
+                  <ProductScrollList items={order.items} idPrefix={order._id} rateable={order.status === "delivered"} reviewsMap={reviewsMap} />
                   {!["delivered", "cancelled"].includes(order.status) && (
                     <div className="mt-2 border-t border-[var(--user-border)] border-dashed">
                       <OrderProgress status={order.status} />
@@ -1028,7 +1053,7 @@ function OrdersContent({ compact = false }) {
                                  {/* Product card */}
                   {order.items?.length > 0 && (
                     <div className="p-2.5 pb-1.5">
-                      <ProductScrollList items={order.items} idPrefix={order._id} />
+                      <ProductScrollList items={order.items} idPrefix={order._id} rateable={order.status === "delivered"} reviewsMap={reviewsMap} />
                     </div>
                   )}
 

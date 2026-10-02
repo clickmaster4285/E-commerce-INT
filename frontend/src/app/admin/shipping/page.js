@@ -420,6 +420,7 @@ export default function ShippingManagementPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [methodModalOpen, setMethodModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState(null);
+  const [methodToDelete, setMethodToDelete] = useState(null);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["adminShippingConfig"],
@@ -468,13 +469,20 @@ export default function ShippingManagementPage() {
 
   const methodDeleteMutation = useMutation({
     mutationFn: (id) => shippingApi.deleteMethod(id),
-    onSuccess: () => {
+    onSuccess: (_res, id) => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
-      toast.success("Shipping method deleted");
+      const deletedName = methods.find((m) => String(m._id) === String(id))?.name || methodToDelete?.name;
+      toast.success(deletedName ? `Shipping method "${deletedName}" deleted successfully` : "Shipping method deleted successfully");
+      setMethodToDelete(null);
     },
     onError: (e) =>
       toast.error(e?.response?.data?.message || e?.message || "Delete failed"),
   });
+
+  const confirmDeleteMethod = () => {
+    if (!methodToDelete) return;
+    methodDeleteMutation.mutate(methodToDelete._id);
+  };
 
   const methodToggleMutation = useMutation({
     mutationFn: (id) => shippingApi.toggleMethod(id),
@@ -728,8 +736,8 @@ export default function ShippingManagementPage() {
                           <EditIcon className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
-                          disabled={methodDeleteMutation.isPending}
+                          onClick={() => setMethodToDelete(m)}
+                          title={`Delete "${m.name}"`}
                           className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                         >
@@ -831,8 +839,8 @@ export default function ShippingManagementPage() {
                     <EditIcon className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => { if (window.confirm(`Delete "${m.name}"?`)) methodDeleteMutation.mutate(m._id); }}
-                    disabled={methodDeleteMutation.isPending}
+                    onClick={() => setMethodToDelete(m)}
+                    title={`Delete "${m.name}"`}
                     className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                   >
@@ -844,6 +852,42 @@ export default function ShippingManagementPage() {
           ))}
         </div>
       </div>
+
+      {/* ===== Delete Confirmation Modal ===== */}
+      {methodToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
+            <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
+                <TrashIcon className="w-5 h-5" style={{ color: "var(--danger)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Delete &quot;{methodToDelete.name}&quot;?</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The shipping method will be permanently removed.</p>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
+              <button
+                onClick={() => setMethodToDelete(null)}
+                disabled={methodDeleteMutation.isPending}
+                className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteMethod}
+                disabled={methodDeleteMutation.isPending}
+                className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--danger)" }}
+              >
+                {methodDeleteMutation.isPending ? (<><Spinner className="w-3.5 h-3.5" /> Deleting...</>) : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== Edit Modal ===== */}
       <EditShippingModal
