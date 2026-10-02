@@ -63,7 +63,7 @@ const verifySmtpConnection = async () => {
   const mailer = getTransporter();
   if (!mailer) {
     const error = new Error(
-      "SMTP configured nahi hai. .env mein SMTP_HOST, SMTP_USER, SMTP_PASS set karein.",
+      "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env.",
     );
     error.code = "SMTP_NOT_CONFIGURED";
     throw error;
@@ -93,7 +93,7 @@ const toFriendlySmtpError = (error) => {
 
   if (code === "EAUTH" || /invalid login|username and password|535/i.test(msg)) {
     const err = new Error(
-      "Email nahi bheja ja saka: SMTP username/password galat hai. Gmail par 16-char App Password use karein (normal password nahi chalega).",
+      "Could not send email: SMTP username/password is incorrect. For Gmail, use a 16-character App Password (a normal password will not work).",
     );
     err.statusCode = 500;
     err.cause = error;
@@ -101,19 +101,19 @@ const toFriendlySmtpError = (error) => {
   }
   if (code === "ESOCKET" || code === "ETIMEDOUT" || code === "ECONNECTION" || /timeout|timed out|connect/i.test(msg)) {
     const err = new Error(
-      "Email server se connect nahi ho saka. SMTP_HOST/PORT check karein aur internet/firewall dekhein.",
+      "Could not connect to the email server. Check SMTP_HOST/PORT and your internet/firewall settings.",
     );
     err.statusCode = 500;
     err.cause = error;
     return err;
   }
   if (code === "EENVELOPE" || /mailbox unavailable|recipient|sender/i.test(msg)) {
-    const err = new Error(`Email address reject ho gayi: ${msg.slice(0, 160)}`);
+    const err = new Error(`Email address was rejected: ${msg.slice(0, 160)}`);
     err.statusCode = 500;
     err.cause = error;
     return err;
   }
-  const err = new Error(`Email nahi bheja ja saka: ${msg.slice(0, 200) || code || "unknown error"}`);
+  const err = new Error(`Could not send email: ${msg.slice(0, 200) || code || "unknown error"}`);
   err.statusCode = 500;
   err.cause = error;
   return err;

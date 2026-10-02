@@ -266,7 +266,7 @@ const sendEmailVerificationOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: result.delivered
             ? `Verification code sent to ${result.email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein ya SMTP configure karein. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
         },
         result.debugOtp,
       ),
@@ -484,7 +484,7 @@ const sendForgotPasswordOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: delivered
             ? `Password reset code sent to ${email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein ya SMTP configure karein. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
         },
         debugOtp,
       ),
@@ -627,8 +627,8 @@ const getEmailHealth = async (req, res) => {
       return res.json({
         success: false,
         configured: false,
-        message: "SMTP configured nahi hai — OTP email nahi jayegi, sirf console par print hogi.",
-        hint: ".env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein. Gmail par App Password use karein.",
+        message: "SMTP is not configured — OTP will only be printed to the console.",
+        hint: "Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM in .env. For Gmail, use an App Password.",
         config: {
           host: cfg.host || "(empty)",
           port: cfg.port,
@@ -642,7 +642,7 @@ const getEmailHealth = async (req, res) => {
     return res.json({
       success: true,
       configured: true,
-      message: `SMTP OK — ${cfg.host}:${cfg.port} se email bheji ja sakti hai.`,
+        message: `SMTP OK — emails can be sent via ${cfg.host}:${cfg.port}.`,
       config: {
         host: cfg.host,
         port: cfg.port,
@@ -655,8 +655,8 @@ const getEmailHealth = async (req, res) => {
     return res.status(500).json({
       success: false,
       configured: true,
-      message: `SMTP login/connect fail: ${error.message}`,
-      hint: "Gmail: App Password (16-char, space ke baghair), 2-Step Verification ON zaroori. Normal password nahi chalega.",
+      message: `SMTP login/connect failed: ${error.message}`,
+      hint: "Gmail: use a 16-character App Password (without spaces) with 2-Step Verification ON. A normal password will not work.",
     });
   }
 };

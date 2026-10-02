@@ -7,7 +7,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../../components/user/Header";
 import Footer from "../../components/user/Footer";
 import CartDrawer from "../../components/user/CartDrawer";
+import VariantQuickBuyDrawer from "../../components/user/VariantQuickBuyDrawer";
 import { CartProvider, useCart } from "../../components/user/CartContext";
+import { QuickBuyProvider } from "../../components/user/QuickBuyContext";
 import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
@@ -111,12 +113,13 @@ export default function UserLayout({ children }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
-  // ✅ Session expire ho to UI logged-out state me lao (reload nahi).
-  // userHttp "user-session-expired" event bhejta hai; yahan sirf
-  // ["userProfile"] invalidate hoti hai — baqi logic same.
+  // Session expired / guest 401: switch UI to logged-out state silently.
+  // NOTE: setQueryData (not invalidate) to avoid a refetch loop —
+  // invalidating would refetch profile, get 401 again, and re-fire the event.
   useEffect(() => {
     const onSessionExpired = () => {
-      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+      queryClient.setQueryData(["userProfile"], null);
+      queryClient.setQueryData(["wishlist"], []);
     };
     window.addEventListener("user-session-expired", onSessionExpired);
     return () => window.removeEventListener("user-session-expired", onSessionExpired);
@@ -146,6 +149,7 @@ export default function UserLayout({ children }) {
   return (
     <WishlistProvider>
       <CartProvider>
+        <QuickBuyProvider>
         <div
           id="user-theme"
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
@@ -154,8 +158,10 @@ export default function UserLayout({ children }) {
           <main className="w-full min-w-0">{children}</main>
           {!hideFooter && <Footer />}
           <CartDrawer />
+          <VariantQuickBuyDrawer />
           <MobileNav />
         </div>
+        </QuickBuyProvider>
       </CartProvider>
     </WishlistProvider>
   );

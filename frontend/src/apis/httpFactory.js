@@ -16,9 +16,10 @@ const getBaseURL = () => {
   return `http://${hostname}:${serverPort}/api`;
 };
 
-// User ko raw backend JWT errors ("Token expired…", "Invalid refresh
-// token") kabhi nahi dikhne chahiye — session khatam ho to friendly text.
-export const FRIENDLY_SESSION_EXPIRED = "Session expire ho gayi, dobara login karein";
+// User-facing messages are always English (no Roman Urdu in toasts/messages).
+// Guests (not logged in) get silent 401s — no session toast on refresh;
+// the layout only resets to logged-out state via "user-session-expired".
+export const FRIENDLY_SESSION_EXPIRED = "Session expired. Please log in again.";
 
 /* ==========================================================
    createAuthHttp — user/admin ke liye alag-alag instance
@@ -108,7 +109,7 @@ export function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
         const retryAfter = Number(error.response?.data?.retryAfter);
         toast.error(
           Number.isFinite(retryAfter) && retryAfter > 0
-            ? `${retryAfter} seconds baad try karein`
+            ? `Please try again in ${retryAfter} seconds.`
             : "Too many requests. Please try again later.",
         );
       }
@@ -130,7 +131,8 @@ export function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
             redirectToLogin();
             return Promise.reject(error);
           }
-          toast.error(FRIENDLY_SESSION_EXPIRED);
+          // Guest / expired session: stay silent (no toast on refresh).
+          // Layout listens for this event and switches to logged-out state.
           try {
             window.dispatchEvent(new CustomEvent("user-session-expired"));
           } catch {
@@ -149,7 +151,7 @@ export function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
             redirectToLogin();
             return Promise.reject(refreshError);
           }
-          toast.error(FRIENDLY_SESSION_EXPIRED);
+          // Silent for guests — no "session expired" toast on page refresh.
           try {
             window.dispatchEvent(new CustomEvent("user-session-expired"));
           } catch {

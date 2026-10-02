@@ -837,7 +837,7 @@ const googleLogin = async (req, res) => {
     if (!email)
       return res
         .status(400)
-        .json({ message: "Google account mein email nahi mili" });
+        .json({ message: "No email found in Google account" });
     let user = await User.findOne({ email });
     if (!user) {
       // ✅ SECURITY FIX: Naye Google users ko direct access NAHI milega

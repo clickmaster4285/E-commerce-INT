@@ -63,7 +63,7 @@ axiosInstance.interceptors.response.use(
       const retryAfter = Number(error.response?.data?.retryAfter);
       toast.error(
         Number.isFinite(retryAfter) && retryAfter > 0
-          ? `${retryAfter} seconds baad try karein`
+          ? `Please try again in ${retryAfter} seconds.`
           : "Too many requests. Please try again later.",
       );
     }
