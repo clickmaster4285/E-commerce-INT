@@ -25,10 +25,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import axiosInstance from "@/apis/axiosInstance";
+import userHttp from "@/apis/userHttp";
 import { addressApi } from "@/apis/user/addressApi";
 import { useWishlist } from "@/components/user/WishlistContext";
-import AddressForm from "@/components/user/AddressForm";
+import dynamic from "next/dynamic";
+// ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same
+const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
+  loading: () => null,
+});
 import OrdersView from "../orders/page";
 import WishlistView from "../wishlist/page";
 import {
@@ -505,7 +509,7 @@ export default function AccountPage() {
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,
@@ -514,7 +518,7 @@ export default function AccountPage() {
   const { data: orders = [] } = useQuery({
     queryKey: ["myOrders"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/orders/my");
+      const res = await userHttp.get("/orders/my");
       return res.data?.data || [];
     },
     enabled: !!user,
@@ -614,7 +618,7 @@ export default function AccountPage() {
       return toast.error("Enter a valid phone number");
     setSavingProfile(true);
     try {
-      await axiosInstance.put("/users/profile", {
+      await userHttp.put("/users/profile", {
         name: String(form.name).trim(),
         username: String(form.username).trim(),
         phone: String(form.phone || "").trim(),
@@ -639,7 +643,7 @@ export default function AccountPage() {
     if (pwForm.next !== pwForm.confirm) return toast.error("Passwords do not match");
     setSavingPw(true);
     try {
-      await axiosInstance.post("/users/change-password", {
+      await userHttp.post("/users/change-password", {
         currentPassword: pwForm.current,
         newPassword: pwForm.next,
       });
@@ -655,7 +659,7 @@ export default function AccountPage() {
   /* ---------- logout ---------- */
   const handleLogout = async () => {
     try {
-      await axiosInstance.post("/users/logout");
+      await userHttp.post("/users/logout");
     } catch {}
     queryClient.removeQueries({ queryKey: ["userProfile"] });
     queryClient.removeQueries({ queryKey: ["myOrders"] });

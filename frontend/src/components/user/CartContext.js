@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import axiosInstance from "@/apis/axiosInstance";
+import userHttp from "@/apis/userHttp";
 import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, maxPayableQty } from "@/utils/dealCalculator";
 import {
   bundleOriginalTotal,
@@ -195,7 +195,7 @@ export function CartProvider({ children }) {
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,
@@ -231,12 +231,12 @@ export function CartProvider({ children }) {
 
     (async () => {
       try {
-        const res = await axiosInstance.get("/cart");
+        const res = await userHttp.get("/cart");
         let items = res.data?.data || [];
         const guest = readLocalCart();
         if (guest.length) {
           items = mergeCarts(items, guest);
-          await axiosInstance.put("/cart", { items }).catch(() => {});
+          await userHttp.put("/cart", { items }).catch(() => {});
           writeLocalCart([]);
         }
         cartRef.current = items;
@@ -268,7 +268,7 @@ export function CartProvider({ children }) {
       writeLocalSelection(nextSel);
     }
     if (userId) {
-      axiosInstance.put("/cart", { items: next }).catch(() => {});
+      userHttp.put("/cart", { items: next }).catch(() => {});
     } else {
       writeLocalCart(next);
     }

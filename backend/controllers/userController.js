@@ -10,6 +10,7 @@ const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
+const log = require("../utils/logger");
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -19,9 +20,27 @@ const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
 
+const getUserAccessDays = () => Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS) || 7;
+const getAdminAccessMinutes = () => Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
+
+// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → 10 min
+const isLongLivedUserToken = (type, role) =>
+  String(type || "user").toLowerCase() !== "employee" &&
+  String(role || "").toLowerCase() === "user";
+
+const getAccessExpiry = (type, role) =>
+  isLongLivedUserToken(type, role)
+    ? `${getUserAccessDays()}d`
+    : `${getAdminAccessMinutes()}m`;
+
+const getAccessCookieMaxAge = (type, role) =>
+  isLongLivedUserToken(type, role)
+    ? getUserAccessDays() * 24 * 60 * 60 * 1000
+    : 60 * 60 * 1000;
+
 const generateTokens = (userId, role, type = 'user') => {
   const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m`,
+    expiresIn: getAccessExpiry(type, role),
   });
   const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
     expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d`,
@@ -167,7 +186,7 @@ const createUser = async (req, res) => {
       });
     } catch (emailError) {
       await PendingRegistration.deleteOne({ email }).catch(() => {});
-      console.error("createUser otp error:", emailError.cause || emailError);
+      log.error("createUser otp error:", emailError.cause || emailError);
       return res.status(500).json({ success: false, message: emailError.message });
     }
 
@@ -175,7 +194,7 @@ const createUser = async (req, res) => {
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
 
     // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.
@@ -194,7 +213,7 @@ const createUser = async (req, res) => {
       user: { name: cleanName, username: finalUsername, phone: cleanPhone, email },
     });
   } catch (error) {
-    console.error("createUser error:", error);
+    log.error("createUser error:", error);
     if (error?.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0] || "field";
       return res
@@ -264,7 +283,7 @@ const loginUser = async (req, res) => {
       user._id,
     );
     const { accessToken, refreshToken } = generateTokens(user._id, user.role, 'user');
-    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
     res.cookie(
       "refreshToken",
       refreshToken,
@@ -284,7 +303,7 @@ const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("loginUser error:", error);
+    log.error("loginUser error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -360,7 +379,7 @@ const loginAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("loginAdmin error:", error);
+    log.error("loginAdmin error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -381,6 +400,33 @@ const refreshAccessToken = async (req, res) => {
         .status(401)
         .json({ success: false, message: "User not found" });
     const { accessToken } = generateTokens(decoded.userId, user.role, userType);
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge(userType, user.role)));
+    res.json({ success: true, message: "Token refreshed" });
+  } catch (error) {
+    res.status(401).json({ success: false, message: "Invalid refresh token" });
+  }
+};
+
+// ✅ ADMIN refresh alias — refreshAccessToken jaisi (purani untouched),
+// sirf employee-type token accept (user token yahan reject).
+const refreshAdminAccessToken = async (req, res) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token)
+      return res
+        .status(401)
+        .json({ success: false, message: "Refresh token required" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.type !== "employee")
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid refresh token" });
+    const user = await Employee.findById(decoded.userId);
+    if (!user)
+      return res
+        .status(401)
+        .json({ success: false, message: "User not found" });
+    const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
     res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
@@ -487,7 +533,7 @@ const getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("getMe error:", error);
+    log.error("getMe error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -539,7 +585,7 @@ const updateProfile = async (req, res) => {
     }
     res.json({ success: true, message: "✅ Profile & Store saved!" });
   } catch (error) {
-    console.error("updateProfile error:", error);
+    log.error("updateProfile error:", error);
     // ✅ Duplicate email/username par friendly 400 message (500 ki jagah)
     if (error?.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0] || "field";
@@ -583,7 +629,7 @@ const changePassword = async (req, res) => {
     );
     res.json({ success: true, message: "✅ Password changed successfully!" });
   } catch (error) {
-    console.error("changePassword error:", error);
+    log.error("changePassword error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -645,7 +691,7 @@ const getProfileInfo = async (req, res) => {
     };
     return res.json({ success: true, data: profileData, user: profileData });
   } catch (error) {
-    console.error("❌ Get Profile Info Error:", error);
+    log.error("❌ Get Profile Info Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -740,7 +786,7 @@ const updateProfileInfo = async (req, res) => {
       storeSkipped,
     });
   } catch (error) {
-    console.error("❌ Update Profile Info Error:", error);
+    log.error("❌ Update Profile Info Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -774,7 +820,7 @@ const changePasswordSocket = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error("❌ Change Password Socket Error:", error);
+    log.error("❌ Change Password Socket Error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -933,7 +979,7 @@ const googleCustomerLogin = async (req, res) => {
     );
 
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
-    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
     res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
     res.json({
       success: true,
@@ -949,7 +995,7 @@ const googleCustomerLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("googleCustomerLogin error:", error);
+    log.error("googleCustomerLogin error:", error);
     res.status(500).json({ success: false, message: "Google login failed" });
   }
 };
@@ -1018,7 +1064,7 @@ const getWishlist = async (req, res) => {
     }
     res.json({ success: true, wishlist: withVariants });
   } catch (error) {
-    console.error("getWishlist error:", error);
+    log.error("getWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1055,7 +1101,7 @@ const toggleWishlist = async (req, res) => {
 
     res.json({ success: true, added, count: wishlistDoc.products.length });
   } catch (error) {
-    console.error("toggleWishlist error:", error);
+    log.error("toggleWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1097,7 +1143,7 @@ const createCheckoutDraft = async (req, res) => {
     const createdDraft = checkoutDoc.drafts[checkoutDoc.drafts.length - 1];
     res.status(201).json({ success: true, draft: createdDraft });
   } catch (error) {
-    console.error("createCheckoutDraft error:", error);
+    log.error("createCheckoutDraft error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1115,7 +1161,7 @@ const getCheckoutDrafts = async (req, res) => {
     const drafts = checkoutDoc.drafts || [];
     res.json({ success: true, drafts });
   } catch (error) {
-    console.error("getCheckoutDrafts error:", error);
+    log.error("getCheckoutDrafts error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1142,7 +1188,7 @@ const getCheckoutDraft = async (req, res) => {
 
     res.json({ success: true, draft });
   } catch (error) {
-    console.error("getCheckoutDraft error:", error);
+    log.error("getCheckoutDraft error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1193,7 +1239,7 @@ const updateCheckoutDraft = async (req, res) => {
     const draft = checkoutDoc.drafts[draftIndex];
     res.json({ success: true, draft });
   } catch (error) {
-    console.error("updateCheckoutDraft error:", error);
+    log.error("updateCheckoutDraft error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1217,7 +1263,7 @@ const deleteCheckoutDraft = async (req, res) => {
 
     res.json({ success: true, message: "Draft deleted" });
   } catch (error) {
-    console.error("deleteCheckoutDraft error:", error);
+    log.error("deleteCheckoutDraft error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1251,6 +1297,7 @@ module.exports = {
   loginUser,
   loginAdmin,
   refreshAccessToken,
+  refreshAdminAccessToken,
   logoutUser,
   getProfile,
   getMe,

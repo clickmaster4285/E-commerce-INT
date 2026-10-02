@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
-import axiosInstance from "@/apis/axiosInstance";
+import adminHttp from "@/apis/adminHttp";
 import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 // ==========================================
@@ -1252,7 +1252,7 @@ export default function EmployeeDetailPage() {
   const { data: currentUserProfile } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await adminHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,

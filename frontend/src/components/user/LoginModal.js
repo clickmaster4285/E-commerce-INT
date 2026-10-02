@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { GoogleLogin } from "@react-oauth/google";
+import LazyGoogleLogin from "./LazyGoogleLogin";
 import {
   Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck, X, AlertCircle,
   KeyRound, MailCheck, ArrowLeft,
@@ -453,7 +453,8 @@ export default function LoginModal({ isOpen, onClose }) {
               <>
                 <div className="flex justify-center mb-6">
                   {googleClientId ? (
-                    <GoogleLogin
+                    <LazyGoogleLogin
+                      clientId={googleClientId}
                       onSuccess={(res) => handleGoogleLogin(res.credential)}
                       onError={() => setGeneralError("Google login failed.")}
                       theme="filled_black"

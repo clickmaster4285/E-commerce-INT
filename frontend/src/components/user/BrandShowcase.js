@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "./ProductCard";
@@ -60,10 +62,9 @@ function BrandRow({ brand, items }) {
     <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4">
       {/* Brand header */}
       <div className="mb-3 flex items-center gap-2.5">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
           {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt={brand.name} loading="lazy" className="max-h-full max-w-full object-contain" />
+            <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
           ) : (
             <span className="text-base font-black text-[var(--user-accent)]">
               {String(brand.name || "?").charAt(0).toUpperCase()}

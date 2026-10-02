@@ -2,6 +2,8 @@
 
 import { use, useState, useMemo, useCallback, useEffect, useRef, memo, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
@@ -217,9 +219,17 @@ const Gallery = memo(({ mainImage, images, onImageSelect, stock, onZoom }) => {
           onMouseLeave={() => { setZoomed(false); setPaused(false); }}
           onMouseMove={handleMove}>
           {mainImage ? (
-            <div key={mainImage} className="w-full h-full" style={{ animation: "galleryImgIn .45s ease" }}>
-              <img src={mainImage} alt="Product" className="w-full h-full object-contain"
-                style={zoomed ? { transform: "scale(1.9)", transformOrigin: origin, transition: "transform .12s ease-out" } : { transform: "scale(1)", transition: "transform .35s ease" }} />
+            <div key={mainImage} className="relative w-full h-full" style={{ animation: "galleryImgIn .45s ease" }}>
+              <Image
+                src={mainImage}
+                alt="Product"
+                fill
+                loader={smartImageLoader}
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                priority
+                className="object-contain"
+                style={zoomed ? { transform: "scale(1.9)", transformOrigin: origin, transition: "transform .12s ease-out" } : { transform: "scale(1)", transition: "transform .35s ease" }}
+              />
             </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center"><Package size={64} className="text-[var(--user-text-subtle)]" /></div>

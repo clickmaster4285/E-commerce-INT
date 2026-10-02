@@ -8,6 +8,7 @@ const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const log = require("../utils/logger");
 
 // ==========================================
 // ⚙️ OTP CONFIG (sirf env se — koi hardcoded fallback nahi)
@@ -26,11 +27,13 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
+const getUserAccessDays = () => Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS) || 7;
+
 const setAuthCookies = (res, userId, role) => {
   const accessToken = jwt.sign(
     { userId, role, type: "user" },
     process.env.JWT_SECRET,
-    { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m` },
+    { expiresIn: `${getUserAccessDays()}d` },
   );
   const refreshToken = jwt.sign(
     { userId, role, type: "user" },
@@ -41,7 +44,7 @@ const setAuthCookies = (res, userId, role) => {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
-    maxAge: Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES) * 60 * 1000,
+    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
@@ -98,7 +101,7 @@ const issueOtp = async ({ email, purpose }) => {
   const debugOtp =
     !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
   if (debugOtp) {
-    console.warn(`🧪 [DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
+    log.warn(`🧪 [DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
   }
 
   return { delivered: delivery.delivered, debugOtp };
@@ -151,7 +154,7 @@ const verifyOtpCode = async ({ email, purpose, otp }) => {
 
 const sendError = (res, error) => {
   const status = error.statusCode || 500;
-  if (status >= 500) console.error("OTP error:", error.cause || error);
+  if (status >= 500) log.error("OTP error:", error.cause || error);
   return res.status(status).json({
     success: false,
     message: error.message,
@@ -220,7 +223,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
     return { alreadyVerified: false, email, delivered: delivery.delivered, debugOtp };
   }

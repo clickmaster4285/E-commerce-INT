@@ -14,7 +14,7 @@
    - Parent har filter change par naya `key` deta hai → remount → page 1.
    ========================================================== */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ListFilter, PackageSearch, RotateCcw, X } from "lucide-react";
 import ProductCard from "./ProductCard";
@@ -104,6 +104,8 @@ export default function FilterResults({
 
   const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
   const currentPage = pagination?.page || Math.min(page, totalPages);
+  // ✅ Badi list ka render defer — filter typing/pagination responsive, logic same
+  const deferredProducts = useDeferredValue(products);
 
   const goToPage = (next) => {
     const value = Math.min(Math.max(1, next), totalPages);
@@ -290,8 +292,8 @@ export default function FilterResults({
       ) : (
         <>
           <div className={GRID}>
-            {products.map((product) => (
-              <ProductCard key={idOf(product._id) || product.name} product={product} />
+            {deferredProducts.map((product, i) => (
+              <ProductCard key={idOf(product._id) || product.name} product={product} priority={i < 2} />
             ))}
           </div>
 

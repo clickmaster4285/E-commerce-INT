@@ -7,7 +7,7 @@ import {
   PenLine, Trash2, AlertCircle, CheckCircle2, ChevronDown,
   Play, Camera, MessageSquareHeart,
 } from "lucide-react";
-import axiosInstance from "@/apis/axiosInstance";
+import userHttp from "@/apis/userHttp";
 import { reviewApi, getReviewErrorMessage } from "@/apis/user/reviewApi";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -354,7 +354,7 @@ export default function ProductReviews({ productId, fallbackSummary }) {
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data || null;
     },
     retry: false,

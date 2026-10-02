@@ -2,6 +2,7 @@ const Attribute = require("../models/Attribute");
 const Category = require("../models/Category");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const log = require("../utils/logger");
 
 const emitSocket = (event, data) => {
   try {
@@ -85,7 +86,7 @@ const getAttributeById = async (req, res) => {
     }
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {
-    console.error("Error in getAttributeById:", error);
+    log.error("Error in getAttributeById:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -134,7 +135,7 @@ const getAttributes = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in getAttributes:", error);
+    log.error("Error in getAttributes:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -268,7 +269,7 @@ const getAttributeCategories = async (req, res) => {
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
-    console.error("Error in getAttributeCategories:", error);
+    log.error("Error in getAttributeCategories:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -353,7 +354,7 @@ const updateAttributeCategories = async (req, res) => {
       data: updatedCategories,
     });
   } catch (error) {
-    console.error("Error in updateAttributeCategories:", error);
+    log.error("Error in updateAttributeCategories:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -371,7 +372,7 @@ const deleteAttribute = async (req, res) => {
     emitSocket("attributeDeleted", attribute.toObject());
     res.status(200).json({ success: true, message: "Attribute deleted successfully" });
   } catch (error) {
-    console.error("Error in deleteAttribute:", error);
+    log.error("Error in deleteAttribute:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

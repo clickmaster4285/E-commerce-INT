@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 // ✅ Server-side pagination response unwrap — baaki modules (stock/discounts)
 // ke pattern ke mutabiq { items, counts, countries, pagination }
 const paginated = (res, fallbackLimit) => {
@@ -22,7 +21,7 @@ const paginated = (res, fallbackLimit) => {
 
 export const adminBrandApi = {
   getAll: () => 
-    axiosInstance.get("/brands/admin/all").then((res) => {
+    adminHttp.get("/brands/admin/all").then((res) => {
       const data = res.data;
       if (data?.success && Array.isArray(data.data)) return data.data;
       if (Array.isArray(data)) return data;
@@ -39,22 +38,22 @@ export const adminBrandApi = {
       params.sort = sort;
       params.order = order || "asc";
     }
-    return axiosInstance.get("/brands/admin/all", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/brands/admin/all", { params }).then((res) => paginated(res, limit));
   },
   
-  getById: (id) => axiosInstance.get(`/brands/${id}`).then((res) => res.data?.data || res.data),
+  getById: (id) => adminHttp.get(`/brands/${id}`).then((res) => res.data?.data || res.data),
   
-  getNextCode: () => axiosInstance.get("/brands/next-code").then((res) => res.data?.data || res.data),
+  getNextCode: () => adminHttp.get("/brands/next-code").then((res) => res.data?.data || res.data),
   
-  create: (formData) => axiosInstance.post("/brands", formData, {
+  create: (formData) => adminHttp.post("/brands", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   }).then((res) => res.data),
   
-  update: (id, formData) => axiosInstance.put(`/brands/${id}`, formData, {
+  update: (id, formData) => adminHttp.put(`/brands/${id}`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   }).then((res) => res.data),
   
-  delete: (id) => axiosInstance.delete(`/brands/${id}`).then((res) => res.data),
+  delete: (id) => adminHttp.delete(`/brands/${id}`).then((res) => res.data),
 };
 
 export const brandApi = adminBrandApi;

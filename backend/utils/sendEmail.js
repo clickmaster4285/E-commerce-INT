@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const log = require("./logger");
 
 // ==========================================
 // ✉️ EMAIL UTILITY (Nodemailer + SMTP)
@@ -121,10 +122,16 @@ const toFriendlySmtpError = (error) => {
 const sendEmail = async ({ to, subject, html, text }) => {
   const mailer = getTransporter();
   if (!mailer) {
-    // 🧪 DEV FALLBACK — SMTP config nahi hai to console par show karo
-    console.warn("⚠️ SMTP not configured — email not sent. Falling back to console.");
-    console.warn(`📧 TO: ${to}\n📧 SUBJECT: ${subject}\n${text || ""}`);
-    console.warn("💡 Fix: .env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+    // 🧪 DEV FALLBACK — sirf development me console par (OTP text samehit).
+    // Production me OTP/email text KABHI print nahi hota — sirf 1 compact warn.
+    // Return shape same ({ delivered:false, reason }) taake caller logic na badle.
+    if (process.env.NODE_ENV !== "production") {
+      log.warn("⚠️ SMTP not configured — email not sent. Falling back to console.");
+      log.warn(`📧 TO: ${to}\n📧 SUBJECT: ${subject}\n${text || ""}`);
+      log.warn("💡 Fix: .env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+    } else {
+      log.warn("⚠️ SMTP not configured — email not sent.");
+    }
     return { delivered: false, reason: "smtp_not_configured" };
   }
 
@@ -138,10 +145,10 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
   try {
     const info = await mailer.sendMail({ from: fromHeader, to, subject, html, text });
-    console.log(`✅ Email sent to ${to} (id: ${info?.messageId || "n/a"})`);
+    log.info(`✅ Email sent to ${to} (id: ${info?.messageId || "n/a"})`);
     return { delivered: true };
   } catch (error) {
-    console.error("❌ SMTP send failed:", error?.code || "", error?.message || error);
+    log.error("❌ SMTP send failed:", error?.code || "", error?.message || error);
     throw toFriendlySmtpError(error);
   }
 };

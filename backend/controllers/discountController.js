@@ -3,6 +3,7 @@ const Deal = require("../models/Deal");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
+const log = require("../utils/logger");
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -306,7 +307,7 @@ exports.createDiscount = async (req, res) => {
       data: newDiscount,
     });
   } catch (error) {
-    console.error("Create Discount Error:", error);
+    log.error("Create Discount Error:", error);
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((e) => e.message);
@@ -442,7 +443,7 @@ exports.getDiscounts = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get Discounts Error:", error);
+    log.error("Get Discounts Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -494,7 +495,7 @@ exports.getDiscountById = async (req, res) => {
 
     return res.status(200).json(obj);
   } catch (error) {
-    console.error("Get Discount By ID Error:", error);
+    log.error("Get Discount By ID Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -705,7 +706,7 @@ exports.updateDiscount = async (req, res) => {
       data: payload,
     });
   } catch (error) {
-    console.error("Update Discount Error:", error);
+    log.error("Update Discount Error:", error);
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((e) => e.message);
@@ -741,7 +742,7 @@ exports.deleteDiscount = async (req, res) => {
 
     return res.status(200).json({ message: "Discount deleted successfully" });
   } catch (error) {
-    console.error("Delete Discount Error:", error);
+    log.error("Delete Discount Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -771,7 +772,7 @@ exports.getPublicDiscounts = async (req, res) => {
       data: discounts,
     });
   } catch (error) {
-    console.error("Get Public Discounts Error:", error);
+    log.error("Get Public Discounts Error:", error);
     return res.status(500).json({
       success: false,
       message: error.message || "Server error",

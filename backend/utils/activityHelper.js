@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const log = require("./logger");
 
 /**
  * Pushes activity to a specific user's array
@@ -16,7 +17,7 @@ const pushActivityToUser = async (userId, activityData) => {
       },
     });
   } catch (err) {
-    console.error("⚠️ pushActivityToUser error:", err.message);
+    log.error("⚠️ pushActivityToUser error:", err.message);
   }
 };
 
@@ -61,7 +62,7 @@ const pushGlobalActivity = async (io, activityData, performerId) => {
     }
     
   } catch (err) {
-    console.error("⚠️ pushGlobalActivity error:", err.message);
+    log.error("⚠️ pushGlobalActivity error:", err.message);
   }
 };
 

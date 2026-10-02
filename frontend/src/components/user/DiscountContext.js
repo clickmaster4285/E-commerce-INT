@@ -13,7 +13,7 @@ export function useDiscounts() {
   const { data: discounts = [], isLoading: isLoadingDiscounts } = useQuery({
     queryKey: ["publicDiscounts"],
     queryFn: () => discountApi.getPublic(),
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     retry: 1,
   });
@@ -21,7 +21,7 @@ export function useDiscounts() {
   const { data: deals = [], isLoading: isLoadingDeals } = useQuery({
     queryKey: ["activeDeals"],
     queryFn: () => dealApi.getActive(),
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     retry: 1,
   });

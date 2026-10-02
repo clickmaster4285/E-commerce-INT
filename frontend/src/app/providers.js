@@ -5,8 +5,9 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 import { Provider as ReduxProvider } from "react-redux";
 import { store } from "@/redux/store";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 
+// ✅ Google GSI global provider hataya — script sirf login/register par
+// LazyGoogleLogin se load hota hai (home/search/product par 100KB bachat).
 export default function Providers({ children }) {
   const [queryClient] = useState(
     () =>
@@ -22,10 +23,8 @@ export default function Providers({ children }) {
   return (
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>
-        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}>
-          {children}
-          <Toaster position="top-right" richColors closeButton />
-        </GoogleOAuthProvider>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
       </QueryClientProvider>
     </ReduxProvider>
   );

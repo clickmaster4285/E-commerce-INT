@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import userHttp from "../userHttp";
 const paginated = (res, fallbackLimit) => {
   const d = res.data;
   if (Array.isArray(d)) {
@@ -15,17 +14,20 @@ const paginated = (res, fallbackLimit) => {
 };
 
 export const dealApi = {
+  // ✅ slim=1: home storefront wale fields hi (615KB → chhota). Shape same (array).
   getActive: () =>
-    axiosInstance.get("/deals/active").then((res) => res.data?.data || []),
+    userHttp
+      .get("/deals/active", { params: { slim: 1 } })
+      .then((res) => res.data?.data || []),
 
   // ✅ NEW — server-side paginated active deals
   getActivePaginated: ({ page = 1, limit = 12 } = {}) =>
-    axiosInstance
+    userHttp
       .get("/deals/active", {
         params: { page, limit },
       })
       .then((res) => paginated(res, limit)),
 
   getById: (id, page = 1, limit = 20) =>
-    axiosInstance.get(`/deals/active/${id}?page=${page}&limit=${limit}`).then((res) => res.data?.data),
+    userHttp.get(`/deals/active/${id}?page=${page}&limit=${limit}`).then((res) => res.data?.data),
 };

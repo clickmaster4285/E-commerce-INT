@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const Banner = require('../models/Banner');
+const log = require("./logger");
 
 // Har minute check karo
 cron.schedule('* * * * *', async () => {
@@ -29,6 +30,6 @@ cron.schedule('* * * * *', async () => {
       { $set: { status: 'expired' } }
     );
   } catch (err) {
-    console.error('Banner auto-schedule cron error:', err.message);
+    log.error('Banner auto-schedule cron error:', err.message);
   }
 });

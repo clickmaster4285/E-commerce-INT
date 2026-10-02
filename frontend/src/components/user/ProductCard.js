@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import {
   Heart,
   Plus,
@@ -77,7 +79,8 @@ function getDealBadgeConfig(deal) {
   };
 }
 
-export default function ProductCard({
+// ✅ memo: parent/context re-render par same-props cards skip (logic same)
+function ProductCardInner({
   product,
   hideDiscountBadge = false,
   dealBadge = null,
@@ -85,6 +88,8 @@ export default function ProductCard({
   dealId = null,
   showDealPricing = false,
   children,
+  // ✅ LCP rows ke liye: pehli 1-2 cards priority (eager+high), baaki lazy — default same
+  priority = false,
 }) {
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
@@ -127,7 +132,7 @@ export default function ProductCard({
     hasDiscount = disc.hasDiscount;
     matchedDeal = disc.matchedDeal;
   } catch (e) {
-    console.warn("Discount calc error:", e);
+    // Discount calc fail → default prices (purana fallback, bina warn ke)
   }
 
   // ✅ When showDealPricing is false (regular listing), still detect deal membership
@@ -206,12 +211,14 @@ export default function ProductCard({
     >
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
         {image ? (
-          <img
+          <Image
             src={getImageUrl(image)}
             alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover"
+            fill
+            loader={smartImageLoader}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+            priority={priority}
+            className="object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -316,3 +323,7 @@ export default function ProductCard({
     </Link>
   );
 }
+
+const ProductCard = memo(ProductCardInner);
+
+export default ProductCard;

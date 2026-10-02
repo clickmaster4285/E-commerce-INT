@@ -4,9 +4,13 @@ import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import axiosInstance from "@/apis/axiosInstance";
+import userHttp from "@/apis/userHttp";
 import { addressApi } from "@/apis/user/addressApi";
-import AddressForm from "@/components/user/AddressForm";
+import dynamic from "next/dynamic";
+// ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same
+const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
+  loading: () => null,
+});
 import { orderApi } from "@/apis/user/orderApi";
 import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
@@ -192,7 +196,7 @@ function CheckoutContent() {
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,
@@ -207,7 +211,7 @@ function CheckoutContent() {
     (async () => {
       if (urlDraftId) {
         try {
-          const res = await axiosInstance.get(`/users/checkout-drafts/${urlDraftId}`);
+          const res = await userHttp.get(`/users/checkout-drafts/${urlDraftId}`);
           const d = res.data?.draft;
           if (cancelled || !d) {
             setSelectedKeys(cart.map((i) => i.key));
@@ -252,7 +256,7 @@ function CheckoutContent() {
     if (!user || !draftRestored.current || !currentDraftId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      axiosInstance.put(`/users/checkout-drafts/${currentDraftId}`, {
+      userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
         step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
         shippingMethod, paymentMethod, saved: false, items: draftItems,
       }).catch(() => {});
@@ -263,7 +267,7 @@ function CheckoutContent() {
   const goToStep = async (n) => {
     if (currentDraftId) {
       try {
-        await axiosInstance.put(`/users/checkout-drafts/${currentDraftId}`, {
+        await userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
           step: n, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
           shippingMethod, paymentMethod, saved: false, items: draftItems,
         });
@@ -281,7 +285,7 @@ function CheckoutContent() {
     try {
       let draftId = currentDraftId;
       if (!draftId) {
-        const createRes = await axiosInstance.post("/users/checkout-drafts", {
+        const createRes = await userHttp.post("/users/checkout-drafts", {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
           shippingMethod, paymentMethod, items: snap,
         });
@@ -289,7 +293,7 @@ function CheckoutContent() {
         setCurrentDraftId(draftId);
         if (draftId) router.replace(`/checkout?draftId=${draftId}`, { scroll: false });
       } else {
-        await axiosInstance.put(`/users/checkout-drafts/${draftId}`, {
+        await userHttp.put(`/users/checkout-drafts/${draftId}`, {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
           shippingMethod, paymentMethod, items: snap,
         });
@@ -302,7 +306,7 @@ function CheckoutContent() {
     if (draftItems.length) restoreItems(draftItems);
     setDraftItems([]);
     if (currentDraftId) {
-      try { await axiosInstance.delete(`/users/checkout-drafts/${currentDraftId}`); } catch {}
+      try { await userHttp.delete(`/users/checkout-drafts/${currentDraftId}`); } catch {}
       setCurrentDraftId(null);
       router.replace("/checkout", { scroll: false });
     }
@@ -472,7 +476,7 @@ function CheckoutContent() {
     if (!/^[0-9+\-\s]{7,20}$/.test(phone)) return toast.error("Please enter a valid phone number");
     setSavingPhone(true);
     try {
-      await axiosInstance.put("/users/phone", { phone });
+      await userHttp.put("/users/phone", { phone });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       toast.success("Phone number saved!");
     } catch (e) { toast.error(e.response?.data?.message || "Phone save failed"); }
@@ -530,7 +534,7 @@ function CheckoutContent() {
       const orderedKeys = itemsWithDiscounts.map((i) => i.key);
       removeItems(orderedKeys);
       setDraftItems([]);
-      if (currentDraftId) { await axiosInstance.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {}); setCurrentDraftId(null); }
+      if (currentDraftId) { await userHttp.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {}); setCurrentDraftId(null); }
       router.push("/orders");
     } catch (e) { toast.error(e.response?.data?.message || "Order place failed"); setPlacing(false); }
   };

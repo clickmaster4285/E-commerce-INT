@@ -4,6 +4,7 @@ const fs = require("fs-extra");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const log = require("../utils/logger");
 
 // ==========================================
 // ⭐ PRODUCT REVIEWS (delivered orders only)
@@ -108,7 +109,7 @@ const getProductReviews = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ [getProductReviews] Error:", error.message);
+    log.error("❌ [getProductReviews] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to fetch reviews" });
   }
 };
@@ -202,7 +203,7 @@ const createReview = async (req, res) => {
         message: "You have already reviewed this product — you can edit your review",
       });
     }
-    console.error("❌ [createReview] Error:", error.message);
+    log.error("❌ [createReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to add review" });
   }
 };
@@ -249,7 +250,7 @@ const updateReview = async (req, res) => {
       .lean();
     return res.status(200).json({ success: true, message: "Review updated", review: populated });
   } catch (error) {
-    console.error("❌ [updateReview] Error:", error.message);
+    log.error("❌ [updateReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update review" });
   }
 };
@@ -269,7 +270,7 @@ const deleteReviewMediaFiles = async (review) => {
       const filePath = path.join(process.cwd(), clean);
       if (await fs.pathExists(filePath)) await fs.remove(filePath);
     } catch (err) {
-      console.error("Review media delete error:", err.message);
+      log.error("Review media delete error:", err.message);
     }
   }
 };
@@ -298,7 +299,7 @@ const deleteReview = async (req, res) => {
     await deleteReviewMediaFiles(review);
     return res.status(200).json({ success: true, message: "Review deleted" });
   } catch (error) {
-    console.error("❌ [deleteReview] Error:", error.message);
+    log.error("❌ [deleteReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to delete review" });
   }
 };
@@ -334,7 +335,7 @@ const toggleHelpful = async (req, res) => {
     await review.save();
     return res.status(200).json({ success: true, helpful: marked, helpfulCount: review.helpfulCount });
   } catch (error) {
-    console.error("❌ [toggleHelpful] Error:", error.message);
+    log.error("❌ [toggleHelpful] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to vote" });
   }
 };
@@ -360,7 +361,7 @@ const setReviewStatus = async (req, res) => {
     await review.save();
     return res.status(200).json({ success: true, message: `Review ${status}`, review });
   } catch (error) {
-    console.error("❌ [setReviewStatus] Error:", error.message);
+    log.error("❌ [setReviewStatus] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update status" });
   }
 };

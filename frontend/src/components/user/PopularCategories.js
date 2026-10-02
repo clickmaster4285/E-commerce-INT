@@ -9,6 +9,8 @@
    ========================================================== */
 
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { ArrowRight, ImageOff } from "lucide-react";
 import SectionHeading from "./SectionHeading";
 import { formatPrice } from "@/utils/homeCatalog";
@@ -56,11 +58,13 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
             <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
               {category.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={category.image}
                   alt={category.name}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  fill
+                  loader={smartImageLoader}
+                  sizes="(max-width: 640px) 50vw, 33vw"
+                  className="object-cover transition duration-500 group-hover:scale-105"
                 />
               ) : (
                 <ImageOff size={26} className="text-[var(--user-text-subtle)]" />

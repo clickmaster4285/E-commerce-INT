@@ -356,8 +356,11 @@ const deleteBrand = async (req, res) => {
 // ==========================================
 const getBrandsPublic = async (req, res) => {
   try {
+    // ✅ slim=1 (opt-in, storefront): _id/name/logo hi chahiye hota hai
+    // (brand_code/country/is_active sirf admin padhta hai). Default same.
+    const slim = req.query.slim === "1";
     const brands = await Brand.find({ is_deleted: false })
-      .select("brand_code name logo country is_active")
+      .select(slim ? "_id name logo.img_url" : "brand_code name logo country is_active")
       .sort({ created_at: -1 })
       .lean()
       .exec();

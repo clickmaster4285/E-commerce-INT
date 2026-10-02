@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const log = require("../utils/logger");
 
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
@@ -42,7 +43,7 @@ const emitSocketEvent = (event, data) => {
       io.emit(event, data);
     }
   } catch (error) {
-    console.warn("⚠️ Socket emit failed:", error.message);
+    log.warn("⚠️ Socket emit failed:", error.message);
   }
 };
 
@@ -956,7 +957,7 @@ const getProducts = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(" [getProducts] Error:", error);
+    log.error(" [getProducts] Error:", error);
     return res.status(500).json({ message: error.message || "Failed to fetch products" });
   }
 };
@@ -973,7 +974,7 @@ const getProductStats = async (req, res) => {
     const stats = await computeProductStats(filter);
     return res.status(200).json({ success: true, stats });
   } catch (error) {
-    console.error("❌ [getProductStats] Error:", error);
+    log.error("❌ [getProductStats] Error:", error);
     return res.status(500).json({ message: error.message || "Failed to fetch product stats" });
   }
 };
@@ -1123,7 +1124,7 @@ const getProductFacets = async (req, res) => {
       deals,
     });
   } catch (error) {
-    console.error("❌ [getProductFacets] Error:", error);
+    log.error("❌ [getProductFacets] Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch facets" });
   }
 };
@@ -1234,7 +1235,7 @@ const getCategoryTiles = async (req, res) => {
 
     return res.status(200).json({ success: true, data: tiles });
   } catch (error) {
-    console.error("❌ [getCategoryTiles] Error:", error);
+    log.error("❌ [getCategoryTiles] Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch category tiles" });
   }
 };
@@ -1311,7 +1312,7 @@ const getProductById = async (req, res) => {
         }
       }
     } catch (healErr) {
-      console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
+      log.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
     }
 
     // ⭐ Rating summary — for the stars + count on the detail page (reviews come from a separate endpoint)
@@ -1334,7 +1335,7 @@ const getProductById = async (req, res) => {
       ratingSummary.count = ratings.length;
       ratingSummary.avg = ratings.length ? Math.round((sum / ratings.length) * 10) / 10 : 0;
     } catch (summaryErr) {
-      console.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+      log.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
     }
 
     return res.status(200).json({
@@ -1343,7 +1344,7 @@ const getProductById = async (req, res) => {
       ratingSummary,
     });
   } catch (error) {
-    console.error("❌ [getProductById] Error:", error);
+    log.error("❌ [getProductById] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to fetch product",
     });
@@ -1530,7 +1531,7 @@ const createProduct = async (req, res) => {
       variants: createdVariants,
     });
   } catch (error) {
-    console.error("❌ [createProduct] Error:", error);
+    log.error("❌ [createProduct] Error:", error);
 
     if (createdProduct) {
       await Variant.deleteMany({ product_id: createdProduct._id }).catch(() => {});
@@ -1936,7 +1937,7 @@ const updateProduct = async (req, res) => {
       variants: updatedVariants,
     });
   } catch (error) {
-    console.error("❌ [updateProduct] Error:", error);
+    log.error("❌ [updateProduct] Error:", error);
     return res.status(400).json({
       message: error.message || "Failed to update product",
     });
@@ -2000,7 +2001,7 @@ const deleteProduct = async (req, res) => {
 
     return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
-    console.error("❌ [deleteProduct] Error:", error);
+    log.error("❌ [deleteProduct] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to delete product",
     });
@@ -2084,7 +2085,7 @@ const toggleProductStatus = async (req, res) => {
           performerId
         );
       } catch (activityErr) {
-        console.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
+        log.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
       }
 
       try {
@@ -2108,11 +2109,11 @@ const toggleProductStatus = async (req, res) => {
           updated_at: populatedProduct?.updated_at,
         });
       } catch (socketErr) {
-        console.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
+        log.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
       }
     });
   } catch (error) {
-    console.error("❌ [toggleProductStatus] Error:", error);
+    log.error("❌ [toggleProductStatus] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to update product status",
     });
@@ -2194,7 +2195,7 @@ const toggleProductFeatured = async (req, res) => {
       product,
     });
   } catch (error) {
-    console.error("❌ [toggleProductFeatured] Error:", error);
+    log.error("❌ [toggleProductFeatured] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to update featured status",
     });

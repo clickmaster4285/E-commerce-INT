@@ -1,5 +1,6 @@
 // backend/scripts/seedAttributes.js
 const Attribute = require("../models/Attribute");
+const log = require("../utils/logger");
 
 // Helper: predefined values formatter
 const toValues = (arr) =>
@@ -130,7 +131,7 @@ const ATTRIBUTES_TO_SEED = [
 
 async function seedAttributes() {
   try {
-    console.log("\n🌍 Checking/Seeding GLOBAL attributes...");
+    log.info("🌍 Checking/Seeding GLOBAL attributes...");
     let createdCount = 0;
     let updatedCount = 0;
 
@@ -144,7 +145,7 @@ async function seedAttributes() {
           is_active: true,
         });
         createdCount++;
-        console.log(`   ✅ Created: ${attr.name} (${attr.values.length} values)`);
+        log.debug(`   ✅ Created: ${attr.name} (${attr.values.length} values)`);
       } else {
         await Attribute.updateOne(
           { code: attr.code },
@@ -162,9 +163,9 @@ async function seedAttributes() {
         updatedCount++;
       }
     }
-    console.log(`\n🎉 Attributes seeding complete! Created: ${createdCount}, Updated: ${updatedCount}\n`);
+    log.info(`🎉 Attributes seeding complete! Created: ${createdCount}, Updated: ${updatedCount}`);
   } catch (error) {
-    console.error("❌ Error in attribute seeding:", error.message);
+    log.error("❌ Error in attribute seeding:", error.message);
     throw error;
   }
 }
@@ -175,7 +176,7 @@ if (require.main === module) {
   
   mongoose.connect(process.env.MONGO_URI)
     .then(() => {
-      console.log("✅ DB Connected for standalone seeding");
+      log.info("✅ DB Connected for standalone seeding");
       return seedAttributes();
     })
     .finally(() => {

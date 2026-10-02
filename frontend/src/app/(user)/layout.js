@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../../components/user/Header";
 import Footer from "../../components/user/Footer";
 import CartDrawer from "../../components/user/CartDrawer";
@@ -109,6 +109,18 @@ function NavItem({ icon, label, active }) {
 export default function UserLayout({ children }) {
   useUserSocketSync();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+
+  // ✅ Session expire ho to UI logged-out state me lao (reload nahi).
+  // userHttp "user-session-expired" event bhejta hai; yahan sirf
+  // ["userProfile"] invalidate hoti hai — baqi logic same.
+  useEffect(() => {
+    const onSessionExpired = () => {
+      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+    };
+    window.addEventListener("user-session-expired", onSessionExpired);
+    return () => window.removeEventListener("user-session-expired", onSessionExpired);
+  }, [queryClient]);
 
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
