@@ -11,6 +11,7 @@ const {
   deleteReview,
   toggleHelpful,
   setReviewStatus,
+  setReviewResponse,
 } = require("../controllers/reviewController");
 const {
   reviewMediaUpload,
@@ -72,5 +73,6 @@ router.post("/:id/helpful", authMiddleware, toggleHelpful);
 // 🛡️ ADMIN — hide/unhide a review
 // ==========================================
 router.patch("/:id/status", authMiddleware, checkPermission("products"), setReviewStatus);
+router.patch("/:id/response", authMiddleware, checkPermission("products"), setReviewResponse);
 
 module.exports = router;

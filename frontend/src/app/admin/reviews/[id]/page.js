@@ -1,10 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Eye, EyeOff, Mail, MessageSquareText, Star, UserRound } from "lucide-react";
+import {
+  ArrowLeft, ArrowUpRight, BadgeCheck, Check, Send,
+  Eye, EyeOff, MessageSquareText, Package, ShieldCheck, Star, ThumbsUp,
+} from "lucide-react";
 import { toast } from "sonner";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
 
@@ -12,19 +15,36 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const mediaUrl = (value) => (!value ? "" : value.startsWith("http") ? value : `${API_ORIGIN}${value.startsWith("/") ? "" : "/"}${value}`);
 const card = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-function dateParts(value) {
-  if (!value) return { day: "Date unavailable", full: "—" };
+function formatDate(value, options = { day: "numeric", month: "short", year: "numeric" }) {
+  if (!value) return "—";
   const date = new Date(value);
-  return {
-    day: date.toLocaleDateString("en-PK", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
-    full: date.toLocaleString("en-PK", { hour: "numeric", minute: "2-digit", hour12: true }),
-  };
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-PK", options);
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("en-PK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function DetailRow({ label, children }) {
+  return <div className="grid grid-cols-[minmax(75px,.7fr)_minmax(0,1.3fr)] gap-3 text-[12px]"><dt style={{ color: "var(--text-muted)" }}>{label}</dt><dd className="min-w-0 break-words font-medium" style={{ color: "var(--text-secondary)" }}>{children || "—"}</dd></div>;
+}
+
+function StatusPill({ hidden }) {
+  return <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold" style={hidden ? { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" } : { backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
+    {hidden ? <EyeOff size={12} /> : <Eye size={12} />}{hidden ? "Hidden" : "Visible"}
+  </span>;
 }
 
 export default function AdminReviewDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const [responseDraft, setResponseDraft] = useState("");
   const { data: review, isLoading, isError } = useQuery({ queryKey: ["adminReview", id], queryFn: () => adminReviewApi.get(id), enabled: !!id });
+  useEffect(() => {
+    setResponseDraft(review?.storeResponse?.message || "");
+  }, [id, review?.storeResponse?.message]);
   const statusMutation = useMutation({
     mutationFn: (status) => adminReviewApi.setStatus(id, status),
     onSuccess: (_data, status) => {
@@ -34,148 +54,172 @@ export default function AdminReviewDetailPage() {
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Could not update review"),
   });
+  const responseMutation = useMutation({
+    mutationFn: (message) => adminReviewApi.setResponse(id, message),
+    onSuccess: () => {
+      toast.success("Store response published");
+      queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || "Could not publish response"),
+  });
 
-  if (isLoading || !id) {
-    return (
-      <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-        <div className="w-full space-y-5">
-          <span className="skeleton inline-block h-4 w-24" />
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,.8fr)]">
-            <div className="space-y-5">
-              <div className="rounded-lg p-5" style={card}>
-                <span className="skeleton block h-6 w-40" />
-                <span className="skeleton mt-4 block h-24 w-full" />
-              </div>
-            </div>
-            <div className="rounded-lg p-5" style={card}>
-              <span className="skeleton block h-5 w-28" />
-              <span className="skeleton mt-4 block h-32 w-full" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading || !id) return (
+    <div className="w-full space-y-5" style={{ color: "var(--text-primary)" }}>
+      <span className="skeleton block h-4 w-48" />
+      <span className="skeleton block h-9 w-64" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(280px,.82fr)]"><div className="skeleton h-[420px] rounded-xl" /><div className="skeleton h-[420px] rounded-xl" /></div>
+    </div>
+  );
 
-  if (isError || !review) {
-    return (
-      <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-        <div className="w-full space-y-5">
-          <Link href="/admin/reviews" className="inline-flex items-center gap-2 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-            <ArrowLeft size={15} /> Back to reviews
-          </Link>
-          <div className="rounded-lg p-8 text-center" style={card}>
-            <h1 className="font-bold" style={{ color: "var(--text-primary)" }}>Review not found</h1>
-            <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>This review may have been removed or is no longer available.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (isError || !review) return (
+    <div className="w-full space-y-5" style={{ color: "var(--text-primary)" }}>
+      <Link href="/admin/reviews" className="inline-flex items-center gap-2 text-[13px] font-semibold" style={{ color: "var(--accent)" }}><ArrowLeft size={15} /> Back to reviews</Link>
+      <div className="rounded-xl p-8 text-center" style={card}><h1 className="font-bold">Review not found</h1><p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>This review may have been removed or is no longer available.</p></div>
+    </div>
+  );
 
   const user = review.user_id && typeof review.user_id === "object" ? review.user_id : {};
   const product = review.product_id && typeof review.product_id === "object" ? review.product_id : {};
-  const date = dateParts(review.created_at);
   const hidden = review.status === "hidden";
-  const rating = Number(review.rating) || 0;
-  return (
-    <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
-      <div className="w-full space-y-5">
-        {/* ===== Header ===== */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="min-w-0">
-            <Link href="/admin/reviews" className="inline-flex items-center gap-2 text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-muted)" }}>
-              <ArrowLeft size={15} /> All reviews
-            </Link>
-            <h1 className="mt-2 text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Review details</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{product.name || "Product review"} · Submitted {date.day} at {date.full}</p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-bold" style={hidden ? { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" } : { backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
-            {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
-            {hidden ? "Hidden" : "Visible"}
-          </span>
-        </div>
+  const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
+  const productId = product._id || (typeof review.product_id === "string" ? review.product_id : null);
+  const reviewerName = user.name || "Customer name unavailable";
+  const attachments = [
+    ...(review.images || []).map((image, index) => ({ key: `image-${index}`, type: "image", url: mediaUrl(image.img_url), index })),
+    ...(review.videos || []).map((video, index) => ({ key: `video-${index}`, type: "video", url: mediaUrl(video.video_url), index })),
+  ];
 
-        {/* ===== Body ===== */}
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,.8fr)]">
-          <section className="space-y-5">
-            <article className="rounded-lg p-5" style={card}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-amber-500">
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <Star key={i} size={19} className={i < rating ? "fill-current" : "opacity-25"} />
-                    ))}
-                  </span>
-                  <strong className="text-sm" style={{ color: "var(--text-primary)" }}>{rating}/5</strong>
+  return (
+    <div className="w-full space-y-4 pb-8" style={{ color: "var(--text-primary)" }}>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
+        <Link href="/admin/reviews" className="transition hover:opacity-70">Reviews</Link><span>/</span><span style={{ color: "var(--text-secondary)" }}>Review details</span>
+      </nav>
+
+      <header className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between" style={{ borderColor: "var(--border-color)" }}>
+        <div className="flex min-w-0 items-start gap-3">
+          <Link href="/admin/reviews" aria-label="Back to reviews" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition hover:opacity-75" style={{ ...card, color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2"><h1 className="text-[21px] font-bold tracking-tight">Review Details</h1><StatusPill hidden={hidden} /></div>
+            <p className="mt-1 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>Review ID: {review._id} <span className="mx-1">·</span> Posted {formatDateTime(review.created_at)}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pl-12 md:pl-0">
+          {productId ? <Link href={`/product/${productId}`} target="_blank" className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition hover:opacity-80" style={{ ...card, color: "var(--text-secondary)" }}><Eye size={14} /> View on Store</Link> : null}
+          <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(hidden ? "active" : "hidden")} className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "var(--accent)" }}>
+            {hidden ? <Eye size={14} /> : <EyeOff size={14} />}{statusMutation.isPending ? "Updating…" : hidden ? "Make Visible" : "Hide Review"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(280px,.82fr)]">
+        <main className="space-y-4">
+          <article className="rounded-xl p-4 sm:p-5" style={card}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
+                  {user.avatar ? <img src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>{review.title ? "Review" : "Rating"}</span>
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold">{reviewerName}{review.verifiedPurchase ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: "var(--success-text)" }}><BadgeCheck size={13} /> Verified Buyer</span> : null}</p>
+                  <div className="mt-1 flex items-center gap-2"><span className="inline-flex items-center gap-0.5 text-amber-500" aria-label={`${rating} out of 5 stars`}>{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={15} className={star <= rating ? "fill-current" : "opacity-25"} />)}</span><span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{rating} / 5</span></div>
+                </div>
               </div>
-              {review.title ? <h2 className="mt-6 text-xl font-bold" style={{ color: "var(--text-primary)" }}>{review.title}</h2> : null}
-              <p className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7" style={{ color: "var(--text-secondary)" }}>{review.comment || "No written comment was included with this rating."}</p>
-            </article>
-            {(review.images?.length || review.videos?.length) ? (
-              <section className="rounded-lg p-5" style={card}>
-                <h2 className="mb-4 text-sm font-bold" style={{ color: "var(--text-primary)" }}>Photos and videos</h2>
-                <div className="flex flex-wrap gap-3">
-                  {(review.images || []).map((image, i) => (
-                    <a key={`image-${i}`} href={mediaUrl(image.img_url)} target="_blank" rel="noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={mediaUrl(image.img_url)} alt={`Review attachment ${i + 1}`} className="h-28 w-28 rounded-lg border object-cover" style={{ borderColor: "var(--border-color)" }} />
-                    </a>
-                  ))}
-                  {(review.videos || []).map((video, i) => (
-                    <video key={`video-${i}`} src={mediaUrl(video.video_url)} controls className="max-h-56 max-w-full rounded-lg" />
-                  ))}
+              <StatusPill hidden={hidden} />
+            </div>
+
+            {review.title ? <h2 className="mt-5 text-base font-bold">{review.title}</h2> : null}
+            <p className={`whitespace-pre-wrap break-words text-[13px] leading-6 ${review.title ? "mt-1.5" : "mt-5"}`} style={{ color: "var(--text-secondary)" }}>{review.comment || "No written comment was included with this rating."}</p>
+
+            {attachments.length ? <div className="mt-4 flex gap-2.5 overflow-x-auto pb-1" aria-label="Review photos and videos">
+              {attachments.map((item) => <div key={item.key} className="h-24 w-24 shrink-0 overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
+                {item.type === "image" ? <a href={item.url} target="_blank" rel="noreferrer" aria-label={`Open review photo ${item.index + 1}`} className="block h-full w-full"><img src={item.url} alt={`Review photo ${item.index + 1}`} className="h-full w-full object-cover" /></a> : <video src={item.url} controls preload="metadata" aria-label={`Review video ${item.index + 1}`} className="h-full w-full object-cover" />}
+              </div>)}
+            </div> : null}
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+              <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><span className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}><ThumbsUp size={12} /> Helpful ({Number(review.helpfulCount) || 0})</span><span>{Number(review.helpfulCount) === 1 ? "1 person found this helpful" : `${Number(review.helpfulCount) || 0} people found this helpful`}</span></div>
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}><ShieldCheck size={13} /> Moderation tools are in the header</span>
+            </div>
+          </article>
+
+          <section className="rounded-xl p-4 sm:p-5" style={card}>
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><MessageSquareText size={17} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-[13px] font-bold">Store response</h2><p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Reply publicly as your store. Keep it helpful, respectful, and specific.</p></div>
+                  <button type="button" onClick={() => setResponseDraft(`Thank you for sharing your feedback${user.name ? `, ${user.name.split(" ")[0]}` : ""}. We appreciate you taking the time to let us know about your experience. Please contact our support team if we can assist you further.`)} className="text-[10px] font-bold transition hover:opacity-75" style={{ color: "var(--accent)" }}>Use suggested reply</button>
                 </div>
-              </section>
-            ) : null}
+                {review.storeResponse?.message ? <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}><p className="whitespace-pre-wrap break-words text-xs leading-5" style={{ color: "var(--text-secondary)" }}>{review.storeResponse.message}</p><p className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>Published by {review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${formatDateTime(review.storeResponse.responded_at)}` : ""}</p></div> : null}
+                <label htmlFor="review-store-response" className="sr-only">Store response message</label>
+                <textarea id="review-store-response" value={responseDraft} onChange={(event) => setResponseDraft(event.target.value.slice(0, 1000))} maxLength={1000} rows={4} placeholder="Write a thoughtful response to this customer…" className="mt-3 w-full resize-y rounded-lg border px-3 py-2.5 text-xs leading-5 outline-none transition focus:ring-2" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{responseDraft.length}/1,000 characters · visible to customers</span><button type="button" disabled={!responseDraft.trim() || responseMutation.isPending} onClick={() => responseMutation.mutate(responseDraft.trim())} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}><Send size={13} />{responseMutation.isPending ? "Publishing…" : review.storeResponse?.message ? "Update response" : "Publish response"}</button></div>
+              </div>
+            </div>
           </section>
 
-          <aside className="space-y-5">
-            <section className="rounded-lg p-5" style={card}>
-              <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Submitted by</h2>
-              <div className="mt-4 flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full text-sm font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
-                  {user.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    (user.name || "U").charAt(0).toUpperCase()
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-bold" style={{ color: "var(--text-primary)" }}>{user.name || "Customer name unavailable"}</p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>Reviewer</p>
-                </div>
-              </div>
-              <div className="mt-5 space-y-3 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
-                <p className="flex items-start gap-2 text-sm" style={{ color: "var(--text-secondary)" }}><Mail size={16} className="mt-0.5 shrink-0" /><span className="break-all">{user.email || "Email unavailable"}</span></p>
-                <p className="flex items-start gap-2 text-sm" style={{ color: "var(--text-secondary)" }}><CalendarDays size={16} className="mt-0.5 shrink-0" /><span>{date.day}<br /><span className="text-xs" style={{ color: "var(--text-muted)" }}>{date.full}</span></span></p>
-                <p className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}><MessageSquareText size={16} /> {product.name || "Product unavailable"}</p>
-                <p className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}><UserRound size={16} /> {review.verifiedPurchase ? "Verified purchase" : "Purchase not verified"}</p>
-              </div>
-            </section>
+          <section className="rounded-xl p-4 sm:p-5" style={card}>
+            <h2 className="text-[13px] font-bold">Order Delivery Verification</h2>
+            <p className="mt-1 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>This review is tied to the customer’s purchase eligibility.</p>
+            <div className="mt-4 flex items-start gap-3 rounded-lg p-3" style={{ backgroundColor: review.verifiedPurchase ? "var(--success-soft)" : "var(--bg-tertiary)" }}>
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: review.verifiedPurchase ? "var(--success)" : "var(--border-color)", color: "white" }}>{review.verifiedPurchase ? <Check size={14} /> : <Package size={13} />}</span>
+              <div><p className="text-xs font-bold" style={{ color: review.verifiedPurchase ? "var(--success-text)" : "var(--text-secondary)" }}>{review.verifiedPurchase ? "Verified purchase" : "Purchase not verified"}</p><p className="mt-0.5 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>{review.verifiedPurchase ? "The customer had a delivered order for this product when the review was submitted." : "This review is not marked as coming from a verified purchase."}</p></div>
+            </div>
+          </section>
 
-            <section className="rounded-lg p-5" style={card}>
-              <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Review visibility</h2>
-              <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>Choose whether customers can see this review.</p>
-              <button
-                type="button"
-                disabled={statusMutation.isPending}
-                onClick={() => statusMutation.mutate(hidden ? "active" : "hidden")}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition hover:opacity-90 disabled:opacity-60"
-                style={{ backgroundColor: hidden ? "var(--success-soft)" : "var(--warning-soft)", color: hidden ? "var(--success-text)" : "var(--warning-text)" }}
-              >
-                {hidden ? <Eye size={16} /> : <EyeOff size={16} />}
-                {hidden ? "Make review visible" : "Hide review"}
-              </button>
-            </section>
-          </aside>
-        </div>
+          <section className="rounded-xl p-4 sm:p-5" style={card}>
+            <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-[13px] font-bold">All Reviews by This Customer</h2><span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{review.customerReviews?.length || 0} more</span></div>
+            {review.customerReviews?.length ? <div className="space-y-2">
+              {review.customerReviews.map((customerReview) => {
+                const relatedProduct = customerReview.product_id && typeof customerReview.product_id === "object" ? customerReview.product_id : {};
+                return <Link key={customerReview._id} href={`/admin/reviews/${customerReview._id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg p-3 transition hover:opacity-80" style={{ ...card }}>
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{relatedProduct.name || "Product unavailable"}</p><p className="mt-1 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{customerReview.title || customerReview.comment || "No written comment"}</p><span className="mt-1 inline-flex items-center gap-0.5 text-amber-500">{[1, 2, 3, 4, 5].map((star) => <Star key={star} size={11} className={star <= (Number(customerReview.rating) || 0) ? "fill-current" : "opacity-25"} />)}<span className="ml-1 text-[10px]" style={{ color: "var(--text-muted)" }}>{Number(customerReview.rating) || 0}/5</span></span></div>
+                  <div className="flex shrink-0 items-center gap-2"><StatusPill hidden={customerReview.status === "hidden"} /><span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{formatDate(customerReview.created_at)}</span></div>
+                </Link>;
+              })}
+            </div> : <p className="rounded-lg px-3 py-4 text-center text-[11px]" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>No other reviews from this customer.</p>}
+          </section>
+        </main>
+
+        <aside className="rounded-xl p-4 sm:p-5" style={card}>
+          <section>
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-[12px] font-bold">Customer Information</h2><span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>Reviewer</span></div>
+            <dl className="space-y-2.5">
+              <DetailRow label="Name">{user.name}</DetailRow>
+              <DetailRow label="Email">{user.email ? <a href={`mailto:${user.email}`} className="hover:underline">{user.email}</a> : null}</DetailRow>
+              <DetailRow label="Phone">{user.phone || null}</DetailRow>
+              <DetailRow label="Joined">{user.created_at ? formatDate(user.created_at) : null}</DetailRow>
+            </dl>
+          </section>
+
+          <section className="mt-4 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+            <h2 className="mb-3 text-[12px] font-bold">Product Information</h2>
+            <div className="flex items-center gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}><Package size={21} /></span>
+              <div className="min-w-0"><p className="truncate text-xs font-bold">{product.name || "Product unavailable"}</p><p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>Product ID: {productId || "—"}</p></div>
+            </div>
+            {productId ? <Link href={`/product/${productId}`} target="_blank" className="mt-3 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold" style={{ ...card, color: "var(--text-secondary)" }}>View Product <ArrowUpRight size={12} /></Link> : null}
+          </section>
+
+          <section className="mt-4 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+            <h2 className="mb-3 text-[12px] font-bold">Review Information</h2>
+            <dl className="space-y-2.5">
+              <DetailRow label="Status"><StatusPill hidden={hidden} /></DetailRow>
+              <DetailRow label="Helpful Count">{Number(review.helpfulCount) || 0}</DetailRow>
+              <DetailRow label="Posted On">{formatDateTime(review.created_at)}</DetailRow>
+              <DetailRow label="Last Updated">{formatDateTime(review.updated_at || review.created_at)}</DetailRow>
+              <DetailRow label="Review ID">{review._id}</DetailRow>
+              <DetailRow label="Rating">{rating} / 5</DetailRow>
+              <DetailRow label="Purchase"><span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold" style={review.verifiedPurchase ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)" } : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{review.verifiedPurchase ? <><BadgeCheck size={11} /> Verified</> : "Unverified"}</span></DetailRow>
+            </dl>
+          </section>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
+            <button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(hidden ? "active" : "hidden")} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-[10px] font-bold transition hover:opacity-80 disabled:opacity-50" style={{ border: "1px solid var(--border-color)", color: hidden ? "var(--success-text)" : "var(--warning-text)" }}>{hidden ? <Eye size={12} /> : <EyeOff size={12} />}{hidden ? "Show Review" : "Hide Review"}</button>
+            <Link href="/admin/reviews" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-[10px] font-bold transition hover:opacity-80" style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}><MessageSquareText size={12} /> All Reviews</Link>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
-
-

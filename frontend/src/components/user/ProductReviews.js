@@ -16,7 +16,7 @@
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Star, Loader2, X, Check, ImagePlus, Video, AlertCircle, Play } from "lucide-react";
+import { Star, Loader2, X, Check, ImagePlus, Video, AlertCircle, Play, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 import { reviewApi, getReviewErrorMessage } from "@/apis/user/reviewApi";
 
@@ -448,6 +448,7 @@ export default function ProductRating({ productId, productName = "", review = nu
               <SavedMedia images={review.images} videos={review.videos} onPreview={setPreview} />
             </div>
           ) : null}
+          {review.storeResponse?.message ? <div className="mt-3 rounded-xl border border-[var(--user-accent)]/20 bg-[var(--user-accent)]/5 p-3"><p className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)]"><MessageSquareText size={14} /> Store response</p><p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-[var(--user-text-secondary)]">{review.storeResponse.message}</p><p className="mt-2 text-[0.625rem] text-[var(--user-text-muted)]">{review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${new Date(review.storeResponse.responded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</p></div> : null}
         </section>
         {modal}
         {lightbox}

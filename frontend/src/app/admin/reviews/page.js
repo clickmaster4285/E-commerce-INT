@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -9,13 +10,12 @@ import {
   Search,
   Eye,
   EyeOff,
-  Trash2,
+  MoreVertical,
   RefreshCw,
   MessageSquareText,
   ChevronLeft,
   ChevronRight,
   X,
-  AlertTriangle,
   Sparkles,
 } from "lucide-react";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
@@ -43,13 +43,6 @@ function buildPageList(currentPage, totalPages, MID = 5) {
   return pages;
 }
 
-const Spinner = ({ className = "w-4 h-4" }) => (
-  <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-  </svg>
-);
-
 const EMPTY_STATS = { total: 0, visible: 0, hidden: 0, five: 0, avg: 0 };
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
@@ -65,6 +58,100 @@ const Stars = ({ value = 0, size = 13 }) => (
   </span>
 );
 
+// ==========================================
+// 3-DOT (KEBAB) ROW ACTION MENU
+// ==========================================
+function RowActions({ review, hidden, isToggling, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const openMenu = () => {
+    const rect = btnRef.current.getBoundingClientRect();
+    const menuW = 190;
+    const menuH = 92;
+    const flipUp = window.innerHeight - rect.bottom < menuH;
+    let left = rect.right - menuW;
+    if (left < 8) left = 8;
+    if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+    setPos({ top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4, left });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) && btnRef.current && !btnRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  const itemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150 text-left";
+  const hoverOn = (e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; };
+  const hoverOff = (e) => { e.currentTarget.style.backgroundColor = "transparent"; };
+
+  return (
+    <div className="relative flex justify-end">
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="Review actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
+        className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-80"
+        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[100] w-[190px] rounded-lg border py-1 shadow-2xl"
+              style={{ top: pos.top, left: pos.left, backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}
+            >
+              <Link
+                href={`/admin/reviews/${review._id}`}
+                role="menuitem"
+                className={itemClass}
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={hoverOn}
+                onMouseLeave={hoverOff}
+              >
+                <Eye size={15} style={{ color: "var(--text-muted)" }} /> View full review
+              </Link>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={isToggling}
+                onClick={() => { setOpen(false); onToggle(); }}
+                className={`${itemClass} disabled:opacity-50`}
+                style={{ color: "var(--text-primary)" }}
+                onMouseEnter={hoverOn}
+                onMouseLeave={hoverOff}
+              >
+                {hidden ? <Eye size={15} style={{ color: "var(--success-text)" }} /> : <EyeOff size={15} style={{ color: "var(--warning-text)" }} />}
+                {hidden ? "Show review" : "Hide review"}
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}
+
 export default function AdminReviewsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -73,7 +160,6 @@ export default function AdminReviewsPage() {
   const [rating, setRating] = useState("all");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("newest");
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const queryKey = ["adminReviews", page, search, rating, status, sort];
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
@@ -103,16 +189,6 @@ export default function AdminReviewsPage() {
       invalidate();
     },
     onError: (e) => toast.error(e?.response?.data?.message || "Status update failed"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => adminReviewApi.remove(id),
-    onSuccess: () => {
-      toast.success("Review deleted");
-      setConfirmDelete(null);
-      invalidate();
-    },
-    onError: (e) => toast.error(e?.response?.data?.message || "Delete failed"),
   });
 
   const selectClass =
@@ -223,7 +299,11 @@ export default function AdminReviewsPage() {
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                   {["Reviewer", "Product", "Rating", "Review", "Visibility", "Submitted", "Actions"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                    <th
+                      key={h}
+                      className={`px-4 py-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${h === "Actions" ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--text-muted)" }}
+                    >
                       {h}
                     </th>
                   ))}
@@ -339,35 +419,12 @@ export default function AdminReviewsPage() {
                           {r.created_at ? new Date(r.created_at).toLocaleDateString("en-PK", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Link
-                              href={`/admin/reviews/${r._id}`}
-                              title="View full review"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-80"
-                              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                            >
-                              <Eye size={14} />
-                            </Link>
-                            <button
-                              type="button"
-                              title={hidden ? "Show review" : "Hide review"}
-                              disabled={statusMutation.isPending}
-                              onClick={() => statusMutation.mutate({ id: r._id, next: hidden ? "active" : "hidden" })}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-80 disabled:opacity-50"
-                              style={{ backgroundColor: hidden ? "var(--success-soft)" : "var(--warning-soft)", color: hidden ? "var(--success-text)" : "var(--warning-text)", border: "1px solid var(--border-color)" }}
-                            >
-                              {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
-                            </button>
-                            <button
-                              type="button"
-                              title="Delete review"
-                              onClick={() => setConfirmDelete(r)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-80"
-                              style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid var(--border-color)" }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                          <RowActions
+                            review={r}
+                            hidden={hidden}
+                            isToggling={statusMutation.isPending}
+                            onToggle={() => statusMutation.mutate({ id: r._id, next: hidden ? "active" : "hidden" })}
+                          />
                         </td>
                       </tr>
                     );
@@ -425,46 +482,6 @@ export default function AdminReviewsPage() {
             </div>
           ) : null}
         </div>
-
-        {/* ===== Delete confirmation ===== */}
-        {confirmDelete ? (
-          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="alertdialog" aria-modal="true">
-            <style>{`@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
-            <div className="w-full max-w-sm rounded-xl p-5" style={{ ...cardStyle, animation: "modalScaleIn 0.2s ease-out" }}>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}>
-                  <AlertTriangle size={20} style={{ color: "var(--danger)" }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Delete this review?</h3>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                    This action cannot be undone. The review will be soft-deleted and its media files removed.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col-reverse sm:flex-row gap-2 mt-5">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(null)}
-                  disabled={deleteMutation.isPending}
-                  className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
-                  style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={deleteMutation.isPending}
-                  onClick={() => deleteMutation.mutate(confirmDelete._id)}
-                  className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: "var(--danger)" }}
-                >
-                  {deleteMutation.isPending ? (<><Spinner className="w-3.5 h-3.5" /> Deleting...</>) : "Delete"}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );

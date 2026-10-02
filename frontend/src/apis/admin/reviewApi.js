@@ -38,8 +38,8 @@ export const adminReviewApi = {
   setStatus: (id, status) =>
     axiosInstance.patch(`/reviews/${id}/status`, { status }).then((res) => res.data),
 
-  // 🛡️ Admin — delete (soft delete, owner/employee allowed)
-  remove: (id) => axiosInstance.delete(`/reviews/${id}`).then((res) => res.data),
+  setResponse: (id, message) =>
+    axiosInstance.patch(`/reviews/${id}/response`, { message }).then((res) => res.data?.review || null),
 };
 
 export default adminReviewApi;

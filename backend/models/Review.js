@@ -43,6 +43,11 @@ const reviewSchema = new mongoose.Schema(
     rating: { type: Number, required: true, min: 1, max: 5 },
     title: { type: String, trim: true, default: "" },
     comment: { type: String, trim: true, default: "" },
+    storeResponse: {
+      message: { type: String, trim: true, default: "" },
+      responded_at: { type: Date, default: null },
+      responded_by_name: { type: String, trim: true, default: "" },
+    },
     images: { type: [reviewMediaSchema], default: [] },
     videos: { type: [reviewVideoSchema], default: [] },
     // ✅ Buyer verified through a delivered order

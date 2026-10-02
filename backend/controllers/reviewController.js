@@ -4,6 +4,8 @@ const fs = require("fs-extra");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 
 // ==========================================
 // ⭐ PRODUCT REVIEWS (delivered orders only)
@@ -51,6 +53,34 @@ const calcSummary = (reviews) => {
     count,
     distribution,
   };
+};
+
+// Populate review owners from both account collections. Older reviews can
+// reference an employee account even though the Review ref points to User.
+const hydrateReviewCustomers = async (reviews = []) => {
+  const unresolvedIds = [...new Set(reviews
+    .filter((review) => !review.user_id?.name)
+    .map((review) => String(review.user_id?._id || review.user_id || ""))
+    .filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+  if (!unresolvedIds.length) return reviews;
+
+  const ids = unresolvedIds.map((id) => new mongoose.Types.ObjectId(id));
+  const [users, employees] = await Promise.all([
+    User.find({ _id: { $in: ids } }).select("name avatar email phone created_at").lean(),
+    Employee.find({ _id: { $in: ids } }).select("name avatar email phone created_at").lean(),
+  ]);
+  const customerById = new Map();
+  users.forEach((user) => customerById.set(String(user._id), user));
+  employees.forEach((employee) => {
+    if (!customerById.has(String(employee._id))) customerById.set(String(employee._id), employee);
+  });
+  reviews.forEach((review) => {
+    if (review.user_id?.name) return;
+    const id = String(review.user_id?._id || review.user_id || "");
+    const customer = customerById.get(id);
+    if (customer) review.user_id = customer;
+  });
+  return reviews;
 };
 
 // ==========================================
@@ -129,7 +159,7 @@ const getMyReviews = async (req, res) => {
       user_id: toObjectId(userId),
       is_deleted: { $ne: true },
     })
-      .select("product_id rating title comment images videos status created_at updated_at")
+      .select("product_id rating title comment images videos status created_at updated_at storeResponse")
       .sort({ created_at: -1 })
       .lean();
     return res.status(200).json({ success: true, reviews });
@@ -390,6 +420,39 @@ const setReviewStatus = async (req, res) => {
 };
 
 // ==========================================
+// 🛡️ ADMIN — publish or update a store response
+// PATCH /api/reviews/:id/response
+// ==========================================
+const setReviewResponse = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid review ID" });
+    }
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Write a response before publishing" });
+    }
+    if (message.length > 1000) {
+      return res.status(400).json({ success: false, message: "Response must be 1,000 characters or fewer" });
+    }
+    const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
+    if (!review) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+    review.storeResponse = {
+      message,
+      responded_at: new Date(),
+      responded_by_name: String(req.user?.name || "Store Support").trim().slice(0, 100),
+    };
+    await review.save();
+    return res.status(200).json({ success: true, message: "Store response published", review });
+  } catch (error) {
+    console.error("[setReviewResponse] Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to publish store response" });
+  }
+};
+
+// ==========================================
 // 🛡️ ADMIN — paginated review list
 // GET /api/reviews/admin/all?page=&limit=&search=&rating=&status=&sort=
 // ==========================================
@@ -422,12 +485,12 @@ const getAdminReviews = async (req, res) => {
 
     const total = await Review.countDocuments(filter);
     const reviews = await Review.find(filter)
-      .populate("user_id", "name avatar email")
       .populate("product_id", "name")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
+    await hydrateReviewCustomers(reviews);
 
     // ✅ Whole-dataset stats (current filters / page se independent) — dashboard stat cards ke liye
     const statsAgg = await Review.aggregate([
@@ -477,10 +540,23 @@ const getAdminReviewById = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid review ID" });
     }
     const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
-      .populate("user_id", "name avatar email")
       .populate("product_id", "name")
       .lean();
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    await hydrateReviewCustomers([review]);
+    const customerId = review.user_id?._id || review.user_id;
+    review.customerReviews = customerId
+      ? await Review.find({
+          user_id: customerId,
+          _id: { $ne: review._id },
+          is_deleted: { $ne: true },
+        })
+          .select("product_id rating title comment status created_at")
+          .populate("product_id", "name")
+          .sort({ created_at: -1 })
+          .limit(3)
+          .lean()
+      : [];
     return res.status(200).json({ success: true, review });
   } catch (error) {
     console.error("[getAdminReviewById] Error:", error.message);
@@ -498,4 +574,5 @@ module.exports = {
   deleteReview,
   toggleHelpful,
   setReviewStatus,
+  setReviewResponse,
 };
