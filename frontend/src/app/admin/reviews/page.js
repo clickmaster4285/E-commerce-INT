@@ -286,7 +286,6 @@ export default function AdminReviewsPage() {
             <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label="Sort reviews">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
-              <option value="helpful">Most helpful</option>
               <option value="high">Highest rated</option>
               <option value="low">Lowest rated</option>
             </select>
@@ -486,7 +485,6 @@ export default function AdminReviewsPage() {
     </div>
   );
 }
-
 
 
 

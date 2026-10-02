@@ -52,8 +52,6 @@ const reviewSchema = new mongoose.Schema(
     videos: { type: [reviewVideoSchema], default: [] },
     // ✅ Buyer verified through a delivered order
     verifiedPurchase: { type: Boolean, default: false },
-    helpfulCount: { type: Number, default: 0 },
-    helpfulBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     status: {
       type: String,
       enum: ["active", "hidden"],

@@ -99,7 +99,6 @@ const getProductReviews = async (req, res) => {
     const sortKey = String(req.query.sort || "newest");
     const sortMap = {
       newest: { created_at: -1 },
-      helpful: { helpfulCount: -1, created_at: -1 },
       high: { rating: -1, created_at: -1 },
       low: { rating: 1, created_at: -1 },
     };
@@ -114,6 +113,7 @@ const getProductReviews = async (req, res) => {
     const total = await Review.countDocuments(filter);
 
     const reviews = await Review.find(filter)
+      .select("-helpfulCount -helpfulBy")
       .populate("user_id", "name avatar")
       .sort(sort)
       .skip((page - 1) * limit)
@@ -358,42 +358,6 @@ const deleteReview = async (req, res) => {
 };
 
 // ==========================================
-// 🔒 HELPFUL toggle (login required)
-// POST /api/reviews/:id/helpful
-// ==========================================
-const toggleHelpful = async (req, res) => {
-  try {
-    const userId = req.user?._id;
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ success: false, message: "Invalid review ID" });
-    }
-    const review = await Review.findOne({
-      _id: req.params.id,
-      status: "active",
-      is_deleted: { $ne: true },
-    });
-    if (!review) {
-      return res.status(404).json({ success: false, message: "Review not found" });
-    }
-    const idx = review.helpfulBy.findIndex((id) => String(id) === String(userId));
-    let marked;
-    if (idx >= 0) {
-      review.helpfulBy.splice(idx, 1);
-      marked = false;
-    } else {
-      review.helpfulBy.push(userId);
-      marked = true;
-    }
-    review.helpfulCount = review.helpfulBy.length;
-    await review.save();
-    return res.status(200).json({ success: true, helpful: marked, helpfulCount: review.helpfulCount });
-  } catch (error) {
-    console.error("❌ [toggleHelpful] Error:", error.message);
-    return res.status(500).json({ success: false, message: "Failed to vote" });
-  }
-};
-
-// ==========================================
 // 🛡️ ADMIN — review hide/unhide
 // PATCH /api/reviews/:id/status
 // ==========================================
@@ -467,7 +431,6 @@ const getAdminReviews = async (req, res) => {
     const sortMap = {
       newest: { created_at: -1 },
       oldest: { created_at: 1 },
-      helpful: { helpfulCount: -1, created_at: -1 },
       high: { rating: -1, created_at: -1 },
       low: { rating: 1, created_at: -1 },
     };
@@ -485,6 +448,7 @@ const getAdminReviews = async (req, res) => {
 
     const total = await Review.countDocuments(filter);
     const reviews = await Review.find(filter)
+      .select("-helpfulCount -helpfulBy")
       .populate("product_id", "name")
       .sort(sort)
       .skip((page - 1) * limit)
@@ -540,6 +504,7 @@ const getAdminReviewById = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid review ID" });
     }
     const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .select("-helpfulCount -helpfulBy")
       .populate("product_id", "name")
       .lean();
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
@@ -572,7 +537,6 @@ module.exports = {
   createReview,
   updateReview,
   deleteReview,
-  toggleHelpful,
   setReviewStatus,
   setReviewResponse,
 };

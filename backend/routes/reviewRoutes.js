@@ -9,7 +9,6 @@ const {
   createReview,
   updateReview,
   deleteReview,
-  toggleHelpful,
   setReviewStatus,
   setReviewResponse,
 } = require("../controllers/reviewController");
@@ -67,7 +66,6 @@ router.put(
   updateReview,
 );
 router.delete("/:id", authMiddleware, deleteReview);
-router.post("/:id/helpful", authMiddleware, toggleHelpful);
 
 // ==========================================
 // 🛡️ ADMIN — hide/unhide a review

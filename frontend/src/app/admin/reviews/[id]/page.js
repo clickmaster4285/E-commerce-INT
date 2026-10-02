@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, ArrowUpRight, BadgeCheck, Check, Send,
-  Eye, EyeOff, MessageSquareText, Package, ShieldCheck, Star, ThumbsUp,
+  ArrowLeft, ArrowUpRight, BadgeCheck, Check, Loader2, Send,
+  Eye, EyeOff, MessageSquareText, Package, ShieldCheck, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
@@ -37,6 +37,28 @@ function StatusPill({ hidden }) {
   </span>;
 }
 
+function buildSuggestedReply(review, customerName) {
+  const rating = Number(review?.rating) || 0;
+  const firstName = String(customerName || "").trim().split(/\s+/)[0];
+  const title = String(review?.title || "").trim();
+  const comment = String(review?.comment || "").trim();
+  const commentExcerpt = comment.length > 220 ? `${comment.slice(0, 220).trimEnd()}…` : comment;
+  const context = [
+    title ? `Title: “${title}”` : "",
+    commentExcerpt ? `Comment: “${commentExcerpt}”` : "",
+  ].filter(Boolean).join(" | ");
+  const reviewContext = context ? ` Your review mentions ${context}.` : "";
+  const greeting = firstName ? `Hello ${firstName},` : "Hello,";
+
+  if (rating <= 2) {
+    return `${greeting}\n\nWe're sorry your experience did not meet expectations, and we acknowledge the concerns you raised.${reviewContext} Please contact our support team through the store's Contact page and include your order number. We'll look into this and explain the available next steps, including refund or replacement options where applicable.\n\nKind regards,\nCustomer Support`;
+  }
+  if (rating === 3) {
+    return `${greeting}\n\nThank you for taking the time to share your feedback.${reviewContext} Your comments help us see where we can improve. If there is anything about your order that needs attention, please contact our support team through the store's Contact page.\n\nKind regards,\nCustomer Support`;
+  }
+  return `${greeting}\n\nThank you for your ${rating}-star review and for sharing your experience.${reviewContext} We're delighted to hear about your positive experience, and we truly appreciate your support.\n\nKind regards,\nCustomer Support`;
+}
+
 export default function AdminReviewDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -56,12 +78,21 @@ export default function AdminReviewDetailPage() {
   });
   const responseMutation = useMutation({
     mutationFn: (message) => adminReviewApi.setResponse(id, message),
-    onSuccess: () => {
-      toast.success("Store response published");
+    onSuccess: (savedReview, message) => {
+      const storeResponse = savedReview?.storeResponse || {
+        message,
+        responded_at: new Date().toISOString(),
+        responded_by_name: "Store Support",
+      };
+      queryClient.setQueryData(["adminReview", id], (current) => current
+        ? { ...current, storeResponse, updated_at: savedReview?.updated_at || current.updated_at }
+        : savedReview);
+      setResponseDraft(storeResponse.message);
+      toast.success("Store response saved");
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Could not publish response"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Could not publish response"),
   });
 
   if (isLoading || !id) return (
@@ -89,6 +120,18 @@ export default function AdminReviewDetailPage() {
     ...(review.images || []).map((image, index) => ({ key: `image-${index}`, type: "image", url: mediaUrl(image.img_url), index })),
     ...(review.videos || []).map((video, index) => ({ key: `video-${index}`, type: "video", url: mediaUrl(video.video_url), index })),
   ];
+  const handlePublishResponse = () => {
+    const message = responseDraft.trim();
+    if (!message) {
+      toast.error("Write a response before publishing.");
+      return;
+    }
+    if (message.length > 1000) {
+      toast.error("Response must be 1,000 characters or fewer.");
+      return;
+    }
+    responseMutation.mutate(message);
+  };
 
   return (
     <div className="w-full space-y-4 pb-8" style={{ color: "var(--text-primary)" }}>
@@ -138,22 +181,31 @@ export default function AdminReviewDetailPage() {
             </div> : null}
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
-              <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}><span className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}><ThumbsUp size={12} /> Helpful ({Number(review.helpfulCount) || 0})</span><span>{Number(review.helpfulCount) === 1 ? "1 person found this helpful" : `${Number(review.helpfulCount) || 0} people found this helpful`}</span></div>
               <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}><ShieldCheck size={13} /> Moderation tools are in the header</span>
             </div>
           </article>
 
-          <section className="rounded-xl p-4 sm:p-5" style={card}>
+          <section className="rounded-xl border-l-[3px] p-4 shadow-sm sm:p-5" style={{ ...card, borderLeftColor: "var(--accent)" }}>
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><MessageSquareText size={17} /></span>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><MessageSquareText size={18} /></span>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-[13px] font-bold">Store response</h2><p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>Reply publicly as your store. Keep it helpful, respectful, and specific.</p></div>
-                  <button type="button" onClick={() => setResponseDraft(`Thank you for sharing your feedback${user.name ? `, ${user.name.split(" ")[0]}` : ""}. We appreciate you taking the time to let us know about your experience. Please contact our support team if we can assist you further.`)} className="text-[10px] font-bold transition hover:opacity-75" style={{ color: "var(--accent)" }}>Use suggested reply</button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-sm font-bold">Store response</h2>
+                      {review.storeResponse?.message ? <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>Published</span> : null}
+                    </div>
+                    <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>Reply publicly as your store. Keep it helpful, respectful, and specific.</p>
+                  </div>
+                  <button type="button" disabled={responseMutation.isPending} onClick={() => setResponseDraft(buildSuggestedReply(review, user.name))} className="inline-flex h-8 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50" style={{ borderColor: "var(--accent-soft)", backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>Use suggested reply</button>
                 </div>
-                {review.storeResponse?.message ? <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}><p className="whitespace-pre-wrap break-words text-xs leading-5" style={{ color: "var(--text-secondary)" }}>{review.storeResponse.message}</p><p className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>Published by {review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${formatDateTime(review.storeResponse.responded_at)}` : ""}</p></div> : null}
+                {review.storeResponse?.message ? <div className="mt-4 rounded-lg border-l-2 p-3.5" style={{ borderColor: "var(--accent-soft)", backgroundColor: "var(--bg-tertiary)" }}><p className="whitespace-pre-wrap break-words text-sm leading-6" style={{ color: "var(--text-primary)" }}>{review.storeResponse.message}</p><p className="mt-2 border-t pt-2 text-[11px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>Published by {review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${formatDateTime(review.storeResponse.responded_at)}` : ""}</p></div> : null}
                 <label htmlFor="review-store-response" className="sr-only">Store response message</label>
-                <textarea id="review-store-response" value={responseDraft} onChange={(event) => setResponseDraft(event.target.value.slice(0, 1000))} maxLength={1000} rows={4} placeholder="Write a thoughtful response to this customer…" className="mt-3 w-full resize-y rounded-lg border px-3 py-2.5 text-xs leading-5 outline-none transition focus:ring-2" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2"><span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{responseDraft.length}/1,000 characters · visible to customers</span><button type="button" disabled={!responseDraft.trim() || responseMutation.isPending} onClick={() => responseMutation.mutate(responseDraft.trim())} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}><Send size={13} />{responseMutation.isPending ? "Publishing…" : review.storeResponse?.message ? "Update response" : "Publish response"}</button></div>
+                <textarea id="review-store-response" value={responseDraft} onChange={(event) => setResponseDraft(event.target.value.slice(0, 1000))} disabled={responseMutation.isPending} maxLength={1000} rows={5} placeholder="Write a thoughtful response to this customer…" className="mt-4 min-h-36 w-full resize-y rounded-lg border px-3.5 py-3 text-sm leading-6 outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:opacity-60" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-[11px]" style={{ color: "var(--text-muted)" }}><span className="font-semibold" style={{ color: "var(--text-secondary)" }}>{responseDraft.length}/1,000</span> characters <span className="mx-1">·</span> Customers will see this after publishing</div>
+                  <button type="button" disabled={responseMutation.isPending} onClick={handlePublishResponse} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>{responseMutation.isPending ? <><Loader2 size={15} className="animate-spin" />{review.storeResponse?.message ? "Updating…" : "Publishing…"}</> : <><Send size={15} />{review.storeResponse?.message ? "Update response" : "Publish response"}</>}</button>
+                </div>
               </div>
             </div>
           </section>
@@ -205,7 +257,6 @@ export default function AdminReviewDetailPage() {
             <h2 className="mb-3 text-[12px] font-bold">Review Information</h2>
             <dl className="space-y-2.5">
               <DetailRow label="Status"><StatusPill hidden={hidden} /></DetailRow>
-              <DetailRow label="Helpful Count">{Number(review.helpfulCount) || 0}</DetailRow>
               <DetailRow label="Posted On">{formatDateTime(review.created_at)}</DetailRow>
               <DetailRow label="Last Updated">{formatDateTime(review.updated_at || review.created_at)}</DetailRow>
               <DetailRow label="Review ID">{review._id}</DetailRow>

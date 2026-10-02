@@ -29,8 +29,6 @@ export const reviewApi = {
   // 🔒 Delete own review
   remove: (id) => axiosInstance.delete(`/reviews/${id}`).then((res) => res.data),
 
-  // 🔒 Helpful vote toggle
-  helpful: (id) => axiosInstance.post(`/reviews/${id}/helpful`).then((res) => res.data),
 };
 
 export const getReviewErrorMessage = (
