@@ -16,6 +16,7 @@ import { io } from 'socket.io-client';
 // ROUTE → PERMISSION MAPPING
 // ==========================================
 const ROUTE_PERMISSIONS = {
+  '/admin/dashboard': 'dashboard',
   '/admin/brands': 'brands',
     '/admin/orders': 'order',
 
@@ -402,11 +403,14 @@ export default function AdminLayout({ children }) {
         ([route]) => pathname === route || pathname.startsWith(`${route}/`)
       );
 
-      if (
+      // ✅ dashboard legacy payloads me missing ho sakta hai — sirf explicit false par redirect
+      const routeRevoked =
         String(nextRole).toLowerCase() !== 'admin' &&
         matchedRoute &&
-        nextPermissions[matchedRoute[1]] !== true
-      ) {
+        (matchedRoute[1] === 'dashboard'
+          ? nextPermissions.dashboard === false
+          : nextPermissions[matchedRoute[1]] !== true);
+      if (routeRevoked) {
         router.replace('/admin/access-denied');
       }
 

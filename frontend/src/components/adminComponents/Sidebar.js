@@ -35,6 +35,7 @@ import {
   Boxes,
   Star, // Added for Featured Products
   SlidersHorizontal, // Added for Attributes
+  MessageSquareText, // Reviews
 } from "lucide-react";
 
 // ============================================================
@@ -101,7 +102,7 @@ const sidebarSections = [
   },
   {
     title: "CATALOG",
-    items: ["Brands", "Categories", "Attributes", "Products", "Featured Products"],
+    items: ["Brands", "Categories", "Attributes", "Products", "Featured Products", "Reviews"],
   },
   {
     title: "SALES & MARKETING",
@@ -126,7 +127,7 @@ const sidebarSections = [
 // ============================================================
 
 const allMenuItems = [
-  { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: null },
+  { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: "dashboard" },
   { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
   { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
   { 
@@ -138,6 +139,8 @@ const allMenuItems = [
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
   // ✅ Featured Products — products hi ek subset hai, is liye wahi "products" permission
   { name: "Featured Products", icon: Star, path: "/admin/featured-products", permissionKey: "products" },
+  // ✅ Reviews — wahi "products" permission (review status endpoint bhi isi par hai)
+  { name: "Reviews", icon: MessageSquareText, path: "/admin/reviews", permissionKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
   { name: "Discounts", icon: Percent, path: "/admin/discounts", permissionKey: "discounts" },
   { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
@@ -389,7 +392,13 @@ export default function Sidebar({ onNavigate, userData }) {
         const currentItem = allMenuItems.find(
           (item) => item.path === pathname && item.permissionKey
         );
-        if (currentItem && freshPermissions[currentItem.permissionKey] !== true) {
+        // ✅ dashboard legacy payloads me missing ho sakta hai — sirf explicit false par redirect
+        const revoked =
+          currentItem &&
+          (currentItem.permissionKey === "dashboard"
+            ? freshPermissions.dashboard === false
+            : freshPermissions[currentItem.permissionKey] !== true);
+        if (revoked) {
           router.replace("/admin/access-denied");
           return;
         }
@@ -439,6 +448,9 @@ export default function Sidebar({ onNavigate, userData }) {
 
     return allMenuItems.filter((item) => {
       if (!item.permissionKey) return true;
+      // ✅ dashboard purane staff records me missing ho sakta hai (undefined) —
+      // sirf explicit false par hide karo, taake legacy accounts lock na hon.
+      if (item.permissionKey === "dashboard") return permissions.dashboard !== false;
       return permissions[item.permissionKey] === true;
     });
   }, [socketPermissions, socketRole, socketProfileLoaded]);

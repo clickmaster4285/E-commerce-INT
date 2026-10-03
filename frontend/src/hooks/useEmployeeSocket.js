@@ -7,6 +7,40 @@ import { useQueryClient } from "@tanstack/react-query";
 let employeeSocket = null;
 
 // =====================================================
+// GET EMPLOYEE SOCKET URL
+// =====================================================
+
+function getEmployeeSocketURL() {
+  if (typeof window === "undefined") {
+    // SSR — sirf env se (koi hardcoded fallback nahi)
+    return (
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+      process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "")
+    );
+  }
+
+  // Client: axios ke dynamic baseURL jaisa hi socket ka host decide karo.
+  // Auth cookie httpOnly + sameSite=lax hai — agar socket ka host page ke host
+  // se alag site ho (jaise page localhost:3000 par ho aur socket env ki wajah
+  // se 192.168.88.62:5000 par) to cookie nahi jaata, socket "guest" reh jaata
+  // hai aur permission-gated events (createEmployee wagera) "Unauthorized"
+  // dete hain.
+  const envUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+
+  if (envUrl) {
+    try {
+      if (new URL(envUrl).hostname === window.location.hostname) {
+        return envUrl;
+      }
+    } catch (e) {
+      // env URL galat hai to neeche wala dynamic URL use hoga
+    }
+  }
+
+  return `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT}`;
+}
+
+// =====================================================
 // GET EMPLOYEE SOCKET
 // =====================================================
 
@@ -18,8 +52,7 @@ export function getEmployeeSocket() {
     return employeeSocket;
   }
 
-  const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getEmployeeSocketURL();
 
   if (!SOCKET_URL) {
     // ✅ Silent — console error show na ho

@@ -111,6 +111,7 @@ const healActivityPerformers = async (activities) => {
 // =====================================================
 
 const fixPermissions = (oldPerms = {}) => ({
+  dashboard: oldPerms?.dashboard ?? true,
   employees: oldPerms?.employees ?? true,
   products: oldPerms?.products ?? true,
   brands: oldPerms?.brands ?? true,
@@ -132,12 +133,11 @@ const needsPermissionMigration = (perms) => {
     return true;
   }
 
-  // Old permission keys
+  // Old permission keys (dashboard ab dobara valid key hai — is liye old list se hata diya)
   const oldKeys = [
     "users",
     "orders",
     "settings",
-    "dashboard",
   ];
 
   if (oldKeys.some((key) => perms[key] !== undefined)) {
@@ -146,6 +146,7 @@ const needsPermissionMigration = (perms) => {
 
   // New permission keys missing
   const requiredKeys = [
+    "dashboard",
     "employees",
     "products",
     "brands",
@@ -621,7 +622,7 @@ exports.updateEmployee = async (req, res) => {
     if (updates.permissions && typeof updates.permissions === "object") {
       const mergedPermissions = fixPermissions({ ...currentPermissions, ...updates.permissions });
       const permissionKeys = [
-        "employees", "products", "brands", "categories", "profile",
+        "dashboard", "employees", "products", "brands", "categories", "profile",
         "store", "discounts", "deals", "bundles", "banners", "manageStock",
         "shipping", "order", "attribute",
       ];
