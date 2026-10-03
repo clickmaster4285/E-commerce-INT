@@ -23,11 +23,12 @@ import { reviewApi, getReviewErrorMessage } from "@/apis/user/reviewApi";
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 const mediaUrl = (raw) => {
-  if (!raw) return null;
+  if (typeof raw !== "string" || !raw) return null;
   if (raw.startsWith("http")) return raw;
   const path = raw.startsWith("/") ? raw : `/${raw}`;
   return `${API_ORIGIN}${path}`;
 };
+const reviewImageUrl = (image) => typeof image === "string" ? image : image?.img_url || image?.url || "";
 
 const RATING_LABELS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"];
 const MAX_IMAGES = 5;
@@ -58,7 +59,7 @@ function StarRow({ value = 0, hover = 0, size = 16, interactive = false, onPick,
             strokeWidth={interactive ? 1.8 : 2}
             className={
               i <= Math.round(shown)
-                ? "text-amber-400 fill-amber-400 drop-shadow-[0_1px_2px_rgba(251,191,36,0.45)]"
+                ? "text-amber-500 fill-amber-500"
                 : "text-[var(--user-text-subtle)]"
             }
           />
@@ -94,12 +95,15 @@ function SavedMedia({ images = [], videos = [], onPreview }) {
 
 /* ---------- Modal (portal — Link/anchor ke andar safe rehne ke liye) ---------- */
 function RatingModal({
-  productName, rated, saving, rating, hover, title, comment, images, video, error, existingImages = 0, existingVideo = false,
-  onPick, onHover, onTitle, onComment, onPickImages, onRemoveImage, onPickVideo, onRemoveVideo,
+  productName, rated, saving, rating, hover, title, comment, images, video, error, existingImages = [], existingVideo = null,
+  onPick, onHover, onTitle, onComment, onPickImages, onRemoveImage, onRemoveExistingImage, onRemoveExistingVideo, onPickVideo, onRemoveVideo,
   onSubmit, onClose,
 }) {
   const imgId = useId();
   const vidId = useId();
+  const savedImages = existingImages
+    .map((item) => reviewImageUrl(item) ? { ...(typeof item === "object" ? item : {}), img_url: reviewImageUrl(item) } : null)
+    .filter(Boolean);
   const [previews, setPreviews] = useState([]);
   const [videoPreview, setVideoPreview] = useState("");
 
@@ -134,13 +138,13 @@ function RatingModal({
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose && onClose(); }}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl"
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur bg-gradient-to-r from-amber-400/10 to-transparent">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur">
           <div className="min-w-0">
-            <p className="text-[0.625rem] font-black uppercase tracking-[0.14em] text-amber-500">
+            <p className="text-[0.6875rem] font-bold tracking-wide text-[var(--user-text-muted)]">
               {rated ? "Update your rating" : "Rate this product"}
             </p>
             {productName ? (
@@ -157,18 +161,24 @@ function RatingModal({
         <div className="px-5 pt-6 pb-4 space-y-4">
           <div className="text-center">
             <div className="flex justify-center">
-              <StarRow value={rating} hover={hover} size={40} interactive onPick={onPick} onHover={onHover} />
+              <StarRow value={rating} hover={hover} size={32} interactive onPick={onPick} onHover={onHover} />
             </div>
-            <p className={`mt-2.5 text-sm font-black ${(hover || rating) ? "text-amber-500" : "text-[var(--user-text-subtle)]"}`}>
+            <p className={`mt-2 text-sm font-semibold ${(hover || rating) ? "text-amber-500" : "text-[var(--user-text-subtle)]"}`}>
               {RATING_LABELS[hover || rating] || "Tap a star to rate"}
             </p>
           </div>
 
-          <input type="text" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
-            placeholder="Add a headline (optional)" className={inputCls} />
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Review title <span className="font-normal text-[var(--user-text-subtle)]">(optional)</span></span>
+            <input type="text" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
+              placeholder="Summarize your experience" className={inputCls} />
+          </label>
 
-          <textarea value={comment} onChange={(e) => onComment(e.target.value)} rows={3} maxLength={800}
-            placeholder="Tell others about your experience (optional)" className={inputCls} />
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Your review <span className="font-normal text-[var(--user-text-subtle)]">(optional)</span></span>
+            <textarea value={comment} onChange={(e) => onComment(e.target.value)} rows={4} maxLength={800}
+              placeholder="What should other shoppers know?" className={inputCls} />
+          </label>
 
 
           {/* Media */}
@@ -184,12 +194,12 @@ function RatingModal({
               {/* ✅ <label htmlFor> — real native file-picker trigger (button + JS .click()
                   tab se "silently kuch nahi hota" ka issue avoid karta hai) */}
               <label htmlFor={imgId}
-                className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${images.length + existingImages >= MAX_IMAGES ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
-                <ImagePlus size={15} /> Photos ({images.length + existingImages}/{MAX_IMAGES})
+                className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${images.length + savedImages.length >= MAX_IMAGES ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
+                <ImagePlus size={15} /> Add photos ({images.length + savedImages.length}/{MAX_IMAGES})
               </label>
               <label htmlFor={vidId}
                 className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${video || existingVideo ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
-                <Video size={15} /> {video || existingVideo ? "1 video added" : "Video (max 1)"}
+                <Video size={15} /> {video || existingVideo ? "Video added" : "Add video (max 1)"}
               </label>
             </div>
 
@@ -198,8 +208,26 @@ function RatingModal({
             <input id={vidId} type="file" accept={VIDEO_ACCEPT} hidden
               onChange={(e) => { onPickVideo(e.target.files && e.target.files[0]); e.target.value = ""; }} />
 
-            {(previews.length > 0 || videoPreview) && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+            {(savedImages.length > 0 || existingVideo || previews.length > 0 || videoPreview) && (
+              <div className="space-y-2">
+                {savedImages.length || existingVideo ? <p className="text-[0.625rem] font-semibold text-[var(--user-text-muted)]">Uploaded media · select × to remove</p> : null}
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                {savedImages.map((item, i) => {
+                  const url = mediaUrl(item.img_url);
+                  return url ? (
+                    <span key={`saved-i-${item.img_url}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
+                      <img src={url} alt={`Uploaded review photo ${i + 1}`} className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => onRemoveExistingImage(item.img_url)} aria-label={`Remove uploaded photo ${i + 1}`} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
+                    </span>
+                  ) : null;
+                })}
+                {existingVideo ? (
+                  <span className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--user-border)] bg-black">
+                    <video src={mediaUrl(existingVideo.video_url)} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-70" />
+                    <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black/60"><Play size={13} className="fill-white text-white" /></span>
+                    <button type="button" onClick={onRemoveExistingVideo} aria-label="Remove uploaded video" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
+                  </span>
+                ) : null}
                 {previews.map((src, i) => (
                   <span key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-[var(--user-bg-hover)]">
                     <img src={src} alt="" className="w-full h-full object-cover" />
@@ -215,6 +243,7 @@ function RatingModal({
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition"><X size={12} /></button>
                   </span>
                 )}
+                </div>
               </div>
             )}
 
@@ -293,6 +322,8 @@ export default function ProductRating({ productId, productName = "", review = nu
   const [comment, setComment] = useState("");
   const [images, setImages] = useState([]);
   const [video, setVideo] = useState(null);
+  const [removedImages, setRemovedImages] = useState([]);
+  const [removedVideo, setRemovedVideo] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
 
@@ -306,6 +337,8 @@ export default function ProductRating({ productId, productName = "", review = nu
     setComment(review ? review.comment || "" : "");
     setImages([]);
     setVideo(null);
+    setRemovedImages([]);
+    setRemovedVideo(false);
     setError("");
     setHover(0);
     setOpen(true);
@@ -319,6 +352,8 @@ export default function ProductRating({ productId, productName = "", review = nu
       setComment(review.comment || "");
       setImages([]);
       setVideo(null);
+      setRemovedImages([]);
+      setRemovedVideo(false);
       setError("");
       setOpen(true);
     });
@@ -329,7 +364,8 @@ export default function ProductRating({ productId, productName = "", review = nu
 
   const pickImages = (files) => {
     const selected = Array.from(files || []);
-    const available = MAX_IMAGES - images.length - (rated ? (review?.images || []).length : 0);
+    const remainingExisting = rated ? (review?.images || []).filter((item) => !removedImages.includes(reviewImageUrl(item))).length : 0;
+    const available = MAX_IMAGES - images.length - remainingExisting;
     const list = selected.slice(0, Math.max(0, available));
     const invalid = selected.find((file) => !IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_BYTES);
     if (invalid) { setError(!IMAGE_TYPES.includes(invalid.type) ? `${invalid.name} is not a supported photo type.` : `${invalid.name} is larger than 10MB.`); }
@@ -344,10 +380,12 @@ export default function ProductRating({ productId, productName = "", review = nu
     if (!file) return;
     if (!VIDEO_TYPES.includes(file.type)) { setError("Choose an MP4, WEBM, or MOV video."); return; }
     if (file.size > MAX_VIDEO_BYTES) { setError("Videos must be 50MB or smaller."); return; }
-    if (rated && (review?.videos || []).length) { setError("This review already has a video."); return; }
+    if (rated && (review?.videos || []).length && !removedVideo) { setError("This review already has a video."); return; }
     setVideo(file); setError("");
   };
   const removeVideo = () => setVideo(null);
+  const removeExistingImage = (url) => setRemovedImages((current) => current.includes(url) ? current : [...current, url]);
+  const removeExistingVideo = () => setRemovedVideo(true);
 
   const submit = async (e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -360,6 +398,8 @@ export default function ProductRating({ productId, productName = "", review = nu
       fd.append("rating", String(rating));
       fd.append("title", title.trim());
       fd.append("comment", comment.trim());
+      if (rated && removedImages.length) fd.append("remove_images", JSON.stringify(removedImages));
+      if (rated && removedVideo) fd.append("remove_video", "true");
       images.forEach((f) => fd.append("images", f));
       if (video) fd.append("videos", video);
 
@@ -396,14 +436,16 @@ export default function ProductRating({ productId, productName = "", review = nu
       images={images}
       video={video}
       error={error}
-      existingImages={rated ? (review?.images || []).length : 0}
-      existingVideo={rated ? (review?.videos || []).length > 0 : false}
+      existingImages={rated ? (review?.images || []).filter((item) => !removedImages.includes(reviewImageUrl(item))) : []}
+      existingVideo={rated && !removedVideo ? (review?.videos || [])[0] || null : null}
       onPick={setRating}
       onHover={setHover}
       onTitle={setTitle}
       onComment={setComment}
       onPickImages={pickImages}
       onRemoveImage={removeImage}
+      onRemoveExistingImage={removeExistingImage}
+      onRemoveExistingVideo={removeExistingVideo}
       onPickVideo={pickVideo}
       onRemoveVideo={removeVideo}
       onSubmit={submit}

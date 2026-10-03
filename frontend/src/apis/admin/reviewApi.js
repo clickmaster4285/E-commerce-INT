@@ -40,6 +40,9 @@ export const adminReviewApi = {
 
   setResponse: (id, message) =>
     axiosInstance.patch(`/reviews/${id}/response`, { message }).then((res) => res.data?.review || null),
+
+  deleteResponse: (id) =>
+    axiosInstance.delete(`/reviews/${id}/response`).then((res) => res.data),
 };
 
 export default adminReviewApi;

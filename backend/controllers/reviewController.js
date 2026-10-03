@@ -288,6 +288,21 @@ const updateReview = async (req, res) => {
     }
     if (title !== undefined) review.title = String(title || "").trim().slice(0, 120);
     if (comment !== undefined) review.comment = String(comment || "").trim();
+    let requestedImageRemovals = [];
+    try {
+      requestedImageRemovals = Array.isArray(req.body.remove_images)
+        ? req.body.remove_images
+        : JSON.parse(req.body.remove_images || "[]");
+    } catch {
+      requestedImageRemovals = [];
+    }
+    const imageRemovalSet = new Set(requestedImageRemovals.filter((url) => typeof url === "string"));
+    const removedImages = (review.images || []).filter((image) => imageRemovalSet.has(image.img_url));
+    if (removedImages.length) {
+      review.images = (review.images || []).filter((image) => !imageRemovalSet.has(image.img_url));
+    }
+    const removedVideos = req.body.remove_video === "true" ? (review.videos || []).slice() : [];
+    if (removedVideos.length) review.videos = [];
     // ✅ Rating-only allowed — comment/photo/video optional rahenge.
 
     // ✅ NEW: Edit karte waqt nayi photos/video bhi add ho sakti hain (limits: 5 images, 1 video).
@@ -298,6 +313,7 @@ const updateReview = async (req, res) => {
     }
 
     await review.save();
+    await deleteReviewMediaFiles({ images: removedImages, videos: removedVideos });
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
       .lean();
@@ -413,6 +429,24 @@ const setReviewResponse = async (req, res) => {
   } catch (error) {
     console.error("[setReviewResponse] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to publish store response" });
+  }
+};
+
+const deleteReviewResponse = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid review ID" });
+    }
+    const review = await Review.findOneAndUpdate(
+      { _id: req.params.id, is_deleted: { $ne: true } },
+      { $unset: { storeResponse: 1 } },
+      { new: false },
+    );
+    if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    return res.status(200).json({ success: true, message: "Store response deleted" });
+  } catch (error) {
+    console.error("[deleteReviewResponse] Error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to delete store response" });
   }
 };
 
@@ -539,4 +573,5 @@ module.exports = {
   deleteReview,
   setReviewStatus,
   setReviewResponse,
+  deleteReviewResponse,
 };

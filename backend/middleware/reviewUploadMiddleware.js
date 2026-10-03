@@ -86,10 +86,22 @@ const saveReviewMedia = async (req, res, next) => {
       if (String(review.user_id) !== String(req.user?._id || "")) {
         return res.status(403).json({ success: false, message: "You cannot edit this review" });
       }
-      if ((review.images || []).length + images.length > MAX_IMAGES) {
+      let requestedImageRemovals = [];
+      try {
+        requestedImageRemovals = Array.isArray(req.body.remove_images)
+          ? req.body.remove_images
+          : JSON.parse(req.body.remove_images || "[]");
+      } catch {
+        requestedImageRemovals = [];
+      }
+      const imageRemovalSet = new Set(requestedImageRemovals.filter((url) => typeof url === "string"));
+      const remainingImageCount = (review.images || []).filter((image) => !imageRemovalSet.has(image.img_url)).length;
+      const removingVideo = req.body.remove_video === "true";
+      const remainingVideoCount = removingVideo ? 0 : (review.videos || []).length;
+      if (remainingImageCount + images.length > MAX_IMAGES) {
         return res.status(400).json({ success: false, message: `A review can have up to ${MAX_IMAGES} photos total` });
       }
-      if ((review.videos || []).length + videos.length > MAX_VIDEOS) {
+      if (remainingVideoCount + videos.length > MAX_VIDEOS) {
         return res.status(400).json({ success: false, message: "A review can have only 1 video total" });
       }
     }

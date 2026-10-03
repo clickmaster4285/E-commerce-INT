@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   allowedDevOrigins: [
     '192.168.88.64',
+    '192.168.88.62',
     'localhost',
     '127.0.0.1',
   ],

@@ -138,7 +138,7 @@ export default function LoginModal({ isOpen, onClose }) {
       return "";
     }
     else if (err.response?.status === 500) {
-      setGeneralError("Server error. Please try again later.");
+      setGeneralError(message || "Server error. Please try again later.");
       return "";
     }
     else if (err.response?.status === 404) {

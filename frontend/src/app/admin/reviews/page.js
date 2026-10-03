@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -153,6 +154,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
 }
 
 export default function AdminReviewsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -160,6 +162,7 @@ export default function AdminReviewsPage() {
   const [rating, setRating] = useState("all");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("newest");
+  const [expandedReviews, setExpandedReviews] = useState(() => new Set());
 
   const queryKey = ["adminReviews", page, search, rating, status, sort];
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
@@ -348,11 +351,26 @@ export default function AdminReviewsPage() {
                     const user = r.user_id && typeof r.user_id === "object" ? r.user_id : {};
                     const product = r.product_id && typeof r.product_id === "object" ? r.product_id : {};
                     const hidden = r.status === "hidden";
+                    const comment = String(r.comment || "").trim();
+                    const commentWords = comment.split(/\s+/).filter(Boolean);
+                    const canExpandComment = commentWords.length > 5;
+                    const isCommentExpanded = expandedReviews.has(r._id);
                     return (
                       <tr
                         key={r._id}
-                        className="transition"
+                        className="cursor-pointer transition"
                         style={{ borderBottom: "1px solid var(--border-color)" }}
+                        onClick={(e) => {
+                          if (e.target.closest("a, button, [role='button']")) return;
+                          router.push(`/admin/reviews/${r._id}`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.target === e.currentTarget) {
+                            router.push(`/admin/reviews/${r._id}`);
+                          }
+                        }}
+                        tabIndex={0}
+                        aria-label={`Open review by ${user?.name || "Customer"} for ${product?.name || "product"}`}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
@@ -389,19 +407,30 @@ export default function AdminReviewsPage() {
                           <span className="mt-0.5 block text-[11px] font-bold" style={{ color: "var(--text-muted)" }}>{r.rating}/5</span>
                         </td>
                         <td className="px-4 py-3">
-                          <Link href={`/admin/reviews/${r._id}`} className="block max-w-[300px] text-left">
+                          <div className="max-w-[300px]">
+                            <Link href={`/admin/reviews/${r._id}`} className="block text-left">
                             {r.title ? (
                               <span className="block truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{r.title}</span>
                             ) : null}
-                            <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                              {r.comment || "— rating only —"}
+                            </Link>
+                            <span className="mt-0.5 block text-[12.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                              {comment ? (isCommentExpanded || !canExpandComment ? comment : `${commentWords.slice(0, 5).join(" ")}…`) : "Rating only"}
                             </span>
-                            {(r.images?.length || r.videos?.length) ? (
+                            {canExpandComment ? (
+                              <button type="button" onClick={() => setExpandedReviews((current) => {
+                                const next = new Set(current);
+                                if (next.has(r._id)) next.delete(r._id);
+                                else next.add(r._id);
+                                return next;
+                              })} className="mt-0.5 rounded-sm text-[11px] font-semibold transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--accent)" }} aria-expanded={isCommentExpanded}>
+                                {isCommentExpanded ? "Read less" : "Read more"}
+                              </button>
+                            ) : null}                            {(r.images?.length || r.videos?.length) ? (
                               <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
                                 {(r.images?.length || 0) + (r.videos?.length || 0)} media
                               </span>
                             ) : null}
-                          </Link>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span

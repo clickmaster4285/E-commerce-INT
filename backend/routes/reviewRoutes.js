@@ -11,6 +11,7 @@ const {
   deleteReview,
   setReviewStatus,
   setReviewResponse,
+  deleteReviewResponse,
 } = require("../controllers/reviewController");
 const {
   reviewMediaUpload,
@@ -72,5 +73,6 @@ router.delete("/:id", authMiddleware, deleteReview);
 // ==========================================
 router.patch("/:id/status", authMiddleware, checkPermission("products"), setReviewStatus);
 router.patch("/:id/response", authMiddleware, checkPermission("products"), setReviewResponse);
+router.delete("/:id/response", authMiddleware, checkPermission("products"), deleteReviewResponse);
 
 module.exports = router;

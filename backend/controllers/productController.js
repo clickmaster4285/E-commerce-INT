@@ -2202,6 +2202,91 @@ const toggleProductFeatured = async (req, res) => {
 };
 
 // ======================================================
+// BULK UPDATE PRODUCT FEATURED
+// ======================================================
+// ✅ "Manage Products" popup (Featured Products page) ke liye — multi-select
+//    ke saath ek hi request me kai products featured/unfeatured karne deta hai.
+//    Body: { ids: [...], is_featured: true|false }
+// ✅ Same rule jo single toggle par hai: sirf ACTIVE products feature ho sakte
+//    hain. Inactive products silently skip ho jaate hain aur count response me
+//    aata hai (frontend toast me dikhata hai). Unfeature hamesha allowed.
+// ✅ featured_at bhi set karte hain (feature → ab ka time, unfeature → null),
+//    taake Featured page ka "recent upar" order sahi rahe.
+const bulkProductFeatured = async (req, res) => {
+  try {
+    const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const isFeatured = req.body?.is_featured === true || req.body?.is_featured === "true";
+
+    // ✅ Sirf valid, unique ObjectIds
+    const ids = [
+      ...new Set(
+        rawIds
+          .map((id) => String(id || "").trim())
+          .filter((id) => mongoose.Types.ObjectId.isValid(id)),
+      ),
+    ];
+
+    if (!ids.length) {
+      return res.status(400).json({ success: false, message: "No valid product ids provided" });
+    }
+    if (ids.length > 100) {
+      return res.status(400).json({ success: false, message: "Too many products selected (max 100)" });
+    }
+
+    const now = new Date();
+    const actor = req.user?._id || null;
+
+    if (isFeatured) {
+      // ✅ Feature karte waqt sirf ACTIVE products — baaki skip.
+      const activeIds = await Product.find({
+        _id: { $in: ids },
+        is_deleted: { $ne: true },
+        status: "active",
+      })
+        .select("_id")
+        .lean()
+        .then((docs) => docs.map((d) => d._id));
+
+      if (activeIds.length) {
+        await Product.updateMany(
+          { _id: { $in: activeIds }, is_deleted: { $ne: true } },
+          { $set: { is_featured: true, featured_at: now, updatedby: actor, updated_at: now } },
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        message:
+          activeIds.length === ids.length
+            ? `${activeIds.length} product${activeIds.length === 1 ? "" : "s"} marked as featured`
+            : `${activeIds.length} product${activeIds.length === 1 ? "" : "s"} marked as featured · ${ids.length - activeIds.length} inactive skipped`,
+        modified: activeIds.length,
+        skipped: ids.length - activeIds.length,
+      });
+    }
+
+    // Unfeature — hamesha allowed (status se koi farq nahi)
+    const result = await Product.updateMany(
+      { _id: { $in: ids }, is_deleted: { $ne: true } },
+      { $set: { is_featured: false, featured_at: null, updatedby: actor, updated_at: now } },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} removed from featured`,
+      modified: result.modifiedCount || 0,
+      skipped: 0,
+    });
+  } catch (error) {
+    console.error("❌ [bulkProductFeatured] Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update featured products",
+    });
+  }
+};
+
+// ======================================================
 // EXPORTS
 // ======================================================
 module.exports = {
@@ -2215,4 +2300,5 @@ module.exports = {
   deleteProduct,
   toggleProductStatus,
   toggleProductFeatured,
+  bulkProductFeatured,
 };

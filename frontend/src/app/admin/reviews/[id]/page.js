@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, ArrowUpRight, BadgeCheck, Check, Loader2, Send,
-  Eye, EyeOff, MessageSquareText, Package, ShieldCheck, Star,
+  ArrowLeft, ArrowUpRight, AlertTriangle, BadgeCheck, Check, Loader2, Send,
+  Eye, EyeOff, MessageSquareText, Package, ShieldCheck, Star, Pencil, Trash2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
@@ -63,6 +63,8 @@ export default function AdminReviewDetailPage() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [responseDraft, setResponseDraft] = useState("");
+  const [isEditingResponse, setIsEditingResponse] = useState(false);
+  const [isDeleteResponseConfirmOpen, setIsDeleteResponseConfirmOpen] = useState(false);
   const { data: review, isLoading, isError } = useQuery({ queryKey: ["adminReview", id], queryFn: () => adminReviewApi.get(id), enabled: !!id });
   useEffect(() => {
     setResponseDraft(review?.storeResponse?.message || "");
@@ -88,11 +90,25 @@ export default function AdminReviewDetailPage() {
         ? { ...current, storeResponse, updated_at: savedReview?.updated_at || current.updated_at }
         : savedReview);
       setResponseDraft(storeResponse.message);
+      setIsEditingResponse(false);
       toast.success("Store response saved");
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Could not publish response"),
+  });
+  const deleteResponseMutation = useMutation({
+    mutationFn: () => adminReviewApi.deleteResponse(id),
+    onSuccess: () => {
+      queryClient.setQueryData(["adminReview", id], (current) => current ? { ...current, storeResponse: null } : current);
+      setResponseDraft("");
+      setIsEditingResponse(false);
+      setIsDeleteResponseConfirmOpen(false);
+      toast.success("Store response deleted");
+      queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || "Could not delete response"),
   });
 
   if (isLoading || !id) return (
@@ -132,6 +148,7 @@ export default function AdminReviewDetailPage() {
     }
     responseMutation.mutate(message);
   };
+  const confirmDeleteResponse = () => deleteResponseMutation.mutate();
 
   return (
     <div className="w-full space-y-4 pb-8" style={{ color: "var(--text-primary)" }}>
@@ -197,15 +214,26 @@ export default function AdminReviewDetailPage() {
                     </div>
                     <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-muted)" }}>Reply publicly as your store. Keep it helpful, respectful, and specific.</p>
                   </div>
-                  <button type="button" disabled={responseMutation.isPending} onClick={() => setResponseDraft(buildSuggestedReply(review, user.name))} className="inline-flex h-8 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50" style={{ borderColor: "var(--accent-soft)", backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>Use suggested reply</button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {review.storeResponse?.message ? <>
+                      <button type="button" disabled={responseMutation.isPending || deleteResponseMutation.isPending} onClick={() => { setResponseDraft(review.storeResponse.message); setIsEditingResponse(true); document.getElementById("review-store-response")?.focus(); }} className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:opacity-50" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><Pencil size={14} /> Edit reply</button>
+                      <button type="button" disabled={responseMutation.isPending || deleteResponseMutation.isPending} onClick={() => setIsDeleteResponseConfirmOpen(true)} className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50" style={{ borderColor: "var(--danger-soft)", backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}>{deleteResponseMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Delete reply</button>
+                    </> : null}
+                    {(isEditingResponse || !review.storeResponse?.message) ? <button type="button" disabled={responseMutation.isPending} onClick={() => setResponseDraft(buildSuggestedReply(review, user.name))} className="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50" style={{ borderColor: "var(--accent-soft)", backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>Use suggested reply</button> : null}
+                  </div>
                 </div>
                 {review.storeResponse?.message ? <div className="mt-4 rounded-lg border-l-2 p-3.5" style={{ borderColor: "var(--accent-soft)", backgroundColor: "var(--bg-tertiary)" }}><p className="whitespace-pre-wrap break-words text-sm leading-6" style={{ color: "var(--text-primary)" }}>{review.storeResponse.message}</p><p className="mt-2 border-t pt-2 text-[11px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>Published by {review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${formatDateTime(review.storeResponse.responded_at)}` : ""}</p></div> : null}
+                {(!review.storeResponse?.message || isEditingResponse) ? <>
                 <label htmlFor="review-store-response" className="sr-only">Store response message</label>
                 <textarea id="review-store-response" value={responseDraft} onChange={(event) => setResponseDraft(event.target.value.slice(0, 1000))} disabled={responseMutation.isPending} maxLength={1000} rows={5} placeholder="Write a thoughtful response to this customer…" className="mt-4 min-h-36 w-full resize-y rounded-lg border px-3.5 py-3 text-sm leading-6 outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:opacity-60" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }} />
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="text-[11px]" style={{ color: "var(--text-muted)" }}><span className="font-semibold" style={{ color: "var(--text-secondary)" }}>{responseDraft.length}/1,000</span> characters <span className="mx-1">·</span> Customers will see this after publishing</div>
-                  <button type="button" disabled={responseMutation.isPending} onClick={handlePublishResponse} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>{responseMutation.isPending ? <><Loader2 size={15} className="animate-spin" />{review.storeResponse?.message ? "Updating…" : "Publishing…"}</> : <><Send size={15} />{review.storeResponse?.message ? "Update response" : "Publish response"}</>}</button>
+                  <div className="flex items-center gap-2">
+                    {review.storeResponse?.message ? <button type="button" disabled={responseMutation.isPending} onClick={() => { setResponseDraft(review.storeResponse.message); setIsEditingResponse(false); }} className="inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:opacity-50" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><X size={14} /> Cancel</button> : null}
+                    <button type="button" disabled={responseMutation.isPending} onClick={handlePublishResponse} className="inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: "var(--accent)" }}>{responseMutation.isPending ? <><Loader2 size={15} className="animate-spin" />{review.storeResponse?.message ? "Updating…" : "Publishing…"}</> : <><Send size={15} />{review.storeResponse?.message ? "Update response" : "Publish response"}</>}</button>
+                  </div>
                 </div>
+                </> : null}
               </div>
             </div>
           </section>
@@ -258,7 +286,6 @@ export default function AdminReviewDetailPage() {
             <dl className="space-y-2.5">
               <DetailRow label="Status"><StatusPill hidden={hidden} /></DetailRow>
               <DetailRow label="Posted On">{formatDateTime(review.created_at)}</DetailRow>
-              <DetailRow label="Last Updated">{formatDateTime(review.updated_at || review.created_at)}</DetailRow>
               <DetailRow label="Review ID">{review._id}</DetailRow>
               <DetailRow label="Rating">{rating} / 5</DetailRow>
               <DetailRow label="Purchase"><span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold" style={review.verifiedPurchase ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)" } : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{review.verifiedPurchase ? <><BadgeCheck size={11} /> Verified</> : "Unverified"}</span></DetailRow>
@@ -271,6 +298,18 @@ export default function AdminReviewDetailPage() {
           </div>
         </aside>
       </div>
+      {isDeleteResponseConfirmOpen ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[3px]" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleteResponseMutation.isPending) setIsDeleteResponseConfirmOpen(false); }}>
+        <section role="alertdialog" aria-modal="true" aria-labelledby="delete-response-title" aria-describedby="delete-response-description" className="w-full max-w-sm rounded-xl border p-5 shadow-2xl" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}>
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}><AlertTriangle size={19} /></span>
+            <div className="min-w-0"><h2 id="delete-response-title" className="text-sm font-bold">Delete this store response?</h2><p id="delete-response-description" className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>Customers will no longer see it.</p></div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button type="button" disabled={deleteResponseMutation.isPending} onClick={() => setIsDeleteResponseConfirmOpen(false)} className="inline-flex h-10 items-center justify-center rounded-lg text-sm font-semibold transition hover:opacity-80 disabled:opacity-60" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>Cancel</button>
+            <button type="button" disabled={deleteResponseMutation.isPending} onClick={confirmDeleteResponse} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "var(--danger-text)" }}>{deleteResponseMutation.isPending ? <><Loader2 size={15} className="animate-spin" /> Deleting…</> : "Delete"}</button>
+          </div>
+        </section>
+      </div> : null}
     </div>
   );
 }
