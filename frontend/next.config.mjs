@@ -1,6 +1,22 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  allowedDevOrigins: [
+    '192.168.88.64',
+    '192.168.88.62',
+    'localhost',
+    '127.0.0.1',
+  ],
+
+  turbopack: {
+    root: __dirname,
+  },
+
+
 };
 
 export default nextConfig;

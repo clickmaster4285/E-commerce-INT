@@ -1,17 +1,72 @@
 const express = require("express");
-const { createProduct, getProducts, getProductById, updateProduct, deleteProduct } = require("../controllers/productController");
+
+const {
+  createProduct,
+  getProducts,
+  getProductStats,
+  getProductFacets,
+  getCategoryTiles,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  toggleProductStatus,
+  toggleProductFeatured,
+  bulkProductFeatured,
+} = require("../controllers/productController");
+
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware"); // <--- Naya import
+const { checkPermission } = require("../middleware/checkPermission");
+
+const {
+  productImagesUpload,
+  validateProductImages,
+} = require("../middleware/productImageMiddleware");
+
+const saveProductImages = require("../middleware/saveProductImages");
 
 const router = express.Router();
 
-// Sirf ADMIN add, update, delete kar sakta hai
-router.post("/", authMiddleware, adminMiddleware, createProduct);
-router.put("/:id", authMiddleware, adminMiddleware, updateProduct);
-router.delete("/:id", authMiddleware, adminMiddleware, deleteProduct);
+// ==========================================
+// 🌐 PUBLIC ROUTES — bina login (User GUI)
+// ==========================================
+router.get("/", getProducts);
+// ✅ Summary stats (stat cards) — list se alag route, taake independently load ho sake.
+//    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
+router.get("/stats", getProductStats);
+// ✅ Storefront shop facets + category tiles — "/:id" se PEHLE (warna id match ho jayega)
+router.get("/facets", getProductFacets);
+router.get("/category-tiles", getCategoryTiles);
+router.get("/:id", getProductById);
 
-// Sab (Admin aur User) dekh sakte hain
-router.get("/", authMiddleware, getProducts);
-router.get("/:id", authMiddleware, getProductById);
+// ==========================================
+// 🛡️ ADMIN ROUTES — login + permission
+// ==========================================
+router.post(
+  "/",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  createProduct,
+);
+
+router.put(
+  "/:id",
+  authMiddleware,
+  checkPermission("products"),
+  productImagesUpload,
+  validateProductImages,
+  saveProductImages,
+  updateProduct,
+);
+
+router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
+// ✅ Featured Products page — bulk mark / unmark ("Manage Products" popup)
+//    "/:id" routes se PEHLE register — warna "bulk-featured" ko id samajh sakta hai.
+router.patch("/bulk-featured", authMiddleware, checkPermission("products"), bulkProductFeatured);
+// ✅ Featured Products page — single mark / unmark
+router.patch("/:id/toggle-featured", authMiddleware, checkPermission("products"), toggleProductFeatured);
 
 module.exports = router;

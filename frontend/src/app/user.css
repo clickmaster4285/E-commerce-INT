@@ -1,0 +1,345 @@
+/* ==========================================
+   USER THEME — DARK MODE (Default)
+========================================== */
+:root {
+  /* Backgrounds */
+  --user-bg:            #000000;
+  --user-bg-elevated:   #0a0a0a;
+  --user-bg-card:       #111111;
+  --user-bg-hover:      #1a1a1a;
+  --user-bg-input:      #0d0d0d;
+
+  /* Text */
+  --user-text:          #ffffff;
+  --user-text-secondary:#e5e5e5;
+  --user-text-muted:    #a3a3a3;
+  --user-text-subtle:   #666666;
+  --user-text-disabled: #404040;
+
+  /* Borders */
+  --user-border:        #1f1f1f;
+  --user-border-soft:   #141414;
+  --user-border-hover:  #2a2a2a;
+
+  /* Accent */
+  --user-accent:        #ffffff;
+  --user-accent-hover:  #e5e5e5;
+  --user-accent-text:   #000000;
+  --user-accent-soft:   rgba(255, 255, 255, 0.08);
+
+  /* Logo background (dono modes mein white) */
+  --user-logo-bg:       #ffffff;
+
+  /* Status */
+  --user-success:       #10b981;
+  --user-danger:        #ef4444;
+  --user-warning:       #f59e0b;
+  --user-info:          #3b82f6;
+
+  /* Shadows */
+  --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.5);
+  --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.5);
+  --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.6);
+
+  /* Radius */
+  --user-radius-sm:     8px;
+  --user-radius-md:     12px;
+  --user-radius-lg:     16px;
+  --user-radius-xl:     24px;
+
+  --user-transition:    0.2s ease;
+}
+
+/* ==========================================
+   LIGHT MODE — Overrides
+========================================== */
+.user-theme.light {
+  --user-bg:            #fafafa;
+  --user-bg-elevated:   #ffffff;
+  --user-bg-card:       #ffffff;
+  --user-bg-hover:      #f0f0f0;
+  --user-bg-input:      #f5f5f5;
+
+  --user-text:          #0a0a0a;
+  --user-text-secondary:#262626;
+  --user-text-muted:    #525252;
+  --user-text-subtle:   #8a8a8a;
+  --user-text-disabled: #c4c4c4;
+
+  --user-border:        #e6e6e6;
+  --user-border-soft:   #f0f0f0;
+  --user-border-hover:  #cfcfcf;
+
+  --user-accent:        #0a0a0a;
+  --user-accent-hover:  #333333;
+  --user-accent-text:   #ffffff;
+  --user-accent-soft:   rgba(0, 0, 0, 0.06);
+
+  --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.06);
+  --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);
+  --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.10);
+}
+
+/* ==========================================
+   WRAPPER BASE
+========================================== */
+.user-theme {
+  background: var(--user-bg);
+  color: var(--user-text);
+  min-height: 100vh;
+}
+
+.user-theme a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ==========================================
+   SCROLLBAR UTILITIES
+========================================== */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.user-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.user-theme ::-webkit-scrollbar-track {
+  background: var(--user-bg);
+}
+.user-theme ::-webkit-scrollbar-thumb {
+  background: var(--user-border-hover);
+  border-radius: 999px;
+}
+.user-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--user-text-subtle);
+}
+
+/* ==========================================
+   TEXT SELECTION
+========================================== */
+.user-theme ::selection {
+  background: var(--user-accent);
+  color: var(--user-accent-text);
+}
+
+/* ==========================================
+   CHROME AUTOFILL FIX
+========================================== */
+.user-theme input:-webkit-autofill,
+.user-theme input:-webkit-autofill:hover,
+.user-theme input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--user-bg-input) inset !important;
+  -webkit-text-fill-color: var(--user-text) !important;
+  caret-color: var(--user-text);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* ==========================================
+   FIX: Accent buttons ka text hamesha sahi
+   (~ = sirf EXACT class match, group-hover safe)
+========================================== */
+[class~="text-[var(--user-accent-text)]"] {
+  color: var(--user-accent-text) !important;
+}
+
+/* Focus outlines clean */
+.user-theme a:focus,
+.user-theme button:focus {
+  outline: none;
+}
+
+/* ==========================================
+   MARQUEE — Auto-scroll loop
+========================================== */
+.marquee-track {
+  animation: user-marquee 45s linear infinite;
+  will-change: transform;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes user-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@media (max-width: 640px) {
+  .marquee-track {
+    animation-duration: 30s;
+  }
+}
+
+/* ==========================================
+   CART DRAWER ANIMATIONS
+========================================== */
+@keyframes cart-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.cart-item-in {
+  animation: cart-item-in 0.3s ease-out both;
+}
+
+@keyframes cart-qty-pop {
+  0% {
+    transform: scale(0.75);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.cart-qty-pop {
+  display: inline-block;
+  animation: cart-qty-pop 0.2s ease-out;
+}
+
+/* ==========================================
+   DEAL PICKER PANEL ANIMATION
+========================================== */
+@keyframes deal-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.deal-picker-panel {
+  animation: deal-picker-in 0.18s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-picker-panel {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-item-in,
+  .cart-qty-pop {
+    animation: none;
+  }
+}
+
+/* ==========================================
+   ULTRA-WIDE / 4K FLUID SCALING
+   ==========================================
+   Masla: 1080p par layout perfect tha, lekin bari (2K/4K) screen par
+   poora store — header, hero, sidebar, products — 1400px par capped hone
+   ki wajah se screen ke beech me chhota sa lagta tha, aur text/icon bhi
+   physically chhote reh jate the.
+
+   Hal — teen layer ka fluid system. Teenon layers 1920px (yani 1080p /
+   Full HD) se neeche BILKUL inactive hain, is liye purana design
+   mobile / laptop / 1080p par jaisa tha waisa hi rehta hai:
+
+     1) .user-shell   → content container screen ke sath barhta hai
+                        (1400px → 2560px), lekin koi jump nahi: 1920px ke
+                        baad har extra viewport pixel ka 62% content ko
+                        milta hai.
+     2) --user-ui-scale → 2000px ke baad root font-size barhta hai, is liye
+                        har rem-based size (Tailwind ka gap/padding/height,
+                        aur converted text sizes) khud-ba-khud scale hoti
+                        hai — page sirf chaura nahi hota, bara bhi lagta hai.
+     3) svg zoom      → lucide icons numeric size ke sath width/height
+                        attribute dete hain; wohi icons usi ratio me
+                        barhte hain (warna text ke sath icons chhote
+                        lagne lagte hain).
+   ========================================== */
+
+/* ---------- 1) FLUID SHELL ----------
+   Home page (aur poora storefront) FULL-WIDTH responsive hai — koi 1400px
+   cap nahi. Har screen par content viewport ki poori chaudai istemal karta
+   hai (sirf component-level side padding rehta hai: px-3 / lg:px-8).
+   Mobile → laptop → 1080p → 2K/4K sab par koi side gap / center cap nahi. */
+.user-shell {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+@media (min-width: 1921px) {
+  .user-shell {
+    max-width: none;
+  }
+}
+
+/* Bundles page ka apna wide shell — full-width responsive */
+.user-shell-1600 {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+@media (min-width: 1921px) {
+  .user-shell-1600 {
+    max-width: none;
+  }
+}
+
+/* ---------- 2) UI SCALE (root font-size) ---------- */
+:root {
+  --user-ui-scale: 1;
+}
+
+@media (min-width: 2000px) {
+  :root {
+    --user-ui-scale: 1.0625;
+  }
+}
+
+@media (min-width: 2560px) {
+  :root {
+    --user-ui-scale: 1.125;
+  }
+}
+
+@media (min-width: 3200px) {
+  :root {
+    --user-ui-scale: 1.1875;
+  }
+}
+
+@media (min-width: 3840px) {
+  :root {
+    --user-ui-scale: 1.25;
+  }
+}
+
+/* rem-based Tailwind utilities + converted text sizes inhi par depend karte
+   hain → yahan ek line se poora storefront scale ho jata hai.
+   Scale 1 par yeh 16px hi hai (koi change nahi). */
+html:has(.user-theme) {
+  font-size: calc(1rem * var(--user-ui-scale));
+}
+
+/* Class-less (inherited) text ka base — body 14px ke barabar, sirf scale par barhta hai */
+.user-theme {
+  font-size: calc(14px * var(--user-ui-scale));
+}
+
+/* ---------- 3) LUCIDE ICONS (numeric size) ---------- */
+/* Sirf woh icons jinpar explicit width attribute hai (lucide numeric size).
+   Percentage-width svg (charts/illustrations) untouched rehte hain. */
+.user-theme svg[width]:not([width*="%"]) {
+  zoom: var(--user-ui-scale);
+}
