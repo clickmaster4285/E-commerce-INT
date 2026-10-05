@@ -43,7 +43,6 @@
     "@types/node": "26.2.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
-    "lightningcss-win32-x64-msvc": "^1.33.0",
     "tailwindcss": "^4"
   }
 }
