@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import adminHttp from "@/apis/adminHttp";
+import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { disconnectSidebarSocket } from "./Sidebar";

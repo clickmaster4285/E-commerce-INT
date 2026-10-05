@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
-import adminHttp from '@/apis/adminHttp';
+import adminHttp from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/useShippingSocketSync';

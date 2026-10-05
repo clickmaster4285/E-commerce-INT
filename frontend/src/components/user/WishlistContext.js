@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import userHttp from "@/apis/userHttp"
+import { userHttp } from "@/apis/axiosInstance"
 const WishlistContext = createContext(null);
 
 export function WishlistProvider({ children }) {

@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 export const variantApi = {
   getNextSku: () =>
     adminHttp.get("/variants/next-sku").then((res) => res.data?.data || res.data),

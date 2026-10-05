@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 // ✅ USER-SIDE Shipping API
 export const shippingApi = {
   // Public — standard/express fees, days, free threshold

@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 export const shippingApi = {
   getConfig: () => adminHttp.get("/shipping/config").then((r) => r.data?.data || r.data),
   quote: (payload) => adminHttp.post("/shipping/quote", payload).then((r) => r.data?.data || r.data),

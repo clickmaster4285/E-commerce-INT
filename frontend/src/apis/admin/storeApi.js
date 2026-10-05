@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 export const storeApi = {
   getPublic: async () => {
     const res = await adminHttp.get("/store/public");

@@ -38,6 +38,8 @@ import {
   LogIn,
   Settings,
   BarChart3,
+  Bell,
+  Copy,
   Layers,
   ShieldCheck,
   Percent,
@@ -45,7 +47,7 @@ import {
 } from "lucide-react";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
-import adminHttp from "@/apis/adminHttp";
+import adminHttp from "@/apis/axiosInstance";
 import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 // ==========================================
@@ -80,21 +82,27 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+      className="badge"
       style={
         active
           ? {
               backgroundColor: "var(--success-soft)",
               color: "var(--success-text)",
-              border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--success) 26%, transparent)",
             }
           : {
               backgroundColor: "var(--danger-soft)",
               color: "var(--danger-text)",
-              border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--danger) 26%, transparent)",
             }
       }
     >
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ backgroundColor: "currentColor" }}
+      />
       {active ? "Active" : "Inactive"}
     </span>
   );
@@ -282,6 +290,9 @@ function EmployeeOverview({
   department,
   empId,
   joinDate,
+  username,
+  preferences,
+  recordInfo,
   ordersHandled,
   salesGenerated,
   productsAdded,
@@ -320,12 +331,13 @@ function EmployeeOverview({
   };
 
   const infoItems = [
-    ["Full Name", name],
-    ["Username", email.split("@")[0]],
-    ["Email Address", email],
-    ["Phone Number", phone || "N/A"],
-    ["Department", department],
-    ["Employee Code", empId],
+    ["Full Name", name, User],
+    ["Username", username, IdCard],
+    ["Email Address", email, Mail],
+    ["Phone Number", phone || "N/A", Phone],
+    ["Department", department, Layers],
+    ["Employee Code", empId, Tag],
+    ["Joined At", joinDate, Clock],
   ];
 
   const STAT_TONES = {
@@ -336,274 +348,735 @@ function EmployeeOverview({
   };
 
   const stats = [
-    { label: "Orders Handled", value: String(ordersHandled ?? 0), icon: ShoppingCart, tone: "success" },
-    { label: "Sales Generated", value: `$${Number(salesGenerated || 0).toLocaleString()}`, icon: DollarSign, tone: "warning" },
-    { label: "Products Added", value: String(productsAdded ?? 0), icon: Package, tone: "info" },
-    { label: "Performance Rating", value: String(performanceRating ?? 0), icon: Star, tone: "accent" },
+    { label: "Orders Handled", value: String(ordersHandled ?? 0), icon: ShoppingCart, tone: "success", hint: "Lifetime processed" },
+    { label: "Sales Generated", value: `$${Number(salesGenerated || 0).toLocaleString()}`, icon: DollarSign, tone: "warning", hint: "Total revenue" },
+    { label: "Products Added", value: String(productsAdded ?? 0), icon: Package, tone: "info", hint: "Catalog listings" },
+    { label: "Performance Rating", value: `${Number(performanceRating || 0).toFixed(1)}/5`, icon: Star, tone: "accent", hint: "Average score" },
+  ];
+
+  const enabledPercent =
+    totalCount ? Math.round((enabledCount / totalCount) * 100) : 0;
+
+  const [activityFilter, setActivityFilter] = useState("all");
+
+  const activityCategories = Array.from(
+    new Set(activities.map((a) => a.category).filter(Boolean))
+  );
+
+  const visibleActivities =
+    activityFilter === "all"
+      ? activities
+      : activities.filter((a) => a.category === activityFilter);
+
+  const categoryBreakdown = (() => {
+    const counts = new Map();
+
+    activities.forEach((activity) => {
+      const key = activity.category || "System";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .map(([category, count]) => ({
+        category,
+        count,
+        percent: activities.length
+          ? Math.round((count / activities.length) * 100)
+          : 0,
+        colors: getActivityColor(category),
+      }))
+      .sort((a, b) => b.count - a.count);
+  })();
+
+  const uniquePerformers = Array.from(
+    new Set(
+      activities
+        .map((a) => a.performedByName)
+        .filter(Boolean)
+    )
+  );
+
+  const lastActivityAt = (() => {
+    if (!activities.length) return "No activity";
+    const latest = activities.reduce((max, item) => {
+      const t = new Date(item.timestamp).getTime();
+      return Number.isNaN(t) ? max : Math.max(max, t);
+    }, 0);
+    return relativeTime(new Date(latest).toISOString());
+  })();
+
+  const averageOrderValue =
+    Number(ordersHandled) > 0
+      ? Math.round(Number(salesGenerated || 0) / Number(ordersHandled))
+      : 0;
+
+  const notificationPrefs = [
+    { key: "email", label: "Email Alerts", icon: Mail },
+    { key: "push", label: "Push Notifications", icon: Bell },
+    { key: "weekly", label: "Weekly Digest", icon: Calendar },
   ];
 
   return (
     <>
-      {/* ============ BREADCRUMB + HEADER ============ */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }} aria-label="Breadcrumb">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 font-medium transition-opacity hover:opacity-80"
+      {/* ============ TOP BAR ============ */}
+      <div className="page-header">
+        <div className="min-w-0">
+          <nav
+            className="mb-2 flex flex-wrap items-center gap-1.5 text-[11.5px]"
             style={{ color: "var(--text-muted)" }}
+            aria-label="Breadcrumb"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
-          </button>
-          <span style={{ opacity: 0.6 }}>/</span>
-          <button onClick={() => router.push("/admin/employees")} className="font-medium transition-opacity hover:opacity-80">
-            Employees
-          </button>
-          <span style={{ opacity: 0.6 }}>/</span>
-          <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-            Employee Details
-          </span>
-        </nav>
+            <button
+              onClick={() => router.push("/admin/employees")}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Employees
+            </button>
+            <span style={{ opacity: 0.5 }}>/</span>
+            <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
+              {name}
+            </span>
+          </nav>
 
-        <button onClick={() => openEditModal(employee)} className="btn-primary">
-          <Pencil className="h-3.5 w-3.5" /> Edit Employee
-        </button>
-      </div>
+          <h1 className="page-title">
+            <span className="page-title-icon">
+              <User className="h-[18px] w-[18px]" />
+            </span>
+            Employee Profile
+          </h1>
 
-      <div>
-        <h1 className="text-[19px] font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
-          Employee Details
-        </h1>
-        <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-          View and manage employee information, permissions and activities.
-        </p>
+          <p className="page-subtitle">
+            Complete record, performance and access control for this staff member.
+          </p>
+        </div>
+
+        <div className="page-actions">
+          {canEditPermissions && (
+            <button
+              onClick={openPermissions}
+              className="btn-secondary inline-flex items-center gap-1.5"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Manage Access
+            </button>
+          )}
+
+          <button
+            onClick={() => openEditModal(employee)}
+            className="btn-primary inline-flex items-center gap-1.5"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Edit Employee
+          </button>
+        </div>
       </div>
 
       {/* ============ HERO CARD ============ */}
-      <section className="card p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          {/* Identity */}
-          <div className="flex min-w-0 flex-1 items-center gap-3.5">
-            <div className="relative shrink-0">
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt={name}
-                  className="h-14 w-14 rounded-full border object-cover"
-                  style={{ borderColor: "var(--border-color)" }}
-                />
-              ) : (
-                <div
-                  className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold"
-                  style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
-                >
-                  {name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              {status === "active" && (
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2"
-                  style={{ backgroundColor: "var(--success)", borderColor: "var(--bg-card)" }}
-                />
-              )}
-            </div>
+      <section className="card overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="h-1 w-full"
+          style={{
+            background:
+              "linear-gradient(90deg, var(--accent), var(--purple), var(--info))",
+          }}
+        />
 
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-[15px] font-bold" style={{ color: "var(--text-primary)" }}>
-                  {name}
-                </h2>
-                <StatusBadge status={status} />
-              </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px]" style={{ color: "var(--text-muted)" }}>
-                <span className="flex items-center gap-1.5">
-                  <User className="h-3 w-3" /> {email.split("@")[0]}
-                </span>
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Mail className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{email}</span>
-                </span>
-                {phone && phone !== "N/A" && (
-                  <span className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3" /> {phone}
-                  </span>
+        <div className="p-5">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            {/* Identity */}
+            <div className="flex min-w-0 flex-1 items-start gap-4">
+              <div className="relative shrink-0">
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt={name}
+                    className="h-20 w-20 rounded-2xl border object-cover"
+                    style={{
+                      borderColor: "var(--border-color)",
+                      boxShadow: "var(--shadow-sm)",
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold"
+                    style={{
+                      backgroundColor: "var(--accent-soft)",
+                      color: "var(--accent)",
+                      border: "1px solid color-mix(in srgb, var(--accent) 22%, transparent)",
+                    }}
+                  >
+                    {name.charAt(0).toUpperCase()}
+                  </div>
                 )}
+
+                <span
+                  title={status === "active" ? "Online account active" : "Account inactive"}
+                  className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-[3px]"
+                  style={{
+                    backgroundColor:
+                      status === "active" ? "var(--success)" : "var(--danger)",
+                    borderColor: "var(--bg-card)",
+                  }}
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    className="truncate text-[20px] font-bold tracking-tight"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {name}
+                  </h2>
+                  <StatusBadge status={status} />
+                  {role && role !== "staff" && (
+                    <span className="badge badge-neutral capitalize">
+                      {role === "admin" ? (
+                        <ShieldCheck className="h-3 w-3" />
+                      ) : (
+                        <Briefcase className="h-3 w-3" />
+                      )}
+                      {role}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+                    style={{ backgroundColor: "var(--bg-tertiary)" }}
+                  >
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{email}</span>
+                  </span>
+
+                  {phone && phone !== "N/A" && (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+                      style={{ backgroundColor: "var(--bg-tertiary)" }}
+                    >
+                      <Phone className="h-3 w-3 shrink-0" />
+                      {phone}
+                    </span>
+                  )}
+
+                  {department && department !== "Not assigned" && (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
+                      style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+                    >
+                      <Layers className="h-3 w-3 shrink-0" />
+                      {department}
+                    </span>
+                  )}
+
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
+                    style={{ backgroundColor: "var(--bg-tertiary)" }}
+                  >
+                    <Calendar className="h-3 w-3 shrink-0" />
+                    Joined {joinDate}
+                  </span>
+                </div>
+
+                {updatedInfo && (
+                  <div
+                    className="mt-3 flex items-center gap-2 text-[11px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <Pencil className="h-3 w-3 shrink-0" style={{ color: "var(--info)" }} />
+                    <span>
+                      Last updated by{" "}
+                      <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
+                        {updatedInfo.name}
+                      </span>{" "}
+                      · {updatedInfo.date}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={`mailto:${email}`}
+                    className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Send Email
+                  </a>
+
+                  {phone && phone !== "N/A" && (
+                    <a
+                      href={`tel:${String(phone).replace(/\s+/g, "")}`}
+                      className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
+                    >
+                      <Phone className="h-3.5 w-3.5" /> Call
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(email);
+                      toast.success("Email copied to clipboard");
+                    }}
+                    className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copy Email
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Key facts */}
-          <div
-            className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2.5 border-t pt-3.5 sm:grid-cols-4 lg:border-l lg:border-t-0 lg:pl-5"
-            style={{ borderColor: "var(--border-color)" }}
-          >
-            {[
-              ["Role", role],
-              ["Employee Code", empId],
-              ["Department", department],
-              ["Joined At", joinDate],
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <p className="text-[9.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  {label}
-                </p>
-                <p className="mt-0.5 truncate text-[12.5px] font-bold capitalize" style={{ color: "var(--text-primary)" }}>
-                  {value || "—"}
-                </p>
-              </div>
-            ))}
+            {/* Key facts */}
+            <div
+              className="grid shrink-0 grid-cols-2 gap-3 rounded-xl border p-4 sm:grid-cols-4 xl:min-w-[420px]"
+              style={{
+                borderColor: "var(--border-color)",
+                backgroundColor: "var(--bg-card-alt)",
+              }}
+            >
+              {[
+                ["Employee Code", empId, IdCard],
+                ["Department", department, Layers],
+                ["Joined At", joinDate, Calendar],
+                ["Access Level", `${enabledCount}/${totalCount}`, ShieldCheck],
+              ].map(([label, value, Icon]) => (
+                <div key={label} className="min-w-0">
+                  <span
+                    className="mb-1.5 flex h-6 w-6 items-center justify-center rounded-md"
+                    style={{
+                      backgroundColor: "var(--accent-soft)",
+                      color: "var(--accent)",
+                    }}
+                  >
+                    <Icon className="h-3 w-3" />
+                  </span>
+
+                  <p
+                    className="text-[9.5px] font-semibold uppercase tracking-wide"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {label}
+                  </p>
+
+                  <p
+                    className="mt-0.5 truncate text-[12.5px] font-bold capitalize"
+                    style={{ color: "var(--text-primary)" }}
+                    title={value || "—"}
+                  >
+                    {value || "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Updated info — shown only when the employee was actually updated */}
-        {updatedInfo && (
-          <div className="mt-3.5 flex items-center gap-2 border-t pt-3 text-[11px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
-            <Pencil className="h-3 w-3 shrink-0" style={{ color: "var(--info)" }} />
-            <span>
-              Last updated by{" "}
-              <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
-                {updatedInfo.name}
-              </span>{" "}
-              · {updatedInfo.date}
-            </span>
-          </div>
-        )}
       </section>
 
       {/* ============ PERFORMANCE STATS ============ */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon, tone }) => {
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map(({ label, value, icon: Icon, tone, hint }) => {
           const toneStyle = STAT_TONES[tone];
           return (
-            <div key={label} className="card flex min-w-0 items-center gap-3 p-3.5">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                style={{ backgroundColor: toneStyle.bg, color: toneStyle.color }}
-              >
-                <Icon className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[9.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  {label}
-                </p>
-                <p className="mt-0.5 truncate text-[13px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>
-                  {value}
-                </p>
+            <div key={label} className="card card-hover p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p
+                    className="text-[9.5px] font-semibold uppercase tracking-wide"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className="mt-1 truncate text-[18px] font-extrabold tabular-nums tracking-tight"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {value}
+                  </p>
+                </div>
+
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{
+                    backgroundColor: toneStyle.bg,
+                    color: toneStyle.color,
+                  }}
+                >
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                </span>
               </div>
+
+              <p
+                className="mt-3 border-t pt-2.5 text-[10.5px] font-medium"
+                style={{ color: "var(--text-muted)", borderColor: "var(--border-color)" }}
+              >
+                {hint}
+              </p>
             </div>
           );
         })}
       </div>
 
-      {/* ============ PERSONAL INFORMATION (all sections on one page, no tabs) ============ */}
-      <div className="grid grid-cols-1 gap-3">
-        {/* Personal Information */}
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              <User className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Personal Information
-            </h3>
-            <button
-              onClick={() => openEditModal(employee)}
-              className="flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
-              style={{ color: "var(--accent)" }}
-            >
-              <Pencil className="h-3 w-3" /> Edit
-            </button>
-          </div>
+      {/* ============ MAIN CONTENT GRID ============ */}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+        {/* Left column */}
+        <div className="space-y-3 xl:col-span-7">
+          {/* Personal Information */}
+          <section className="card p-5">
+            <div className="mb-4 flex items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
+              <h3 className="section-header mb-0">
+                <User className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                Personal Information
+              </h3>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-6">
-            {infoItems.map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <p className="text-[9.5px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  {label}
-                </p>
-                <p className="mt-0.5 break-words text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {value || "—"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* ============ ACCESS CONTROL (all on one page) ============ */}
-      <section className="card p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-            <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Access Control
-          </h3>
-          <div className="flex items-center gap-2">
-            <span
-              className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
-              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
-            >
-              {totalCount ? Math.round((enabledCount / totalCount) * 100) : 0}% Enabled
-            </span>
-            {canEditPermissions && (
               <button
-                onClick={openPermissions}
-                className="flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-80"
-                style={{ color: "var(--accent)" }}
+                onClick={() => openEditModal(employee)}
+                className="btn-ghost inline-flex items-center gap-1 text-[11px] font-semibold"
               >
                 <Pencil className="h-3 w-3" /> Edit
               </button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {filteredPermissions.map(({ key, label, value }) => (
-            <div
-              key={key}
-              className="rounded-lg border p-2.5"
-              style={{
-                borderColor: value ? "color-mix(in srgb, var(--success) 28%, transparent)" : "var(--border-color)",
-                backgroundColor: value ? "var(--success-soft)" : "var(--bg-card-alt)",
-              }}
-            >
-              <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                {label}
-              </p>
-              <p
-                className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold"
-                style={{ color: value ? "var(--success-text)" : "var(--danger-text)" }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "currentColor" }} />
-                {value ? "Enabled" : "Disabled"}
-              </p>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ============ ACTIVITY LOG (full timeline, live via socket — single page) ============ */}
-      <section className="card p-4">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Activity Log
+            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+              {infoItems.map(([label, value, Icon]) => (
+                <div key={label} className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+
+                  <div className="min-w-0">
+                    <p
+                      className="text-[9.5px] font-medium uppercase tracking-wide"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      className="mt-0.5 break-words text-[12.5px] font-semibold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {value || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Account & Records */}
+          <section className="card p-5">
+            <div
+              className="mb-4 flex items-center justify-between gap-2 border-b pb-3"
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              <h3 className="section-header mb-0">
+                <FileText className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                Account &amp; Records
+              </h3>
+
+              <span className="badge badge-neutral">
+                <Store className="h-3 w-3" />
+                {recordInfo.store}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+              {[
+                ["Account Status", status === "active" ? "Active" : "Inactive", Power],
+                ["Access Role", role === "staff" ? "Standard staff" : role, ShieldCheck],
+                ["Created On", recordInfo.createdAt, Calendar],
+                ["Created By", recordInfo.createdBy, User],
+                ["Last Updated", recordInfo.updatedAt, Pencil],
+                ["Performance Rating", `${Number(performanceRating || 0).toFixed(1)} / 5`, Star],
+              ].map(([label, value, Icon]) => (
+                <div key={label} className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+
+                  <div className="min-w-0">
+                    <p
+                      className="text-[9.5px] font-medium uppercase tracking-wide"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      className="mt-0.5 break-words text-[12.5px] font-semibold capitalize"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {value || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Notification Preferences */}
+          <section className="card p-5">
+            <div
+              className="mb-4 flex items-center justify-between gap-2 border-b pb-3"
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              <h3 className="section-header mb-0">
+                <Bell className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                Notification Preferences
+              </h3>
+
+              <span className="text-[10.5px] font-medium" style={{ color: "var(--text-muted)" }}>
+                Set by the employee
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {notificationPrefs.map(({ key, label, icon: Icon }) => {
+                const enabled = preferences?.notifications?.[key] !== false;
+
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
+                    style={{
+                      borderColor: enabled
+                        ? "color-mix(in srgb, var(--info) 24%, transparent)"
+                        : "var(--border-color)",
+                      backgroundColor: enabled ? "var(--info-soft)" : "var(--bg-card-alt)",
+                    }}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Icon
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={{ color: enabled ? "var(--info-text)" : "var(--text-muted)" }}
+                      />
+                      <span
+                        className="truncate text-[11.5px] font-semibold"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {label}
+                      </span>
+                    </span>
+
+                    <span
+                      className="inline-flex shrink-0 items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide"
+                      style={{ color: enabled ? "var(--info-text)" : "var(--danger-text)" }}
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: "currentColor" }}
+                      />
+                      {enabled ? "On" : "Off"}
+                    </span>
+                  </div>
+                );
+              })}
+
+              <div
+                className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
+                style={{
+                  borderColor: "var(--border-color)",
+                  backgroundColor: "var(--bg-card-alt)",
+                }}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Settings
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: "var(--text-muted)" }}
+                  />
+                  <span
+                    className="truncate text-[11.5px] font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Dark Mode
+                  </span>
+                </span>
+
+                <span
+                  className="inline-flex shrink-0 items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide"
+                  style={{
+                    color: preferences?.darkMode !== false ? "var(--info-text)" : "var(--danger-text)",
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: "currentColor" }}
+                  />
+                  {preferences?.darkMode !== false ? "On" : "Off"}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Access Control */}
+          <section className="card p-5">
+            <div
+              className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3"
+              style={{ borderColor: "var(--border-color)" }}
+            >
+              <h3 className="section-header mb-0">
+                <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+                Access Control
+              </h3>
+
+              <div className="flex items-center gap-2">
+                <span className="badge badge-accent">
+                  {enabledCount} of {totalCount} enabled
+                </span>
+
+                {canEditPermissions && (
+                  <button
+                    onClick={openPermissions}
+                    className="btn-ghost inline-flex items-center gap-1 text-[11px] font-semibold"
+                  >
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Coverage bar */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                <span>Permission coverage</span>
+                <span className="tabular-nums">{enabledPercent}%</span>
+              </div>
+
+              <div className="progress-bar">
+                <div
+                  className="progress-bar-fill"
+                  style={{
+                    width: `${enabledPercent}%`,
+                    background: "linear-gradient(90deg, var(--success), var(--info))",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredPermissions.map(({ key, label, value }) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 transition-colors"
+                  style={{
+                    borderColor: value
+                      ? "color-mix(in srgb, var(--success) 24%, transparent)"
+                      : "var(--border-color)",
+                    backgroundColor: value ? "var(--success-soft)" : "var(--bg-card-alt)",
+                  }}
+                >
+                  <span
+                    className="truncate text-[11.5px] font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                    title={label}
+                  >
+                    {label}
+                  </span>
+
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide"
+                    style={{ color: value ? "var(--success-text)" : "var(--danger-text)" }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: "currentColor" }}
+                    />
+                    {value ? "On" : "Off"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Right column — Activity Log */}
+        <section className="card flex flex-col p-5 xl:col-span-5">
+          <div
+            className="mb-4 flex items-center justify-between gap-2 border-b pb-3"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <h3 className="section-header mb-0">
+              <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+              Activity Log
             </h3>
+
             <div className="flex items-center gap-2">
               <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold"
-                style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
+                style={{
+                  backgroundColor: "var(--success-soft)",
+                  color: "var(--success-text)",
+                }}
               >
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
-                LIVE
+                <span
+                  className="h-1.5 w-1.5 animate-pulse rounded-full"
+                  style={{ backgroundColor: "currentColor" }}
+                />
+                Live
               </span>
-              <span className="text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
+
+              <span
+                className="text-[11px] font-semibold"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {activities.length} {activities.length === 1 ? "event" : "events"}
               </span>
             </div>
           </div>
 
-          <div className="max-h-[520px] overflow-y-auto pr-1">
-            {activities.length ? (
-              activities.map((activity, index) => {
+          {activityCategories.length > 1 && (
+            <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto pb-0.5">
+              {[{ label: "All", value: "all" }, ...activityCategories.map((c) => ({ label: c, value: c }))].map(
+                (chip) => {
+                  const activeChip = activityFilter === chip.value;
+
+                  return (
+                    <button
+                      key={chip.value}
+                      type="button"
+                      onClick={() => setActivityFilter(chip.value)}
+                      className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-colors"
+                      style={{
+                        backgroundColor: activeChip ? "var(--accent-soft)" : "transparent",
+                        color: activeChip ? "var(--accent)" : "var(--text-muted)",
+                        border: "1px solid",
+                        borderColor: activeChip
+                          ? "color-mix(in srgb, var(--accent) 28%, transparent)"
+                          : "var(--border-color)",
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          <div className="custom-scrollbar max-h-[620px] min-h-[220px] flex-1 overflow-y-auto pr-1">
+            {visibleActivities.length ? (
+              visibleActivities.map((activity, index) => {
                 const colors = getActivityColor(activity.category);
-                const isLast = index === activities.length - 1;
+                const isLast = index === visibleActivities.length - 1;
+
                 return (
-                  <div key={activity._id || index} className="relative flex gap-3 pb-4 last:pb-0">
+                  <div
+                    key={activity._id || index}
+                    className="group relative flex gap-3 pb-4 last:pb-0"
+                  >
                     {!isLast && (
                       <span
                         aria-hidden="true"
@@ -616,56 +1089,73 @@ function EmployeeOverview({
                       <ActivityIcon category={activity.category} size="sm" />
                     </span>
 
-                    <div className="min-w-0 flex-1 pt-0.5">
-                      <p className="text-[12px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>
+                    <div className="min-w-0 flex-1 rounded-lg py-1.5 pl-2 pr-1 transition-colors hover:bg-[var(--bg-card-alt)]">
+                      <p
+                        className="text-[12px] font-semibold leading-snug"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         {activity.action}
                       </p>
 
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span
-                          className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold"
+                          className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wide"
                           style={{ backgroundColor: colors.bg, color: colors.color }}
                         >
                           {activity.category}
                         </span>
 
                         {activity.performedByName && (
-                          <>
-                            <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
-                              by{" "}
-                              <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
-                                {activity.performedByName}
-                              </span>
+                          <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
+                            by{" "}
+                            <span
+                              className="font-semibold"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {activity.performedByName}
                             </span>
-                            <span style={{ color: "var(--text-muted)" }}>·</span>
-                          </>
+                          </span>
                         )}
 
-                        <span className="text-[9.5px] font-medium" style={{ color: "var(--text-muted)" }}>
+                        <span
+                          className="text-[9.5px] font-semibold"
+                          style={{ color: "var(--info-text)" }}
+                        >
                           {relativeTime(activity.timestamp)}
                         </span>
-
-                        <span className="text-[9.5px]" style={{ color: "var(--text-muted)", opacity: 0.85 }}>
-                          {new Date(activity.timestamp).toLocaleString("en-US", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
                       </div>
+
+                      <p
+                        className="mt-1 text-[9.5px]"
+                        style={{ color: "var(--text-muted)", opacity: 0.85 }}
+                      >
+                        {new Date(activity.timestamp).toLocaleString("en-US", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="flex items-center justify-center py-10 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                No activity found for this employee yet.
+              <div className="empty-state">
+                <span className="empty-state-icon">
+                  <FileText className="h-6 w-6" />
+                </span>
+                <p className="text-[12px]">
+                  {activityFilter === "all"
+                    ? "No activity found for this employee yet."
+                    : `No ${activityFilter} activity recorded yet.`}
+                </p>
               </div>
             )}
           </div>
-      </section>
+        </section>
+      </div>
     </>
   );
 }
@@ -1325,9 +1815,17 @@ export default function EmployeeDetailPage() {
       employee.department ||
       "Not assigned",
 
-    dateOfBirth =
-      employee.dateOfBirth ||
-      "Not provided",
+    username =
+      employee.username ||
+      email.split("@")[0],
+
+    preferences =
+      employee.preferences ||
+      {},
+
+    storeId =
+      employee.storeId ||
+      null,
 
     employeeId: empId =
       employee.employeeCode ||
@@ -1355,6 +1853,7 @@ export default function EmployeeDetailPage() {
 
     permissions =
       userData.permissions ||
+      employee.permissions ||
       {},
   } = employee;
 
@@ -1370,6 +1869,27 @@ export default function EmployeeDetailPage() {
         }
       )
     : "N/A";
+
+  const formatDateTime = (value) =>
+    value
+      ? new Date(value).toLocaleString("en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "—";
+
+  const recordInfo = {
+    createdAt: formatDateTime(created_at),
+    createdBy:
+      employee.createdby?.name ||
+      employee.createdby?.email ||
+      "System",
+    updatedAt: formatDateTime(employee.updated_at),
+    store: storeId ? "Assigned to store" : "No store assigned",
+  };
 
   // ==========================================
   // "LAST UPDATED" INFO — shown only when the
@@ -1463,7 +1983,7 @@ export default function EmployeeDetailPage() {
 
   return (
     <div
-      className="w-full min-h-screen space-y-4"
+      className="w-full min-h-screen space-y-3"
       style={{
         color:
           "var(--text-primary)",
@@ -1480,6 +2000,9 @@ export default function EmployeeDetailPage() {
         department={department}
         empId={empId}
         joinDate={joinDate}
+        username={username}
+        preferences={preferences}
+        recordInfo={recordInfo}
         ordersHandled={ordersHandled}
         salesGenerated={salesGenerated}
         productsAdded={productsAdded}

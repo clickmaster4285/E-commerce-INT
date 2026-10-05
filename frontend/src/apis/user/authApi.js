@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 // ==========================================
 // 🔐 AUTH / OTP API
 // ==========================================

@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 // ✅ Smart list unwrap — existing API pattern follow karta hai
 const list = (res) => {
   const d = res.data;

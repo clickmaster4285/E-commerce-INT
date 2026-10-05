@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 const list = (res) => {
   const d = res.data;
   if (Array.isArray(d)) return d;

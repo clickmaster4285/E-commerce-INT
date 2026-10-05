@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import adminHttp from '@/apis/adminHttp';
+import axiosInstance from '@/apis/axiosInstance';
 import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   Settings,
   ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ==========================================
@@ -113,6 +114,7 @@ export default function AdminLoginPage() {
   // Sidebar ke top par jo store name dikhta hai wo isi Redux slice se aata hai.
   // Login page par sidebar/socket nahi hota, is liye wahi public store endpoint
   // call kar ke usi slice mein daal dete hain - dono jagah same name/logo aata hai.
+  // ✅ Non-blocking: store fetch background mein chalta rahe, UI block na ho
   const storeName = useSelector((state) => state.storeInfo.storeName);
   const storeLogo = useSelector((state) => state.storeInfo.logo);
   const isStoreLoaded = useSelector((state) => state.storeInfo.isLoaded);
@@ -122,6 +124,9 @@ export default function AdminLoginPage() {
     queryFn: storeApi.getPublic,
     staleTime: 5 * 60 * 1000,
     enabled: !isStoreLoaded,
+    // ✅ Non-blocking: error throw na kare, background mein rehtay hain
+    throwOnError: false,
+    retry: false,
   });
 
   useEffect(() => {
@@ -144,23 +149,15 @@ export default function AdminLoginPage() {
     email: '',
     password: '',
   });
-  const [hasBgImage, setHasBgImage] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
 
-  // BG image probe: CSS `background-image` par `onError` kabhi fire nahi hota
-  // (CSS background images DOM error events nahi bhejti), is liye yahan DOM se
-  // bahar `new Image()` se probe karte hain. Warna missing image par khaali panel
-  // dikhta aur `hasBgImage` hamesha `true` rehta.
-  useEffect(() => {
-    const probe = new Image();
-    probe.onerror = () => setHasBgImage(false);
-    probe.src = LOGIN_BACKGROUND_IMAGE_SRC;
-  }, []);
+  // ✅ Background image check removed - avoids unnecessary network probe on login load
+  // The CSS fallback color (#0f172a) handles missing images gracefully
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await adminHttp.post('/users/admin/login', userData);
+      const response = await axiosInstance.post('/users/admin/login', userData);
       return response.data;
     },
 
@@ -168,12 +165,18 @@ export default function AdminLoginPage() {
       const role = String(data?.user?.role || '').toLowerCase();
 
       if (!data?.user || !['admin', 'staff', 'manager'].includes(role)) {
-        adminHttp.post('/users/logout').catch(() => {});
+        axiosInstance.post('/users/logout').catch(() => {});
         toast.error(
           'Access denied. Only administrators, managers and staff members can log in.'
         );
         return;
       }
+
+      // ✅ Show success toast before redirect - professional UX
+      toast.success('Login successful', {
+        duration: 2000,
+        icon: <CheckCircle2 className="h-5 w-5" />,
+      });
 
       queryClient.removeQueries();
 
@@ -239,18 +242,16 @@ export default function AdminLoginPage() {
           background: '#0f172a', // Fallback color
         }}
       >
-        {/* Background Image Layer */}
-        {hasBgImage && (
-          <>
-            <div
-              className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500"
-              style={{ backgroundImage: `url(${LOGIN_BACKGROUND_IMAGE_SRC})` }}
-            />
-            {/* Keep the dashboard artwork bright while preserving text contrast. */}
-            <div className="absolute inset-0 z-0 bg-slate-950/10" />
-            <div className="absolute inset-0 z-0 bg-gradient-to-t from-slate-950/45 via-transparent to-slate-950/10" />
-          </>
-        )}
+        {/* Background Image Layer - CSS fallback handles missing images */}
+        <>
+          <div
+            className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500"
+            style={{ backgroundImage: `url(${LOGIN_BACKGROUND_IMAGE_SRC})` }}
+          />
+          {/* Keep the dashboard artwork bright while preserving text contrast. */}
+          <div className="absolute inset-0 z-0 bg-slate-950/10" />
+          <div className="absolute inset-0 z-0 bg-gradient-to-t from-slate-950/45 via-transparent to-slate-950/10" />
+        </>
 
         {/* Content Wrapper */}
         <div className="relative z-10 flex h-full flex-col justify-between">

@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 // ✅ Smart list unwrap
 const list = (res) => {
   const d = res.data;

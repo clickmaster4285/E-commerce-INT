@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 export const addressApi = {
   getAll: () => userHttp.get("/addresses").then((res) => res.data?.data || []),
   create: (data) => userHttp.post("/addresses", data).then((res) => res.data?.data),

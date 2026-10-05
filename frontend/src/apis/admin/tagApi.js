@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 export const tagApi = {
   getAll: () => 
     adminHttp.get("/tags").then((res) => {
