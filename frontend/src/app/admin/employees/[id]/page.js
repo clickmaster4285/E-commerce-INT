@@ -55,6 +55,7 @@ import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 // (admin chahe to koi bhi toggle off kar sakta hai)
 // ==========================================
 const ALLOWED_PERMISSIONS = {
+  dashboard: { label: "Dashboard", default: true },
   employees: { label: "Employees", default: true },
   products: { label: "Products", default: true },
   brands: { label: "Brands", default: true },
@@ -504,7 +505,10 @@ function EmployeeOverview({
         role="tablist"
         aria-label="Employee sections"
       >
-        {tabs.map((tab) => {
+        {[
+          { id: "overview", label: "Overview", icon: User },
+          ...tabs,
+        ].map((tab) => {
           const TabIcon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
@@ -537,6 +541,7 @@ function EmployeeOverview({
       </div>
 
       {/* ============ INFO CARDS ============ */}
+      {activeTab === "overview" && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {/* Personal Information */}
         <section className="card p-4">
@@ -663,6 +668,7 @@ function EmployeeOverview({
           </div>
         </section>
       </div>
+      )}
 
       {/* ============ ACCESS CONTROL (Permissions tab) ============ */}
       {activeTab === "permissions" && (
@@ -1194,7 +1200,7 @@ export default function EmployeeDetailPage() {
     useEmployeeSocketSync(employeeId);
 
   const [activeTab, setActiveTab] =
-    useState("permissions");
+    useState("overview");
 
   const [showEditModal, setShowEditModal] =
     useState(false);
@@ -1222,6 +1228,7 @@ export default function EmployeeDetailPage() {
     permissionsData,
     setPermissionsData,
   ] = useState({
+    dashboard: true,
     employees: true,
     products: true,
     brands: true,

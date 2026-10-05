@@ -11,6 +11,7 @@ const {
   deleteProduct,
   toggleProductStatus,
   toggleProductFeatured,
+  bulkProductFeatured,
 } = require("../controllers/productController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -62,7 +63,10 @@ router.put(
 
 router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
-// ✅ Featured Products page — mark / unmark
+// ✅ Featured Products page — bulk mark / unmark ("Manage Products" popup)
+//    "/:id" routes se PEHLE register — warna "bulk-featured" ko id samajh sakta hai.
+router.patch("/bulk-featured", authMiddleware, checkPermission("products"), bulkProductFeatured);
+// ✅ Featured Products page — single mark / unmark
 router.patch("/:id/toggle-featured", authMiddleware, checkPermission("products"), toggleProductFeatured);
 
 module.exports = router;

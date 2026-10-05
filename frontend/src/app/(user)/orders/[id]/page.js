@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import axiosInstance from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { addressApi } from "@/apis/user/addressApi";
+import { reviewApi } from "@/apis/user/reviewApi";
+import ProductRating from "@/components/user/ProductReviews";
 import { Country, State, City } from "country-state-city";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
@@ -295,6 +297,28 @@ export default function OrderDetailPage({ params }) {
   const { data: order, isLoading } = useQuery({ queryKey: ["order", id], queryFn: () => orderApi.getById(id), retry: false });
   const { data: addresses = [] } = useQuery({ queryKey: ["addresses"], queryFn: addressApi.getAll, enabled: !!order && order.status === "pending" });
 
+  // ✅ User ki apni ratings — delivered order ke items par "Rate" / rated badge dikhane ke liye.
+  const { data: user = null } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => { const res = await axiosInstance.get("/users/profile"); return res.data?.user || res.data || null; },
+    retry: false,
+  });
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ["myReviews"],
+    queryFn: reviewApi.mine,
+    enabled: !!user,
+    retry: false,
+  });
+  const reviewsMap = useMemo(() => {
+    const map = new Map();
+    (myReviews || []).forEach((r) => {
+      const pid = String(r.product_id?._id || r.product_id || "");
+      if (pid) map.set(pid, r);
+    });
+    return map;
+  }, [myReviews]);
+  const canRate = order?.status === "delivered";
+
   if (isLoading) {
     return (
     <>
@@ -512,6 +536,11 @@ export default function OrderDetailPage({ params }) {
                         {i.deal_id && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
                         {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
                       </div>
+                      {canRate && (
+                        <div className="mt-3 max-w-xs">
+                          <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={i.name} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       {hasDiscount && <p className="text-[0.6875rem] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
@@ -762,6 +791,11 @@ export default function OrderDetailPage({ params }) {
                     {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
                     <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
                     {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
+                    {canRate && (
+                      <div className="mt-2">
+                        <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={i.name} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
+                      </div>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[0.8125rem] font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>

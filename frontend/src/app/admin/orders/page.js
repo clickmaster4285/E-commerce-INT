@@ -518,7 +518,7 @@ export default function OrdersPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                 
-                    <th className="w-[36px] px-1 py-4" />
+                    <th className="w-[36px] px-1 py-3" />
                     <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="12%" />
                     <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="16%" />
                     <th className="px-3 py-4 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell"
@@ -550,7 +550,7 @@ export default function OrdersPage() {
                           onClick={() => openDetailPage(order)}
                         >
                         
-                          <td className="px-1 py-4 align-middle text-center" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-1 py-2.5 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setExpandedRows((prev) => isExpanded ? prev.filter((x) => x !== order._id) : [...prev, order._id])}
                               aria-label={isExpanded ? "Collapse items preview" : "Expand items preview"}
@@ -560,10 +560,10 @@ export default function OrdersPage() {
                               <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-200 motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`} />
                             </button>
                           </td>
-                          <td className="px-4 py-4 align-middle box-border">
+                          <td className="px-4 py-2.5 align-middle box-border">
                             <p className="font-semibold break-words">{order.order_number}</p>
                           </td>
-                          <td className="px-4 py-4 align-middle box-border">
+                          <td className="px-4 py-2.5 align-middle box-border">
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
                                 style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
@@ -581,11 +581,11 @@ export default function OrdersPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-3 align-middle hidden md:table-cell box-border">
-                            <div className="space-y-1">
-                              {(order.items || []).slice(0, 4).map((item, idx) => (
+                          <td className="px-3 py-2.5 align-middle hidden md:table-cell box-border">
+                            <div className="space-y-0.5">
+                              {(order.items || []).slice(0, 2).map((item, idx) => (
                                 <div key={`${order._id}-row-item-${idx}`} className="flex items-center gap-1.5 min-w-0">
-                                  <OrderItemImage item={item} size={26} />
+                                  <OrderItemImage item={item} size={22} />
                                   <span className="truncate text-[12px] min-w-0" title={item.name}>{item.name}</span>
                                   <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                                     ×{item.qty}
@@ -601,18 +601,18 @@ export default function OrdersPage() {
                                   )}
                                 </div>
                               ))}
-                              {(order.items || []).length > 4 && (
-                                <p className="text-[11px] pl-[34px]" style={{ color: "var(--text-muted)" }}>
-                                  +{(order.items || []).length - 4} more item{(order.items || []).length - 4 === 1 ? "" : "s"}
+                              {(order.items || []).length > 2 && (
+                                <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
+                                  +{(order.items || []).length - 2} more item{(order.items || []).length - 2 === 1 ? "" : "s"}
                                 </p>
                               )}
-                              <p className="text-[10px] pl-[34px]" style={{ color: "var(--text-muted)" }}>
+                              <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
                                 {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"} · {orderPaidUnits(order)} unit{orderPaidUnits(order) === 1 ? "" : "s"}
                                 {orderFreeUnits(order) > 0 ? ` (+${orderFreeUnits(order)} free)` : ""}
                               </p>
                             </div>
                           </td>
-                          <td className="px-4 py-4 align-middle text-right box-border">
+                          <td className="px-4 py-2.5 align-middle text-right box-border">
                             <p className="font-bold whitespace-nowrap">Rs. {order.total?.toLocaleString()}</p>
                             {orderFreeUnits(order) > 0 && (
                               <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--success-text)" }}>
@@ -625,7 +625,7 @@ export default function OrdersPage() {
                               </p>
                             )}
                           </td>
-                          <td className="px-3 py-4 align-middle text-center hidden lg:table-cell box-border">
+                          <td className="px-3 py-2.5 align-middle text-center hidden lg:table-cell box-border">
                             <div className="inline-flex flex-col items-center gap-1">
                               <PaymentBadge status={payStatus} />
                               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
@@ -633,12 +633,12 @@ export default function OrdersPage() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-3 py-4 align-middle text-center box-border"><StatusBadge status={order.status} /></td>
-                          <td className="px-4 py-4 align-middle text-[13px] whitespace-nowrap hidden lg:table-cell box-border"
+                          <td className="px-3 py-2.5 align-middle text-center box-border"><StatusBadge status={order.status} /></td>
+                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap hidden lg:table-cell box-border"
                             style={{ color: "var(--text-muted)" }}>
                             {formatDate(order.created_at)}
                           </td>
-                          <td className="px-3 py-4 align-middle whitespace-nowrap text-right relative box-border" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-3 py-2.5 align-middle whitespace-nowrap text-right relative box-border" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end items-center">
                               <button
                                 onClick={() => setActionMenuFor(actionMenuFor === order._id ? null : order._id)}

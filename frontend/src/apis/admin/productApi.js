@@ -68,6 +68,14 @@ export const adminProductApi = {
   // ✅ Featured Products page — mark / unmark (PATCH, atomic backend flip)
   toggleFeatured: (id) =>
     axiosInstance.patch(`/products/${id}/toggle-featured`).then((res) => res.data),
+
+  // ✅ "Manage Products" popup — bulk mark / unmark (multi-select)
+  //    Body: { ids: [...], is_featured: true|false }
+  //    Response: { success, message, modified, skipped }
+  bulkFeatured: ({ ids = [], is_featured = true } = {}) =>
+    axiosInstance
+      .patch("/products/bulk-featured", { ids, is_featured })
+      .then((res) => res.data),
 };
 
 // ✅ ALIAS
