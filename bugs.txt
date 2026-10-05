@@ -1,0 +1,14 @@
+=========================================end======================================================
+28/09/2026
+
+1. on login page: {
+    don't show message "Invalid credentials" as card , the message shown on toast 
+    and show message as understandable like "user not found" || "password incorrect"
+}
+2. on descount creation modal the "Discount Value" redefine the desc. 
+3. on descount creation modal the "Fixed Price (Rs.)" cann't be less then 0
+4. unwated remove on "descount & deals" detail page
+5. on "manage-stock" detial popup page: on Stock History section shown also the "Explanation "
+
+=========================================end========================================================
+
