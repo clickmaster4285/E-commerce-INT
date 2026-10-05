@@ -40,9 +40,9 @@
   --chart-danger: #ef4444;
 
   /* ---- Surfaces ---- */
-  --bg-primary: #f3f5f9;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #e9edf4;
+  --bg-primary: #eef2f8;
+  --bg-secondary: #eef2f8;
+  --bg-tertiary: #e2e8f0;
   --bg-sidebar: #0b1220;
   --bg-sidebar-hover: #16223a;
   --bg-sidebar-active: #2563eb;
@@ -50,7 +50,7 @@
   --bg-navbar: #ffffff;
   --bg-card: #ffffff;
   --bg-card-alt: #f8fafc;
-  --bg-table: #f8fafc;
+  --bg-table: #f1f5f9;
   --bg-input: #f1f5f9;
   --bg-row-hover: color-mix(in srgb, var(--accent) 4%, var(--bg-card));
   --bg-main: var(--bg-primary);
@@ -115,9 +115,9 @@
    LIGHT THEME (explicit)
    ============================================================ */
 html.light {
-  --bg-primary: #f3f5f9;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #e9edf4;
+  --bg-primary: #eef2f8;
+  --bg-secondary: #eef2f8;
+  --bg-tertiary: #e2e8f0;
   --bg-sidebar: #0b1220;
   --bg-sidebar-hover: #16223a;
   --bg-sidebar-active: #2563eb;

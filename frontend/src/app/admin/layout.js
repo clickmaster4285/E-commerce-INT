@@ -661,7 +661,7 @@ export default function AdminLayout({ children }) {
 
         {/* Page */}
         <main className="flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
-          {children}
+          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
         </main>
 
       </div>
