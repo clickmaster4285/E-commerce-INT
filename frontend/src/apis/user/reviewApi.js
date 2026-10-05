@@ -12,23 +12,22 @@ export const reviewApi = {
       })
       .then((res) => res.data),
 
+  // 🔒 Current user ki apni reviews (product_id → rating map ke liye)
+  mine: () =>
+    axiosInstance.get("/reviews/my").then((res) => res.data?.reviews || []),
+
   // 🔒 Create — FormData (rating, title, comment, product_id, images[], videos[])
   create: (formData) =>
-    userHttp
-      .post("/reviews", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+    axiosInstance
+      .post("/reviews", formData)
       .then((res) => res.data),
 
-  // 🔒 Edit own review (text fields)
-  update: (id, data) =>
-    userHttp.put(`/reviews/${id}`, data).then((res) => res.data),
+  // 🔒 Edit own review (FormData — rating, title, comment, optional new images/videos)
+  update: (id, data) => axiosInstance.put(`/reviews/${id}`, data).then((res) => res.data),
 
   // 🔒 Delete own review
   remove: (id) => userHttp.delete(`/reviews/${id}`).then((res) => res.data),
 
-  // 🔒 Helpful vote toggle
-  helpful: (id) => userHttp.post(`/reviews/${id}/helpful`).then((res) => res.data),
 };
 
 export const getReviewErrorMessage = (

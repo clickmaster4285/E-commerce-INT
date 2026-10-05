@@ -1661,6 +1661,15 @@ export default function ProductDetailPage() {
   const lowerAssignedNames = new Set([...assignedTagNames].map(n => n.toLowerCase()));
   const globalTagNames = new Set((globalTags || []).map(t => String(t.name || t).trim().toLowerCase()));
   const assignedTags = (globalTags || []).filter(tag => lowerAssignedNames.has(String(tag.name || tag).trim().toLowerCase()));
+  // Resolve assigned tag names/IDs back to their full records (including createdby).
+  const tagRecordLookup = {};
+  (globalTags || []).forEach(tag => {
+    if (!tag || typeof tag !== "object") return;
+    const nameKey = String(tag.name || "").trim().toLowerCase();
+    const idKey = tag._id ? String(tag._id).trim().toLowerCase() : "";
+    if (nameKey) tagRecordLookup[nameKey] = tag;
+    if (idKey) tagRecordLookup[idKey] = tag;
+  });
   const missingTagNames = [];
   assignedTagNames.forEach(name => {
     if (!globalTagNames.has(name.toLowerCase())) {

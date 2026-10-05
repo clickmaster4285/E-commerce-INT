@@ -521,7 +521,7 @@ const getMe = async (req, res) => {
         status: entity.is_deleted ? "Inactive" : "Active",
         avatar: entity.avatar || null,
         permissions: entity.permissions || {
-          products: true, brands: true, categories: true,
+          dashboard: true, products: true, brands: true, categories: true,
           employees: true, discounts: true, deals: true, banners: true,
           manageStock: true, shipping: true, order: true, attribute: true,
           profile: true, store: true, bundles: true
@@ -672,7 +672,7 @@ const getProfileInfo = async (req, res) => {
       website: user.website || store.website || "",
       address: user.address || store.address || "",
       permissions: user.permissions || {
-        products: true, brands: true, categories: true,
+        dashboard: true, products: true, brands: true, categories: true,
         employees: true, discounts: true, deals: true, banners: true,
         manageStock: true, shipping: true, order: true, attribute: true,
         profile: true, store: true, bundles: true

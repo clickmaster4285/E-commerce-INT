@@ -2,6 +2,8 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs-extra");
 const sharp = require("sharp");
+const mongoose = require("mongoose");
+const Review = require("../models/Review");
 
 // ==========================================
 // ⭐ REVIEW MEDIA UPLOAD (images + video)
@@ -70,7 +72,40 @@ const saveReviewMedia = async (req, res, next) => {
     }
     if (!images.length && !videos.length) return next();
 
-    const productId = String(req.body?.product_id || req.params?.productId || "general");
+    const productId = String(req.body?.product_id || req.params?.productId || "");
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ success: false, message: "Valid product_id required" });
+    }
+
+    // For edits, check ownership and remaining media slots before writing files.
+    if (req.method === "PUT") {
+      const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+        .select("user_id images videos")
+        .lean();
+      if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+      if (String(review.user_id) !== String(req.user?._id || "")) {
+        return res.status(403).json({ success: false, message: "You cannot edit this review" });
+      }
+      let requestedImageRemovals = [];
+      try {
+        requestedImageRemovals = Array.isArray(req.body.remove_images)
+          ? req.body.remove_images
+          : JSON.parse(req.body.remove_images || "[]");
+      } catch {
+        requestedImageRemovals = [];
+      }
+      const imageRemovalSet = new Set(requestedImageRemovals.filter((url) => typeof url === "string"));
+      const remainingImageCount = (review.images || []).filter((image) => !imageRemovalSet.has(image.img_url)).length;
+      const removingVideo = req.body.remove_video === "true";
+      const remainingVideoCount = removingVideo ? 0 : (review.videos || []).length;
+      if (remainingImageCount + images.length > MAX_IMAGES) {
+        return res.status(400).json({ success: false, message: `A review can have up to ${MAX_IMAGES} photos total` });
+      }
+      if (remainingVideoCount + videos.length > MAX_VIDEOS) {
+        return res.status(400).json({ success: false, message: "A review can have only 1 video total" });
+      }
+    }
+
     const uploadDirectory = path.join(process.cwd(), "uploads", "reviews", productId);
     await fs.ensureDir(uploadDirectory);
 

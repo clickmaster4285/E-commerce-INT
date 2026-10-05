@@ -30,6 +30,7 @@ const employeeSchema = new mongoose.Schema(
     // --- Permissions (same structure as User) ---
     // ✅ Sab permissions by default true — admin chahe to baad me off kar sakta hai
     permissions: {
+      dashboard: { type: Boolean, default: true },
       products: { type: Boolean, default: true },
       brands: { type: Boolean, default: true },
       categories: { type: Boolean, default: true },

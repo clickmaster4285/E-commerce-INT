@@ -9,7 +9,7 @@
    - Unmark: existing PATCH /products/:id/toggle-featured
    ========================================================== */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,11 +23,15 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  X,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 
 const PER_PAGE = 20;
+const MODAL_PER_PAGE = 8;
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (path) => {
@@ -295,12 +299,385 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
 
 
 
+/* ==========================================================
+   MODAL SKELETON
+   ========================================================== */
+function ModalSkeleton({ rows = MODAL_PER_PAGE }) {
+  return (
+    <div className="space-y-1">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={`manage-skeleton-${i}`} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+          <div className="h-5 w-5 shrink-0 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          <div className="h-9 w-9 shrink-0 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          <div className="flex-1">
+            <div className="h-3 w-1/2 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+            <div className="mt-2 h-2.5 w-1/3 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ==========================================================
+   MANAGE FEATURED MODAL — "Manage Products" popup
+   Saare products (sirf featured nahi) + multi-select checkbox.
+   User kai products ek saath feature / unfeature kar sakta hai —
+   professional dashboards jaisa. Inactive products select nahi ho
+   sakte (backend bhi same rule lagata hai).
+   ========================================================== */
+function ManageFeaturedModal({ open, onClose, onSaved }) {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  // draft: user ke explicitly toggle kiye ids → desired featured state
+  const [draft, setDraft] = useState({});
+  // orig: jab product pehli dafa dikha us waqt ka actual is_featured
+  const [orig, setOrig] = useState({});
+
+  // Modal khulte hi sab state reset
+  useEffect(() => {
+    if (open) {
+      setSearch("");
+      setDebounced("");
+      setPage(1);
+      setDraft({});
+      setOrig({});
+    }
+  }, [open]);
+
+  // Debounced search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebounced(search.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ["manage-featured", page, debounced],
+    queryFn: () => productApi.getPaginated({ page, limit: MODAL_PER_PAGE, search: debounced }),
+    enabled: open,
+    retry: false,
+  });
+
+  const products = useMemo(() => data?.products || [], [data]);
+  const pagination = data?.pagination || {};
+  const totalPages = Math.max(1, Number(pagination.pages) || 1);
+  const totalRecords = Number(pagination.total) || 0;
+
+  // Naye loaded products ke original state capture karo (draft ko touch na karo)
+  useEffect(() => {
+    if (!open || !products.length) return;
+    setOrig((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      products.forEach((p) => {
+        if (!(p._id in next)) {
+          next[p._id] = p.is_featured === true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [products, open]);
+
+  const valueOf = (p) =>
+    Object.prototype.hasOwnProperty.call(draft, p._id)
+      ? draft[p._id]
+      : orig[p._id] ?? p.is_featured === true;
+
+  const selectableOnPage = products.filter((p) => p.status === "active");
+  const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((p) => valueOf(p));
+  const selectedCount = products.filter((p) => valueOf(p)).length;
+
+  // Actual changes (draft vs orig) — cross-page safe
+  const toFeature = [];
+  const toUnfeature = [];
+  Object.keys(draft).forEach((id) => {
+    const wants = draft[id];
+    const was = orig[id];
+    if (was === undefined) return;
+    if (wants && !was) toFeature.push(id);
+    else if (!wants && was) toUnfeature.push(id);
+  });
+  const hasChanges = toFeature.length > 0 || toUnfeature.length > 0;
+
+  const toggleRow = (p) => {
+    if (p.status !== "active") return;
+    setDraft((prev) => ({ ...prev, [p._id]: !valueOf(p) }));
+  };
+
+  const toggleAllOnPage = () => {
+    if (!selectableOnPage.length) return;
+    const next = !allOnPageSelected;
+    setDraft((prev) => {
+      const merged = { ...prev };
+      selectableOnPage.forEach((p) => { merged[p._id] = next; });
+      return merged;
+    });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const results = [];
+      if (toFeature.length) results.push(await productApi.bulkFeatured({ ids: toFeature, is_featured: true }));
+      if (toUnfeature.length) results.push(await productApi.bulkFeatured({ ids: toUnfeature, is_featured: false }));
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["featured-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["manage-featured"] });
+      const messages = (results || []).map((r) => r?.message).filter(Boolean);
+      toast.success(messages.length ? messages.join(" · ") : "Featured products updated");
+      onSaved?.();
+      onClose?.();
+    },
+    onError: (e) => {
+      toast.error(e?.response?.data?.message || "Failed to update featured products");
+    },
+  });
+
+  const actionLabel = saveMutation.isPending
+    ? "Saving..."
+    : toFeature.length && toUnfeature.length
+      ? "Update Featured"
+      : toFeature.length
+        ? `Feature ${toFeature.length} Selected`
+        : toUnfeature.length
+          ? `Remove ${toUnfeature.length} from Featured`
+          : "No Changes";
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Manage featured products"
+    >
+      <style>{`@keyframes modalScaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}} @keyframes modalSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl sm:max-w-3xl sm:rounded-2xl"
+        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", animation: "modalSlideUp .25s ease-out" }}
+      >
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-4" style={{ borderColor: "var(--border-color)" }}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <Star className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-bold leading-6">Manage Featured Products</h2>
+              <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                Select the products you want to show on the storefront
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-70"
+            style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* TOOLBAR */}
+        <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border-color)" }}>
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 w-full rounded-lg pl-9 pr-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex items-center gap-3 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+            <label className="flex cursor-pointer select-none items-center gap-2">
+              <input
+                type="checkbox"
+                checked={allOnPageSelected}
+                onChange={toggleAllOnPage}
+                disabled={!selectableOnPage.length}
+                className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+              />
+              Select all on page
+            </label>
+            <span aria-hidden="true">·</span>
+            <span><span className="font-bold" style={{ color: "var(--text-primary)" }}>{selectedCount}</span> selected</span>
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {isLoading ? (
+            <ModalSkeleton rows={MODAL_PER_PAGE} />
+          ) : isError ? (
+            <div className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
+              <p className="text-[13px]">Failed to load products. Please check your connection.</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
+                style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+              <Package className="mx-auto mb-3 h-8 w-8 opacity-30" />
+              <p className="text-[13px]">{debounced ? "No products match your search" : "No products found"}</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {products.map((p) => {
+                const variant = p?.variants?.[0];
+                const img = variant?.images?.[0]?.img_url;
+                const isInactive = p.status !== "active";
+                const checked = valueOf(p);
+                return (
+                  <div
+                    key={p._id}
+                    onClick={() => toggleRow(p)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition"
+                    style={{
+                      cursor: isInactive ? "not-allowed" : "pointer",
+                      opacity: isInactive ? 0.55 : 1,
+                      backgroundColor: checked ? "var(--bg-tertiary)" : "transparent",
+                    }}
+                    onMouseEnter={(e) => { if (!isInactive && !checked) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }}
+                    onMouseLeave={(e) => { if (!checked) e.currentTarget.style.backgroundColor = "transparent"; }}
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded border"
+                      style={{
+                        backgroundColor: checked ? "var(--accent)" : "var(--bg-card)",
+                        borderColor: checked ? "var(--accent)" : "var(--border-color)",
+                        color: "var(--accent-text)",
+                      }}
+                    >
+                      {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                    </span>
+
+                    {img ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getImageUrl(img)} alt={p.name} className="h-9 w-9 shrink-0 rounded object-cover" />
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
+                        <Package className="h-4 w-4" />
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold">{p.name}</p>
+                      <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        {variant?.sku || "—"} · {p?.category_id?.name || "—"} · {p?.brand_id?.name || "—"}
+                      </p>
+                    </div>
+
+                    {isInactive ? (
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}>
+                        Inactive
+                      </span>
+                    ) : (
+                      <StatusBadge status={p.status} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        <div className="flex flex-col gap-3 border-t px-5 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border-color)" }}>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((v) => Math.max(1, v - 1))}
+              disabled={page <= 1 || isFetching}
+              aria-label="Previous page"
+              className="flex h-8 w-8 items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Page <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{page}</span> of {totalPages}
+              {totalRecords > 0 ? ` · ${fmt(totalRecords)} products` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+              disabled={page >= totalPages || isFetching}
+              aria-label="Next page"
+              className="flex h-8 w-8 items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            {isFetching && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" style={{ color: "var(--text-muted)" }} />}
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDraft({})}
+              disabled={!Object.keys(draft).length || saveMutation.isPending}
+              className="h-9 rounded-lg px-3 text-[13px] font-medium transition disabled:opacity-40 hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saveMutation.isPending}
+              className="h-9 rounded-lg px-3 text-[13px] font-medium transition disabled:opacity-40 hover:opacity-80"
+              style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => saveMutation.mutate()}
+              disabled={!hasChanges || saveMutation.isPending}
+              className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 hover:opacity-90"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+              {actionLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function FeaturedProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState("list");
+  // ✅ "Manage Products" popup — multi-select featured manager
+  const [manageOpen, setManageOpen] = useState(false);
 
   // ✅ Same API jo Products page use karta hai — sirf featured=true filter ke saath
   // sort="featured-recent" → featured_at desc (jo abhi featured hua wo top par).
@@ -394,7 +771,7 @@ export default function FeaturedProductsPage() {
           </div>
           <button
             type="button"
-            onClick={() => router.push("/admin/products")}
+            onClick={() => setManageOpen(true)}
             className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
@@ -606,6 +983,12 @@ export default function FeaturedProductsPage() {
           </div>
         </div>
       )}
+
+      {/* "Manage Products" popup — saare products + multi-select featured manager */}
+      <ManageFeaturedModal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+      />
     </div>
   );
 }

@@ -13,8 +13,10 @@ import {
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
+import axiosInstance from "@/apis/axiosInstance";
+import { reviewApi } from "@/apis/user/reviewApi";
 import ProductCard from "@/components/user/ProductCard";
-import ProductReviews from "@/components/user/ProductReviews";
+import ProductRating from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
@@ -467,6 +469,22 @@ function ProductDetailContent({ params }) {
   const queryClient = useQueryClient();
   const { product, isLoading, isError } = useProductDetail(id);
 
+  // ✅ User ki apni ratings — product page par sirf apni di hui rating dikhani hai.
+  const { data: user = null } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const res = await axiosInstance.get("/users/profile");
+      return res.data?.user || res.data || null;
+    },
+    retry: false,
+  });
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ["myReviews"],
+    queryFn: reviewApi.mine,
+    enabled: !!user,
+    retry: false,
+  });
+
   const { data: store = null } = useQuery({ queryKey: ["storeInfo"], queryFn: storeApi.getPublic, staleTime: 5 * 60 * 1000 });
   const storeName = store?.store_name || "";
 
@@ -599,6 +617,12 @@ function ProductDetailContent({ params }) {
   const productId = product?._id || product?.id;
   const liked = productId ? isWishlisted(productId) : false;
 
+  // ✅ Is product ke liye user ki apni rating (agar di ho).
+  const myReview = useMemo(() => {
+    if (!productId) return null;
+    return myReviews.find((r) => String(r.product_id?._id || r.product_id) === String(productId)) || null;
+  }, [myReviews, productId]);
+
   if (isLoading) return <LoadingState />;
   if (isError || !product) return <ErrorState isError={isError} />;
 
@@ -627,12 +651,11 @@ function ProductDetailContent({ params }) {
               <span className={`inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${stockStatus.dot}`} /> {stockStatus.text}
               </span>
-              {(product.ratingSummary?.count || 0) > 0 && (
-                <a href="#reviews" className="inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-bold px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-500 hover:opacity-80 transition">
+              {myReview && (
+                <span className="inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-bold px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-500">
                   <Star size={11} className="fill-amber-400 text-amber-400" />
-                  {Number(product.ratingSummary.avg || 0).toFixed(1)}
-                  <span className="font-semibold opacity-80">({product.ratingSummary.count} review{product.ratingSummary.count === 1 ? "" : "s"})</span>
-                </a>
+                  Your rating: {myReview.rating}/5
+                </span>
               )}
             </div>
           </div>
@@ -838,7 +861,11 @@ function ProductDetailContent({ params }) {
         </div>
       </div>
 
-      <ProductReviews productId={productId} fallbackSummary={product.ratingSummary} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 lg:gap-8 mt-5 sm:mt-6">
+        <div className="min-w-0 lg:col-span-8">
+      <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
+        </div>
+      </div>
       <MoreImagesStack images={allImages} onZoom={openLightbox} />
       <RelatedProducts products={related} />
 
