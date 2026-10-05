@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 // ✅ Smart list unwrap
 const list = (res) => {
   const d = res.data;
@@ -14,7 +13,7 @@ const list = (res) => {
 // ==========================================
 export const adminProductApi = {
   // ✅ Ab /products use karo (admin/all exist nahi karta)
-  getAll: () => axiosInstance.get("/products").then(list),
+  getAll: () => adminHttp.get("/products").then(list),
 
   // ✅ Server-side pagination (Admin Products list)
   // Backend: ?page&limit&search&category_id&brand_id&status&sort&featured
@@ -30,7 +29,7 @@ export const adminProductApi = {
     if (featured === true || featured === "true" || featured === "1") params.featured = "true";
     // "newest" backend ka default hai → bhejne ki zaroorat nahi
     if (sort && sort !== "newest") params.sort = sort;
-    return axiosInstance.get("/products", { params }).then((res) => res.data);
+    return adminHttp.get("/products", { params }).then((res) => res.data);
   },
 
   // ✅ Summary stats (stat cards) — alag API, taake cards table se independently load hon.
@@ -42,28 +41,28 @@ export const adminProductApi = {
     if (category_id && category_id !== "all") params.category_id = category_id;
     if (brand_id && brand_id !== "all") params.brand_id = brand_id;
     if (status && status !== "all") params.status = status;
-    return axiosInstance
+    return adminHttp
       .get("/products/stats", { params })
       .then((res) => (res.data?.stats ? res.data.stats : (res.data?.data || res.data || {})));
   },
 
   getByBrand: (brandId) =>
-    axiosInstance.get("/products", { params: { brand_id: brandId } }).then(list),
+    adminHttp.get("/products", { params: { brand_id: brandId } }).then(list),
 
   getById: (id) =>
-    axiosInstance.get(`/products/${id}`).then((res) => res.data?.data || res.data),
+    adminHttp.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 
   create: (data) =>
-    axiosInstance.post("/products", data).then((res) => res.data),
+    adminHttp.post("/products", data).then((res) => res.data),
 
   update: (id, data) =>
-    axiosInstance.put(`/products/${id}`, data).then((res) => res.data),
+    adminHttp.put(`/products/${id}`, data).then((res) => res.data),
 
   delete: (id) =>
-    axiosInstance.delete(`/products/${id}`).then((res) => res.data),
+    adminHttp.delete(`/products/${id}`).then((res) => res.data),
 
   toggleStatus: (id) =>
-    axiosInstance.patch(`/products/${id}/toggle-status`).then((res) => res.data),
+    adminHttp.patch(`/products/${id}/toggle-status`).then((res) => res.data),
 
   // ✅ Featured Products page — mark / unmark (PATCH, atomic backend flip)
   toggleFeatured: (id) =>

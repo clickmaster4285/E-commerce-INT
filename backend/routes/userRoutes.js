@@ -4,6 +4,7 @@ const {
   loginUser,
   loginAdmin,
   refreshAccessToken,
+  refreshAdminAccessToken,
   logoutUser,
   getProfile,
   getMe,
@@ -43,6 +44,10 @@ router.post("/register", limiters.register, createUser);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
+// ✅ ADMIN refresh alias — purana endpoint untouched (compat). Sirf
+// employee-type refresh token accept karta hai (user going admin panel
+// ke liye nahi). Shape/logic purani jaisi.
+router.post("/admin/refresh-token", refreshAdminAccessToken);
 router.post("/logout", logoutUser);
 router.post("/google-login", limiters.adminLogin, googleLogin);
 router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);

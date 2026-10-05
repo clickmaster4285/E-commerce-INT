@@ -151,8 +151,8 @@ function SearchContent() {
         {!isLoading && !isError && q && total > 0 && (
           <div ref={gridTopRef} className="scroll-mt-24">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
-              {products.map((product) => (
-                <ProductCard key={product._id} product={product} />
+              {products.map((product, i) => (
+                <ProductCard key={product._id} product={product} priority={i < 2} />
               ))}
             </div>
             <PaginationBar

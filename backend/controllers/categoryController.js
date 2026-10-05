@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const log = require("../utils/logger");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
 const User = require("../models/User");
@@ -29,7 +30,7 @@ const emitSocketEvent = (event, data) => {
     const io = getIO();
     if (io) io.emit(event, data);
   } catch (error) {
-    console.warn(`Socket emit failed for ${event}:`, error.message);
+    log.warn(`Socket emit failed for ${event}:`, error.message);
   }
 };
 
@@ -413,7 +414,7 @@ const createCategory = async (req, res) => {
 
     return res.status(201).json({ success: true, message: "Category created successfully", data: category });
   } catch (error) {
-    console.error("Create category error:", error);
+    log.error("Create category error:", error);
     return res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }
 };
@@ -595,7 +596,7 @@ const updateCategory = async (req, res) => {
       data: updatedCategory
     });
   } catch (error) {
-    console.error("Update error:", error);
+    log.error("Update error:", error);
     return res.status(400).json({ success: false, message: error.message });
   }
 };

@@ -1,4 +1,5 @@
 const Variant = require("../models/Variant");
+const log = require("../utils/logger");
 const Product = require("../models/Product");
 const StockHistory = require("../models/StockHistory");
 const { getIO } = require("../utils/socket");
@@ -18,7 +19,7 @@ const emitSocketEvent = (event, data) => {
       io.emit(event, data);
     }
   } catch (error) {
-    console.warn(
+    log.warn(
       `⚠️ Socket emit failed for ${event}:`,
       error.message
     );
@@ -211,7 +212,7 @@ const getStockOverview = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get stock overview error:", error);
+    log.error("Get stock overview error:", error);
     res.status(500).json({
       message: error.message,
     });
@@ -467,7 +468,7 @@ const adjustStock = async (req, res) => {
       history,
     });
   } catch (error) {
-    console.error(
+    log.error(
       "Adjust stock error:",
       error
     );
@@ -531,7 +532,7 @@ const getStockHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get stock history error:", error);
+    log.error("Get stock history error:", error);
     res.status(500).json({
       message: error.message,
     });

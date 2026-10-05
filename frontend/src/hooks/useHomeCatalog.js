@@ -34,13 +34,15 @@ const createEmptyFilters = (initial = {}) => ({
   maxPrice: initial.maxPrice ?? null,
 });
 
-/* Filters → facets API params (server leave-one-out khud karta hai) */
-export function filtersToFacetParams(filters) {
+/* Filters → facets API params (server leave-one-out khud karta hai).
+   search sirf /shop se aata hai (?q=) — home hamesha undefined bhejta hai. */
+export function filtersToFacetParams(filters, extra = {}) {
   const bands = [
     ...((filters?.discountBands || []).map(Number).filter((n) => Number.isFinite(n))),
     ...((filters?.discountBand ?? null) !== null ? [Number(filters.discountBand)] : []),
   ].filter((n) => Number.isFinite(n) && n > 0);
   return {
+    search: String(extra?.search || "").trim() || undefined,
     brand_id: (filters?.brandIds || []).map(String).filter(Boolean).join(",") || undefined,
     category_id: (filters?.categoryIds || []).map(String).filter(Boolean).join(",") || undefined,
     minPrice: filters?.minPrice ?? undefined,
@@ -51,7 +53,8 @@ export function filtersToFacetParams(filters) {
   };
 }
 
-export function useHomeCatalog(initialFilters = {}) {
+export function useHomeCatalog(initialFilters = {}, opts = {}) {
+  const search = String(opts?.search || "").trim();
   const { data: categories = [], isPending: categoriesPending } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
@@ -88,7 +91,8 @@ export function useHomeCatalog(initialFilters = {}) {
 
   // ✅ Sidebar counts + bounds + grid total — SERVER (leave-one-out included)
   // react-query keys ko stable hash karta hai, is liye object seedha key me.
-  const facetParams = useMemo(() => filtersToFacetParams(filters), [filters]);
+  // search (?q=) key me shamil hai taake shop par counts query-aware hon.
+  const facetParams = useMemo(() => filtersToFacetParams(filters, { search }), [filters, search]);
   const {
     data: facets = null,
     isPending: facetsPending,

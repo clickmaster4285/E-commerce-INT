@@ -3,6 +3,7 @@ const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const path = require("path");
 const fs = require("fs-extra");
+const log = require("../utils/logger");
 
 const IMAGE_FOLDER = path.join(__dirname, "../uploads/bundles");
 
@@ -162,7 +163,7 @@ const attachPricing = async (rawBundles) => {
 };
 
 const handleError = (res, error, fallback) => {
-  console.error(fallback, error);
+  log.error(fallback, error);
   if (error?.name === "ValidationError") {
     const msg = Object.values(error.errors || {})
       .map((e) => e.message)

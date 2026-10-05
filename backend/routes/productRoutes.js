@@ -34,8 +34,14 @@ router.get("/", getProducts);
 //    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
 router.get("/stats", getProductStats);
 // ✅ Storefront shop facets + category tiles — "/:id" se PEHLE (warna id match ho jayega)
-router.get("/facets", getProductFacets);
-router.get("/category-tiles", getCategoryTiles);
+// Master-data GETs: short public cache (60s) + ETag (express default).
+// User-specific/cart/orders par kabhi nahi — sirf ye do static-ish routes.
+const masterCache = (req, res, next) => {
+  res.set("Cache-Control", "public, max-age=60, must-revalidate");
+  next();
+};
+router.get("/facets", masterCache, getProductFacets);
+router.get("/category-tiles", masterCache, getCategoryTiles);
 router.get("/:id", getProductById);
 
 // ==========================================

@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 
 let globalSocket = null;
 let hasLoggedError = false; // ✅ Spam rokne ke liye
+let connectScheduled = false; // ✅ idle-connect ek hi baar schedule ho
 
 const getSocketURL = () => {
   if (typeof window === "undefined") {
@@ -43,11 +44,52 @@ function cleanupOldSocket() {
     }
     globalSocket = null;
   }
+  connectScheduled = false;
+}
+
+/* ✅ IDLE-CONNECT — TCP/TLS handshake critical path (LCP/TBT) se bahar.
+   Socket object foran banta hai (listeners attach hote hain, koi event
+   miss nahi hota — sirf transport idle/interaction/2s-timeout par khulta
+   hai). URL, options, events, singleton — sab same. */
+function scheduleConnect(socket) {
+  if (!socket || socket.connected || connectScheduled) return;
+  connectScheduled = true;
+  const fire = () => {
+    if (!connectScheduled) return;
+    connectScheduled = false;
+    try {
+      if (globalSocket === socket && !socket.connected) socket.connect();
+    } catch (e) {
+      // ignore — reconnection waise hi chalegi
+    }
+  };
+  const kick = () => {
+    try {
+      if (typeof window !== "undefined" && window.cancelIdleCallback) window.cancelIdleCallback(idleId);
+    } catch (e) {}
+    window.removeEventListener("pointerdown", kick);
+    window.removeEventListener("keydown", kick);
+    window.removeEventListener("touchstart", kick);
+    fire();
+  };
+  let idleId = null;
+  try {
+    if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(() => fire(), { timeout: 2000 });
+      window.addEventListener("pointerdown", kick, { once: true, passive: true });
+      window.addEventListener("keydown", kick, { once: true });
+      window.addEventListener("touchstart", kick, { once: true, passive: true });
+      return;
+    }
+  } catch (e) {
+    // fallback neeche
+  }
+  fire();
 }
 
 function getSocket() {
-  // ✅ Agar socket pehle se connected hai toh wahi return karo
-  if (globalSocket && globalSocket.connected) return globalSocket;
+  // ✅ Agar socket pehle se hai (connected ya idle-pending) toh wahi return karo
+  if (globalSocket && (globalSocket.connected || connectScheduled)) return globalSocket;
 
   // ✅ Agar pehle disconnected ya error state mein tha toh purge karo
   if (globalSocket) {
@@ -68,16 +110,16 @@ function getSocket() {
       reconnectionAttempts: 3,        // ✅ Zyada attempts se spam kam
       reconnectionDelay: 1500,
       reconnectionDelayMax: 4000,
-      autoConnect: true,
+      autoConnect: false, // ✅ idle-connect: transport idle/interaction par khulta hai
       timeout: 15000,
     });
+    scheduleConnect(globalSocket);
   } catch (err) {
     // ✅ Silent — socket init fail par bhi console error show na ho
     return null;
   }
 
   globalSocket.on("connect", () => {
-    console.log("✅ Socket connected:", globalSocket?.id || "unknown");
     hasLoggedError = false;
   });
 

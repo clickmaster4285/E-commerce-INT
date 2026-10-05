@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import axiosInstance from "@/apis/axiosInstance";
+import userHttp from "@/apis/userHttp";
 import { orderApi } from "@/apis/user/orderApi";
 import { addressApi } from "@/apis/user/addressApi";
 import { reviewApi } from "@/apis/user/reviewApi";
@@ -176,10 +176,10 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
       if (type === "update_saved") {
         // Update saved address + order snapshot
         if (currentAddress) await addressApi.update(currentAddress._id, form);
-        await axiosInstance.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id });
+        await userHttp.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id });
       } else {
         // Order only — custom snapshot, address book untouched
-        await axiosInstance.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id, address_override: form });
+        await userHttp.put(`/orders/${order._id}/edit`, { address_id: currentAddress?._id, address_override: form });
       }
 
       invalidateAll();
@@ -381,7 +381,7 @@ export default function OrderDetailPage({ params }) {
   const handleCancel = async () => {
     setCanceling(true);
     try {
-      await axiosInstance.delete(`/orders/${order._id}`);
+      await userHttp.delete(`/orders/${order._id}`);
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       toast.success("Order cancelled successfully!");
       router.push("/orders");

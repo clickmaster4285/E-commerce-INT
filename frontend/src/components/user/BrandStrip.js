@@ -7,6 +7,8 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
 import {
   idOf,
@@ -48,10 +50,9 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
               title={`${brand.name} — ${brand.count} products`}
               className="group flex w-[7.75rem] shrink-0 flex-col items-center gap-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)]"
             >
-              <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+              <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
                 {logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logo} alt={brand.name} loading="lazy" className="max-h-full max-w-full object-contain" />
+                  <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
                 ) : (
                   <span className="text-lg font-black text-[var(--user-accent)]">
                     {String(brand.name || "?").charAt(0).toUpperCase()}

@@ -3,6 +3,7 @@ const Product = require("../models/Product");
 const Brand = require("../models/brand");
 const Category = require("../models/Category");
 const Discount = require("../models/Discount");
+const log = require("../utils/logger");
 
 // ==========================================
 // RANGE CONFIG — 7d/30d grouped per day, 3m/6m/1y per month
@@ -292,7 +293,7 @@ const getDashboardStats = async (req, res) => {
 
 
   } catch (error) {
-    console.error("❌ [getDashboardStats] Error:", error);
+    log.error("❌ [getDashboardStats] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

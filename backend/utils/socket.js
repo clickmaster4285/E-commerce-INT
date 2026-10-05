@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const log = require("./logger");
 
 let io = null;
 
@@ -56,7 +57,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const savedSize = verifyFile(filePath, "WebP");
     return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: `uploads/store/${finalName}` };
   } catch (err) {
-    console.warn("⚠️ Sharp compression failed, saving raw:", err.message);
+    log.warn("⚠️ Sharp compression failed, saving raw:", err.message);
     const fallbackExt = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
     const fallbackName = `store-logo-${Date.now()}-${safeName}-raw.${fallbackExt}`;
     const fallbackPath = path.join(storeDir, fallbackName);
@@ -117,7 +118,7 @@ const deleteOldLogo = async () => {
         if (fs.existsSync(p)) { fs.unlinkSync(p); break; }
       }
     }
-  } catch (e) { console.error("❌ deleteOldLogo error:", e.message); }
+  } catch (e) { log.error("❌ deleteOldLogo error:", e.message); }
 };
 
 const getDefaultPermissions = () => {
@@ -497,7 +498,7 @@ const initSocket = (server) => {
         let logoFile = null;
         if (payload?.logoBase64) {
           try { await deleteOldLogo(); logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName); }
-          catch (e) { console.error("❌ Logo processing error:", e.message); }
+          catch (e) { log.error("❌ Logo processing error:", e.message); }
         }
         const { logoBase64, logoFileName, logoMimeType, ...bodyData } = payload || {};
         const req = {
@@ -567,7 +568,7 @@ const initSocket = (server) => {
         };
         socket.emit("profileData", { success: true, data: profileData, user: profileData });
       } catch (e) {
-        console.error("❌ Socket getProfile error:", e.message);
+        log.error("❌ Socket getProfile error:", e.message);
         socket.emit("profileData", { success: false, message: e.message });
       }
     });
@@ -717,7 +718,7 @@ const initSocket = (server) => {
           .select("name variants").lean();
         socket.emit("productsList", products);
       } catch (e) {
-        console.error("❌ Socket getProducts error:", e.message);
+        log.error("❌ Socket getProducts error:", e.message);
         socket.emit("productsList", []);
       }
     });

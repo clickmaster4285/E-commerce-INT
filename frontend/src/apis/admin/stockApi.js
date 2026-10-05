@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 // ✅ Smart list unwrap — existing API pattern follow karta hai
 const list = (res) => {
   const d = res.data;
@@ -33,26 +32,26 @@ const paginated = (res, fallbackLimit) => {
 
 export const stockApi = {
   // Variant-level stock items (quantity/min_qnt/max_qnt reuse)
-  getAll: () => axiosInstance.get("/stock").then(list),
+  getAll: () => adminHttp.get("/stock").then(list),
 
   getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all" } = {}) => {
     const params = { page, limit };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
-    return axiosInstance.get("/stock", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/stock", { params }).then((res) => paginated(res, limit));
   },
 
   getHistoryPaginated: ({ page = 1, limit = 20, variantId = "" } = {}) => {
     const params = { page, limit };
     if (variantId) params.variant_id = variantId;
-    return axiosInstance.get("/stock/history", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/stock/history", { params }).then((res) => paginated(res, limit));
   },
 
   adjust: (data) =>
-    axiosInstance.post("/stock/adjust", data).then((res) => res.data),
+    adminHttp.post("/stock/adjust", data).then((res) => res.data),
 
   getHistory: (variantId) =>
-    axiosInstance
+    adminHttp
       .get("/stock/history", {
         params: variantId ? { variant_id: variantId } : undefined,
       })

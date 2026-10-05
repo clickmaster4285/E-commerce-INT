@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import axiosInstance from "@/apis/axiosInstance";
+import adminHttp from "@/apis/adminHttp";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { disconnectSidebarSocket } from "./Sidebar";
@@ -138,7 +138,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     setIsOpen(false);
     
     try {
-      await axiosInstance.post("/users/logout");
+      await adminHttp.post("/users/logout");
       toast.success("Logged out successfully!");
     } catch (e) {
       console.error("Logout error:", e);

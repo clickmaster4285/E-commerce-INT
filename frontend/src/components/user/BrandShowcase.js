@@ -5,7 +5,8 @@
    aakhri section. Top brands ki apni sliding product rows:
 
    - SIRF woh brands jin me 6 ya 6 se zyada products hon
-   - STRICTLY 1 ROW: desktop 6, tablet 4, mobile 3 products (ek hi row)
+   - STRICTLY 1 ROW: mobile 2, sm 3, md/lg 4, xl+ 5 products (ek hi row,
+     site-standard grid — sab ProductCards same size ke)
    - Row ke LEFT / RIGHT side par arrows — click par SIRF 1 product
      slide hota hai (zyada nahi)
    - Jis taraf koi product na ho us taraf ka arrow HIDE rehta hai
@@ -14,6 +15,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "./ProductCard";
@@ -28,14 +31,16 @@ import {
 
 const BRAND_LIMIT = 4;
 
-/* STRICTLY 1 ROW — har screen par: mobile (3 cols) → 3, tablet (4 cols)
-   → 4, desktop (6 cols) → 6 products. Ek se zyada rows kabhi nahi. */
+/* STRICTLY 1 ROW — site-standard grid jaisa (FeaturedProducts / FilterResults):
+   mobile (2 cols) → 2, sm (3 cols) → 3, md/lg (4 cols) → 4,
+   xl+ (5 cols) → 5 products. Taake cards baaki site jitne same size ke hon. */
 function useVisibleCount() {
   const get = () => {
-    if (typeof window === "undefined") return 6;
-    if (window.matchMedia("(min-width: 1024px)").matches) return 6;
-    if (window.matchMedia("(min-width: 640px)").matches) return 4;
-    return 3;
+    if (typeof window === "undefined") return 4;
+    if (window.matchMedia("(min-width: 1280px)").matches) return 5;
+    if (window.matchMedia("(min-width: 768px)").matches) return 4;
+    if (window.matchMedia("(min-width: 640px)").matches) return 3;
+    return 2;
   };
   const [count, setCount] = useState(get);
   useEffect(() => {
@@ -60,10 +65,9 @@ function BrandRow({ brand, items }) {
     <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4">
       {/* Brand header */}
       <div className="mb-3 flex items-center gap-2.5">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
           {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo} alt={brand.name} loading="lazy" className="max-h-full max-w-full object-contain" />
+            <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
           ) : (
             <span className="text-base font-black text-[var(--user-accent)]">
               {String(brand.name || "?").charAt(0).toUpperCase()}
@@ -92,7 +96,7 @@ function BrandRow({ brand, items }) {
         <div
           key={safeStart}
           style={{ animation: "catSlideIn 0.25s ease-out" }}
-          className="grid w-full grid-cols-3 gap-2.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6"
+          className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5"
         >
           {visible.map((product) => (
             <ProductCard key={idOf(product._id) || product.name} product={product} />

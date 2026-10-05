@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { GoogleLogin } from "@react-oauth/google";
+import LazyGoogleLogin from "@/components/user/LazyGoogleLogin";
 import {
   Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck,
   Truck, RotateCcw, Sparkles, KeyRound, MailCheck, ArrowLeft, AlertCircle,
@@ -476,7 +476,8 @@ export default function UserLoginPage() {
               <>
                 <div className="flex justify-center mb-6">
                   {googleClientId ? (
-                    <GoogleLogin
+                    <LazyGoogleLogin
+                      clientId={googleClientId}
                       onSuccess={(res) => handleGoogleLogin(res.credential)}
                       onError={() => toast.error("Google login failed. Try again.")}
                       theme="filled_black"

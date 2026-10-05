@@ -1,5 +1,6 @@
   const path = require("path");
   const fs = require("fs-extra");
+const log = require("./logger");
 
   // Single image delete
   const deleteImageFile = async (imgUrl) => {
@@ -17,7 +18,7 @@
         await fs.remove(filePath);
       }
     } catch (error) {
-      console.error(
+      log.error(
         "Image delete error:",
         error.message
       );
@@ -41,7 +42,7 @@
         await fs.remove(folderPath);
       }
     } catch (error) {
-      console.error(
+      log.error(
         "Product upload folder delete error:",
         error.message
       );

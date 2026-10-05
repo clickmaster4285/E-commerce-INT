@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 const getList = (response) => {
   const payload = response?.data;
 
@@ -42,12 +41,12 @@ const getPaginated = (response, fallbackLimit) => {
 
 export const adminCategoryApi = {
   getAll: () =>
-    axiosInstance
+    adminHttp
       .get("/categories")
       .then(getList),
 
   getAllAdmin: () =>
-    axiosInstance
+    adminHttp
       .get("/categories/admin/all")
       .then(getList),
 
@@ -60,18 +59,18 @@ export const adminCategoryApi = {
       params.sort = sort;
       params.order = order || "asc";
     }
-    return axiosInstance
+    return adminHttp
       .get("/categories/admin/all", { params })
       .then((response) => getPaginated(response, limit));
   },
 
   getById: (id) =>
-    axiosInstance
+    adminHttp
       .get(`/categories/${id}`)
       .then(getObject),
 
   getNextCode: () =>
-    axiosInstance
+    adminHttp
       .get("/categories/next-code")
       .then((response) => {
         const payload = response?.data;
@@ -84,34 +83,34 @@ export const adminCategoryApi = {
       }),
 
   getAttributes: (categoryId) =>
-    axiosInstance
+    adminHttp
       .get(`/categories/${categoryId}/attributes`)
       .then(getList),
 
   getAttributesHierarchy: (categoryId) =>
-    axiosInstance
+    adminHttp
       .get(`/categories/${categoryId}/attributes-hierarchy`)
       .then(getList),
 
   create: (data) =>
-    axiosInstance
+    adminHttp
       .post("/categories", data)
       .then(getObject),
 
   update: (id, data) =>
-    axiosInstance
+    adminHttp
       .put(`/categories/${id}`, data)
       .then(getObject),
 
   updateAttributes: (id, attributes) =>
-    axiosInstance
+    adminHttp
       .put(`/categories/${id}/attributes`, {
         attributes,
       })
       .then(getObject),
 
   delete: (id) =>
-    axiosInstance
+    adminHttp
       .delete(`/categories/${id}`)
       .then(getObject),
 };

@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import userHttp from "../userHttp";
 const list = (res) => {
   const d = res.data;
   if (Array.isArray(d)) return d;
@@ -9,10 +8,10 @@ const list = (res) => {
 };
 
 export const brandApi = {
-  // ✅ PUBLIC — bina login
-  getAll: () => axiosInstance.get("/brands").then(list),
+  // ✅ PUBLIC — bina login (slim=1: storefront ko _id/name/logo hi chahiye)
+  getAll: () => userHttp.get("/brands", { params: { slim: 1 } }).then(list),
   getById: (id) =>
-    axiosInstance.get(`/brands/${id}`).then((res) => res.data?.data || res.data),
+    userHttp.get(`/brands/${id}`).then((res) => res.data?.data || res.data),
   getWithProducts: (id) =>
-    axiosInstance.get(`/brands/${id}/details`).then((res) => res.data?.data || res.data),
+    userHttp.get(`/brands/${id}/details`).then((res) => res.data?.data || res.data),
 };

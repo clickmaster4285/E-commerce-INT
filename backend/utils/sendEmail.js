@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const log = require("./logger");
 
 // ==========================================
 // ✉️ EMAIL UTILITY (Nodemailer + SMTP)
@@ -62,7 +63,7 @@ const verifySmtpConnection = async () => {
   const mailer = getTransporter();
   if (!mailer) {
     const error = new Error(
-      "SMTP configured nahi hai. .env mein SMTP_HOST, SMTP_USER, SMTP_PASS set karein.",
+      "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASS in .env.",
     );
     error.code = "SMTP_NOT_CONFIGURED";
     throw error;
@@ -92,7 +93,7 @@ const toFriendlySmtpError = (error) => {
 
   if (code === "EAUTH" || /invalid login|username and password|535/i.test(msg)) {
     const err = new Error(
-      "Email nahi bheja ja saka: SMTP username/password galat hai. Gmail par 16-char App Password use karein (normal password nahi chalega).",
+      "Could not send email: SMTP username/password is incorrect. For Gmail, use a 16-character App Password (a normal password will not work).",
     );
     err.statusCode = 500;
     err.cause = error;
@@ -100,19 +101,19 @@ const toFriendlySmtpError = (error) => {
   }
   if (code === "ESOCKET" || code === "ETIMEDOUT" || code === "ECONNECTION" || /timeout|timed out|connect/i.test(msg)) {
     const err = new Error(
-      "Email server se connect nahi ho saka. SMTP_HOST/PORT check karein aur internet/firewall dekhein.",
+      "Could not connect to the email server. Check SMTP_HOST/PORT and your internet/firewall settings.",
     );
     err.statusCode = 500;
     err.cause = error;
     return err;
   }
   if (code === "EENVELOPE" || /mailbox unavailable|recipient|sender/i.test(msg)) {
-    const err = new Error(`Email address reject ho gayi: ${msg.slice(0, 160)}`);
+    const err = new Error(`Email address was rejected: ${msg.slice(0, 160)}`);
     err.statusCode = 500;
     err.cause = error;
     return err;
   }
-  const err = new Error(`Email nahi bheja ja saka: ${msg.slice(0, 200) || code || "unknown error"}`);
+  const err = new Error(`Could not send email: ${msg.slice(0, 200) || code || "unknown error"}`);
   err.statusCode = 500;
   err.cause = error;
   return err;
@@ -121,10 +122,16 @@ const toFriendlySmtpError = (error) => {
 const sendEmail = async ({ to, subject, html, text }) => {
   const mailer = getTransporter();
   if (!mailer) {
-    // 🧪 DEV FALLBACK — SMTP config nahi hai to console par show karo
-    console.warn("⚠️ SMTP not configured — email not sent. Falling back to console.");
-    console.warn(`📧 TO: ${to}\n📧 SUBJECT: ${subject}\n${text || ""}`);
-    console.warn("💡 Fix: .env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+    // 🧪 DEV FALLBACK — sirf development me console par (OTP text samehit).
+    // Production me OTP/email text KABHI print nahi hota — sirf 1 compact warn.
+    // Return shape same ({ delivered:false, reason }) taake caller logic na badle.
+    if (process.env.NODE_ENV !== "production") {
+      log.warn("⚠️ SMTP not configured — email not sent. Falling back to console.");
+      log.warn(`📧 TO: ${to}\n📧 SUBJECT: ${subject}\n${text || ""}`);
+      log.warn("💡 Fix: .env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+    } else {
+      log.warn("⚠️ SMTP not configured — email not sent.");
+    }
     return { delivered: false, reason: "smtp_not_configured" };
   }
 
@@ -138,10 +145,10 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
   try {
     const info = await mailer.sendMail({ from: fromHeader, to, subject, html, text });
-    console.log(`✅ Email sent to ${to} (id: ${info?.messageId || "n/a"})`);
+    log.info(`✅ Email sent to ${to} (id: ${info?.messageId || "n/a"})`);
     return { delivered: true };
   } catch (error) {
-    console.error("❌ SMTP send failed:", error?.code || "", error?.message || error);
+    log.error("❌ SMTP send failed:", error?.code || "", error?.message || error);
     throw toFriendlySmtpError(error);
   }
 };

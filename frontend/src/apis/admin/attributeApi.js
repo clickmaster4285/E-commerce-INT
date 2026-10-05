@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 const unwrap = (res) => {
   const d = res?.data;
   if (Array.isArray(d)) return d;
@@ -31,36 +30,36 @@ export const attributeApi = {
     } else if (params && typeof params === "object") {
       Object.assign(query, params);
     }
-    return axiosInstance.get("/attributes", { params: query }).then(unwrap);
+    return adminHttp.get("/attributes", { params: query }).then(unwrap);
   },
 
   getAllPaginated: ({ page = 1, limit = 20, search = "", category = "" } = {}) => {
     const query = { page, limit };
     if (search) query.search = search;
     if (category && category !== "all") query.category = category;
-    return axiosInstance.get("/attributes", { params: query }).then((res) => paginated(res, limit));
+    return adminHttp.get("/attributes", { params: query }).then((res) => paginated(res, limit));
   },
 
   getById: (id) =>
-    axiosInstance.get(`/attributes/${id}`).then(unwrapObject),
+    adminHttp.get(`/attributes/${id}`).then(unwrapObject),
 
   getByCategory: (categoryId) =>
-    axiosInstance
+    adminHttp
       .get(`/categories/${categoryId}/attributes`)
       .then(unwrap),
 
   create: (data) =>
-    axiosInstance.post("/attributes", data).then(unwrapObject),
+    adminHttp.post("/attributes", data).then(unwrapObject),
 
   update: (id, data) =>
-    axiosInstance.put(`/attributes/${id}`, data).then(unwrapObject),
+    adminHttp.put(`/attributes/${id}`, data).then(unwrapObject),
 
   getCategories: (id) =>
-    axiosInstance.get(`/attributes/${id}/categories`).then(unwrap),
+    adminHttp.get(`/attributes/${id}/categories`).then(unwrap),
 
   updateCategories: (id, categoryIds) =>
-    axiosInstance.put(`/attributes/${id}/categories`, { category_ids: categoryIds }).then(unwrapObject),
+    adminHttp.put(`/attributes/${id}/categories`, { category_ids: categoryIds }).then(unwrapObject),
 
   delete: (id) =>
-    axiosInstance.delete(`/attributes/${id}`).then((res) => res.data),
+    adminHttp.delete(`/attributes/${id}`).then((res) => res.data),
 };

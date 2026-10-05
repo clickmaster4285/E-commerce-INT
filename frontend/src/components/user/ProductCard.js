@@ -1,21 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import {
   Heart,
-  Plus,
+  ShoppingCart,
+  Zap,
+  SlidersHorizontal,
   Check,
   Package,
   Tag,
   Truck,
-  Zap,
   PackageOpen,
   Sparkles,
 } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { useDiscounts } from "./DiscountContext";
+import { useQuickBuy } from "./QuickBuyContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -77,7 +82,8 @@ function getDealBadgeConfig(deal) {
   };
 }
 
-export default function ProductCard({
+// ✅ memo: parent/context re-render par same-props cards skip (logic same)
+function ProductCardInner({
   product,
   hideDiscountBadge = false,
   dealBadge = null,
@@ -85,11 +91,15 @@ export default function ProductCard({
   dealId = null,
   showDealPricing = false,
   children,
+  // ✅ LCP rows ke liye: pehli 1-2 cards priority (eager+high), baaki lazy — default same
+  priority = false,
 }) {
   const [added, setAdded] = useState(false);
+  const router = useRouter();
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
   const { calculateProductDiscount, getActiveDealForProduct } = useDiscounts();
+  const { openQuickBuy } = useQuickBuy() || {};
 
   if (!product) return null;
 
@@ -127,7 +137,7 @@ export default function ProductCard({
     hasDiscount = disc.hasDiscount;
     matchedDeal = disc.matchedDeal;
   } catch (e) {
-    console.warn("Discount calc error:", e);
+    // Discount calc fail → default prices (purana fallback, bina warn ke)
   }
 
   // ✅ When showDealPricing is false (regular listing), still detect deal membership
@@ -165,32 +175,53 @@ export default function ProductCard({
     }
   }
 
-  const handleAdd = (e) => {
+  // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
+  const hasMultipleVariants = variants.length > 1;
+
+  const buildDealInfo = () => {
+    if (!activeDeal) return null;
+    const info = {
+      dealId: activeDeal._id,
+      dealType: activeDeal.type,
+      dealName: activeDeal.name,
+      dealBadge: badgeConfig?.text || null,
+      savings: price > 0 ? oldPrice - price : 0,
+      originalPrice: oldPrice,
+      dealDiscountValue: Number(activeDeal.discountValue) || 0,
+      minQuantity: Number(activeDeal.minQuantity) || 1,
+    };
+    if (activeDeal.type === "buy_x_get_y") {
+      info.buyQuantity = activeDeal.buyQuantity;
+      info.getQuantity = activeDeal.getQuantity;
+    }
+    return info;
+  };
+
+  // Single-variant: sirf cart me add (koi drawer open / navigate nahi)
+  const handleQuickAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
-
-    if (activeDeal) {
-      const dealInfo = {
-        dealId: activeDeal._id,
-        dealType: activeDeal.type,
-        dealName: activeDeal.name,
-        dealBadge: badgeConfig?.text || null,
-        savings: price > 0 ? oldPrice - price : 0,
-        originalPrice: oldPrice,
-        dealDiscountValue: Number(activeDeal.discountValue) || 0,
-        minQuantity: Number(activeDeal.minQuantity) || 1,
-      };
-      if (activeDeal.type === "buy_x_get_y") {
-        dealInfo.buyQuantity = activeDeal.buyQuantity;
-        dealInfo.getQuantity = activeDeal.getQuantity;
-      }
-      addToCart(product, firstVariant, 1, dealInfo);
-    } else {
-      addToCart(product, firstVariant, 1);
-    }
+    addToCart(product, firstVariant, 1, buildDealInfo());
     setAdded(true);
     setTimeout(() => setAdded(false), 1200);
+  };
+
+  // Single-variant: add + go straight to checkout
+  const handleQuickBuy = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (out) return;
+    addToCart(product, firstVariant, 1, buildDealInfo());
+    router.push("/checkout");
+  };
+
+  // Multi-variant: global options drawer kholo (CartDrawer jaisa)
+  const handleOpenOptions = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (out) return;
+    openQuickBuy?.(product, buildDealInfo());
   };
 
   return (
@@ -206,12 +237,14 @@ export default function ProductCard({
     >
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
         {image ? (
-          <img
+          <Image
             src={getImageUrl(image)}
             alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover"
+            fill
+            loader={smartImageLoader}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+            priority={priority}
+            className="object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -271,19 +304,48 @@ export default function ProductCard({
           />
         </button>
 
-        <button
-          onClick={handleAdd}
-          disabled={out}
-          className={`absolute bottom-2.5 right-2.5 z-10 w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 active:scale-90 ${
-            out
-              ? "bg-[var(--user-bg-hover)] text-[var(--user-text-disabled)] cursor-not-allowed"
-              : added
-                ? "bg-[var(--user-success)] text-white"
-                : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:scale-105"
-          } md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0`}
-        >
-          {added ? <Check size={18} /> : <Plus size={18} />}
-        </button>
+        {/* Hover quick actions — no plus icon.
+            Multi-variant: only "Choose Options" (opens right-side drawer).
+            Single variant: "Add to Cart" + "Buy Now".
+            Desktop: reveal on hover. Mobile: always visible (no hover). */}
+        {!out && (
+          <div className="absolute inset-x-2.5 bottom-2.5 z-10 flex gap-1.5 md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0 transition-all duration-300">
+            {hasMultipleVariants ? (
+              <button
+                onClick={handleOpenOptions}
+                className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:opacity-90 active:scale-[0.98] transition"
+              >
+                <SlidersHorizontal size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                Choose Options
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleQuickAdd}
+                  className={`flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg active:scale-[0.98] transition ${
+                    added
+                      ? "bg-[var(--user-success)] text-white"
+                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"
+                  }`}
+                >
+                  {added ? (
+                    <Check size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  ) : (
+                    <ShoppingCart size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  )}
+                  {added ? "Added!" : "Cart"}
+                </button>
+                <button
+                  onClick={handleQuickBuy}
+                  className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:bg-black/75 active:scale-[0.98] transition"
+                >
+                 
+                  Buy Now
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
@@ -316,3 +378,7 @@ export default function ProductCard({
     </Link>
   );
 }
+
+const ProductCard = memo(ProductCardInner);
+
+export default ProductCard;

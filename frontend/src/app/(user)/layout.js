@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../../components/user/Header";
 import Footer from "../../components/user/Footer";
 import CartDrawer from "../../components/user/CartDrawer";
+import VariantQuickBuyDrawer from "../../components/user/VariantQuickBuyDrawer";
 import { CartProvider, useCart } from "../../components/user/CartContext";
+import { QuickBuyProvider } from "../../components/user/QuickBuyContext";
 import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
@@ -109,6 +111,19 @@ function NavItem({ icon, label, active }) {
 export default function UserLayout({ children }) {
   useUserSocketSync();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+
+  // Session expired / guest 401: switch UI to logged-out state silently.
+  // NOTE: setQueryData (not invalidate) to avoid a refetch loop —
+  // invalidating would refetch profile, get 401 again, and re-fire the event.
+  useEffect(() => {
+    const onSessionExpired = () => {
+      queryClient.setQueryData(["userProfile"], null);
+      queryClient.setQueryData(["wishlist"], []);
+    };
+    window.addEventListener("user-session-expired", onSessionExpired);
+    return () => window.removeEventListener("user-session-expired", onSessionExpired);
+  }, [queryClient]);
 
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
@@ -134,6 +149,7 @@ export default function UserLayout({ children }) {
   return (
     <WishlistProvider>
       <CartProvider>
+        <QuickBuyProvider>
         <div
           id="user-theme"
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
@@ -142,8 +158,10 @@ export default function UserLayout({ children }) {
           <main className="w-full min-w-0">{children}</main>
           {!hideFooter && <Footer />}
           <CartDrawer />
+          <VariantQuickBuyDrawer />
           <MobileNav />
         </div>
+        </QuickBuyProvider>
       </CartProvider>
     </WishlistProvider>
   );

@@ -10,7 +10,7 @@
    Har tab me numbered server pagination (PaginationBar, 20 per page).
    ========================================================== */
 
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Flame, PackageSearch, Sparkles, TrendingUp } from "lucide-react";
 import ProductCard from "./ProductCard";
@@ -52,6 +52,8 @@ function TabGrid({ tab }) {
 
   const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
   const currentPage = pagination?.page || Math.min(page, totalPages);
+  // ✅ Badi list ka render defer — urgent updates (tab/page) pehle, logic same
+  const deferredProducts = useDeferredValue(products);
 
   const goToPage = (next) => {
     setPage(Math.min(Math.max(1, next), totalPages));
@@ -100,8 +102,8 @@ function TabGrid({ tab }) {
   return (
     <div ref={gridRef} className="scroll-mt-24">
       <div className={GRID}>
-        {products.map((product) => (
-          <ProductCard key={idOf(product._id) || product.name} product={product} />
+        {deferredProducts.map((product, i) => (
+          <ProductCard key={idOf(product._id) || product.name} product={product} priority={i < 2} />
         ))}
       </div>
 

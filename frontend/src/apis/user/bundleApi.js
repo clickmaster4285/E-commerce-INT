@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import userHttp from "../userHttp";
 // ✅ Smart list unwrap
 const list = (res) => {
   const d = res.data;
@@ -14,7 +13,7 @@ const list = (res) => {
 export const bundleApi = {
   // Sirf active bundles (storefront)
   getAllActive: ({ limit, page } = {}) =>
-    axiosInstance
+    userHttp
       .get("/bundles/active", {
         params: { limit: limit || undefined, page: page || undefined },
       })

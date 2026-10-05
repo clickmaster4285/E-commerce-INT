@@ -2,6 +2,7 @@ const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { validatePhone } = require("../utils/phoneValidator");
+const log = require("../utils/logger");
 
 // @desc    Get Store Info
 const getStoreInfo = async (req, res) => {
@@ -10,7 +11,7 @@ const getStoreInfo = async (req, res) => {
     if (!store) store = await Store.create({});
     res.status(200).json({ success: true, data: store.toObject() });
   } catch (error) {
-    console.error("Get Store Error:", error);
+    log.error("Get Store Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -128,7 +129,7 @@ const updateStoreInfo = async (req, res) => {
       message: "Store updated successfully",
     });
   } catch (error) {
-    console.error("Update Store Error:", error);
+    log.error("Update Store Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

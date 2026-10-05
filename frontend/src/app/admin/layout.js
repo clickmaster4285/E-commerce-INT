@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
-import axiosInstance from '@/apis/axiosInstance';
+import adminHttp from '@/apis/adminHttp';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/useShippingSocketSync';
@@ -63,7 +63,7 @@ function getLayoutPermSocket() {
 // ==========================================
 const getProfile = async () => {
   try {
-    const response = await axiosInstance.get('/users/profile', { timeout: 10000 });
+    const response = await adminHttp.get('/users/profile', { timeout: 10000 });
 
     let extractedUser = null;
 
@@ -90,7 +90,7 @@ const getProfile = async () => {
 // Agar tumhare backend ka store endpoint different hai
 // to sirf yahan endpoint change karna hoga.
 const getStoreData = async () => {
-  const response = await axiosInstance.get('/store');
+  const response = await adminHttp.get('/store');
 
   return (
     response.data?.store ||

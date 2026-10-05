@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldX, Mail, Lock, AlertTriangle, LogOut } from 'lucide-react';
-import axiosInstance from '@/apis/axiosInstance';
+import adminHttp from '@/apis/adminHttp';
 import { toast } from 'sonner';
 
 export default function AccessDeniedPage() {
@@ -30,7 +30,7 @@ export default function AccessDeniedPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await axiosInstance.post('/users/logout');
+      await adminHttp.post('/users/logout');
     } catch (err) {
       console.error('Logout error:', err);
     }

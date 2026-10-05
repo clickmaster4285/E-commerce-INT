@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { validatePhone } = require("../utils/phoneValidator");
+const log = require("../utils/logger");
 
 // =====================================================
 // ACTIVITY HELPER
@@ -26,7 +27,7 @@ const pushActivity = async (employeeDocId, activityData) => {
       },
     });
   } catch (err) {
-    console.error("⚠️ pushActivity error:", err.message);
+    log.error("⚠️ pushActivity error:", err.message);
   }
 };
 
@@ -270,7 +271,7 @@ exports.getAllEmployees = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
+    log.error(
       "❌ getAllEmployees error:",
       error.message
     );
@@ -322,7 +323,7 @@ exports.getEmployeeById = async (req, res) => {
       data: employee,
     });
   } catch (error) {
-    console.error(
+    log.error(
       "❌ getEmployeeById error:",
       error.message
     );
@@ -462,7 +463,7 @@ exports.createEmployee = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("❌ createEmployee error:", error.message);
+    log.error("❌ createEmployee error:", error.message);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -690,7 +691,7 @@ exports.updateEmployee = async (req, res) => {
       permissionsChanged,
     });
   } catch (error) {
-    console.error("❌ updateEmployee error:", error.message);
+    log.error("❌ updateEmployee error:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -759,7 +760,7 @@ exports.deleteEmployee = async (
         "Employee deleted",
     });
   } catch (error) {
-    console.error(
+    log.error(
       "❌ deleteEmployee error:",
       error.message
     );
@@ -875,7 +876,7 @@ exports.toggleStatus = async (
       data: updated,
     });
   } catch (error) {
-    console.error(
+    log.error(
       "❌ toggleStatus error:",
       error.message
     );

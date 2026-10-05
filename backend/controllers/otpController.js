@@ -8,6 +8,7 @@ const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const log = require("../utils/logger");
 
 // ==========================================
 // ⚙️ OTP CONFIG (sirf env se — koi hardcoded fallback nahi)
@@ -26,11 +27,13 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
+const getUserAccessDays = () => Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS) || 7;
+
 const setAuthCookies = (res, userId, role) => {
   const accessToken = jwt.sign(
     { userId, role, type: "user" },
     process.env.JWT_SECRET,
-    { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m` },
+    { expiresIn: `${getUserAccessDays()}d` },
   );
   const refreshToken = jwt.sign(
     { userId, role, type: "user" },
@@ -41,7 +44,7 @@ const setAuthCookies = (res, userId, role) => {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
-    maxAge: Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES) * 60 * 1000,
+    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
@@ -98,7 +101,7 @@ const issueOtp = async ({ email, purpose }) => {
   const debugOtp =
     !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
   if (debugOtp) {
-    console.warn(`🧪 [DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
+    log.warn(`🧪 [DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
   }
 
   return { delivered: delivery.delivered, debugOtp };
@@ -151,7 +154,7 @@ const verifyOtpCode = async ({ email, purpose, otp }) => {
 
 const sendError = (res, error) => {
   const status = error.statusCode || 500;
-  if (status >= 500) console.error("OTP error:", error.cause || error);
+  if (status >= 500) log.error("OTP error:", error.cause || error);
   return res.status(status).json({
     success: false,
     message: error.message,
@@ -220,7 +223,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
     return { alreadyVerified: false, email, delivered: delivery.delivered, debugOtp };
   }
@@ -263,7 +266,7 @@ const sendEmailVerificationOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: result.delivered
             ? `Verification code sent to ${result.email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein ya SMTP configure karein. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
         },
         result.debugOtp,
       ),
@@ -481,7 +484,7 @@ const sendForgotPasswordOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: delivered
             ? `Password reset code sent to ${email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein ya SMTP configure karein. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
         },
         debugOtp,
       ),
@@ -624,8 +627,8 @@ const getEmailHealth = async (req, res) => {
       return res.json({
         success: false,
         configured: false,
-        message: "SMTP configured nahi hai — OTP email nahi jayegi, sirf console par print hogi.",
-        hint: ".env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein. Gmail par App Password use karein.",
+        message: "SMTP is not configured — OTP will only be printed to the console.",
+        hint: "Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM in .env. For Gmail, use an App Password.",
         config: {
           host: cfg.host || "(empty)",
           port: cfg.port,
@@ -639,7 +642,7 @@ const getEmailHealth = async (req, res) => {
     return res.json({
       success: true,
       configured: true,
-      message: `SMTP OK — ${cfg.host}:${cfg.port} se email bheji ja sakti hai.`,
+        message: `SMTP OK — emails can be sent via ${cfg.host}:${cfg.port}.`,
       config: {
         host: cfg.host,
         port: cfg.port,
@@ -652,8 +655,8 @@ const getEmailHealth = async (req, res) => {
     return res.status(500).json({
       success: false,
       configured: true,
-      message: `SMTP login/connect fail: ${error.message}`,
-      hint: "Gmail: App Password (16-char, space ke baghair), 2-Step Verification ON zaroori. Normal password nahi chalega.",
+      message: `SMTP login/connect failed: ${error.message}`,
+      hint: "Gmail: use a 16-character App Password (without spaces) with 2-Step Verification ON. A normal password will not work.",
     });
   }
 };

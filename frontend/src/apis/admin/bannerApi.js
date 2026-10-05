@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../adminHttp";
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
   if (Array.isArray(d)) {
@@ -20,34 +19,34 @@ export const bannerAPI = {
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (bannerType && bannerType !== "all") params.bannerType = bannerType;
-    return axiosInstance.get("/banners", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/banners", { params }).then((res) => paginated(res, limit));
   },
 
   list: (params) =>
-    axiosInstance.get("/banners", { params }),
+    adminHttp.get("/banners", { params }),
 
   active: (page) =>
-    axiosInstance.get("/banners/active", {
+    adminHttp.get("/banners/active", {
       params: { page },
     }),
 
   get: (id) =>
-    axiosInstance.get(`/banners/${id}`),
+    adminHttp.get(`/banners/${id}`),
 
   create: (data) =>
-    axiosInstance.post("/banners", data),
+    adminHttp.post("/banners", data),
 
   update: (id, data) =>
-    axiosInstance.put(`/banners/${id}`, data),
+    adminHttp.put(`/banners/${id}`, data),
 
   toggle: (id) =>
-    axiosInstance.patch(`/banners/${id}/toggle`),
+    adminHttp.patch(`/banners/${id}/toggle`),
 
   duplicate: (id) =>
-    axiosInstance.post(`/banners/${id}/duplicate`),
+    adminHttp.post(`/banners/${id}/duplicate`),
 
   delete: (id) =>
-    axiosInstance.delete(`/banners/${id}`),
+    adminHttp.delete(`/banners/${id}`),
 };
 
 export default bannerAPI;

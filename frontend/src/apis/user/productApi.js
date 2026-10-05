@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import userHttp from "../userHttp";
 const list = (res) => {
   const d = res.data;
   if (Array.isArray(d)) return d;
@@ -24,7 +23,7 @@ const paginated = (res, fallbackLimit) => {
 
 export const productApi = {
   // ✅ PUBLIC — bina login (User GUI) — legacy full list (purane callers ke liye)
-  getAll: () => axiosInstance.get("/products").then(list),
+  getAll: () => userHttp.get("/products").then(list),
 
   // ✅ Server-side paginated list (User GUI shop/facets/search/brand/related)
   // Backend: ?page&limit&search&sort&brand_id&category_id&minPrice&maxPrice
@@ -47,7 +46,7 @@ export const productApi = {
     featured = "",
     ids = [],
   } = {}) =>
-    axiosInstance
+    userHttp
       .get("/products", {
         params: {
           page,
@@ -80,7 +79,7 @@ export const productApi = {
     deal = [],
     discount = [],
   } = {}) =>
-    axiosInstance
+    userHttp
       .get("/products/facets", {
         params: {
           search: search || undefined,
@@ -97,13 +96,13 @@ export const productApi = {
 
   // ✅ Category tiles (PopularCategories + HomeCategories) — count + fromPrice + image
   getCategoryTiles: ({ limit = 12 } = {}) =>
-    axiosInstance
+    userHttp
       .get("/products/category-tiles", { params: { limit } })
       .then((res) => res.data?.data || []),
 
   getById: (id) =>
-    axiosInstance.get(`/products/${id}`).then((res) => res.data?.data || res.data),
+    userHttp.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 
   getByBrand: (brandId) =>
-    axiosInstance.get(`/products?brand_id=${brandId}`).then(list),
+    userHttp.get(`/products?brand_id=${brandId}`).then(list),
 };

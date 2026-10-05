@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import axiosInstance from '@/apis/axiosInstance';
+import adminHttp from '@/apis/adminHttp';
 import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
@@ -151,7 +151,7 @@ export default function AdminLoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (userData) => {
-      const response = await axiosInstance.post(
+      const response = await adminHttp.post(
         '/users/admin/login',
         userData
       );
@@ -165,7 +165,7 @@ export default function AdminLoginPage() {
         !data?.user ||
         !['admin', 'staff', 'manager'].includes(role)
       ) {
-        axiosInstance.post('/users/logout').catch(() => {});
+        adminHttp.post('/users/logout').catch(() => {});
         toast.error(
           'Access denied. Only administrators, managers and staff members can log in.'
         );

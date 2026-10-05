@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
+const log = require("../utils/logger");
 
 const {
   getNextCode,
@@ -35,7 +36,7 @@ router.get("/public", async (req, res) => {
       count: categories.length,
     });
   } catch (error) {
-    console.error("❌ Public categories fetch error:", error.message);
+    log.error("❌ Public categories fetch error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch categories",
@@ -155,7 +156,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching admin categories:", error);
+    log.error("Error fetching admin categories:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch category tree",

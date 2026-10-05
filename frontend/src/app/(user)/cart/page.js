@@ -47,7 +47,7 @@ function getDealBadgeConfig(deal) {
 export default function CartPage() {
   const router = useRouter();
   const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection, applyDealToItem } = useCart();
-  const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
+  const { calculateProductDiscount, deals: dealsList = [], getActiveDealsForProduct } = useDiscounts();
   const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
   // ✅ Deal picker — kaunsa card ka popup khula hai (sirf ek waqt pe ek)
   const [openDealCardKey, setOpenDealCardKey] = useState(null);
@@ -274,10 +274,17 @@ export default function CartPage() {
 
   const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => {
     const dealOpen = openDealCardKey === row.key;
+    // ✅ Deal button/picker sirf tab jab is product ke liye koi active deal ho
+    const hasAvailableDeals = (getActiveDealsForProduct?.({
+      _id: row.raw?.productId || row.raw?.id,
+      category_id: row.raw?.categoryId || row.raw?.category_id || null,
+      brand_id: row.raw?.brandId || row.raw?.brand_id || null,
+    }) || []).length > 0;
+    const pickerOpen = dealOpen && hasAvailableDeals;
     return (
     <div
-      onClick={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
-      className={`relative cursor-pointer group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${dealOpen ? "min-h-[16.25rem] border-purple-500/40" : ""} ${
+      onClick={hasAvailableDeals ? () => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key)) : undefined}
+      className={`relative ${hasAvailableDeals ? "cursor-pointer" : ""} group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${pickerOpen ? "min-h-[16.25rem] border-purple-500/40" : ""} ${
       !isSelected ? "opacity-60" : ""
     } ${
       isDeal
@@ -360,17 +367,19 @@ export default function CartPage() {
                 <TrendingUp size={10} /> -{Math.round(((row.originalPrice - row.displayPrice) / row.originalPrice) * 100)}%
               </span>
             )}
-            {/* ✅ DEALS BUTTON — drawer jaisa explicit deal picker toggle */}
+            {/* ✅ DEALS BUTTON — sirf jab is product par koi active deal ho */}
+            {hasAvailableDeals && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpenDealCardKey((prev) => (prev === row.key ? null : row.key)); }}
               aria-label="View available deals"
-              aria-expanded={dealOpen}
+              aria-expanded={pickerOpen}
               className="inline-flex items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
             >
               <BadgePercent size={11} />
               <span>Deals</span>
             </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 mt-auto pt-2">
@@ -382,12 +391,14 @@ export default function CartPage() {
             )}
           </div>
 
+          {hasAvailableDeals && (
           <DealInfoDropdown
             cartItem={row.raw}
             onApplyDeal={(deal) => applyDealToItem(row.key, deal)}
-            open={openDealCardKey === row.key}
+            open={pickerOpen}
             onClose={() => setOpenDealCardKey(null)}
           />
+          )}
         </div>
       </div>
 
@@ -839,10 +850,18 @@ export default function CartPage() {
 // ✅ MOBILE cart card (Daraz-style) — reusable in mobile tree, uses passed-in handlers.
 function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect, onApplyDeal, openDealPicker = false, onToggleDealPicker }) {
   const img = getImgUrl(row.image);
+  const { getActiveDealsForProduct } = useDiscounts();
+  // ✅ Deal button/picker sirf tab jab is product ke liye koi active deal ho
+  const hasAvailableDeals = (getActiveDealsForProduct?.({
+    _id: row.raw?.productId || row.raw?.id,
+    category_id: row.raw?.categoryId || row.raw?.category_id || null,
+    brand_id: row.raw?.brandId || row.raw?.brand_id || null,
+  }) || []).length > 0;
+  const pickerOpen = openDealPicker && hasAvailableDeals;
   return (
     <div
-      onClick={() => onToggleDealPicker?.()}
-      className={`relative cursor-pointer bg-[var(--user-bg-card)] rounded-xl border p-3 mb-2 flex items-start gap-2 transition-all duration-200 ${openDealPicker ? "min-h-[15rem] border-purple-500/40" : "border-[var(--user-border)]"} ${!isSelected ? "opacity-60" : ""}`}>
+      onClick={hasAvailableDeals ? () => onToggleDealPicker?.() : undefined}
+      className={`relative ${hasAvailableDeals ? "cursor-pointer" : ""} bg-[var(--user-bg-card)] rounded-xl border p-3 mb-2 flex items-start gap-2 transition-all duration-200 ${pickerOpen ? "min-h-[15rem] border-purple-500/40" : "border-[var(--user-border)]"} ${!isSelected ? "opacity-60" : ""}`}>
       {/* ✅ Selection checkbox (unchanged) */}
       <button
         type="button"
@@ -911,24 +930,28 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
           </div>
         ) : null}
 
-        {/* ✅ DEALS BUTTON — mobile card pe explicit deal picker toggle (drawer jaisa) */}
+        {/* ✅ DEALS BUTTON — sirf jab is product par koi active deal ho */}
+        {hasAvailableDeals && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
           aria-label="View available deals"
-          aria-expanded={openDealPicker}
+          aria-expanded={pickerOpen}
           className="inline-flex w-fit items-center gap-1 mt-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[0.5625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
         >
           <BadgePercent size={10} />
           <span>Deals</span>
         </button>
+        )}
 
+        {hasAvailableDeals && (
         <DealInfoDropdown
           cartItem={row.raw}
           onApplyDeal={onApplyDeal}
-          open={openDealPicker}
+          open={pickerOpen}
           onClose={() => onToggleDealPicker?.(false)}
         />
+        )}
 
         {/* ✅ Row 2 — Price (left) + QTY stepper (right) — neche wali line khatam */}
         <div className="flex items-center justify-between gap-2 mt-1.5">
