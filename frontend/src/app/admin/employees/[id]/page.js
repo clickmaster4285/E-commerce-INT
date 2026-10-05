@@ -18,8 +18,6 @@ import {
   User,
   Loader2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Pencil,
   X,
   Eye,
@@ -58,6 +56,8 @@ const ALLOWED_PERMISSIONS = {
   dashboard: { label: "Dashboard", default: true },
   employees: { label: "Employees", default: true },
   products: { label: "Products", default: true },
+  featuredProducts: { label: "Featured Products", default: true },
+  reviews: { label: "Reviews", default: true },
   brands: { label: "Brands", default: true },
   categories: { label: "Categories", default: true },
   discounts: { label: "Discounts", default: true },
@@ -290,10 +290,7 @@ function EmployeeOverview({
   filteredPermissions,
   enabledCount,
   totalCount,
-  tabs,
-  activeTab,
-  setActiveTab,
-  filteredActivities,
+  activities,
   canEditPermissions,
   setPermissionsData,
   setShowPermissionsModal,
@@ -498,51 +495,8 @@ function EmployeeOverview({
         })}
       </div>
 
-      {/* ============ SECTION TABS ============ */}
-      <div
-        className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5"
-        style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
-        role="tablist"
-        aria-label="Employee sections"
-      >
-        {[
-          { id: "overview", label: "Overview", icon: User },
-          ...tabs,
-        ].map((tab) => {
-          const TabIcon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setActiveTab(tab.id)}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-semibold transition-all duration-150"
-              style={
-                isActive
-                  ? { backgroundColor: "var(--bg-card)", color: "var(--accent)", boxShadow: "var(--shadow-sm)" }
-                  : { color: "var(--text-muted)" }
-              }
-            >
-              <TabIcon className="h-3.5 w-3.5" />
-              {tab.label}
-              {tab.id === "all" && (
-                <span
-                  className="ml-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                  style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
-                >
-                  <span className="h-1 w-1 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
-                  LIVE
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ============ INFO CARDS ============ */}
-      {activeTab === "overview" && (
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+      {/* ============ PERSONAL INFORMATION (all sections on one page, no tabs) ============ */}
+      <div className="grid grid-cols-1 gap-3">
         {/* Personal Information */}
         <section className="card p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -558,7 +512,7 @@ function EmployeeOverview({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-6">
             {infoItems.map(([label, value]) => (
               <div key={label} className="min-w-0">
                 <p className="text-[9.5px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
@@ -571,13 +525,21 @@ function EmployeeOverview({
             ))}
           </div>
         </section>
+      </div>
 
-        {/* Permissions */}
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Permissions
-            </h3>
+      {/* ============ ACCESS CONTROL (all on one page) ============ */}
+      <section className="card p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
+            <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Access Control
+          </h3>
+          <div className="flex items-center gap-2">
+            <span
+              className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
+              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              {totalCount ? Math.round((enabledCount / totalCount) * 100) : 0}% Enabled
+            </span>
             {canEditPermissions && (
               <button
                 onClick={openPermissions}
@@ -588,132 +550,35 @@ function EmployeeOverview({
               </button>
             )}
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-            {filteredPermissions.map(({ key, label, value }) => (
-              <div key={key} className="flex min-w-0 items-center gap-1.5 text-[11px]">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: value ? "var(--success)" : "var(--danger)" }}
-                />
-                <span className="truncate" style={{ color: "var(--text-secondary)" }}>
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-3 border-t pt-2.5 text-[10.5px] font-medium" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
-            {enabledCount} of {totalCount} enabled
-          </p>
-        </section>
-
-        {/* Recent Activities (live via socket) */}
-        <section className="card flex flex-col p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Recent Activities
-            </h3>
-            <button
-              onClick={() => setActiveTab("all")}
-              className="flex items-center gap-1.5 text-[11px] font-semibold transition-opacity hover:opacity-80"
-              style={{ color: "var(--accent)" }}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {filteredPermissions.map(({ key, label, value }) => (
+            <div
+              key={key}
+              className="rounded-lg border p-2.5"
+              style={{
+                borderColor: value ? "color-mix(in srgb, var(--success) 28%, transparent)" : "var(--border-color)",
+                backgroundColor: value ? "var(--success-soft)" : "var(--bg-card-alt)",
+              }}
             >
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
+              <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
+                {label}
+              </p>
+              <p
+                className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold"
+                style={{ color: value ? "var(--success-text)" : "var(--danger-text)" }}
               >
-                <span className="h-1 w-1 animate-pulse rounded-full" style={{ backgroundColor: "currentColor" }} />
-                LIVE
-              </span>
-              View All
-            </button>
-          </div>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "currentColor" }} />
+                {value ? "Enabled" : "Disabled"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="max-h-[230px] min-h-[120px] flex-1 space-y-2 overflow-y-auto pr-1">
-            {filteredActivities.length ? (
-              filteredActivities.slice(0, 6).map((activity, index) => {
-                const colors = getActivityColor(activity.category);
-                return (
-                  <div
-                    key={activity._id || index}
-                    className="flex gap-2.5 border-b pb-2 last:border-b-0"
-                    style={{ borderColor: "var(--border-color)" }}
-                  >
-                    <ActivityIcon category={activity.category} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium leading-snug" style={{ color: "var(--text-primary)" }}>
-                        {activity.action}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span
-                          className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold"
-                          style={{ backgroundColor: colors.bg, color: colors.color }}
-                        >
-                          {activity.category}
-                        </span>
-                        <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
-                          {relativeTime(activity.timestamp)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="flex h-full items-center justify-center py-6 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                No activity found
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-      )}
-
-      {/* ============ ACCESS CONTROL (Permissions tab) ============ */}
-      {activeTab === "permissions" && (
-        <section className="card p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
-              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Access Control
-            </h3>
-            <span
-              className="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
-              style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
-            >
-              {totalCount ? Math.round((enabledCount / totalCount) * 100) : 0}% Enabled
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {filteredPermissions.map(({ key, label, value }) => (
-              <div
-                key={key}
-                className="rounded-lg border p-2.5"
-                style={{
-                  borderColor: value ? "color-mix(in srgb, var(--success) 28%, transparent)" : "var(--border-color)",
-                  backgroundColor: value ? "var(--success-soft)" : "var(--bg-card-alt)",
-                }}
-              >
-                <p className="text-[11.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {label}
-                </p>
-                <p
-                  className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold"
-                  style={{ color: value ? "var(--success-text)" : "var(--danger-text)" }}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "currentColor" }} />
-                  {value ? "Enabled" : "Disabled"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ============ ACTIVITY LOG (full timeline, live via socket) ============ */}
-      {activeTab === "all" && (
-        <section className="card p-4">
+      {/* ============ ACTIVITY LOG (full timeline, live via socket — single page) ============ */}
+      <section className="card p-4">
           <div className="mb-4 flex items-center justify-between gap-2">
             <h3 className="flex items-center gap-2 text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>
               <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} /> Activity Log
@@ -727,16 +592,16 @@ function EmployeeOverview({
                 LIVE
               </span>
               <span className="text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
-                {filteredActivities.length} {filteredActivities.length === 1 ? "event" : "events"}
+                {activities.length} {activities.length === 1 ? "event" : "events"}
               </span>
             </div>
           </div>
 
           <div className="max-h-[520px] overflow-y-auto pr-1">
-            {filteredActivities.length ? (
-              filteredActivities.map((activity, index) => {
+            {activities.length ? (
+              activities.map((activity, index) => {
                 const colors = getActivityColor(activity.category);
-                const isLast = index === filteredActivities.length - 1;
+                const isLast = index === activities.length - 1;
                 return (
                   <div key={activity._id || index} className="relative flex gap-3 pb-4 last:pb-0">
                     {!isLast && (
@@ -800,8 +665,7 @@ function EmployeeOverview({
               </div>
             )}
           </div>
-        </section>
-      )}
+      </section>
     </>
   );
 }
@@ -912,278 +776,6 @@ function getActivityColor(category) {
   };
 }
 
-function getFilteredActivities(activities, activeTab) {
-  if (!activities || !Array.isArray(activities)) return [];
-
-  if (activeTab === "all") return activities;
-
-  if (activeTab === "employee") {
-    return activities.filter(
-      (act) =>
-        act.category === "Employee Management" ||
-        (act.action &&
-          act.action.toLowerCase().includes("employee"))
-    );
-  }
-
-  if (activeTab === "brand") {
-    return activities.filter(
-      (act) =>
-        act.category === "Store Management" ||
-        (act.action &&
-          act.action.toLowerCase().includes("brand"))
-    );
-  }
-
-  if (activeTab === "product") {
-    return activities.filter(
-      (act) =>
-        act.category === "Product Management" ||
-        (act.action &&
-          act.action.toLowerCase().includes("product"))
-    );
-  }
-
-  if (activeTab === "category") {
-    return activities.filter(
-      (act) =>
-        act.action &&
-        act.action.toLowerCase().includes("category")
-    );
-  }
-
-  if (activeTab === "discount") {
-    return activities.filter(
-      (act) =>
-        act.category === "Discount Management" ||
-        (act.action &&
-          act.action.toLowerCase().includes("discount"))
-    );
-  }
-
-  return activities;
-}
-
-// ==========================================
-// SCROLLABLE TABS
-// ==========================================
-
-// Compact rounded-square arrow used to scroll the tab strip
-function TabArrowButton({ direction, onClick, disabled }) {
-  const [hov, setHov] = useState(false);
-  const enabled = !disabled;
-
-  return (
-    <button
-      type="button"
-      aria-label={
-        direction === "left"
-          ? "Scroll tabs left"
-          : "Scroll tabs right"
-      }
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      className="shrink-0 h-7 w-7 flex items-center justify-center rounded-md transition-colors duration-150 disabled:cursor-default focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]"
-      style={{
-        backgroundColor: "var(--bg-tertiary)",
-        border: "1px solid var(--border-color)",
-        color:
-          enabled && hov
-            ? "var(--accent)"
-            : "var(--text-muted)",
-        opacity: enabled ? 1 : 0.35,
-      }}
-    >
-      {direction === "left" ? (
-        <ChevronLeft className="w-3.5 h-3.5" />
-      ) : (
-        <ChevronRight className="w-3.5 h-3.5" />
-      )}
-    </button>
-  );
-}
-
-function ScrollableTabs({
-  tabs,
-  activeTab,
-  onTabChange,
-}) {
-  const scrollRef = useRef(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const startScrollLeft = useRef(0);
-
-  // Arrow availability based on current scroll position
-  const [canScrollLeft, setCanScrollLeft] =
-    useState(false);
-  const [canScrollRight, setCanScrollRight] =
-    useState(false);
-
-  const updateArrows = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 1);
-    setCanScrollRight(
-      el.scrollLeft <
-        el.scrollWidth - el.clientWidth - 1
-    );
-  };
-
-  // Keep arrow state in sync (mount, resize, layout settle)
-  useEffect(() => {
-    updateArrows();
-    window.addEventListener("resize", updateArrows);
-    const t1 = setTimeout(updateArrows, 100);
-    const t2 = setTimeout(updateArrows, 400);
-    return () => {
-      window.removeEventListener(
-        "resize",
-        updateArrows
-      );
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [tabs.length]);
-
-  // Keep the active tab visible when it changes
-  useEffect(() => {
-    if (!scrollRef.current) return;
-
-    const activeBtn =
-      scrollRef.current.querySelector(
-        '[data-active="true"]'
-      );
-
-    if (activeBtn) {
-      activeBtn.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-  }, [activeTab]);
-
-  // Scroll by roughly 2–3 tabs per arrow click
-  const getScrollStep = () => {
-    const el = scrollRef.current;
-    if (!el) return 240;
-
-    const btns = Array.from(
-      el.querySelectorAll("[data-tab-btn]")
-    );
-
-    const sample = btns
-      .slice(0, 3)
-      .map((b) => b.offsetWidth)
-      .filter(Boolean);
-
-    const avg = sample.length
-      ? sample.reduce((a, b) => a + b, 0) /
-        sample.length
-      : 96;
-
-    return Math.max(160, Math.round(avg * 2.5));
-  };
-
-  const scrollByAmount = (direction) => {
-    scrollRef.current?.scrollBy({
-      left: direction * getScrollStep(),
-      behavior: "smooth",
-    });
-  };
-
-  const handleMouseDown = (e) => {
-    isDragging.current = true;
-    startX.current =
-      e.pageX - scrollRef.current.offsetLeft;
-
-    startScrollLeft.current =
-      scrollRef.current.scrollLeft;
-
-    scrollRef.current.style.cursor = "grabbing";
-    scrollRef.current.style.userSelect = "none";
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging.current) return;
-
-    e.preventDefault();
-
-    const x =
-      e.pageX - scrollRef.current.offsetLeft;
-
-    const walk =
-      (x - startX.current) * 1.5;
-
-    scrollRef.current.scrollLeft =
-      startScrollLeft.current - walk;
-  };
-
-  const handleMouseUp = () => {
-    isDragging.current = false;
-
-    if (scrollRef.current) {
-      scrollRef.current.style.cursor = "grab";
-      scrollRef.current.style.userSelect = "";
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      {/* Tab strip */}
-      <div
-        className="relative flex-1 min-w-0"
-        style={{
-          borderBottom: "1px solid var(--border-color)",
-        }}
-      >
-        <div
-          className="flex items-end gap-6"
-        >
-          {tabs.map((tab) => {
-            const isActive =
-              activeTab === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                data-tab-btn={tab.id}
-                data-active={
-                  isActive ? "true" : "false"
-                }
-                onClick={() =>
-                  onTabChange(tab.id)
-                }
-                className="relative text-[13px] font-medium px-1 py-3 transition-all duration-200 whitespace-nowrap flex items-center gap-2 shrink-0 group"
-                style={{
-                  color: isActive
-                    ? "var(--accent)"
-                    : "var(--text-muted)",
-                  borderBottom: isActive
-                    ? "2px solid var(--accent)"
-                    : "2px solid transparent",
-                }}
-              >
-                <tab.icon
-                  className={`w-4 h-4 transition-colors ${
-                    isActive
-                      ? "text-[var(--accent)]"
-                      : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
-                  }`}
-                />
-
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ==========================================
 // MAIN EMPLOYEE DETAIL PAGE
 // ==========================================
@@ -1198,9 +790,6 @@ export default function EmployeeDetailPage() {
 
   const { markSelfAction } =
     useEmployeeSocketSync(employeeId);
-
-  const [activeTab, setActiveTab] =
-    useState("overview");
 
   const [showEditModal, setShowEditModal] =
     useState(false);
@@ -1231,6 +820,8 @@ export default function EmployeeDetailPage() {
     dashboard: true,
     employees: true,
     products: true,
+    featuredProducts: true,
+    reviews: true,
     brands: true,
     categories: true,
     discounts: true,
@@ -1844,28 +1435,6 @@ export default function EmployeeDetailPage() {
     !isSelfView && canManageEmployees;
 
   // ==========================================
-  // TABS
-  // ==========================================
-  const tabs = [
-    {
-      id: "permissions",
-      label: "Permissions",
-      icon: ShieldCheck,
-    },
-    {
-      id: "all",
-      label: "Activity Log",
-      icon: Clock,
-    },
-  ];
-
-  const filteredActivities =
-    getFilteredActivities(
-      activities,
-      activeTab
-    );
-
-  // ==========================================
   // PERMISSIONS
   // ==========================================
   const filteredPermissions =
@@ -1919,10 +1488,7 @@ export default function EmployeeDetailPage() {
         filteredPermissions={filteredPermissions}
         enabledCount={enabledCount}
         totalCount={totalCount}
-        tabs={tabs}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        filteredActivities={filteredActivities}
+        activities={activities || []}
         canEditPermissions={canEditPermissions}
         setPermissionsData={setPermissionsData}
         setShowPermissionsModal={setShowPermissionsModal}

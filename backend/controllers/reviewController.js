@@ -8,6 +8,21 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 
 // ==========================================
+// 🔌 SOCKET HELPER (baqi controllers ki tarah)
+// Admin review actions (hide/unhide, response) sab connected
+// admin panels par live sync hote hain.
+// ==========================================
+const emitSocketEvent = (event, data) => {
+  try {
+    const { getIO } = require("../utils/socket");
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (error) {
+    console.error("⚠️ Review socket emit failed:", error.message);
+  }
+};
+
+// ==========================================
 // ⭐ PRODUCT REVIEWS (delivered orders only)
 // ==========================================
 
@@ -392,6 +407,12 @@ const setReviewStatus = async (req, res) => {
     }
     review.status = status;
     await review.save();
+    emitSocketEvent("reviewUpdated", {
+      _id: review._id,
+      product_id: review.product_id,
+      status,
+      statusOnly: true,
+    });
     return res.status(200).json({ success: true, message: `Review ${status}`, review });
   } catch (error) {
     log.error("❌ [setReviewStatus] Error:", error.message);
@@ -425,6 +446,12 @@ const setReviewResponse = async (req, res) => {
       responded_by_name: String(req.user?.name || "Store Support").trim().slice(0, 100),
     };
     await review.save();
+    emitSocketEvent("reviewUpdated", {
+      _id: review._id,
+      product_id: review.product_id,
+      hasResponse: true,
+      responseOnly: true,
+    });
     return res.status(200).json({ success: true, message: "Store response published", review });
   } catch (error) {
     console.error("[setReviewResponse] Error:", error.message);
@@ -443,6 +470,11 @@ const deleteReviewResponse = async (req, res) => {
       { new: false },
     );
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    emitSocketEvent("reviewUpdated", {
+      _id: req.params.id,
+      hasResponse: false,
+      responseOnly: true,
+    });
     return res.status(200).json({ success: true, message: "Store response deleted" });
   } catch (error) {
     console.error("[deleteReviewResponse] Error:", error.message);

@@ -115,6 +115,8 @@ const fixPermissions = (oldPerms = {}) => ({
   dashboard: oldPerms?.dashboard ?? true,
   employees: oldPerms?.employees ?? true,
   products: oldPerms?.products ?? true,
+  featuredProducts: oldPerms?.featuredProducts ?? oldPerms?.products ?? true,
+  reviews: oldPerms?.reviews ?? oldPerms?.products ?? true,
   brands: oldPerms?.brands ?? true,
   categories: oldPerms?.categories ?? true,
   profile: oldPerms?.profile ?? true,
@@ -150,6 +152,8 @@ const needsPermissionMigration = (perms) => {
     "dashboard",
     "employees",
     "products",
+    "featuredProducts",
+    "reviews",
     "brands",
     "categories",
     "profile",
@@ -623,7 +627,7 @@ exports.updateEmployee = async (req, res) => {
     if (updates.permissions && typeof updates.permissions === "object") {
       const mergedPermissions = fixPermissions({ ...currentPermissions, ...updates.permissions });
       const permissionKeys = [
-        "dashboard", "employees", "products", "brands", "categories", "profile",
+        "dashboard", "employees", "products", "featuredProducts", "reviews", "brands", "categories", "profile",
         "store", "discounts", "deals", "bundles", "banners", "manageStock",
         "shipping", "order", "attribute",
       ];

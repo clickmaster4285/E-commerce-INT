@@ -126,6 +126,9 @@ export function useProductSocketSync() {
     function invalidateAll() {
       queryClient.invalidateQueries({ queryKey: ["brands"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      // ✅ Featured Products page ki lists (same product data ka subset)
+      queryClient.invalidateQueries({ queryKey: ["featured-products"] });
+      queryClient.invalidateQueries({ queryKey: ["manage-featured"] });
       // ✅ Detail page queries ["product", id] — PREFIX invalidation se saari
       // ids match hoti hain, is liye detail page har socket update pe fresh
       // ho jata hai (socket _id vs URL id ke mismatch ka chance hi khatam).

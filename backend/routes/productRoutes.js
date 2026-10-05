@@ -71,8 +71,8 @@ router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
 // ✅ Featured Products page — bulk mark / unmark ("Manage Products" popup)
 //    "/:id" routes se PEHLE register — warna "bulk-featured" ko id samajh sakta hai.
-router.patch("/bulk-featured", authMiddleware, checkPermission("products"), bulkProductFeatured);
+router.patch("/bulk-featured", authMiddleware, checkPermission("featuredProducts"), bulkProductFeatured);
 // ✅ Featured Products page — single mark / unmark
-router.patch("/:id/toggle-featured", authMiddleware, checkPermission("products"), toggleProductFeatured);
+router.patch("/:id/toggle-featured", authMiddleware, checkPermission("featuredProducts"), toggleProductFeatured);
 
 module.exports = router;
