@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 const getList = (response) => {
   const payload = response?.data;
 

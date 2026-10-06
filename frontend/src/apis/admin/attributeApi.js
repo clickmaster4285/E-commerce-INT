@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 const unwrap = (res) => {
   const d = res?.data;
   if (Array.isArray(d)) return d;

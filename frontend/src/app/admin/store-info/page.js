@@ -38,7 +38,7 @@ import {
 
 import { useSocket } from "@/hooks/useSocket";
 import { useQuery } from "@tanstack/react-query";
-import adminHttp from "@/apis/adminHttp"
+import adminHttp from "@/apis/axiosInstance"
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 

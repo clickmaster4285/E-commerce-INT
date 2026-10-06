@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import userHttp from "@/apis/userHttp";
+import { userHttp } from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import dynamic from "next/dynamic";
 // ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same

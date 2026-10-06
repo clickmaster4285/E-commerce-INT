@@ -25,8 +25,8 @@ const router = express.Router();
 // 🛡️ ADMIN — saari reviews (paginated + stats)
 // ✅ "/:id" routes se PEHLE — warna "admin" ko id samajh liya jayega.
 // ==========================================
-router.get("/admin/all", authMiddleware, checkPermission("products"), getAdminReviews);
-router.get("/admin/:id", authMiddleware, checkPermission("products"), getAdminReviewById);
+router.get("/admin/all", authMiddleware, checkPermission("reviews"), getAdminReviews);
+router.get("/admin/:id", authMiddleware, checkPermission("reviews"), getAdminReviewById);
 
 // ==========================================
 // 🌐 PUBLIC — reviews + summary for one product
@@ -71,8 +71,8 @@ router.delete("/:id", authMiddleware, deleteReview);
 // ==========================================
 // 🛡️ ADMIN — hide/unhide a review
 // ==========================================
-router.patch("/:id/status", authMiddleware, checkPermission("products"), setReviewStatus);
-router.patch("/:id/response", authMiddleware, checkPermission("products"), setReviewResponse);
-router.delete("/:id/response", authMiddleware, checkPermission("products"), deleteReviewResponse);
+router.patch("/:id/status", authMiddleware, checkPermission("reviews"), setReviewStatus);
+router.patch("/:id/response", authMiddleware, checkPermission("reviews"), setReviewResponse);
+router.delete("/:id/response", authMiddleware, checkPermission("reviews"), deleteReviewResponse);
 
 module.exports = router;

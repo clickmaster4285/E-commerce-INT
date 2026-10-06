@@ -21,7 +21,6 @@ const AlertIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fil
 const LockIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>);
 const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
 const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>);
-const CreditCardIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h3m4 0h3M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" /></svg>);
 const ReceiptIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17h6M9 13h6M9 9h3m9 12V5a2 2 0 00-2-2H5a2 2 0 00-2 2v16l3-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5z" /></svg>);
 
 /* ==================== HELPERS ==================== */
@@ -52,7 +51,7 @@ const PAYMENT_STATUS_CONFIG = {
   refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
 
-// Payment method ka poora naam (order payload me short code aata hai: cod/bank/card)
+// Full payment method name (the order payload carries a short code: cod/bank/card)
 const PAYMENT_METHOD_LABEL = {
   cod: "Cash on Delivery",
   bank: "Bank Transfer",
@@ -65,9 +64,9 @@ function isPromoLine(item) {
   return !!(item?.deal_id || item?.deal_type || item?.bundle_id || item?.bundle_name);
 }
 
-// ✅ Line-level savings — deal/bundle line ka discount deal-engine se aata hai,
-//    is liye un par `savings` (per-unit price drop) DOBARA count nahi karte.
-//    Checkout ka bhi yahi rule hai: dealActive ? dealSavings : savings * qty
+// ✅ Line-level savings — the deal/bundle discount for a deal line comes from
+//    the deal engine, so `savings` (per-unit price drop) is NOT counted again there.
+//    Checkout follows the same rule: dealActive ? dealSavings : savings * qty
 function itemLineSavings(item) {
   if (isPromoLine(item)) {
     return (Number(item?.deal_savings) || 0) + (Number(item?.bundle_savings) || 0);
@@ -81,16 +80,6 @@ function StatusBadge({ status }) {
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
       {status}
-    </span>
-  );
-}
-
-function PaymentBadge({ status }) {
-  const item = PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG.pending;
-  return (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide"
-      style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {item.label}
     </span>
   );
 }
@@ -114,7 +103,7 @@ function OrderItemImage({ item, size = 60 }) {
 }
 
 /* ==================== DEAL / BUNDLE HELPERS ==================== */
-// Deal type ko human-readable label me badalta hai (checkout/cart wali wording)
+// Converts a deal type into a human-readable label (same wording as checkout/cart)
 function dealLabel(item) {
   const type = item?.deal_type || "";
   if (type === "buy_x_get_y") {
@@ -129,7 +118,7 @@ function dealLabel(item) {
   return item.deal_name || "";
 }
 
-// Ek item par lagne wale saare promos (deal + bundle) — badges ke liye
+// All promos applied to one item (deal + bundle) — used for badges
 function itemPromoBadges(item) {
   const badges = [];
   const dl = dealLabel(item);
@@ -161,7 +150,7 @@ function PromoTag({ children, tone = "warning" }) {
   );
 }
 
-// ✅ "Yeh deal KYUN lagi" — professional order view me yeh explanation hoti hai
+// ✅ "Why this deal applied" — a professional order view shows this explanation
 function promoReason(group) {
   const rows = group.items || [];
   const paid = rows.reduce((s, it) => s + (Number(it.qty) || 0), 0);
@@ -185,7 +174,7 @@ function promoReason(group) {
   return `Deal applied on ${unitWord(paid)} — pricing and savings were adjusted for this line.`;
 }
 
-// Item-level ek line me wajah (items table me dikhane ke liye)
+// One-line item-level reason (shown in the items table)
 function itemPromoReason(item) {
   const type = item?.deal_type || "";
   if (type === "buy_x_get_y") {
@@ -213,9 +202,9 @@ const ORDER_STEP_LABEL = {
   delivered: "Delivered",
 };
 
-// Vertical timeline — sirf woh times jo order me waqai record hain
-// (placed = created_at, current stage = updated_at). Baaki stages ki exact
-// timestamps store nahi hoti, is liye un par time show nahi karte.
+// Vertical timeline — only timestamps actually recorded on the order
+// (placed = created_at, current stage = updated_at). Other stages have no
+// stored timestamps, so no time is shown for them.
 function OrderTimeline({ order }) {
   const cancelled = order.status === "cancelled";
   const effective = order.status === "processing" ? "confirmed" : order.status;
@@ -415,7 +404,7 @@ export default function OrderDetailPage({ params }) {
   }, [order]);
   const totalSaved = priceDiscounts + dealSavings + bundleSavings;
 
-  // ✅ Counts: product rows, paid units aur free units — admin ko saaf pata chale
+  // ✅ Counts: product rows, paid units and free units — kept explicit for admin
   const itemRows = (order?.items || []).length;
   const paidUnits = useMemo(
     () => (order?.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0),
@@ -426,7 +415,7 @@ export default function OrderDetailPage({ params }) {
     [order]
   );
 
-  // ✅ Deals / bundles ko group karo — har group ka apna reason + savings
+  // ✅ Group deals / bundles — each group gets its own reason + savings
   const promoGroups = useMemo(() => {
     const rows = order?.items || [];
     const map = new Map();
@@ -481,7 +470,7 @@ export default function OrderDetailPage({ params }) {
   const dealGroups = promoGroups.filter((g) => g.kind === "deal");
   const bundleGroups = promoGroups.filter((g) => g.kind === "bundle");
 
-  // ✅ Price discounts (deal ke ilawa) — discount name ke hisaab se group
+  // ✅ Price discounts (excluding deals) — grouped by discount name
   const discountGroups = useMemo(() => {
     const map = new Map();
     (order?.items || []).forEach((it) => {
@@ -513,7 +502,6 @@ export default function OrderDetailPage({ params }) {
   const customerName = order?.address_snapshot?.full_name || user.name || "Unknown";
   const customerPhone = order?.address_snapshot?.phone || "";
   const customerEmail = user.email || "";
-  const customerContact = customerEmail || customerPhone;
 
   if (isLoading) {
     return (
@@ -563,9 +551,7 @@ export default function OrderDetailPage({ params }) {
               <StatusBadge status={order.status} />
             </div>
             <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              Placed on {formatDateTime(order.created_at)}
-              {customerName !== "Unknown" ? ` • by ${customerName}` : ""}
-              {customerContact ? ` (${customerContact})` : ""}
+              {formatDateTime(order.created_at)}
             </p>
           </div>
           <div className="w-full md:w-auto">
@@ -580,8 +566,9 @@ export default function OrderDetailPage({ params }) {
           </div>
         </div>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {/* Quick stats — 3 cards, no duplication:
+            Order Status / Payment (status + method + amount) / Total Amount */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <StatCard
             label="Order Status"
             icon={<BoxIcon className="w-5 h-5" />}
@@ -593,22 +580,12 @@ export default function OrderDetailPage({ params }) {
               : `Updated ${formatDateTime(order.updated_at)}`}
           />
           <StatCard
-            label="Payment Status"
+            label="Payment"
             icon={<BanknoteIcon className="w-5 h-5" />}
             accent="var(--success-text)"
             accentSoft="var(--success-soft)"
             value={(PAYMENT_STATUS_CONFIG[payStatus] || {}).label || "Unpaid"}
-            sub={`via ${paymentMethodLabel(order.payment?.method)}`}
-          />
-          <StatCard
-            label="Payment Method"
-            icon={<CreditCardIcon className="w-5 h-5" />}
-            accent="var(--purple-text)"
-            accentSoft="var(--purple-soft)"
-            value={paymentMethodLabel(order.payment?.method)}
-            sub={payStatus === "paid"
-              ? `Rs. ${Number(order.total || 0).toLocaleString()} received`
-              : `Rs. ${Number(order.total || 0).toLocaleString()} to collect`}
+            sub={`Via ${paymentMethodLabel(order.payment?.method)}`}
           />
           <StatCard
             label="Total Amount"
@@ -616,7 +593,6 @@ export default function OrderDetailPage({ params }) {
             accent="var(--warning-text)"
             accentSoft="var(--warning-soft)"
             value={`Rs. ${Number(order.total || 0).toLocaleString()}`}
-            sub={<PaymentBadge status={payStatus} />}
           />
         </div>
 
@@ -726,34 +702,28 @@ export default function OrderDetailPage({ params }) {
                   </tbody>
                 </table>
               </div>
-
-              {(dealSavings > 0 || bundleSavings > 0) && (
-                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 px-4 py-2.5"
-                  style={{ backgroundColor: "var(--bg-tertiary)", borderTop: "1px solid var(--border-color)" }}>
-                  {dealSavings > 0 && (
-                    <span className="text-[12px] font-semibold">
-                      Total Deal Savings: <span style={{ color: "var(--success-text)" }}>Rs. {dealSavings.toLocaleString()}</span>
-                    </span>
-                  )}
-                  {bundleSavings > 0 && (
-                    <span className="text-[12px] font-semibold">
-                      Total Bundle Savings: <span style={{ color: "var(--success-text)" }}>Rs. {bundleSavings.toLocaleString()}</span>
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
+            {/* Deal/bundle totals are not repeated here — shown once
+                in "Order Summary" and "Deal & Bundle Summary" below. */}
 
-            {/* ---- Order Summary ---- */}
+            {/* ---- Order Summary ----
+                How the total is built, step by step:
+                Original MRP (before discounts) − Total Saved = Subtotal (discounted),
+                then Subtotal + Shipping + Tax = Total Amount.
+                Savings are already adjusted in the prices — never deducted twice. */}
             <div className="rounded-lg p-4" style={cardStyle}>
               <h2 className="text-[15px] font-bold mb-3">Order Summary</h2>
-              {/* ✅ Arithmetic: subtotal + shipping + tax = total amount
-                  (subtotal me discounted price pehle se hi baked hai) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <div className="space-y-1.5">
-                  <TotalRow label="Subtotal" value={`Rs. ${Number(order.subtotal || 0).toLocaleString()}`} />
-                  <TotalRow label="Shipping Charges" value={`Rs. ${Number(order.shipping || 0).toLocaleString()}`} />
-                  <TotalRow label="Tax" value={`Rs. ${Number(order.tax || 0).toLocaleString()}`} />
+                  {totalSaved > 0 && (
+                    <>
+                      <TotalRow label="Original price (before discounts)" value={`Rs. ${(Number(order.subtotal || 0) + totalSaved).toLocaleString()}`} />
+                      <TotalRow label="Less: total saved" value={`− Rs. ${totalSaved.toLocaleString()}`} accent="var(--success-text)" />
+                    </>
+                  )}
+                  <TotalRow label="Subtotal (after discounts)" value={`Rs. ${Number(order.subtotal || 0).toLocaleString()}`} />
+                  <TotalRow label="+ Shipping Charges" value={`Rs. ${Number(order.shipping || 0).toLocaleString()}`} />
+                  <TotalRow label="+ Tax" value={`Rs. ${Number(order.tax || 0).toLocaleString()}`} />
                   <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
                     <span>Total Amount</span>
                     <span>Rs. {Number(order.total || 0).toLocaleString()}</span>
@@ -763,27 +733,24 @@ export default function OrderDetailPage({ params }) {
                 <div className="space-y-1.5 pt-3 mt-3 md:pt-0 md:mt-0 md:border-l md:pl-6"
                   style={{ borderColor: "var(--border-color)" }}>
                   <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    Savings &amp; promos
+                    Savings
                   </p>
                   {priceDiscounts > 0 && (
-                    <TotalRow label="Price Discounts" value={`− Rs. ${priceDiscounts.toLocaleString()}`} accent="var(--success-text)" />
+                    <TotalRow label="Price discounts (MRP → sale price)" value={`Rs. ${priceDiscounts.toLocaleString()}`} accent="var(--success-text)" />
                   )}
                   {dealSavings > 0 && (
-                    <TotalRow label="Total Deal Savings" value={`− Rs. ${dealSavings.toLocaleString()}`} accent="var(--success-text)" />
+                    <TotalRow label="Deal savings (deal offer)" value={`Rs. ${dealSavings.toLocaleString()}`} accent="var(--success-text)" />
                   )}
                   {bundleSavings > 0 && (
-                    <TotalRow label="Total Bundle Savings" value={`− Rs. ${bundleSavings.toLocaleString()}`} accent="var(--success-text)" />
-                  )}
-                  {totalSaved === 0 && (
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      No discount, deal or bundle applied on this order.
-                    </p>
+                    <TotalRow label="Bundle savings (combo rate)" value={`Rs. ${bundleSavings.toLocaleString()}`} accent="var(--success-text)" />
                   )}
                   {totalSaved > 0 && (
-                    <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                      <span>Total Saved</span>
-                      <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
+                        <span>Total Saved</span>
+                        <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -827,14 +794,12 @@ export default function OrderDetailPage({ params }) {
               <OrderTimeline order={order} />
             </div>
 
-            {/* ---- Additional Information ---- */}
+            {/* ---- Additional Information ----
+                (Order number / date already shown in the header — not repeated) */}
             <div className="rounded-lg p-4" style={cardStyle}>
               <h2 className="text-[15px] font-bold mb-3">Additional Information</h2>
               <div className="space-y-1.5 text-[13px]">
-                <InfoRow label="Order Number" value={order.order_number} />
-                <InfoRow label="Order Date" value={formatDateTime(order.created_at)} />
-                <InfoRow label="Shipping Method" value={order.shipping_method ? String(order.shipping_method) : "—"} capitalize />
-                <InfoRow label="Notes" value={order.notes ? order.notes : "—"} />
+                <InfoRow label="Shipping Method" value={order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—"} capitalize />
                 {order.status === "cancelled" && order.cancel_reason && (
                   <InfoRow label="Cancellation Reason" value={order.cancel_reason} />
                 )}
@@ -844,16 +809,11 @@ export default function OrderDetailPage({ params }) {
         </div>
 
 
-        {/* ---- Deal & Bundle Summary (jab order me koi promo lagi ho) ---- */}
+        {/* ---- Deal & Bundle Summary (shown when any promo is applied to the order) ---- */}
         {(dealGroups.length > 0 || bundleGroups.length > 0 || discountGroups.length > 0) && (
           <div className="rounded-lg p-4" style={cardStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="text-[15px] font-bold">Deal &amp; Bundle Summary</h2>
-              {totalSaved > 0 && (
-                <span className="text-[12px] font-semibold">
-                  Total saved on this order: <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
-                </span>
-              )}
             </div>
 
             <div className={promoGridClass}>
@@ -968,7 +928,7 @@ function StatCard({ label, icon, value, sub, accent = "var(--accent)", accentSof
   );
 }
 
-// Deal / bundle / discount group ka card — kyun lagi + kis product par + kitna bacha
+// Deal / bundle / discount group card — why it applied + which products + how much saved
 function PromoGroupCard({ group }) {
   const promoTag = group.kind === "deal" ? "warning" : "info";
 
@@ -1004,7 +964,7 @@ function PromoGroupCard({ group }) {
   );
 }
 
-// Additional Information card ki ek row
+// One row of the Additional Information card
 function InfoRow({ label, value, capitalize = false }) {
   return (
     <div className="flex items-start justify-between gap-3">

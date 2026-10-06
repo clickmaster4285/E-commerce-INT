@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 const paginated = (res, fallbackLimit) => {
   const d = res.data;
   if (Array.isArray(d)) {

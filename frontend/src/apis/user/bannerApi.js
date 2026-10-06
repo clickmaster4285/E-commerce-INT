@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 export const bannerApi = {
   // ✅ ?limit= bhejo to server utne hi bhejta hai (600+ fetch band); na bhejo to legacy full
   getActive: ({ limit = 12 } = {}) =>

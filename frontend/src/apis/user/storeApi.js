@@ -1,4 +1,4 @@
-import userHttp from "../userHttp";
+import { userHttp } from "../axiosInstance";
 export const storeApi = {
   getPublic: async () => {
     const res = await userHttp.get("/store/public");

@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import useBannerSocketSync from "../../../hooks/useBannerSocket";
 import { dealApi } from "../../../apis/admin/dealApi";
-import { DealFormModal, SelectionModal } from "../deals/page";
+import { DealFormModal, SelectionModal } from "../deals/_components/dealModals";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
