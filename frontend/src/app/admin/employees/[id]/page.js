@@ -419,15 +419,6 @@ function EmployeeOverview({
 
       {/* ============ HERO CARD ============ */}
       <section className="card overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="h-1 w-full"
-          style={{
-            background:
-              "linear-gradient(90deg, var(--accent), var(--purple), var(--info))",
-          }}
-        />
-
         <div className="p-5">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             {/* Identity */}

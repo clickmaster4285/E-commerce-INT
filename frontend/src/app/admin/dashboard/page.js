@@ -23,6 +23,7 @@ import {
   PackagePlus,
   RefreshCw,
   ShoppingCart,
+  Star,
   Tag,
   Tags,
   Wallet,
@@ -261,6 +262,15 @@ function StatCards({ data }) {
       color: "#06b6d4",
       bg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
       spark: data?.sparklines?.categories,
+    },
+    {
+      title: "Featured Products",
+      value: data?.counts?.featuredProducts ?? 0,
+      trend: data?.counts?.featuredProductsTrend ?? 0,
+      icon: Star,
+      color: "#f59e0b",
+      bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      spark: data?.sparklines?.featuredProducts,
     },
   ];
 
@@ -1084,8 +1094,8 @@ export default function Dashboard() {
       {/* Body */}
       {isLoading ? (
         <div className="space-y-5">
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-            {[0, 1, 2, 3, 4].map((i) => (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="skeleton h-[120px]" />
             ))}
           </div>

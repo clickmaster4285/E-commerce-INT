@@ -347,7 +347,9 @@ const loginAdmin = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Password incorrect" });
     const io = req.io || getIO();
-    await pushGlobalActivity(
+    // Keep the activity audit, but don't make a successful login wait for
+    // secondary activity fan-out writes across the staff collection.
+    void pushGlobalActivity(
       io,
       {
         action: `${employee.name} (${employee.role}) logged in to admin panel`,
@@ -462,16 +464,13 @@ const logoutUser = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const userType = req.userType || 'user';
-    let entity = null;
-    if (userType === 'employee') {
-      entity = await Employee.findById(req.user._id)
+    // authMiddleware already loaded the employee account, so reuse it during
+    // admin access verification instead of querying it and its store again.
+    const entity = userType === 'employee'
+      ? req.user
+      : await User.findById(req.user._id)
         .select("-password -activities")
         .populate("storeId");
-    } else {
-      entity = await User.findById(req.user._id)
-        .select("-password -activities")
-        .populate("storeId");
-    }
     if (!entity)
       return res
         .status(404)

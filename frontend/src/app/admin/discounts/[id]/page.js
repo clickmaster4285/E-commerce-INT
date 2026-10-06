@@ -13,7 +13,8 @@ import { discountApi } from "../../../../apis/admin/discountApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
-import { DiscountFormModal, SelectionModal, validateNonNegative } from "../../discounts/page";
+import { DiscountFormModal, SelectionModal } from "../_components/discountModals";
+import { validateNonNegative } from "../_components/discountUtils";
 import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
 
 /* =========================================================
