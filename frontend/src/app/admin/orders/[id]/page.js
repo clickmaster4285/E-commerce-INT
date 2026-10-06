@@ -502,7 +502,6 @@ export default function OrderDetailPage({ params }) {
   const customerName = order?.address_snapshot?.full_name || user.name || "Unknown";
   const customerPhone = order?.address_snapshot?.phone || "";
   const customerEmail = user.email || "";
-  const customerContact = customerEmail || customerPhone;
 
   if (isLoading) {
     return (
@@ -552,9 +551,7 @@ export default function OrderDetailPage({ params }) {
               <StatusBadge status={order.status} />
             </div>
             <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              Placed on {formatDateTime(order.created_at)}
-              {customerName !== "Unknown" ? ` • by ${customerName}` : ""}
-              {customerContact ? ` (${customerContact})` : ""}
+              {formatDateTime(order.created_at)}
             </p>
           </div>
           <div className="w-full md:w-auto">
@@ -588,7 +585,7 @@ export default function OrderDetailPage({ params }) {
             accent="var(--success-text)"
             accentSoft="var(--success-soft)"
             value={(PAYMENT_STATUS_CONFIG[payStatus] || {}).label || "Unpaid"}
-            sub={`via ${paymentMethodLabel(order.payment?.method)} • Rs. ${Number(order.total || 0).toLocaleString()} ${payStatus === "paid" ? "received" : "to collect"}`}
+            sub={`Via ${paymentMethodLabel(order.payment?.method)}`}
           />
           <StatCard
             label="Total Amount"
@@ -596,7 +593,6 @@ export default function OrderDetailPage({ params }) {
             accent="var(--warning-text)"
             accentSoft="var(--warning-soft)"
             value={`Rs. ${Number(order.total || 0).toLocaleString()}`}
-            sub={`Subtotal + shipping + tax • ${paidUnits} paid${freeUnits > 0 ? ` + ${freeUnits} free` : ""}`}
           />
         </div>
 
@@ -716,15 +712,9 @@ export default function OrderDetailPage({ params }) {
                 then Subtotal + Shipping + Tax = Total Amount.
                 Savings are already adjusted in the prices — never deducted twice. */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-1">Order Summary</h2>
-              <p className="text-[12px] mb-3" style={{ color: "var(--text-muted)" }}>
-                Subtotal is built from discounted prices — savings are already adjusted in it, not deducted again.
-              </p>
+              <h2 className="text-[15px] font-bold mb-3">Order Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    How the total is built
-                  </p>
                   {totalSaved > 0 && (
                     <>
                       <TotalRow label="Original price (before discounts)" value={`Rs. ${(Number(order.subtotal || 0) + totalSaved).toLocaleString()}`} />
@@ -743,7 +733,7 @@ export default function OrderDetailPage({ params }) {
                 <div className="space-y-1.5 pt-3 mt-3 md:pt-0 md:mt-0 md:border-l md:pl-6"
                   style={{ borderColor: "var(--border-color)" }}>
                   <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    Customer savings breakdown
+                    Savings
                   </p>
                   {priceDiscounts > 0 && (
                     <TotalRow label="Price discounts (MRP → sale price)" value={`Rs. ${priceDiscounts.toLocaleString()}`} accent="var(--success-text)" />
@@ -754,20 +744,12 @@ export default function OrderDetailPage({ params }) {
                   {bundleSavings > 0 && (
                     <TotalRow label="Bundle savings (combo rate)" value={`Rs. ${bundleSavings.toLocaleString()}`} accent="var(--success-text)" />
                   )}
-                  {totalSaved === 0 && (
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      No discount, deal or bundle applied on this order.
-                    </p>
-                  )}
                   {totalSaved > 0 && (
                     <>
                       <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
                         <span>Total Saved</span>
                         <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
                       </div>
-                      <p className="text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>
-                        This amount bridges the original price to the subtotal above — it is not deducted from the total separately.
-                      </p>
                     </>
                   )}
                 </div>
@@ -832,9 +814,6 @@ export default function OrderDetailPage({ params }) {
           <div className="rounded-lg p-4" style={cardStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="text-[15px] font-bold">Deal &amp; Bundle Summary</h2>
-              <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                Why each offer applied — details below, totals in Order Summary
-              </span>
             </div>
 
             <div className={promoGridClass}>

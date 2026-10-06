@@ -38,8 +38,6 @@ import {
   LogIn,
   Settings,
   BarChart3,
-  Bell,
-  Copy,
   Layers,
   ShieldCheck,
   Percent,
@@ -290,9 +288,6 @@ function EmployeeOverview({
   department,
   empId,
   joinDate,
-  username,
-  preferences,
-  recordInfo,
   ordersHandled,
   salesGenerated,
   productsAdded,
@@ -332,7 +327,7 @@ function EmployeeOverview({
 
   const infoItems = [
     ["Full Name", name, User],
-    ["Username", username, IdCard],
+    ["Username", email.split("@")[0], IdCard],
     ["Email Address", email, Mail],
     ["Phone Number", phone || "N/A", Phone],
     ["Department", department, Layers],
@@ -367,54 +362,6 @@ function EmployeeOverview({
     activityFilter === "all"
       ? activities
       : activities.filter((a) => a.category === activityFilter);
-
-  const categoryBreakdown = (() => {
-    const counts = new Map();
-
-    activities.forEach((activity) => {
-      const key = activity.category || "System";
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-
-    return Array.from(counts.entries())
-      .map(([category, count]) => ({
-        category,
-        count,
-        percent: activities.length
-          ? Math.round((count / activities.length) * 100)
-          : 0,
-        colors: getActivityColor(category),
-      }))
-      .sort((a, b) => b.count - a.count);
-  })();
-
-  const uniquePerformers = Array.from(
-    new Set(
-      activities
-        .map((a) => a.performedByName)
-        .filter(Boolean)
-    )
-  );
-
-  const lastActivityAt = (() => {
-    if (!activities.length) return "No activity";
-    const latest = activities.reduce((max, item) => {
-      const t = new Date(item.timestamp).getTime();
-      return Number.isNaN(t) ? max : Math.max(max, t);
-    }, 0);
-    return relativeTime(new Date(latest).toISOString());
-  })();
-
-  const averageOrderValue =
-    Number(ordersHandled) > 0
-      ? Math.round(Number(salesGenerated || 0) / Number(ordersHandled))
-      : 0;
-
-  const notificationPrefs = [
-    { key: "email", label: "Email Alerts", icon: Mail },
-    { key: "push", label: "Push Notifications", icon: Bell },
-    { key: "weekly", label: "Weekly Digest", icon: Calendar },
-  ];
 
   return (
     <>
@@ -597,35 +544,6 @@ function EmployeeOverview({
                     </span>
                   </div>
                 )}
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={`mailto:${email}`}
-                    className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
-                  >
-                    <Mail className="h-3.5 w-3.5" /> Send Email
-                  </a>
-
-                  {phone && phone !== "N/A" && (
-                    <a
-                      href={`tel:${String(phone).replace(/\s+/g, "")}`}
-                      className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
-                    >
-                      <Phone className="h-3.5 w-3.5" /> Call
-                    </a>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(email);
-                      toast.success("Email copied to clipboard");
-                    }}
-                    className="btn-secondary inline-flex items-center gap-1.5 text-[11.5px]"
-                  >
-                    <Copy className="h-3.5 w-3.5" /> Copy Email
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -768,156 +686,6 @@ function EmployeeOverview({
                   </div>
                 </div>
               ))}
-            </div>
-          </section>
-
-          {/* Account & Records */}
-          <section className="card p-5">
-            <div
-              className="mb-4 flex items-center justify-between gap-2 border-b pb-3"
-              style={{ borderColor: "var(--border-color)" }}
-            >
-              <h3 className="section-header mb-0">
-                <FileText className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                Account &amp; Records
-              </h3>
-
-              <span className="badge badge-neutral">
-                <Store className="h-3 w-3" />
-                {recordInfo.store}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-              {[
-                ["Account Status", status === "active" ? "Active" : "Inactive", Power],
-                ["Access Role", role === "staff" ? "Standard staff" : role, ShieldCheck],
-                ["Created On", recordInfo.createdAt, Calendar],
-                ["Created By", recordInfo.createdBy, User],
-                ["Last Updated", recordInfo.updatedAt, Pencil],
-                ["Performance Rating", `${Number(performanceRating || 0).toFixed(1)} / 5`, Star],
-              ].map(([label, value, Icon]) => (
-                <div key={label} className="flex min-w-0 items-start gap-2.5">
-                  <span
-                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
-
-                  <div className="min-w-0">
-                    <p
-                      className="text-[9.5px] font-medium uppercase tracking-wide"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {label}
-                    </p>
-                    <p
-                      className="mt-0.5 break-words text-[12.5px] font-semibold capitalize"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {value || "—"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Notification Preferences */}
-          <section className="card p-5">
-            <div
-              className="mb-4 flex items-center justify-between gap-2 border-b pb-3"
-              style={{ borderColor: "var(--border-color)" }}
-            >
-              <h3 className="section-header mb-0">
-                <Bell className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                Notification Preferences
-              </h3>
-
-              <span className="text-[10.5px] font-medium" style={{ color: "var(--text-muted)" }}>
-                Set by the employee
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {notificationPrefs.map(({ key, label, icon: Icon }) => {
-                const enabled = preferences?.notifications?.[key] !== false;
-
-                return (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
-                    style={{
-                      borderColor: enabled
-                        ? "color-mix(in srgb, var(--info) 24%, transparent)"
-                        : "var(--border-color)",
-                      backgroundColor: enabled ? "var(--info-soft)" : "var(--bg-card-alt)",
-                    }}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Icon
-                        className="h-3.5 w-3.5 shrink-0"
-                        style={{ color: enabled ? "var(--info-text)" : "var(--text-muted)" }}
-                      />
-                      <span
-                        className="truncate text-[11.5px] font-semibold"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {label}
-                      </span>
-                    </span>
-
-                    <span
-                      className="inline-flex shrink-0 items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide"
-                      style={{ color: enabled ? "var(--info-text)" : "var(--danger-text)" }}
-                    >
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: "currentColor" }}
-                      />
-                      {enabled ? "On" : "Off"}
-                    </span>
-                  </div>
-                );
-              })}
-
-              <div
-                className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
-                style={{
-                  borderColor: "var(--border-color)",
-                  backgroundColor: "var(--bg-card-alt)",
-                }}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Settings
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: "var(--text-muted)" }}
-                  />
-                  <span
-                    className="truncate text-[11.5px] font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Dark Mode
-                  </span>
-                </span>
-
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide"
-                  style={{
-                    color: preferences?.darkMode !== false ? "var(--info-text)" : "var(--danger-text)",
-                  }}
-                >
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: "currentColor" }}
-                  />
-                  {preferences?.darkMode !== false ? "On" : "Off"}
-                </span>
-              </div>
             </div>
           </section>
 
@@ -1815,18 +1583,6 @@ export default function EmployeeDetailPage() {
       employee.department ||
       "Not assigned",
 
-    username =
-      employee.username ||
-      email.split("@")[0],
-
-    preferences =
-      employee.preferences ||
-      {},
-
-    storeId =
-      employee.storeId ||
-      null,
-
     employeeId: empId =
       employee.employeeCode ||
       "N/A",
@@ -1869,27 +1625,6 @@ export default function EmployeeDetailPage() {
         }
       )
     : "N/A";
-
-  const formatDateTime = (value) =>
-    value
-      ? new Date(value).toLocaleString("en-US", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "—";
-
-  const recordInfo = {
-    createdAt: formatDateTime(created_at),
-    createdBy:
-      employee.createdby?.name ||
-      employee.createdby?.email ||
-      "System",
-    updatedAt: formatDateTime(employee.updated_at),
-    store: storeId ? "Assigned to store" : "No store assigned",
-  };
 
   // ==========================================
   // "LAST UPDATED" INFO — shown only when the
@@ -2000,9 +1735,6 @@ export default function EmployeeDetailPage() {
         department={department}
         empId={empId}
         joinDate={joinDate}
-        username={username}
-        preferences={preferences}
-        recordInfo={recordInfo}
         ordersHandled={ordersHandled}
         salesGenerated={salesGenerated}
         productsAdded={productsAdded}
@@ -2642,33 +2374,6 @@ export default function EmployeeDetailPage() {
           GLOBAL STYLES
       ========================================== */}
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(
-            156,
-            163,
-            175,
-            0.2
-          );
-          border-radius: 20px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(
-            156,
-            163,
-            175,
-            0.4
-          );
-        }
-
         .no-scrollbar::-webkit-scrollbar {
           display: none;
         }

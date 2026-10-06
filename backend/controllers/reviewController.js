@@ -588,6 +588,17 @@ const getAdminReviewById = async (req, res) => {
           .limit(3)
           .lean()
       : [];
+    const matchingOrder = customerId && review.product_id
+      ? await Order.findOne({
+          user_id: customerId,
+          "items.product_id": review.product_id,
+          ...(review.verifiedPurchase ? { status: "delivered" } : {}),
+        })
+          .sort({ created_at: -1 })
+          .select("_id order_number status created_at")
+          .lean()
+      : null;
+    review.relatedOrder = matchingOrder;
     return res.status(200).json({ success: true, review });
   } catch (error) {
     console.error("[getAdminReviewById] Error:", error.message);
