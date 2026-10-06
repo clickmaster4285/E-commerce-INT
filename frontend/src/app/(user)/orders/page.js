@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import userHttp from "@/apis/userHttp";
+import { userHttp } from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";

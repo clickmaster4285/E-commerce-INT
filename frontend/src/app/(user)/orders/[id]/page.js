@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import userHttp from "@/apis/userHttp";
+import { userHttp } from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { addressApi } from "@/apis/user/addressApi";
 import { reviewApi } from "@/apis/user/reviewApi";
@@ -300,7 +300,7 @@ export default function OrderDetailPage({ params }) {
   // ✅ User ki apni ratings — delivered order ke items par "Rate" / rated badge dikhane ke liye.
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
-    queryFn: async () => { const res = await axiosInstance.get("/users/profile"); return res.data?.user || res.data || null; },
+    queryFn: async () => { const res = await userHttp.get("/users/profile"); return res.data?.user || res.data || null; },
     retry: false,
   });
   const { data: myReviews = [] } = useQuery({

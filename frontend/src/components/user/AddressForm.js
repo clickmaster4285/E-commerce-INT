@@ -7,7 +7,7 @@ import { Country, State, City } from "country-state-city";
 import { addressApi } from "@/apis/user/addressApi";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
-import userHttp from "@/apis/userHttp"
+import { userHttp } from "@/apis/axiosInstance"
 const normalizeStateName = (s) => {
   if (!s) return "";
   return s

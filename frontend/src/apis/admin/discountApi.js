@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp"; // ✅ Curly braces {} ke baghair (Default Import)
+import adminHttp from "../axiosInstance"; // ✅ Curly braces {} ke baghair (Default Import)
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
   if (Array.isArray(d)) {

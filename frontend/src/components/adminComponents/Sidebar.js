@@ -83,7 +83,7 @@ function StoreMark({
       }}
     >
       <span
-        className={`font-bold uppercase tracking-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] ${letterClass}`}
+        className={`font-semibold uppercase tracking-tight text-white ${letterClass}`}
       >
         {letter}
       </span>
@@ -141,10 +141,10 @@ const allMenuItems = [
     permissionKey: "attribute" 
   },
   { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
-  // ✅ Featured Products — products hi ek subset hai, is liye wahi "products" permission
-  { name: "Featured Products", icon: Star, path: "/admin/featured-products", permissionKey: "products" },
-  // ✅ Reviews — wahi "products" permission (review status endpoint bhi isi par hai)
-  { name: "Reviews", icon: MessageSquareText, path: "/admin/reviews", permissionKey: "products" },
+  // ✅ Featured Products — alag permission (legacy staff: products se fallback)
+  { name: "Featured Products", icon: Star, path: "/admin/featured-products", permissionKey: "featuredProducts", fallbackKey: "products" },
+  // ✅ Reviews — alag permission (legacy staff: products se fallback)
+  { name: "Reviews", icon: MessageSquareText, path: "/admin/reviews", permissionKey: "reviews", fallbackKey: "products" },
   { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
   { name: "Discounts", icon: Percent, path: "/admin/discounts", permissionKey: "discounts" },
   { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
@@ -399,11 +399,19 @@ export default function Sidebar({ onNavigate, userData }) {
           (item) => item.path === pathname && item.permissionKey
         );
         // ✅ dashboard legacy payloads me missing ho sakta hai — sirf explicit false par redirect
+        // ✅ featuredProducts/reviews legacy me missing hon to products se fallback (backend bhi undefined = allow)
+        const effectiveValue = (item) => {
+          if (!item) return undefined;
+          const v = freshPermissions[item.permissionKey];
+          if (v !== undefined) return v;
+          if (item.fallbackKey) return freshPermissions[item.fallbackKey];
+          return undefined;
+        };
         const revoked =
           currentItem &&
           (currentItem.permissionKey === "dashboard"
             ? freshPermissions.dashboard === false
-            : freshPermissions[currentItem.permissionKey] !== true);
+            : effectiveValue(currentItem) === false);
         if (revoked) {
           router.replace("/admin/access-denied");
           return;
@@ -457,6 +465,14 @@ export default function Sidebar({ onNavigate, userData }) {
       // ✅ dashboard purane staff records me missing ho sakta hai (undefined) —
       // sirf explicit false par hide karo, taake legacy accounts lock na hon.
       if (item.permissionKey === "dashboard") return permissions.dashboard !== false;
+      const v = permissions[item.permissionKey];
+      // ✅ featuredProducts/reviews legacy me missing hon to products se fallback
+      if (v !== undefined) return v === true;
+      if (item.fallbackKey) {
+        const fb = permissions[item.fallbackKey];
+        if (fb !== undefined) return fb === true;
+        return true; // backend undefined = allow
+      }
       return permissions[item.permissionKey] === true;
     });
   }, [socketPermissions, socketRole, socketProfileLoaded]);
@@ -719,7 +735,7 @@ export default function Sidebar({ onNavigate, userData }) {
                   />
                 ) : (
                   <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
                       {section.title}
                     </span>
                   </div>

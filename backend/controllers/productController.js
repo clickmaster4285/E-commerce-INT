@@ -2216,6 +2216,48 @@ const toggleProductFeatured = async (req, res) => {
         : "Product removed from featured",
       product,
     });
+
+    // ---- Background task (await nahi hota → request latency par asar nahi) ----
+    // ✅ Baqi product actions (status toggle waghera) ki tarah socket + activity,
+    //    taake Featured Products page dusre tabs/staff ke liye live sync ho.
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+    const productId = product._id;
+    const productName = product.name;
+    const nextFeatured = product.is_featured === true;
+
+    setImmediate(async () => {
+      try {
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${performerName} ${nextFeatured ? "marked" : "removed"} product "${productName}" ${nextFeatured ? "as featured" : "from featured"}`,
+            category: "Product Management",
+            performedBy: performerId,
+            performedByName: performerName,
+            details: { productId, is_featured: nextFeatured },
+          },
+          performerId
+        );
+      } catch (activityErr) {
+        log.error("⚠️ [toggleProductFeatured] activity log failed:", activityErr?.message || activityErr);
+      }
+
+      try {
+        emitSocketEvent("productUpdated", {
+          _id: productId,
+          name: productName,
+          is_featured: nextFeatured,
+          // ✅ featuredOnly: sirf featured flag badla hai → listeners full refetch
+          //    ke bajaye apni featured lists refresh kar sakte hain
+          featuredOnly: true,
+          updated_at: product.updated_at,
+        });
+      } catch (socketErr) {
+        log.error("⚠️ [toggleProductFeatured] socket broadcast failed:", socketErr?.message || socketErr);
+      }
+    });
   } catch (error) {
     log.error("❌ [toggleProductFeatured] Error:", error);
     return res.status(500).json({
@@ -2277,7 +2319,7 @@ const bulkProductFeatured = async (req, res) => {
         );
       }
 
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
         message:
           activeIds.length === ids.length
@@ -2286,6 +2328,28 @@ const bulkProductFeatured = async (req, res) => {
         modified: activeIds.length,
         skipped: ids.length - activeIds.length,
       });
+
+      // ✅ Socket + activity (baqi product actions ki tarah) — fire & forget
+      setImmediate(async () => {
+        try {
+          const io = req.io || getIO();
+          await pushGlobalActivity(
+            io,
+            {
+              action: `${req.user?.name || "Admin"} marked ${activeIds.length} product${activeIds.length === 1 ? "" : "s"} as featured`,
+              category: "Product Management",
+              performedBy: actor,
+              performedByName: req.user?.name || "Admin",
+              details: { ids: activeIds, is_featured: true },
+            },
+            actor
+          );
+          emitSocketEvent("productUpdated", { ids: activeIds, is_featured: true, bulk: true });
+        } catch (e) {
+          log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
+        }
+      });
+      return;
     }
 
     // Unfeature — hamesha allowed (status se koi farq nahi)
@@ -2294,12 +2358,34 @@ const bulkProductFeatured = async (req, res) => {
       { $set: { is_featured: false, featured_at: null, updatedby: actor, updated_at: now } },
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: `${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} removed from featured`,
       modified: result.modifiedCount || 0,
       skipped: 0,
     });
+
+    // ✅ Socket + activity (baqi product actions ki tarah) — fire & forget
+    setImmediate(async () => {
+      try {
+        const io = req.io || getIO();
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${req.user?.name || "Admin"} removed ${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} from featured`,
+            category: "Product Management",
+            performedBy: actor,
+            performedByName: req.user?.name || "Admin",
+            details: { ids, is_featured: false },
+          },
+          actor
+        );
+        emitSocketEvent("productUpdated", { ids, is_featured: false, bulk: true });
+      } catch (e) {
+        log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
+      }
+    });
+    return;
   } catch (error) {
     console.error("❌ [bulkProductFeatured] Error:", error);
     return res.status(500).json({

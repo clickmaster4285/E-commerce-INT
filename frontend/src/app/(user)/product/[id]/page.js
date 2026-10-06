@@ -13,7 +13,7 @@ import {
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
-import axiosInstance from "@/apis/axiosInstance";
+import { userHttp } from "@/apis/axiosInstance";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductCard from "@/components/user/ProductCard";
 import ProductRating from "@/components/user/ProductReviews";
@@ -473,7 +473,7 @@ function ProductDetailContent({ params }) {
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data || null;
     },
     retry: false,

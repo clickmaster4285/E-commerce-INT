@@ -12,7 +12,7 @@ import { dealApi } from "../../../../apis/admin/dealApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
-import { DealFormModal, SelectionModal } from "../page";
+import { DealFormModal, SelectionModal } from "../_components/dealModals";
 import useDealSocketSync from "@/hooks/useDealSocketSync";
 
 /* =========================================================

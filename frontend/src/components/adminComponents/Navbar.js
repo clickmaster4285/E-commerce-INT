@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import adminHttp from "@/apis/adminHttp";
+import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { disconnectSidebarSocket } from "./Sidebar";
@@ -247,7 +247,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               />
             ) : (
               <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white transition-shadow duration-200"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white transition-shadow duration-200"
                 style={{
                   background: avatarGradient,
                   boxShadow: isOpen || isProfileActive
@@ -311,7 +311,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                       />
                     ) : (
                       <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
                         style={{
                           background: avatarGradient,
                           boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,

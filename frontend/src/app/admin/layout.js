@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
-import adminHttp from '@/apis/adminHttp';
+import adminHttp from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/useShippingSocketSync';
@@ -23,8 +23,10 @@ const ROUTE_PERMISSIONS = {
   '/admin/categories': 'categories',
   '/admin/attributes': 'attribute',
   '/admin/products': 'products',
-  // ✅ Featured Products — products ka hi subset hai (same permission)
-  '/admin/featured-products': 'products',
+  // ✅ Featured Products — alag permission (legacy: products se fallback, backend undefined = allow)
+  '/admin/featured-products': 'featuredProducts',
+  // ✅ Reviews — alag permission (legacy: products se fallback, backend undefined = allow)
+  '/admin/reviews': 'reviews',
   '/admin/store-info': 'store',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
@@ -250,7 +252,21 @@ export default function AdminLayout({ children }) {
         pathname.startsWith(route + '/')
     );
 
-    if (matched && perms[matched[1]] === false) {
+    // ✅ featuredProducts/reviews legacy records me missing ho sakte hain —
+    // backend undefined = allow, is liye products se fallback lo
+    const ROUTE_FALLBACK = {
+      featuredProducts: 'products',
+      reviews: 'products',
+    };
+    const effectivePerm = (key) => {
+      const v = perms[key];
+      if (v !== undefined) return v;
+      const fb = ROUTE_FALLBACK[key];
+      if (fb) return perms[fb];
+      return undefined;
+    };
+
+    if (matched && effectivePerm(matched[1]) === false) {
       return {
         isAuthenticated: true,
         checkComplete: true,
@@ -406,12 +422,19 @@ export default function AdminLayout({ children }) {
       );
 
       // ✅ dashboard legacy payloads me missing ho sakta hai — sirf explicit false par redirect
+      // ✅ featuredProducts/reviews legacy me missing hon to products se fallback (backend undefined = allow)
+      const nextEffective = (key) => {
+        const v = nextPermissions[key];
+        if (v !== undefined) return v;
+        if (key === 'featuredProducts' || key === 'reviews') return nextPermissions.products;
+        return undefined;
+      };
       const routeRevoked =
         String(nextRole).toLowerCase() !== 'admin' &&
         matchedRoute &&
         (matchedRoute[1] === 'dashboard'
           ? nextPermissions.dashboard === false
-          : nextPermissions[matchedRoute[1]] !== true);
+          : nextEffective(matchedRoute[1]) === false);
       if (routeRevoked) {
         router.replace('/admin/access-denied');
       }
@@ -610,7 +633,7 @@ export default function AdminLayout({ children }) {
   // MAIN LAYOUT
   // ==========================================
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="admin-panel flex h-screen overflow-hidden">
 
       {/* Mobile Overlay */}
       {sidebarOpen && (

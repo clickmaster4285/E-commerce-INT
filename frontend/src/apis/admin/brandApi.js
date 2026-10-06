@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 // ✅ Server-side pagination response unwrap — baaki modules (stock/discounts)
 // ke pattern ke mutabiq { items, counts, countries, pagination }
 const paginated = (res, fallbackLimit) => {

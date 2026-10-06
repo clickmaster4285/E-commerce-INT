@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 // ============================================================
 // HELPER: UNWRAP API RESPONSE
 // Backend response: { success: true, data: {...} }

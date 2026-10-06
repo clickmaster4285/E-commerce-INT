@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldX, Mail, Lock, AlertTriangle, LogOut } from 'lucide-react';
-import adminHttp from '@/apis/adminHttp';
+import adminHttp from '@/apis/axiosInstance';
 import { toast } from 'sonner';
 
 export default function AccessDeniedPage() {

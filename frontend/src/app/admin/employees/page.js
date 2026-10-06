@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
-import adminHttp from "@/apis/adminHttp";
+import adminHttp from "@/apis/axiosInstance";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 const ITEMS_PER_PAGE = 20;

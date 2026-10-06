@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
+import { useReviewSocketSync } from "@/hooks/useReviewSocketSync";
 
 const PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -156,6 +157,9 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
 export default function AdminReviewsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // ✅ Baqi pages ki tarah live socket sync —
+  //    dusre staff/tab ki review changes bina refresh ke nazar aayein
+  useReviewSocketSync();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");

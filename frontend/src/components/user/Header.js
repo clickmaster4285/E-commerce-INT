@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
-import userHttp from "@/apis/userHttp";
+import { userHttp } from "@/apis/axiosInstance";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
