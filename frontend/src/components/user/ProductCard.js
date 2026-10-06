@@ -244,6 +244,7 @@ function ProductCardInner({
             loader={smartImageLoader}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             priority={priority}
+            fetchPriority={priority ? "high" : "auto"}
             className="object-cover"
           />
         ) : (

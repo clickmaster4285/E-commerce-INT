@@ -39,9 +39,15 @@ export default async function Home() {
   );
 }
 
-/* LCP preload (server): slide-0 ka optimizer URL pehle se pata hai —
-   client API round-trip ka wait nahi. React <link> ko head me hoist
-   karta hai. Banners na hon to kuch render nahi (client fallback same). */
+/* LCP preload (server): slide-0 ka URL pehle se pata hai — client API
+   round-trip ka wait nahi. React <link> ko head me hoist karta hai.
+   Banners na hon to kuch render nahi (client fallback same).
+   ✅ FAST-CDN (picsum/fastly/unsplash): seedha CDN preload — optimizer
+   round-trip (cold par seconds) se bacho. Baaki local images optimizer
+   srcSet se (smartImageLoader parity). */
+const FAST_CDN_PRELOAD =
+  /^(picsum\.photos|fastly\.picsum\.photos|images\.unsplash\.com|cdn\.shopify\.com)$/i;
+
 function HeroPreload({ banners }) {
   const first = Array.isArray(banners) ? banners[0] : null;
   const raw = first?.desktopImage || first?.tabletImage || first?.mobileImage;
@@ -51,6 +57,14 @@ function HeroPreload({ banners }) {
     const base = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
     if (!base) return null;
     src = `${base}${src.startsWith("/") ? "" : "/"}${src}`;
+  }
+  try {
+    const host = new URL(src, "http://localhost").hostname;
+    if (FAST_CDN_PRELOAD.test(host)) {
+      return <link rel="preload" as="image" href={src} fetchPriority="high" />;
+    }
+  } catch {
+    // neeche optimizer path
   }
   const enc = encodeURIComponent(src);
   const srcSet = [640, 1080, 1920]

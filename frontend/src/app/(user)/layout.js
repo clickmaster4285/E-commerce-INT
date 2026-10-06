@@ -14,19 +14,7 @@ import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
 import { useUserSocketSync } from "@/hooks/useUserSocketSync";
-
-function getThemeFromCookie() {
-  const cookies = document.cookie.split("; ");
-  const themeCookie = cookies.find((cookie) => cookie.startsWith("user-theme="));
-  if (!themeCookie) return "dark";
-  return themeCookie.split("=")[1];
-}
-
-export function setUserTheme(theme) {
-  document.cookie = `user-theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
-  const element = document.getElementById("user-theme");
-  if (element) element.classList.toggle("light", theme === "light");
-}
+import { getThemeFromCookie, initThemeFromCookie } from "@/lib/theme";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -41,6 +29,7 @@ function MobileNav() {
 
   return (
     <nav
+      aria-label="Mobile"
       className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
@@ -132,9 +121,7 @@ export default function UserLayout({ children }) {
   });
 
   useEffect(() => {
-    const savedTheme = getThemeFromCookie();
-    const element = document.getElementById("user-theme");
-    if (element) element.classList.toggle("light", savedTheme === "light");
+    initThemeFromCookie();
   }, []);
 
   useEffect(() => {

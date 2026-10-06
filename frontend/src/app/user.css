@@ -13,7 +13,9 @@
   --user-text:          #ffffff;
   --user-text-secondary:#e5e5e5;
   --user-text-muted:    #a3a3a3;
-  --user-text-subtle:   #666666;
+  /* ✅ A11Y contrast: #666 black par 3.5:1 tha (AA fail) → #767676 = 4.54:1.
+     Visual farq na hone ke barabar, Lighthouse contrast pass. */
+  --user-text-subtle:   #767676;
   --user-text-disabled: #404040;
 
   /* Borders */
@@ -63,7 +65,8 @@
   --user-text:          #0a0a0a;
   --user-text-secondary:#262626;
   --user-text-muted:    #525252;
-  --user-text-subtle:   #8a8a8a;
+  /* ✅ A11Y contrast: #8a8a8a white par ~3:1 tha → #737373 ≈ 4.6:1. */
+  --user-text-subtle:   #737373;
   --user-text-disabled: #c4c4c4;
 
   --user-border:        #e6e6e6;
@@ -267,10 +270,11 @@
    ========================================== */
 
 /* ---------- 1) FLUID SHELL ----------
-   Home page (aur poora storefront) FULL-WIDTH responsive hai — koi 1400px
-   cap nahi. Har screen par content viewport ki poori chaudai istemal karta
-   hai (sirf component-level side padding rehta hai: px-3 / lg:px-8).
-   Mobile → laptop → 1080p → 2K/4K sab par koi side gap / center cap nahi. */
+   Home page (aur poora storefront) 2560px tak FULL-WIDTH responsive hai —
+   koi 1400px cap nahi. Har screen par content viewport ki poori chaudai
+   istemal karta hai (sirf component-level side padding rehta hai:
+   px-3 / lg:px-8). Mobile → laptop → 1080p → 1440p (2560px) sab par koi
+   side gap / center cap nahi. 2560px ke BAAD section (4) ka cap lagta hai. */
 .user-shell {
   width: 100%;
   max-width: none;
@@ -342,4 +346,28 @@ html:has(.user-theme) {
    Percentage-width svg (charts/illustrations) untouched rehte hain. */
 .user-theme svg[width]:not([width*="%"]) {
   zoom: var(--user-ui-scale);
+}
+
+/* ---------- 4) 2560px CAP (Amazon style) ----------
+   2560px (1440p) tak page FULL fluid expand hota hai —
+   sidebar left edge se attached, hero/cards poori chaudai me,
+   UI scale 1 → 1.125 tak barhta hai (section 2).
+   Us se bari screen (3K / 4K / 5K / ultrawide) par page 2560px par
+   CENTERED cap ho jata hai: content mazeed stretch nahi hota,
+   bahar dono taraf same theme background rehta hai.
+   UI scale bhi 1.125 par capped hai (section 2), is liye text/icons
+   bhi 2560px ke baad nahi barhte.
+   2560px aur us se neeche iska ZERO effect — wahan look pixel-perfect
+   same rehta hai (media query inactive). */
+@media (min-width: 2561px) {
+  html:has(.user-theme) body {
+    max-width: 2560px;
+    margin-inline: auto;
+  }
+  html:has(.user-theme) {
+    background: #000000;
+  }
+  html:has(.user-theme.light) {
+    background: #fafafa;
+  }
 }

@@ -48,6 +48,8 @@ const employeeSchema = new mongoose.Schema(
       shipping: { type: Boolean, default: true },
       order: { type: Boolean, default: true },
       attribute: { type: Boolean, default: true },
+      vendors: { type: Boolean, default: true },
+      purchaseOrders: { type: Boolean, default: true },
     },
 
     preferences: {

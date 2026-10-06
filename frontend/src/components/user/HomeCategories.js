@@ -89,7 +89,7 @@ export default function HomeCategories({ tiles = [], totalProducts = 0, isLoadin
           {visibleTiles.map((category) => (
             <Link
               key={category._id}
-              href={`/?category=${category._id}`}
+              href={`/filtering-product?category=${category._id}`}
               title={`${category.name} — ${category.count} products`}
               className="group flex flex-col items-center gap-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] hover:shadow-[var(--user-shadow-md)]"
             >

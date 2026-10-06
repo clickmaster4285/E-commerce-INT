@@ -36,7 +36,7 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
       <SectionHeading
         title="Shop by Brand"
         subtitle={`${list.length} featured brands`}
-        href="/"
+        href="/filtering-product"
         linkLabel="All brands"
       />
 
@@ -46,7 +46,7 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
           return (
             <Link
               key={brand._id}
-              href={`/?brand=${brand._id}`}
+              href={`/filtering-product?brand=${brand._id}`}
               title={`${brand.name} — ${brand.count} products`}
               className="group flex w-[7.75rem] shrink-0 flex-col items-center gap-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)]"
             >

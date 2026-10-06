@@ -120,7 +120,9 @@ const variantSchema = new mongoose.Schema(
 );
 
 // ✅ Shop facets (price/stock) + price sort: pehle variant + stock sums
-// isi index se serve hote hain.
-variantSchema.index({ product_id: 1, is_deleted: 1, created_at: 1 });
+// isi index se serve hote hain. `_id` tail is liye taake variantStatsMap
+// wala { created_at: 1, _id: 1 } sort bhi index se aaye (in-memory
+// filesort nahi) — $first hamesha deterministic rehta hai.
+variantSchema.index({ product_id: 1, is_deleted: 1, created_at: 1, _id: 1 });
 
 module.exports = mongoose.model("Variant", variantSchema);

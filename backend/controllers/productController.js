@@ -604,8 +604,10 @@ const applyShopFacets = async (baseFilter, shop, exclude = null, pre = null) => 
   const useDeal = exclude !== "deal" && shop.dealIds.length > 0;
   if (!usePrice && !useStock && !useDiscount && !useDeal) return null;
 
-  const baseDocs = await Product.find(baseFilter).select("_id").lean();
-  let working = baseDocs.map((d) => d._id);
+  // ✅ baseIds caller (facets) se precomputed aa sakte hain — dobara
+  // full scan nahi (ek facets request me ye fn 4x chalta hai).
+  const baseDocs = pre?.baseIds || (await Product.find(baseFilter).select("_id").lean());
+  let working = pre?.baseIds ? [...pre.baseIds] : baseDocs.map((d) => d._id);
   if (!working.length) return [];
 
   let stats = null;
@@ -713,7 +715,19 @@ const computeProductStats = async (filter, totalOverride = null) => {
 // ke products dobara aa jate the aur kuch products kabhi dikhte hi nahi the).
 // `_id` tie-breaker ek TOTAL order banata hai, is liye har page exactly ek baar.
 const PRODUCT_LIST_SORT = { created_at: -1, _id: -1 };
-
+// ✅ slim=1 (opt-in, storefront lists): sirf category/brand names populate.
+// tag_ids/createdby/updatedby storefront cards me kahin display nahi hote
+// (admin/detail callers slim nahi bhejte → unka response bilkul same).
+const applyListPopulates = (query, slim) => {
+  query.populate("category_id", "name").populate("brand_id", "name");
+  if (!slim) {
+    query
+      .populate("tag_ids", "name")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email");
+  }
+  return query;
+};
 // ✅ FEATURED PAGE SORT — "recent upar, top par"
 //    Featured Products page ke liye. `created_at` yahan kaam ka nahi: bulk/seed
 //    insert me sab products ka created_at ek hi millisecond ka hota hai, is liye
@@ -734,6 +748,8 @@ const getProducts = async (req, res) => {
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50; admin 20 bhejta hai)
     const sort = String(req.query.sort || "newest");
+    // ✅ Storefront lists (?slim=1) — 3 populates kam (payload + DB round-trips)
+    const slimList = String(req.query.slim || "") === "1";
 
     // ---- Filter build ----
     // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
@@ -829,13 +845,7 @@ const getProducts = async (req, res) => {
       const dSafe = Math.min(page, dPages);
       pageIds = scored.slice((dSafe - 1) * limit, dSafe * limit).map((s) => s.id);
       const dProducts = pageIds.length
-        ? await Product.find({ _id: { $in: pageIds } })
-            .populate("category_id", "name")
-            .populate("brand_id", "name")
-            .populate("tag_ids", "name")
-            .populate("createdby", "name email")
-            .populate("updatedby", "name email")
-            .lean()
+        ? await applyListPopulates(Product.find({ _id: { $in: pageIds } }), slimList).lean()
         : [];
       const dOrder = new Map(pageIds.map((id, i) => [String(id), i]));
       dProducts.sort((a, b) => dOrder.get(String(a._id)) - dOrder.get(String(b._id)));
@@ -915,13 +925,10 @@ const getProducts = async (req, res) => {
       });
     }
 
-    const products = await Product.find({ _id: { $in: pageIds } })
-      .populate("category_id", "name")
-      .populate("brand_id", "name")
-      .populate("tag_ids", "name")
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .lean();
+    const products = await applyListPopulates(
+      Product.find({ _id: { $in: pageIds } }),
+      slimList,
+    ).lean();
 
     // page order preserve karo
     const orderMap = new Map(pageIds.map((id, i) => [String(id), i]));
@@ -1033,15 +1040,21 @@ const getProductFacets = async (req, res) => {
     const brandCounts = brandGroups.map((g) => ({ _id: g._id, count: g.count }));
 
     // ✅ Shared pieces (ek baar fetch) + indexed counting (single pass)
-    const baseIdDocs = await Product.find(filter).select("_id").lean();
-    const baseIds = baseIdDocs.map((d) => d._id);
-    const [statsAll, refsAll, discountDocs, activeDeals] = await Promise.all([
-      variantStatsMap(baseIds),
-      productRefsMap(baseIds),
+    // ✅ GLOBAL-SHORTCUT: filter me sirf is_deleted ho (home/filtering ka
+    // initial load — sab se common case) to base == global: dobara full
+    // scan + variant agg + refs nahi, wahi global results reuse (same output).
+    const isGlobalFilter = Object.keys(filter).length === 1 && filter.is_deleted !== undefined;
+    const baseIdDocs = isGlobalFilter ? allIdsDocs : await Product.find(filter).select("_id").lean();
+    const baseIds = isGlobalFilter ? allIds : baseIdDocs.map((d) => d._id);
+    const globalRefsPromise = productRefsMap(allIds);
+    const [statsAll, refsAll, discountDocs, activeDeals, globalRefs] = await Promise.all([
+      isGlobalFilter ? globalStats : variantStatsMap(baseIds),
+      isGlobalFilter ? globalRefsPromise : productRefsMap(baseIds),
       activePublicDiscounts(),
       allActiveDeals(),
+      isGlobalFilter ? globalRefsPromise : Promise.resolve(null),
     ]);
-    const pre = { stats: statsAll, refsMap: refsAll, discountDocs, dealDocs: activeDeals };
+    const pre = { stats: statsAll, refsMap: refsAll, discountDocs, dealDocs: activeDeals, baseIds };
     const discountIdx = buildDiscountIndex(discountDocs);
     const dealIdx = buildDealIndex(activeDeals);
 
@@ -1049,13 +1062,13 @@ const getProductFacets = async (req, res) => {
     // Koi discount na ho to original hi final hai.
     let bounds = { min: 0, max: 0 };
     {
-      const globalRefs = await productRefsMap(allIds);
+      const refs = globalRefs || (await productRefsMap(allIds));
       let lo = Infinity;
       let hi = 0;
       globalStats.forEach(({ price }, key) => {
         if (!(price > 0)) return;
-        const refs = globalRefs.get(String(key)) || { cid: "", bid: "" };
-        const final = finalPriceIndexed(price, String(key), refs.cid, refs.bid, discountIdx);
+        const ref = refs.get(String(key)) || { cid: "", bid: "" };
+        const final = finalPriceIndexed(price, String(key), ref.cid, ref.bid, discountIdx);
         if (!(final > 0)) return;
         if (final < lo) lo = final;
         if (final > hi) hi = final;
@@ -1212,22 +1225,31 @@ const getCategoryTiles = async (req, res) => {
       .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)))
       .slice(0, limit);
 
-    // ✅ fromPrice + image (tiles tak mehdood — bounded queries)
+    // ✅ fromPrice + image — tiles tak mehdood, BATCHED (pehle har tile par
+    // 2 queries thin: N tiles = 2N queries. Ab union par SIRF 2 queries,
+    // per-tile math JS me — output numbers bilkul same).
+    const tileSubSets = new Map(tiles.map((t) => [String(t._id), new Set((t._sub || []).map(String))]));
+    const unionSubIds = [...new Set(tiles.flatMap((t) => t._sub || []))];
+    const unionProducts = unionSubIds.length
+      ? await Product.find({ is_deleted: { $ne: true }, category_id: { $in: unionSubIds } })
+          .select("_id category_id")
+          .lean()
+      : [];
+    const unionStats = await variantStatsMap(unionProducts.map((p) => p._id));
+    const cidOfUnion = new Map(
+      unionProducts.map((p) => [String(p._id), String(p.category_id?._id || p.category_id || "")]),
+    );
     for (const t of tiles) {
-      const inSub = await Product.find({
-        is_deleted: { $ne: true },
-        category_id: { $in: t._sub },
-      })
-        .select("_id")
-        .lean();
-      const pstats = await variantStatsMap(inSub.map((p) => p._id));
+      const sub = tileSubSets.get(String(t._id));
       let lo = Infinity;
-      pstats.forEach(({ price }) => {
-        if (price > 0 && price < lo) lo = price;
+      unionStats.forEach(({ price }, pid) => {
+        if (!(price > 0)) return;
+        if (!sub.has(cidOfUnion.get(String(pid)) || "")) return;
+        if (price < lo) lo = price;
       });
       t.fromPrice = lo === Infinity ? 0 : Math.round(lo);
       const cand = recent.find(
-        (p) => t._sub.includes(String(p.category_id?._id || p.category_id)) && recentVariantMap.has(String(p._id)),
+        (p) => sub.has(String(p.category_id?._id || p.category_id)) && recentVariantMap.has(String(p._id)),
       );
       t.image = cand ? recentVariantMap.get(String(cand._id)) : null;
       delete t._sub;

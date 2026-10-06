@@ -618,6 +618,7 @@ export default function HomeSidebar({
               value={brandQuery}
               onChange={(event) => setBrandQuery(event.target.value)}
               placeholder="Search brand..."
+              aria-label="Search brands"
               className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 pl-7 pr-2.5 text-[0.75rem] text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
             />
           </div>

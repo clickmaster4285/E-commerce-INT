@@ -33,6 +33,8 @@ const ROUTE_PERMISSIONS = {
   '/admin/deals': 'deals',
   '/admin/banners': 'banners',
   '/admin/manage-stock': 'manageStock',
+  '/admin/vendors': 'vendors',
+  '/admin/purchase-orders': 'purchaseOrders',
 };
 
 // ==========================================
