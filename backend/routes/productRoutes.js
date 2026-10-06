@@ -24,6 +24,11 @@ const {
 
 const saveProductImages = require("../middleware/saveProductImages");
 
+const { publicCache, invalidate } = require("../utils/publicCache");
+
+// ✅ Admin mutation ke baad public cache drop (foran fresh)
+const dropProductsCache = (req, res, next) => { invalidate("products"); next(); };
+
 const router = express.Router();
 
 // ==========================================
@@ -40,8 +45,8 @@ const masterCache = (req, res, next) => {
   res.set("Cache-Control", "public, max-age=60, must-revalidate");
   next();
 };
-router.get("/facets", masterCache, getProductFacets);
-router.get("/category-tiles", masterCache, getCategoryTiles);
+router.get("/facets", masterCache, publicCache(30 * 1000), getProductFacets);
+router.get("/category-tiles", masterCache, publicCache(60 * 1000), getCategoryTiles);
 router.get("/:id", getProductById);
 
 // ==========================================
@@ -51,6 +56,7 @@ router.post(
   "/",
   authMiddleware,
   checkPermission("products"),
+  dropProductsCache,
   productImagesUpload,
   validateProductImages,
   saveProductImages,
@@ -61,14 +67,15 @@ router.put(
   "/:id",
   authMiddleware,
   checkPermission("products"),
+  dropProductsCache,
   productImagesUpload,
   validateProductImages,
   saveProductImages,
   updateProduct,
 );
 
-router.delete("/:id", authMiddleware, checkPermission("products"), deleteProduct);
-router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), toggleProductStatus);
+router.delete("/:id", authMiddleware, checkPermission("products"), dropProductsCache, deleteProduct);
+router.patch("/:id/toggle-status", authMiddleware, checkPermission("products"), dropProductsCache, toggleProductStatus);
 // ✅ Featured Products page — bulk mark / unmark ("Manage Products" popup)
 //    "/:id" routes se PEHLE register — warna "bulk-featured" ko id samajh sakta hai.
 router.patch("/bulk-featured", authMiddleware, checkPermission("featuredProducts"), bulkProductFeatured);

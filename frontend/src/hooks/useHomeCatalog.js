@@ -92,14 +92,20 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
   // ✅ Sidebar counts + bounds + grid total — SERVER (leave-one-out included)
   // react-query keys ko stable hash karta hai, is liye object seedha key me.
   // search (?q=) key me shamil hai taake shop par counts query-aware hon.
+  // ✅ KEY ALIASING: filters bilkul empty + koi search nahi → params global
+  // request jese hain (getFacets({})), is liye ["shopFacets","global"] key
+  // reuse hoti hai jo HomeNav/Header ke sath shared hai — home par DO
+  // facets requests ki jagah EK (62KB + poora compute bachta hai).
+  // Filter lagte hi key badal kar params wali (refetch, sahi counts).
   const facetParams = useMemo(() => filtersToFacetParams(filters, { search }), [filters, search]);
+  const isPristineFacets = !search && !hasActiveFilters(filters);
   const {
     data: facets = null,
     isPending: facetsPending,
     isError: facetsError,
     refetch: refetchFacets,
   } = useQuery({
-    queryKey: ["shopFacets", facetParams],
+    queryKey: isPristineFacets ? ["shopFacets", "global"] : ["shopFacets", facetParams],
     queryFn: () => productApi.getFacets(facetParams),
     staleTime: 60 * 1000,
     retry: 1,

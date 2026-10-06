@@ -137,6 +137,7 @@ export default function BannerSlider({ initialBanners = null }) {
                   loader={smartImageLoader}
                   sizes="100vw"
                   priority={i === 0}
+                  fetchPriority={i === 0 ? "high" : "auto"}
                   className={`object-cover ${isActive ? "animate-[kenBurns_8s_ease-out_forwards]" : ""}`}
                 />
               ) : imgUrl ? (

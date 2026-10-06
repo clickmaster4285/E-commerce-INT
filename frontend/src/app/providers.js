@@ -15,6 +15,10 @@ export default function Providers({ children }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,
+            gcTime: 5 * 60 * 1000,
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            retry: 1,
           },
         },
       })

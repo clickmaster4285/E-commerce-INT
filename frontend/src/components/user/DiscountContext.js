@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { discountApi } from "@/apis/user/discountApi";
 import { dealApi } from "@/apis/user/dealApi";
 import { useSocket } from "@/hooks/useSocket";
@@ -27,6 +27,70 @@ export function useDiscounts() {
   });
 
   const isLoading = isLoadingDiscounts || isLoadingDeals;
+
+  /* ✅ PERF INDEX — har ProductCard render par 700 deals ka full scan +
+     badi productIds lists ka .some() hota tha (60+ cards × 700 deals =
+     sekron hazaar ops per render). Ye index wahi matching O(1) buckets
+     me karta hai — output bilkul same (checkApplies parity):
+       - "all" → openAll (har product se match)
+       - product/category/brand ids → us id ke bucket me
+       - empty id list / unknown applyTo → kisi bucket me nahi (= match nahi,
+         bilkul checkApplies jaisa jo [].some() par false deta hai)
+     Window check (isActive/start/end) loop ke andar hi rehta hai. */
+  const dealIndex = useMemo(() => {
+    const byProduct = new Map();
+    const byCategory = new Map();
+    const byBrand = new Map();
+    const openAll = [];
+    const norm = (list) =>
+      (Array.isArray(list) ? list : [])
+        .map((e) => String(e?._id || e || ""))
+        .filter(Boolean);
+    const push = (map, key, deal) => {
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(deal);
+    };
+    (deals || []).forEach((deal) => {
+      const t = deal?.applyTo;
+      if (t === "all") {
+        openAll.push(deal);
+      } else if (t === "product" || t === "specific_products") {
+        norm(deal.productIds || deal.selectedProducts).forEach((id) =>
+          push(byProduct, id, deal),
+        );
+      } else if (t === "category" || t === "specific_categories") {
+        norm(deal.categoryIds || deal.selectedCategories).forEach((id) =>
+          push(byCategory, id, deal),
+        );
+      } else if (t === "brand" || t === "specific_brands") {
+        norm(deal.brandIds || deal.selectedBrands).forEach((id) =>
+          push(byBrand, id, deal),
+        );
+      }
+    });
+    return { byProduct, byCategory, byBrand, openAll };
+  }, [deals]);
+
+  /* Candidates (deduped, order stable) — sirf wahi deals jo is product se
+     match HO SAKTI hain. Window check caller loop me karta hai. */
+  const dealCandidates = useCallback(
+    (productId, categoryId, brandId) => {
+      const out = new Set(dealIndex.openAll);
+      const a = productId ? dealIndex.byProduct.get(productId) : null;
+      if (a) a.forEach((d) => out.add(d));
+      if (categoryId) {
+        const b = dealIndex.byCategory.get(categoryId);
+        if (b) b.forEach((d) => out.add(d));
+      }
+      if (brandId) {
+        const c = dealIndex.byBrand.get(brandId);
+        if (c) c.forEach((d) => out.add(d));
+      }
+      return [...out];
+    },
+    [dealIndex],
+  );
 
   useEffect(() => {
     if (!socket) return;
@@ -111,7 +175,7 @@ export function useDiscounts() {
           };
         }
 
-        for (const deal of deals) {
+        for (const deal of dealCandidates(productId, categoryId, brandId)) {
           if (!deal.isActive) continue;
           const startDate = new Date(deal.startDate);
           const endDate = new Date(deal.endDate);
@@ -235,7 +299,7 @@ export function useDiscounts() {
         matchedDeal: matchedDeal,
       };
     },
-    [discounts, deals],
+    [discounts, dealCandidates],
   );
 
   const getActiveDealForProduct = useCallback(
@@ -263,7 +327,7 @@ export function useDiscounts() {
         return false;
       };
 
-      for (const deal of deals) {
+      for (const deal of dealCandidates(productId, categoryId, brandId)) {
         if (!deal.isActive) continue;
         const startDate = new Date(deal.startDate);
         const endDate = new Date(deal.endDate);
@@ -272,7 +336,7 @@ export function useDiscounts() {
       }
       return null;
     },
-    [deals],
+    [deals, dealCandidates],
   );
 
   // ✅ Returns ALL active deals matching this product (same matching rules
@@ -302,7 +366,7 @@ export function useDiscounts() {
         return false;
       };
 
-      return deals.filter((deal) => {
+      return dealCandidates(productId, categoryId, brandId).filter((deal) => {
         if (!deal.isActive) return false;
         const startDate = new Date(deal.startDate);
         const endDate = new Date(deal.endDate);
@@ -310,7 +374,7 @@ export function useDiscounts() {
         return checkApplies(deal);
       });
     },
-    [deals],
+    [deals, dealCandidates],
   );
 
   return { discounts, deals, isLoading, calculateProductDiscount, getActiveDealForProduct, getActiveDealsForProduct };

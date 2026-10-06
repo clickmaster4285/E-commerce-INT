@@ -102,7 +102,7 @@ function DropdownPanel({ style, panelRef, title, meta, footer, children, onMouse
 function CategoryRow({ category, count = 0, onPick }) {
   return (
     <Link
-      href={`/?category=${category._id}`}
+      href={`/filtering-product?category=${category._id}`}
       onClick={onPick}
       className="flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)]"
     >
@@ -252,7 +252,7 @@ export default function HomeNav() {
   }, [panel, positionPanel]);
 
   return (
-    <nav className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
+    <nav aria-label="Primary" className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
       <div className="w-full max-w-none px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
         <div className="flex h-11 items-center justify-center gap-0.5 overflow-x-auto scrollbar-hide lg:h-12 lg:gap-1.5">
           {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
@@ -271,7 +271,7 @@ export default function HomeNav() {
           {visibleParents.map((category) => (
             <Link
               key={category._id}
-              href={`/?category=${category._id}`}
+              href={`/filtering-product?category=${category._id}`}
               className={`${itemClass(pathname.startsWith(`/?category=${category._id}`))} max-w-[200px}`}
             >
               <span className="truncate capitalize">{category.name}</span>
@@ -331,7 +331,7 @@ export default function HomeNav() {
               ))}
               {hiddenParents.length > MORE_DROPDOWN_LIMIT && (
                 <Link
-                  href="/?allCategories=1"
+                  href="/filtering-product?allCategories=1"
                   onClick={closePanel}
                   className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)] text-[var(--user-accent)] font-medium"
                 >

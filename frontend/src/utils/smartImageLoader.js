@@ -12,6 +12,15 @@ const PRIVATE_HOST =
 // flag OFF hona chahiye.
 const LOCAL_OPTIMIZE = process.env.NEXT_PUBLIC_IMAGE_LOCAL_OPTIMIZE === "1";
 
+/* ✅ FAST-CDN passthrough — picsum/fastly jese image CDN khud hi edge-
+   cached + compressed serve karte hain. Inhe optimizer se ghumane ka matlab:
+   browser → Next → (slow international fetch + 302 + full-size download +
+   resize) → browser = LCP par 6-10 SECOND per image (measured).
+   Seedha browser → CDN = parallel, edge-cached, ~10x faster. Pixels bilkul
+   same (koi resize/convert nahi, sirf route badalta hai). Local /uploads
+   pehle ki tarah optimizer se (wo localhost par ms me hota hai). */
+const FAST_CDN = /^(picsum\.photos|fastly\.picsum\.photos|images\.unsplash\.com|cdn\.shopify\.com)$/i;
+
 export function smartImageLoader({ src, width, quality }) {
   const q = quality || 75;
   // Relative /uploads paths ko backend origin se absolute karo — warna
@@ -25,6 +34,8 @@ export function smartImageLoader({ src, width, quality }) {
   }
   try {
     const host = new URL(absolute, "http://localhost").hostname;
+    // Fast image CDN → direct (optimizer round-trip se bacho, LCP fast)
+    if (FAST_CDN.test(host)) return absolute;
     // Optimizer block karega (400) → direct src (koi regression nahi)
     if (PRIVATE_HOST.test(host) && !LOCAL_OPTIMIZE) return absolute;
   } catch {

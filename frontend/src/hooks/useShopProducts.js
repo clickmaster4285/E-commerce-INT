@@ -40,6 +40,8 @@ export function useShopProducts({
     dealIds: (dealIds || []).map(String).filter(Boolean),
     discountBands: [...(discountBands || [])].map(Number).filter((n) => Number.isFinite(n)),
     minDiscount,
+    // ✅ Storefront grids ko tags/createdby nahi chahiye (payload + DB kam)
+    slim: 1,
   };
 
   const query = useQuery({
@@ -72,6 +74,7 @@ export function useShopProducts({
         deal: params.dealIds,
         discount: params.discountBands,
         minDiscount: params.minDiscount,
+        slim: 1,
       }),
     enabled,
     retry: 1,

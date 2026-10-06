@@ -16,14 +16,19 @@ const {
 } = require("../controllers/categoryController");
 
 const Category = require("../models/Category");
+const { publicCache, invalidate } = require("../utils/publicCache");
 
 const router = express.Router();
+
+// ✅ Admin mutation ke baad public cache drop (foran fresh)
+const dropCategoriesCache = (req, res, next) => { invalidate("categories"); next(); };
 
 // ==========================================
 // ✅ PUBLIC ROUTE — Bina login ke categories (User GUI ke liye)
 // Ye route PEHLE declare karna zaroori hai warna "/" wala route pehle match ho jayega
+// ✅ 60s memo (output same)
 // ==========================================
-router.get("/public", async (req, res) => {
+router.get("/public", publicCache(60 * 1000), async (req, res) => {
   try {
     const categories = await Category.find({ is_deleted: false })
       .select("name description parent_category_id category_type sort_order created_at")
@@ -173,9 +178,9 @@ router.get("/", authMiddleware, checkPermission("products"), getCategories);
 router.get("/:id", authMiddleware, checkPermission("products"), getCategoryById);
 router.get("/:id/attributes", authMiddleware, checkPermission("products"), getCategoryAttributes);
 router.get("/:id/attributes-hierarchy", authMiddleware, checkPermission("products"), getCategoryAttributesHierarchical);
-router.post("/", authMiddleware, checkPermission("products"), createCategory);
-router.put("/:id", authMiddleware, checkPermission("products"), updateCategory);
-router.put("/:id/attributes", authMiddleware, checkPermission("products"), assignCategoryAttributes);
-router.delete("/:id", authMiddleware, checkPermission("products"), deleteCategory);
+router.post("/", authMiddleware, checkPermission("products"), dropCategoriesCache, createCategory);
+router.put("/:id", authMiddleware, checkPermission("products"), dropCategoriesCache, updateCategory);
+router.put("/:id/attributes", authMiddleware, checkPermission("products"), dropCategoriesCache, assignCategoryAttributes);
+router.delete("/:id", authMiddleware, checkPermission("products"), dropCategoriesCache, deleteCategory);
 
 module.exports = router;

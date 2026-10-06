@@ -70,6 +70,8 @@ const ALLOWED_PERMISSIONS = {
   shipping: { label: "Shipping", default: true },
   order: { label: "Order", default: true },
   attribute: { label: "Attribute", default: true },
+  vendors: { label: "Vendors", default: true },
+  purchaseOrders: { label: "Purchase Orders", default: true },
 };
 
 // ==========================================

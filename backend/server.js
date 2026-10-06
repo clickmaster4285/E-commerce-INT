@@ -45,6 +45,8 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const shippingRoutes = require("./routes/shippingRoutes");
 const attributeRoutes = require("./routes/attributeRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
 
 // ==========================================
 // APP & SERVER SETUP
@@ -173,6 +175,8 @@ app.use(`${API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${API_PREFIX}/attributes`, attributeRoutes);
 app.use(`${API_PREFIX}/shipping`, shippingRoutes);
 app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
+app.use(`${API_PREFIX}/vendors`, vendorRoutes);
+app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -244,6 +248,7 @@ const seedDefaultData = async () => {
               profile: true, employees: true, discounts: true,
               deals: true, bundles: true, store: true, banners: true,
               manageStock: true, shipping: true, order: true, attribute: true,
+              vendors: true, purchaseOrders: true,
             },
           });
           log.info("✅ Default Admin Employee Created (employees collection)");
