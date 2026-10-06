@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
-import axiosInstance from "@/apis/axiosInstance";
+import adminHttp from "@/apis/axiosInstance";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 
 const ITEMS_PER_PAGE = 20;
@@ -222,7 +222,7 @@ export default function EmployeesPage() {
   const { data: currentUserProfile } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await adminHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,

@@ -7,8 +7,7 @@ import { Country, State, City } from "country-state-city";
 import { addressApi } from "@/apis/user/addressApi";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
-import axiosInstance from "@/apis/axiosInstance";
-
+import { userHttp } from "@/apis/axiosInstance"
 const normalizeStateName = (s) => {
   if (!s) return "";
   return s
@@ -38,7 +37,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
   const { data: user } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,

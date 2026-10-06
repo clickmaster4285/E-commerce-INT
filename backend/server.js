@@ -1,8 +1,9 @@
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const compression = require("compression");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
@@ -11,6 +12,7 @@ const cookieParser = require("cookie-parser");
 const net = require('net');
 
 const connectDB = require("./config/db");
+const log = require("./utils/logger");
 const User = require("./models/User");
 const Employee = require("./models/Employee");
 const Store = require("./models/Store");
@@ -71,7 +73,7 @@ const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 // ==========================================
 // MIDDLEWARES
 // ==========================================
-if (!CLIENT_URL) console.warn("⚠️ CLIENT_URL is not configured in .env");
+if (!CLIENT_URL) log.warn("⚠️ CLIENT_URL is not configured in .env");
 
 const buildAllowedOrigins = () => {
   const origins = new Set();
@@ -108,13 +110,35 @@ app.use(cors({
   credentials: true,
 }));
 
+// ✅ COMPRESSION (gzip) — JSON APIs ke liye. /uploads (pehle se webp/compressed)
+// aur /socket.io (binary frames) ko skip — double compress se bacho.
+// Order: cors ke baad, rate-limit/routes se pehle (order unchanged).
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      if (req.path.startsWith("/uploads") || req.path.startsWith("/socket.io")) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
+
 app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
 app.use(cookieParser());
 
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
-app.use("/uploads", express.static(uploadDir, { maxAge: UPLOAD_CACHE_MAX_AGE, etag: true }));
+// ✅ /uploads: saari filenames Date.now/uuid wali hain (overwrite par naya
+// naam banta hai) → 1y immutable safe. Webp pehle se compressed hai.
+app.use(
+  "/uploads",
+  express.static(uploadDir, {
+    maxAge: "1y",
+    immutable: true,
+    etag: true,
+  }),
+);
 
 const io = initSocket(server);
 app.use((req, res, next) => { req.io = io; next(); });
@@ -196,7 +220,7 @@ const seedDefaultData = async () => {
           weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
           store_status: process.env.DEFAULT_STORE_STATUS,
         });
-        console.log("✅ Default Store Created");
+        log.info("✅ Default Store Created");
       }
 
       // 2. Admin Seed (Employees collection only)
@@ -222,7 +246,7 @@ const seedDefaultData = async () => {
               manageStock: true, shipping: true, order: true, attribute: true,
             },
           });
-          console.log("✅ Default Admin Employee Created (employees collection)");
+          log.info("✅ Default Admin Employee Created (employees collection)");
         }
       }
     }
@@ -231,7 +255,7 @@ const seedDefaultData = async () => {
     await seedAttributes(); 
 
   } catch (error) {
-    console.error("❌ Seed Error:", error.message);
+    log.error("❌ Seed Error:", error.message);
   }
 };
 
@@ -265,39 +289,37 @@ const startServer = async () => {
     else if (bannerScheduler?.start) bannerScheduler.start();
 
     // 📧 SMTP status — OTP email jayegi ya sirf console par aayegi, start par hi pata chal jaye
+    // (checks same hain, sirf print 1 compact warn/line me)
+    let smtpStatus = "SMTP off (console fallback)";
     try {
       const { isSmtpConfigured, verifySmtpConnection, getSmtpConfig } = require("./utils/sendEmail");
       if (!isSmtpConfigured()) {
-        console.warn("⚠️ SMTP not configured — OTP emails console par print hongi, inbox mein NAHI jayengi.");
-        console.warn("💡 Fix: backend/.env mein SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM set karein.");
+        log.warn("⚠️ SMTP not configured — OTP emails console par print hongi (backend/.env me SMTP_* set karein).");
       } else {
         const cfg = getSmtpConfig();
         await verifySmtpConnection();
-        console.log(`✅ SMTP OK — OTP emails ${cfg.host}:${cfg.port} (${cfg.user}) se jayengi`);
+        smtpStatus = `SMTP ok (${cfg.host}:${cfg.port})`;
+        log.info(`✅ SMTP OK — OTP emails ${cfg.host}:${cfg.port} (${cfg.user}) se jayengi`);
       }
     } catch (smtpError) {
-      console.error("❌ SMTP check failed:", smtpError.message);
-      console.error("💡 Gmail: 16-char App Password use karein (spaces hata kar), 2-Step Verification ON rakhein.");
+      log.error("❌ SMTP check failed:", smtpError.message);
+      log.error("💡 Gmail: 16-char App Password use karein (spaces hata kar), 2-Step Verification ON rakhein.");
     }
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
-      console.error(`❌ Port ${PORT} is already in use (EADDRINUSE). Please close the other process or change PORT in .env.`);
-      console.error(`💡 Fix: kill $(lsof -t -i:${PORT}) or change PORT=${PORT+1}`);
+      log.error(`❌ Port ${PORT} is already in use (EADDRINUSE). Please close the other process or change PORT in .env.`);
+      log.error(`💡 Fix: kill $(lsof -t -i:${PORT}) or change PORT=${PORT+1}`);
       process.exit(1);
     }
 
     server.listen(PORT, HOST, () => {
       const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
-      console.log("==========================================");
-      console.log(` ${STARTUP_MESSAGE}`);
-      console.log("==========================================");
-      console.log(`🌐 Server: http://${displayHost}:${PORT}`);
-      console.log(`🔗 API: http://${displayHost}:${PORT}${API_PREFIX}`);
-      console.log("==========================================");
+      // Start line hamesha dikhe (LOG_LEVEL se independent) — ye noise nahi, confirmation hai
+      log.info(`✅ ${STARTUP_MESSAGE} | API http://${displayHost}:${PORT}${API_PREFIX} | DB ok | ${smtpStatus}`);
     });
   } catch (error) {
-    console.error("❌ Server start failed:", error.message);
+    log.error("❌ Server start failed:", error.message);
     process.exit(1);
   }
 };

@@ -1,9 +1,8 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axiosInstance from "@/apis/axiosInstance";
-
+import { userHttp } from "@/apis/axiosInstance"
 const WishlistContext = createContext(null);
 
 export function WishlistProvider({ children }) {
@@ -13,7 +12,7 @@ export function WishlistProvider({ children }) {
   const { data: wishlist = [], isLoading } = useQuery({
     queryKey: ["wishlist"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/wishlist");
+      const res = await userHttp.get("/users/wishlist");
       return res.data?.wishlist || [];
     },
     retry: false,
@@ -22,7 +21,7 @@ export function WishlistProvider({ children }) {
   // ✅ Toggle (add/remove) in database
   const toggleMutation = useMutation({
     mutationFn: async (productId) => {
-      const res = await axiosInstance.put("/users/wishlist/toggle", {
+      const res = await userHttp.put("/users/wishlist/toggle", {
         product_id: productId,
       });
       return res.data;
@@ -32,10 +31,12 @@ export function WishlistProvider({ children }) {
     },
   });
 
-  const isWishlisted = (id) =>
-    wishlist.some((w) => (w._id || w.id)?.toString() === id?.toString());
+  const isWishlisted = useCallback(
+    (id) => wishlist.some((w) => (w._id || w.id)?.toString() === id?.toString()),
+    [wishlist],
+  );
 
-  const toggleWishlist = (productId) => toggleMutation.mutate(productId);
+  const toggleWishlist = useCallback((productId) => toggleMutation.mutate(productId), [toggleMutation]);
 
   const value = useMemo(
     () => ({
@@ -45,7 +46,7 @@ export function WishlistProvider({ children }) {
       isWishlisted,
       toggleWishlist,
     }),
-    [wishlist, isLoading, toggleMutation],
+    [wishlist, isLoading, isWishlisted, toggleWishlist],
   );
 
   return (

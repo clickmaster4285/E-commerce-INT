@@ -38,8 +38,7 @@ import {
 
 import { useSocket } from "@/hooks/useSocket";
 import { useQuery } from "@tanstack/react-query";
-import axiosInstance from "@/apis/axiosInstance";
-
+import adminHttp from "@/apis/axiosInstance"
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
@@ -490,7 +489,7 @@ export default function StoreInfoPage() {
   const { data: currentUserProfile } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await adminHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,

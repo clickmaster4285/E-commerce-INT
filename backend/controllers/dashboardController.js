@@ -3,6 +3,7 @@ const Product = require("../models/Product");
 const Brand = require("../models/brand");
 const Category = require("../models/Category");
 const Discount = require("../models/Discount");
+const log = require("../utils/logger");
 
 // ==========================================
 // RANGE CONFIG — 7d/30d grouped per day, 3m/6m/1y per month
@@ -106,23 +107,25 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---- Counts + weekly creation trends ----
+    const featuredProducts = await Product.countDocuments({ is_featured: true, is_deleted: { $ne: true } });
     const [products, brands, categories] = await Promise.all([
       Product.countDocuments({ is_deleted: { $ne: true } }),
       Brand.countDocuments({ is_deleted: { $ne: true } }),
       Category.countDocuments({ is_deleted: { $ne: true } }),
     ]);
 
-    const creationTrend = async (Model) => {
+    const creationTrend = async (Model, filter = {}) => {
       const [cur, prev] = await Promise.all([
-        Model.countDocuments({ created_at: { $gte: weekStart, $lte: end } }),
-        Model.countDocuments({ created_at: { $gte: prevWeekStart, $lt: weekStart } }),
+        Model.countDocuments({ created_at: { $gte: weekStart, $lte: end }, ...filter }),
+        Model.countDocuments({ created_at: { $gte: prevWeekStart, $lt: weekStart }, ...filter }),
       ]);
       return pctChange(cur, prev);
     };
-    const [productsTrend, brandsTrend, categoriesTrend] = await Promise.all([
+    const [productsTrend, brandsTrend, categoriesTrend, featuredProductsTrend] = await Promise.all([
       creationTrend(Product),
       creationTrend(Brand),
       creationTrend(Category),
+      creationTrend(Product, { is_featured: true }),
     ]);
 
     // ---- Sparklines — last 7 days ----
@@ -131,7 +134,7 @@ const getDashboardStats = async (req, res) => {
         { $match: { created_at: { $gte: weekStart } } },
         { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } }, n: { $sum: 1 } } },
       ]);
-    const [prodSpark, brandSpark, catSpark, revenueSparkRows] = await Promise.all([
+    const [prodSpark, brandSpark, catSpark, revenueSparkRows, featuredSparkRows] = await Promise.all([
       creationSpark(Product),
       creationSpark(Brand),
       creationSpark(Category),
@@ -139,12 +142,17 @@ const getDashboardStats = async (req, res) => {
         { $match: { created_at: { $gte: weekStart }, status: { $ne: "cancelled" } } },
         { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } }, revenue: { $sum: "$total" } } },
       ]),
+      Product.aggregate([
+        { $match: { featured_at: { $gte: weekStart } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$featured_at" } }, n: { $sum: 1 } } },
+      ]),
     ]);
     const toSpark = (rows) => {
       const map = new Map(rows.map((r) => [r._id, r.n]));
       return buildBuckets(weekStart, end, "day").map((b) => map.get(b.key) || 0);
     };
     const revenueSpark = toSpark(revenueSparkRows.map((r) => ({ _id: r._id, n: r.revenue })));
+    const featuredSpark = toSpark(featuredSparkRows);
 
     // ---- Item-level aggregation (top products + category distribution) ----
     const itemAgg = (match) =>
@@ -271,7 +279,7 @@ const getDashboardStats = async (req, res) => {
       success: true,
       data: {
         range: rangeKey,
-        counts: { products, brands, categories, productsTrend, brandsTrend, categoriesTrend },
+        counts: { products, brands, categories, productsTrend, brandsTrend, categoriesTrend, featuredProducts, featuredProductsTrend },
         revenue: { total: Math.round(curTotals.revenue), trend: pctChange(curTotals.revenue, prevTotals.revenue) },
         orders: { count: curTotals.orders, trend: pctChange(curTotals.orders, prevTotals.orders) },
         series,
@@ -280,6 +288,7 @@ const getDashboardStats = async (req, res) => {
           brands: toSpark(brandSpark),
           categories: toSpark(catSpark),
           revenue: revenueSpark,
+          featuredProducts: featuredSpark,
         },
         distribution,
         topProducts,
@@ -292,7 +301,7 @@ const getDashboardStats = async (req, res) => {
 
 
   } catch (error) {
-    console.error("❌ [getDashboardStats] Error:", error);
+    log.error("❌ [getDashboardStats] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

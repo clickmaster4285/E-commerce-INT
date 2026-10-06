@@ -44,7 +44,11 @@ const upload = multer({
 });
 
 // ✅ PUBLIC ROUTE — No auth required (for frontend store info)
-router.get("/public", getStoreInfo);
+// Master-data: short public cache (60s). Protected PUT/admin GET untouched.
+router.get("/public", (req, res, next) => {
+  res.set("Cache-Control", "public, max-age=60, must-revalidate");
+  next();
+}, getStoreInfo);
 
 // ✅ PROTECTED ROUTES — Admin only
 router.route("/")

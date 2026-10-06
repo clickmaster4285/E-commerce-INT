@@ -24,6 +24,7 @@ const Deal = require("../models/Deal");
 const Banner = require("../models/Banner");
 const Tag = require("../models/Tag");
 const Employee = require("../models/Employee");
+const log = require("../utils/logger");
 
 // ==========================================
 // UTILITY FUNCTIONS
@@ -380,7 +381,7 @@ const BANNER_PAGES = ["homepage", "category", "product", "cart", "checkout"];
 // ==========================================
 
 async function seedBrands() {
-  console.log("\n🏭 Seeding Brands...");
+  log.info("\n🏭 Seeding Brands...");
   const brands = [];
   const uniqueBrands = [...new Set(BRAND_NAMES)];
   
@@ -408,22 +409,22 @@ async function seedBrands() {
   // Batch insert for performance
   const existingCount = await Brand.countDocuments({ is_deleted: false });
   if (existingCount >= 1000) {
-    console.log(`   ⏭️  Skipping - ${existingCount} brands already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} brands already exist`);
     return await Brand.find({ is_deleted: false }).select("_id name brand_code").lean();
   }
   
   await Brand.deleteMany({});
   const result = await Brand.insertMany(brands, { ordered: false });
-  console.log(`   ✅ Created ${result.length} brands`);
+  log.info(`   ✅ Created ${result.length} brands`);
   return result;
 }
 
 async function seedCategories() {
-  console.log("\n📂 Seeding Categories...");
+  log.info("\n📂 Seeding Categories...");
   
   const existingCount = await Category.countDocuments({ is_deleted: false });
   if (existingCount >= 60) {
-    console.log(`   ⏭️  Skipping - ${existingCount} categories already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} categories already exist`);
     return await Category.find({ is_deleted: false }).select("_id name category_code parent_category_id").lean();
   }
   
@@ -458,12 +459,12 @@ async function seedCategories() {
   }
   
   const result = await Category.find({ is_deleted: false }).select("_id name category_code parent_category_id").lean();
-  console.log(`   ✅ Created ${result.length} categories`);
+  log.info(`   ✅ Created ${result.length} categories`);
   return result;
 }
 
 async function seedTags() {
-  console.log("\n🏷️  Seeding Tags...");
+  log.info("\n🏷️  Seeding Tags...");
   
   const tagNames = [
     "bestseller", "new arrival", "trending", "sale", "limited edition",
@@ -480,7 +481,7 @@ async function seedTags() {
   
   const existingCount = await Tag.countDocuments({ is_deleted: false });
   if (existingCount >= 40) {
-    console.log(`   ⏭️  Skipping - ${existingCount} tags already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} tags already exist`);
     return await Tag.find({ is_deleted: false }).select("_id name").lean();
   }
   
@@ -492,16 +493,16 @@ async function seedTags() {
   }));
   
   const result = await Tag.insertMany(tags);
-  console.log(`   ✅ Created ${result.length} tags`);
+  log.info(`   ✅ Created ${result.length} tags`);
   return result;
 }
 
 async function seedProducts(brands, categories, tags) {
-  console.log("\n📦 Seeding Products & Variants...");
+  log.info("\n📦 Seeding Products & Variants...");
   
   const existingProducts = await Product.countDocuments({ is_deleted: false });
   if (existingProducts >= 1000) {
-    console.log(`   ⏭️  Skipping - ${existingProducts} products already exist`);
+    log.info(`   ⏭️  Skipping - ${existingProducts} products already exist`);
     return await Product.find({ is_deleted: false }).select("_id").lean();
   }
   
@@ -611,10 +612,10 @@ async function seedProducts(brands, categories, tags) {
   
   // Insert products in batches
   const productDocs = await Product.insertMany(products, { ordered: false });
-  console.log(`   ✅ Created ${productDocs.length} products`);
+  log.info(`   ✅ Created ${productDocs.length} products`);
   
   // Create variants for each product
-  console.log("   🔄 Creating variants...");
+  log.info("   🔄 Creating variants...");
   let variantCount = 0;
   
   for (const product of productDocs) {
@@ -680,24 +681,24 @@ async function seedProducts(brands, categories, tags) {
     const result = await Variant.insertMany(batch, { ordered: false });
     insertedVariants += result.length;
   }
-  console.log(`   ✅ Created ${insertedVariants} variants`);
+  log.info(`   ✅ Created ${insertedVariants} variants`);
   
   return productDocs;
 }
 
 async function seedDiscounts(products, brands, categories, tags) {
-  console.log("\n💰 Seeding Discounts...");
+  log.info("\n💰 Seeding Discounts...");
   
   const existingCount = await Discount.countDocuments({ is_deleted: false });
   if (existingCount >= 1000) {
-    console.log(`   ⏭️  Skipping - ${existingCount} discounts already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} discounts already exist`);
     return;
   }
   
   // Get an employee for createdBy (required field)
   const employee = await Employee.findOne({});
   if (!employee) {
-    console.log("   ⚠️  No employee found - skipping discounts (createdBy is required)");
+    log.info("   ⚠️  No employee found - skipping discounts (createdBy is required)");
     return;
   }
   
@@ -780,15 +781,15 @@ async function seedDiscounts(products, brands, categories, tags) {
     const result = await Discount.insertMany(batch, { ordered: false });
     inserted += result.length;
   }
-  console.log(`   ✅ Created ${inserted} discounts`);
+  log.info(`   ✅ Created ${inserted} discounts`);
 }
 
 async function seedDeals(products, brands, categories) {
-  console.log("\n🎯 Seeding Deals...");
+  log.info("\n🎯 Seeding Deals...");
   
   const existingCount = await Deal.countDocuments({});
   if (existingCount >= 1000) {
-    console.log(`   ⏭️  Skipping - ${existingCount} deals already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} deals already exist`);
     return await Deal.find({}).select("_id").lean();
   }
   
@@ -880,16 +881,16 @@ async function seedDeals(products, brands, categories) {
     const result = await Deal.insertMany(batch, { ordered: false });
     inserted += result.length;
   }
-  console.log(`   ✅ Created ${inserted} deals`);
+  log.info(`   ✅ Created ${inserted} deals`);
   return deals;
 }
 
 async function seedBanners(products, categories, brands, deals) {
-  console.log("\n🖼️  Seeding Banners...");
+  log.info("\n🖼️  Seeding Banners...");
   
   const existingCount = await Banner.countDocuments({});
   if (existingCount >= 1000) {
-    console.log(`   ⏭️  Skipping - ${existingCount} banners already exist`);
+    log.info(`   ⏭️  Skipping - ${existingCount} banners already exist`);
     return;
   }
   
@@ -973,7 +974,7 @@ async function seedBanners(products, categories, brands, deals) {
     const result = await Banner.insertMany(batch, { ordered: false });
     inserted += result.length;
   }
-  console.log(`   ✅ Created ${inserted} banners`);
+  log.info(`   ✅ Created ${inserted} banners`);
 }
 
 // ==========================================
@@ -981,11 +982,11 @@ async function seedBanners(products, categories, brands, deals) {
 // ==========================================
 
 async function seedAllData() {
-  console.log("╔══════════════════════════════════════════╗");
-  console.log("║   COMPREHENSIVE E-COMMERCE DATA SEED    ║");
-  console.log("║   1000+ Brands, Products, Discounts     ║");
-  console.log("║   Deals, Banners & More                 ║");
-  console.log("╚══════════════════════════════════════════╝");
+  log.info("╔══════════════════════════════════════════╗");
+  log.info("║   COMPREHENSIVE E-COMMERCE DATA SEED    ║");
+  log.info("║   1000+ Brands, Products, Discounts     ║");
+  log.info("║   Deals, Banners & More                 ║");
+  log.info("╚══════════════════════════════════════════╝");
   
   try {
     // 1. Seed Brands
@@ -1021,22 +1022,22 @@ async function seedAllData() {
       tags: await Tag.countDocuments({ is_deleted: false }),
     };
     
-    console.log("\n╔══════════════════════════════════════════╗");
-    console.log("║           SEED COMPLETE SUMMARY          ║");
-    console.log("╠══════════════════════════════════════════╣");
-    console.log(`║  🏭 Brands:      ${String(counts.brands).padStart(6)}               ║`);
-    console.log(`║  📂 Categories:  ${String(counts.categories).padStart(6)}               ║`);
-    console.log(`║  📦 Products:    ${String(counts.products).padStart(6)}               ║`);
-    console.log(`║  🔀 Variants:    ${String(counts.variants).padStart(6)}               ║`);
-    console.log(`║  🏷️  Tags:        ${String(counts.tags).padStart(6)}               ║`);
-    console.log(`║  💰 Discounts:   ${String(counts.discounts).padStart(6)}               ║`);
-    console.log(`║  🎯 Deals:       ${String(counts.deals).padStart(6)}               ║`);
-    console.log(`║  🖼️  Banners:     ${String(counts.banners).padStart(6)}               ║`);
-    console.log("╚══════════════════════════════════════════╝");
+    log.info("\n╔══════════════════════════════════════════╗");
+    log.info("║           SEED COMPLETE SUMMARY          ║");
+    log.info("╠══════════════════════════════════════════╣");
+    log.info(`║  🏭 Brands:      ${String(counts.brands).padStart(6)}               ║`);
+    log.info(`║  📂 Categories:  ${String(counts.categories).padStart(6)}               ║`);
+    log.info(`║  📦 Products:    ${String(counts.products).padStart(6)}               ║`);
+    log.info(`║  🔀 Variants:    ${String(counts.variants).padStart(6)}               ║`);
+    log.info(`║  🏷️  Tags:        ${String(counts.tags).padStart(6)}               ║`);
+    log.info(`║  💰 Discounts:   ${String(counts.discounts).padStart(6)}               ║`);
+    log.info(`║  🎯 Deals:       ${String(counts.deals).padStart(6)}               ║`);
+    log.info(`║  🖼️  Banners:     ${String(counts.banners).padStart(6)}               ║`);
+    log.info("╚══════════════════════════════════════════╝");
     
     return counts;
   } catch (error) {
-    console.error("\n❌ Seed Error:", error);
+    log.error("\n❌ Seed Error:", error);
     throw error;
   }
 }
@@ -1048,16 +1049,16 @@ async function seedAllData() {
 if (require.main === module) {
   mongoose.connect(process.env.MONGO_URI)
     .then(() => {
-      console.log("✅ Connected to MongoDB");
+      log.info("✅ Connected to MongoDB");
       return seedAllData();
     })
     .then(() => {
-      console.log("\n🎉 All seed data created successfully!");
+      log.info("\n🎉 All seed data created successfully!");
       mongoose.disconnect();
       process.exit(0);
     })
     .catch((err) => {
-      console.error("\n❌ Fatal Error:", err.message);
+      log.error("\n❌ Fatal Error:", err.message);
       mongoose.disconnect();
       process.exit(1);
     });

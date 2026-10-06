@@ -1,5 +1,6 @@
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
+const log = require("../utils/logger");
 
 // ==========================================
 // 🚦 DYNAMIC RATE LIMITING (.env based)
@@ -36,16 +37,20 @@ const getStore = () => {
         maxRetriesPerRequest: 2,
         enableReadyCheck: true,
       });
+      // Redis errors repeat ho sakte hain — terminal spam na ho, sirf pehli baar
+      let redisErrorLogged = false;
       client.on("error", (err) => {
-        console.error("❌ [rateLimit] Redis error:", err.message);
+        if (redisErrorLogged) return;
+        redisErrorLogged = true;
+        log.error("❌ [rateLimit] Redis error:", err.message);
       });
       sharedStore = new RedisStore({
         // ✅ ioredis client ke liye sendCommand adapter
         sendCommand: (...args) => client.call(...args),
       });
-      console.log("✅ [rateLimit] Redis store enabled");
+      log.info("✅ [rateLimit] Redis store enabled");
     } catch (error) {
-      console.error(
+      log.error(
         "⚠️ [rateLimit] REDIS_URL set hai lekin redis store load nahi hua — memory store use hoga:",
         error.message,
       );

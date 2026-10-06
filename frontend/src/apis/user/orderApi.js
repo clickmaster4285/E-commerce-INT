@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import { userHttp } from "../axiosInstance";
 const paginated = (res, fallbackLimit) => {
   const d = res.data;
   if (Array.isArray(d)) {
@@ -19,13 +18,13 @@ const paginated = (res, fallbackLimit) => {
 };
 
 export const orderApi = {
-  place: (data) => axiosInstance.post("/orders", data).then((res) => res.data?.data),
+  place: (data) => userHttp.post("/orders", data).then((res) => res.data?.data),
 
-  myOrders: () => axiosInstance.get("/orders/my").then((res) => res.data?.data || []),
+  myOrders: () => userHttp.get("/orders/my").then((res) => res.data?.data || []),
 
   // ✅ NEW — server-side paginated list with filters
   getMyOrdersPaginated: ({ page = 1, limit = 10, status = "all", search = "", sort = "newest", timeRange = "all" } = {}) =>
-    axiosInstance
+    userHttp
       .get("/orders/my", {
         params: {
           page,
@@ -38,5 +37,5 @@ export const orderApi = {
       })
       .then((res) => paginated(res, limit)),
 
-  getById: (id) => axiosInstance.get(`/orders/${id}`).then((res) => res.data?.data),
+  getById: (id) => userHttp.get(`/orders/${id}`).then((res) => res.data?.data),
 };

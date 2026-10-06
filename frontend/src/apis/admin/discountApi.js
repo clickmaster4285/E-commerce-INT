@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance"; // ✅ Curly braces {} ke baghair (Default Import)
-
+import adminHttp from "../axiosInstance"; // ✅ Curly braces {} ke baghair (Default Import)
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
   if (Array.isArray(d)) {
@@ -22,7 +21,7 @@ export const discountApi = {
   getAll: async () => {
     try {
       // Backend route: GET /discounts
-      const response = await axiosInstance.get("/discounts");
+      const response = await adminHttp.get("/discounts");
       return response.data;
     } catch (error) {
       console.error("❌ Error fetching discounts:", error);
@@ -34,14 +33,14 @@ export const discountApi = {
     const params = { page, limit };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
-    return axiosInstance.get("/discounts", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/discounts", { params }).then((res) => paginated(res, limit));
   },
 
   // ✅ GET SINGLE DISCOUNT
   getById: async (id) => {
     try {
       if (!id) throw new Error("Discount ID is required");
-      const response = await axiosInstance.get(`/discounts/${id}`);
+      const response = await adminHttp.get(`/discounts/${id}`);
       return response.data;
     } catch (error) {
       console.error(`❌ Error fetching discount ${id}:`, error);
@@ -52,7 +51,7 @@ export const discountApi = {
   // ✅ CREATE DISCOUNT
   create: async (data) => {
     try {
-      const response = await axiosInstance.post("/discounts", data);
+      const response = await adminHttp.post("/discounts", data);
       return response.data;
     } catch (error) {
       console.error("❌ Error creating discount:", error);
@@ -64,7 +63,7 @@ export const discountApi = {
   update: async (id, data) => {
     try {
       if (!id) throw new Error("Discount ID is required");
-      const response = await axiosInstance.put(`/discounts/${id}`, data);
+      const response = await adminHttp.put(`/discounts/${id}`, data);
       return response.data;
     } catch (error) {
       console.error(`❌ Error updating discount ${id}:`, error);
@@ -76,7 +75,7 @@ export const discountApi = {
   delete: async (id) => {
     try {
       if (!id) throw new Error("Discount ID is required");
-      const response = await axiosInstance.delete(`/discounts/${id}`);
+      const response = await adminHttp.delete(`/discounts/${id}`);
       return response.data;
     } catch (error) {
       console.error(`❌ Error deleting discount ${id}:`, error);
@@ -87,7 +86,7 @@ export const discountApi = {
   // ✅ PUBLIC DISCOUNTS
   getPublic: async () => {
     try {
-      const response = await axiosInstance.get("/discounts/public");
+      const response = await adminHttp.get("/discounts/public");
       return response.data;
     } catch (error) {
       console.error("❌ Error fetching public discounts:", error);

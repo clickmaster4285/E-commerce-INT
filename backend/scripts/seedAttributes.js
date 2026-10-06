@@ -1,5 +1,6 @@
 // backend/scripts/seedAttributes.js
 const Attribute = require("../models/Attribute");
+const log = require("../utils/logger");
 
 const toValues = (arr) =>
   arr.map((v, i) => ({ label: v, value: v, sort_order: i, is_active: true }));
@@ -232,7 +233,7 @@ async function seedAttributes() {
       `\n🎉 Done! Created: ${created}, Updated: ${updated}, Legacy deactivated: ${legacy.modifiedCount}\n`
     );
   } catch (error) {
-    console.error("❌ Error in attribute seeding:", error.message);
+    log.error("❌ Error in attribute seeding:", error.message);
     throw error;
   }
 }
@@ -244,7 +245,7 @@ if (require.main === module) {
   mongoose
     .connect(process.env.MONGO_URI)
     .then(() => {
-      console.log("✅ DB Connected for standalone seeding");
+      log.info("✅ DB Connected for standalone seeding");
       return seedAttributes();
     })
     .catch(() => (process.exitCode = 1))

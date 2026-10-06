@@ -1,8 +1,7 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../axiosInstance";
 export const dashboardApi = {
   getStats: (range) =>
-    axiosInstance
+    adminHttp
       .get("/dashboard/stats", { params: { range } })
       .then((res) => res.data?.data || res.data),
 };

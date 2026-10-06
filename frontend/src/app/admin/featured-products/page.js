@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
+import { useProductSocketSync } from "@/hooks/useProductSocketSync";
 
 const PER_PAGE = 20;
 const MODAL_PER_PAGE = 8;
@@ -673,6 +674,9 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
 export default function FeaturedProductsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  // ✅ Baqi pages (Products waghera) ki tarah live socket sync —
+  //    dusre staff/tab ki featured changes bina refresh ke nazar aayein
+  useProductSocketSync();
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState("list");

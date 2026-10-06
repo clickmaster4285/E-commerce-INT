@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const log = require("../utils/logger");
 
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
@@ -42,7 +43,7 @@ const emitSocketEvent = (event, data) => {
       io.emit(event, data);
     }
   } catch (error) {
-    console.warn("⚠️ Socket emit failed:", error.message);
+    log.warn("⚠️ Socket emit failed:", error.message);
   }
 };
 
@@ -956,7 +957,7 @@ const getProducts = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(" [getProducts] Error:", error);
+    log.error(" [getProducts] Error:", error);
     return res.status(500).json({ message: error.message || "Failed to fetch products" });
   }
 };
@@ -973,7 +974,7 @@ const getProductStats = async (req, res) => {
     const stats = await computeProductStats(filter);
     return res.status(200).json({ success: true, stats });
   } catch (error) {
-    console.error("❌ [getProductStats] Error:", error);
+    log.error("❌ [getProductStats] Error:", error);
     return res.status(500).json({ message: error.message || "Failed to fetch product stats" });
   }
 };
@@ -1123,7 +1124,7 @@ const getProductFacets = async (req, res) => {
       deals,
     });
   } catch (error) {
-    console.error("❌ [getProductFacets] Error:", error);
+    log.error("❌ [getProductFacets] Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch facets" });
   }
 };
@@ -1234,7 +1235,7 @@ const getCategoryTiles = async (req, res) => {
 
     return res.status(200).json({ success: true, data: tiles });
   } catch (error) {
-    console.error("❌ [getCategoryTiles] Error:", error);
+    log.error("❌ [getCategoryTiles] Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch category tiles" });
   }
 };
@@ -1311,7 +1312,7 @@ const getProductById = async (req, res) => {
         }
       }
     } catch (healErr) {
-      console.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
+      log.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
     }
 
     // ⭐ Rating summary — for the stars + count on the detail page (reviews come from a separate endpoint)
@@ -1334,7 +1335,7 @@ const getProductById = async (req, res) => {
       ratingSummary.count = ratings.length;
       ratingSummary.avg = ratings.length ? Math.round((sum / ratings.length) * 10) / 10 : 0;
     } catch (summaryErr) {
-      console.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+      log.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
     }
 
     return res.status(200).json({
@@ -1343,7 +1344,7 @@ const getProductById = async (req, res) => {
       ratingSummary,
     });
   } catch (error) {
-    console.error("❌ [getProductById] Error:", error);
+    log.error("❌ [getProductById] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to fetch product",
     });
@@ -1530,7 +1531,7 @@ const createProduct = async (req, res) => {
       variants: createdVariants,
     });
   } catch (error) {
-    console.error("❌ [createProduct] Error:", error);
+    log.error("❌ [createProduct] Error:", error);
 
     if (createdProduct) {
       await Variant.deleteMany({ product_id: createdProduct._id }).catch(() => {});
@@ -1936,7 +1937,7 @@ const updateProduct = async (req, res) => {
       variants: updatedVariants,
     });
   } catch (error) {
-    console.error("❌ [updateProduct] Error:", error);
+    log.error("❌ [updateProduct] Error:", error);
     return res.status(400).json({
       message: error.message || "Failed to update product",
     });
@@ -2000,7 +2001,7 @@ const deleteProduct = async (req, res) => {
 
     return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
-    console.error("❌ [deleteProduct] Error:", error);
+    log.error("❌ [deleteProduct] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to delete product",
     });
@@ -2084,7 +2085,7 @@ const toggleProductStatus = async (req, res) => {
           performerId
         );
       } catch (activityErr) {
-        console.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
+        log.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
       }
 
       try {
@@ -2108,11 +2109,11 @@ const toggleProductStatus = async (req, res) => {
           updated_at: populatedProduct?.updated_at,
         });
       } catch (socketErr) {
-        console.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
+        log.error("⚠️ [toggleProductStatus] socket broadcast failed:", socketErr?.message || socketErr);
       }
     });
   } catch (error) {
-    console.error("❌ [toggleProductStatus] Error:", error);
+    log.error("❌ [toggleProductStatus] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to update product status",
     });
@@ -2193,8 +2194,50 @@ const toggleProductFeatured = async (req, res) => {
         : "Product removed from featured",
       product,
     });
+
+    // ---- Background task (await nahi hota → request latency par asar nahi) ----
+    // ✅ Baqi product actions (status toggle waghera) ki tarah socket + activity,
+    //    taake Featured Products page dusre tabs/staff ke liye live sync ho.
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const io = req.io || getIO();
+    const productId = product._id;
+    const productName = product.name;
+    const nextFeatured = product.is_featured === true;
+
+    setImmediate(async () => {
+      try {
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${performerName} ${nextFeatured ? "marked" : "removed"} product "${productName}" ${nextFeatured ? "as featured" : "from featured"}`,
+            category: "Product Management",
+            performedBy: performerId,
+            performedByName: performerName,
+            details: { productId, is_featured: nextFeatured },
+          },
+          performerId
+        );
+      } catch (activityErr) {
+        log.error("⚠️ [toggleProductFeatured] activity log failed:", activityErr?.message || activityErr);
+      }
+
+      try {
+        emitSocketEvent("productUpdated", {
+          _id: productId,
+          name: productName,
+          is_featured: nextFeatured,
+          // ✅ featuredOnly: sirf featured flag badla hai → listeners full refetch
+          //    ke bajaye apni featured lists refresh kar sakte hain
+          featuredOnly: true,
+          updated_at: product.updated_at,
+        });
+      } catch (socketErr) {
+        log.error("⚠️ [toggleProductFeatured] socket broadcast failed:", socketErr?.message || socketErr);
+      }
+    });
   } catch (error) {
-    console.error("❌ [toggleProductFeatured] Error:", error);
+    log.error("❌ [toggleProductFeatured] Error:", error);
     return res.status(500).json({
       message: error.message || "Failed to update featured status",
     });
@@ -2254,7 +2297,7 @@ const bulkProductFeatured = async (req, res) => {
         );
       }
 
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
         message:
           activeIds.length === ids.length
@@ -2263,6 +2306,28 @@ const bulkProductFeatured = async (req, res) => {
         modified: activeIds.length,
         skipped: ids.length - activeIds.length,
       });
+
+      // ✅ Socket + activity (baqi product actions ki tarah) — fire & forget
+      setImmediate(async () => {
+        try {
+          const io = req.io || getIO();
+          await pushGlobalActivity(
+            io,
+            {
+              action: `${req.user?.name || "Admin"} marked ${activeIds.length} product${activeIds.length === 1 ? "" : "s"} as featured`,
+              category: "Product Management",
+              performedBy: actor,
+              performedByName: req.user?.name || "Admin",
+              details: { ids: activeIds, is_featured: true },
+            },
+            actor
+          );
+          emitSocketEvent("productUpdated", { ids: activeIds, is_featured: true, bulk: true });
+        } catch (e) {
+          log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
+        }
+      });
+      return;
     }
 
     // Unfeature — hamesha allowed (status se koi farq nahi)
@@ -2271,12 +2336,34 @@ const bulkProductFeatured = async (req, res) => {
       { $set: { is_featured: false, featured_at: null, updatedby: actor, updated_at: now } },
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: `${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} removed from featured`,
       modified: result.modifiedCount || 0,
       skipped: 0,
     });
+
+    // ✅ Socket + activity (baqi product actions ki tarah) — fire & forget
+    setImmediate(async () => {
+      try {
+        const io = req.io || getIO();
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${req.user?.name || "Admin"} removed ${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} from featured`,
+            category: "Product Management",
+            performedBy: actor,
+            performedByName: req.user?.name || "Admin",
+            details: { ids, is_featured: false },
+          },
+          actor
+        );
+        emitSocketEvent("productUpdated", { ids, is_featured: false, bulk: true });
+      } catch (e) {
+        log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
+      }
+    });
+    return;
   } catch (error) {
     console.error("❌ [bulkProductFeatured] Error:", error);
     return res.status(500).json({

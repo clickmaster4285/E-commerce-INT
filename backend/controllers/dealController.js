@@ -1,4 +1,5 @@
 const Deal = require("../models/Deal");
+const log = require("../utils/logger");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
@@ -155,7 +156,7 @@ const createDeal = async (req, res) => {
       data: deal,
     });
   } catch (error) {
-    console.error("Create Deal Error:", error);
+    log.error("Create Deal Error:", error);
 
     res.status(500).json({
       success: false,
@@ -295,7 +296,7 @@ const getDeals = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get Deals Error:", error);
+    log.error("Get Deals Error:", error);
 
     res.status(500).json({
       success: false,
@@ -335,7 +336,7 @@ const getDealById = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.error("Get Deal By ID Error:", error);
+    log.error("Get Deal By ID Error:", error);
 
     res.status(500).json({
       success: false,
@@ -393,7 +394,7 @@ const updateDeal = async (req, res) => {
       data: dealPayload,
     });
   } catch (error) {
-    console.error("Update Deal Error:", error);
+    log.error("Update Deal Error:", error);
 
     res.status(500).json({
       success: false,
@@ -429,7 +430,7 @@ const deleteDeal = async (req, res) => {
       message: "Deal deleted successfully",
     });
   } catch (error) {
-    console.error("Delete Deal Error:", error);
+    log.error("Delete Deal Error:", error);
 
     res.status(500).json({
       success: false,
@@ -476,7 +477,7 @@ const toggleDealStatus = async (req, res) => {
       data: deal,
     });
   } catch (error) {
-    console.error("Toggle Deal Status Error:", error);
+    log.error("Toggle Deal Status Error:", error);
 
     res.status(500).json({
       success: false,
@@ -502,7 +503,24 @@ const getActiveDeals = async (req, res) => {
     };
 
     // ---- LEGACY MODE (no limit) → exact old behavior ----
+    // ✅ slim=1 (opt-in, home storefront): sirf wahi fields jo user GUI
+    // padhta hai (name/type/pricing/matching/cover/bundleRule). Bina slim
+    // ke response bilkul purana — koi caller nahi toot ta.
     if (!limit) {
+      if (req.query.slim === "1") {
+        const deals = await Deal.find(query)
+          .select(
+            "_id name description type applyTo productIds categoryIds brandIds discountValue buyQuantity getQuantity minQuantity bundleRule image startDate endDate isActive isFeatured createdAt",
+          )
+          .populate("productIds", "_id images.img_url")
+          .populate("categoryIds", "_id")
+          .populate("brandIds", "_id")
+          .populate("bundleRule.freeProduct", "_id name images.img_url")
+          .sort({ priority: -1, createdAt: -1 })
+          .lean();
+
+        return res.status(200).json({ success: true, data: deals });
+      }
       const deals = await Deal.find(query)
         .populate("productIds", "name sku images selling_price variants")
         .populate("categoryIds", "name code")
@@ -545,7 +563,7 @@ const getActiveDeals = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get Active Deals Error:", error);
+    log.error("Get Active Deals Error:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch active deals",
@@ -563,7 +581,7 @@ const getActiveDealById = async (req, res) => {
     const Product = require("../models/Product");
     const Variant = require("../models/Variant");
 
-    console.log("🔍 Fetching deal with ID:", id);
+    log.debug("🔍 Fetching deal with ID:", id);
 
     const deal = await Deal.findById(id)
       .populate("productIds", "name sku images selling_price variants brand_id category_id price discount")
@@ -572,11 +590,11 @@ const getActiveDealById = async (req, res) => {
       .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS);
 
     if (!deal) {
-      console.log("❌ Deal not found in database");
+      log.debug("❌ Deal not found in database");
       return res.status(404).json({ success: false, message: "Deal not found" });
     }
 
-    console.log("✅ Deal found:", deal.name, "| applyTo:", deal.applyTo);
+    log.debug("✅ Deal found:", deal.name, "| applyTo:", deal.applyTo);
 
     let productsQuery = { is_deleted: { $ne: true }, status: "active" };
 
@@ -634,7 +652,7 @@ const getActiveDealById = async (req, res) => {
       };
     };
 
-    console.log("📦 Products found:", productsToShow.length, "out of total", totalProducts);
+    log.debug("📦 Products found:", productsToShow.length, "out of total", totalProducts);
 
     const dealObj = deal.toObject();
     dealObj.productIds = (dealObj.productIds || []).map(withVariants);
@@ -646,7 +664,7 @@ const getActiveDealById = async (req, res) => {
 
     res.status(200).json({ success: true, data: dealObj });
   } catch (error) {
-    console.error("❌ Get Active Deal By ID Error:", error);
+    log.error("❌ Get Active Deal By ID Error:", error);
     res.status(500).json({ success: false, message: error.message || "Failed to fetch deal" });
   }
 };
@@ -672,7 +690,7 @@ const uploadDealImage = async (req, res) => {
       data: { url },
     });
   } catch (error) {
-    console.error("Upload Deal Image Error:", error);
+    log.error("Upload Deal Image Error:", error);
 
     res.status(500).json({
       success: false,

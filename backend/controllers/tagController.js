@@ -2,6 +2,7 @@ const Tag = require("../models/Tag");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const mongoose = require("mongoose");
+const log = require("../utils/logger");
 
 // Helper to resolve user/employee info
 const resolveCreator = async (userId) => {
@@ -50,7 +51,7 @@ const getAllTags = async (req, res) => {
 
     return res.status(200).json(resolvedTags);
   } catch (error) {
-    console.error("❌ [getAllTags] Error:", error);
+    log.error("❌ [getAllTags] Error:", error);
     return res.status(500).json({ message: "Failed to fetch tags" });
   }
 };
@@ -93,7 +94,7 @@ const createTag = async (req, res) => {
     const populatedTag = { ...tagDoc, createdby: createdbyInfo, updatedby: updatedbyInfo };
     return res.status(201).json(populatedTag);
   } catch (error) {
-    console.error("❌ [createTag] Error:", error);
+    log.error("❌ [createTag] Error:", error);
     // Handle duplicate key error specifically if it slips through
     if (error.code === 11000) {
       return res.status(409).json({ message: "Tag already exists (Duplicate Slug)" });
@@ -160,7 +161,7 @@ const updateTag = async (req, res) => {
     const populatedTag = { ...tagDoc, createdby: createdbyInfo, updatedby: updatedbyInfo };
     return res.status(200).json(populatedTag);
   } catch (error) {
-    console.error("❌ [updateTag] Error:", error);
+    log.error("❌ [updateTag] Error:", error);
     if (error.code === 11000) {
       return res.status(409).json({ message: "Duplicate slug detected" });
     }
@@ -189,7 +190,7 @@ const deleteTag = async (req, res) => {
 
     return res.status(200).json({ message: "Tag deleted successfully" });
   } catch (error) {
-    console.error("❌ [deleteTag] Error:", error);
+    log.error("❌ [deleteTag] Error:", error);
     return res.status(500).json({ message: "Failed to delete tag" });
   }
 };

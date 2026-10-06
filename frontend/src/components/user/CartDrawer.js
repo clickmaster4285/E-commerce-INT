@@ -583,6 +583,14 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
   function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
     const { applyDealToItem } = useCart();
+    const { getActiveDealsForProduct } = useDiscounts();
+    // ✅ Deal button sirf tab dikhao jab is product ke liye koi active deal ho —
+    // warna bina-deal product par bhi "Deals" button aata tha.
+    const hasAvailableDeals = (getActiveDealsForProduct?.({
+      _id: row.raw?.productId || row.raw?.id,
+      category_id: row.raw?.categoryId || row.raw?.category_id || null,
+      brand_id: row.raw?.brandId || row.raw?.brand_id || null,
+    }) || []).length > 0;
     return (
       <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${openDealPicker ? "min-h-[15rem] border-purple-500/40" : ""} ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
         {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
@@ -687,7 +695,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
             </div>
           </div>
 
-          {/* ✅ DEALS BUTTON — bottom-left of card */}
+          {/* ✅ DEALS BUTTON — sirf jab is product par koi active deal ho */}
+          {hasAvailableDeals && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
@@ -697,13 +706,16 @@ import { shippingApi } from "@/apis/user/shippingApi";
             <BadgePercent size={10} />
             <span>Deals</span>
           </button>
+          )}
 
+          {hasAvailableDeals && (
           <DealInfoDropdown
             cartItem={row.raw}
             onApplyDeal={(deal) => applyDealToItem(row.key, deal)}
             open={openDealPicker}
             onClose={onCloseDealPicker}
           />
+          )}
         </div>
       </li>
     );

@@ -614,7 +614,7 @@ html.dark .select-field {
   margin-bottom: 16px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -661,8 +661,8 @@ html.dark .select-field {
   align-items: center;
   gap: 10px;
   font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   color: var(--text-primary);
 }
@@ -707,7 +707,7 @@ html.dark .select-field {
   padding: 11px 16px;
   text-align: left;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -837,7 +837,7 @@ html.dark .select-field {
 
 .modal-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
@@ -951,6 +951,37 @@ html.dark .select-field {
   text-decoration: underline;
 }
 
+.custom-scrollbar {
+  scrollbar-width: thin;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.28);
+  border-radius: 999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ============================================================
    ANIMATIONS
    ============================================================ */
@@ -976,6 +1007,43 @@ html.dark .select-field {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ============================================================
+   ADMIN TYPOGRAPHY NORMALIZATION — professional weights
+   No 700/800/900 (bold) weight anywhere in admin — 600 max.
+   Tailwind font-bold / extrabold / black + <strong>/<b> all map
+   to semibold (600) so hierarchy is preserved without a heavy,
+   over-bold look. Body text at 400/500 is untouched.
+   ============================================================ */
+.admin-panel .font-black,
+.admin-panel .font-extrabold,
+.admin-panel .font-bold {
+  font-weight: 600 !important;
+}
+
+.admin-panel strong,
+.admin-panel b {
+  font-weight: 600 !important;
+}
+
+.admin-panel h1,
+.admin-panel h2 {
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+
+.admin-panel h3,
+.admin-panel h4 {
+  font-weight: 600 !important;
 }
 
 /* ============================================================

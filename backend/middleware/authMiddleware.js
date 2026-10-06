@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const log = require("../utils/logger");
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -48,17 +49,17 @@ const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error(" Auth Middleware Error:", error.message);
-    }
-
     if (error.name === "TokenExpiredError") {
+      // Expected event (silent refresh flow) — terminal noise nahi
+      log.debug("Auth token expired (expected, silent refresh)");
       return res.status(401).json({ success: false, message: "Token expired. Please login again." });
     }
     if (error.name === "JsonWebTokenError") {
+      log.warn("Auth invalid token:", error.message);
       return res.status(401).json({ success: false, message: "Invalid token" });
     }
 
+    log.error("Auth Middleware Error:", error.message);
     return res.status(500).json({ success: false, message: "Authentication failed" });
   }
 };

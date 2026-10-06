@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
-import axiosInstance from "@/apis/axiosInstance";
+import { userHttp } from "@/apis/axiosInstance";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
@@ -151,10 +153,13 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
                 >
                   {img ? (
-                    <img
+                    <Image
                       src={getImageUrl(img)}
                       alt={p.name}
-                      className="w-10 h-10 rounded-lg object-cover border border-[var(--user-border)] shrink-0"
+                      width={40}
+                      height={40}
+                      loader={smartImageLoader}
+                      className="rounded-lg object-cover border border-[var(--user-border)] shrink-0"
                     />
                   ) : (
                     <div className="w-10 h-10 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
@@ -302,7 +307,7 @@ export default function Header() {
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const res = await axiosInstance.get("/users/profile");
+      const res = await userHttp.get("/users/profile");
       return res.data?.user || res.data;
     },
     retry: false,
@@ -390,7 +395,7 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      await axiosInstance.post("/users/logout");
+      await userHttp.post("/users/logout");
     } catch {}
     queryClient.removeQueries({ queryKey: ["userProfile"] });
     setProfileOpen(false);
@@ -811,11 +816,14 @@ export default function Header() {
                     style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                   >
                     {logoUrl ? (
-                      <span className="w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
-                        <img
+                      <span className="relative w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                        <Image
                           src={logoUrl}
                           alt={brand.name}
-                          className="w-full h-full object-contain"
+                          fill
+                          loader={smartImageLoader}
+                          sizes="40px"
+                          className="object-contain"
                         />
                       </span>
                     ) : (

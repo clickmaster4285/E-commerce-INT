@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import { userHttp } from "../axiosInstance";
 const list = (res) => {
   const d = res.data;
   if (Array.isArray(d)) return d;
@@ -10,9 +9,9 @@ const list = (res) => {
 
 export const categoryApi = {
   // ✅ PUBLIC — naye /public endpoint pe (bina login)
-  getAll: () => axiosInstance.get("/categories/public").then(list),
+  getAll: () => userHttp.get("/categories/public").then(list),
 
   // Admin-only — abhi bhi auth ke saath
   getById: (id) =>
-    axiosInstance.get(`/categories/${id}`).then((res) => res.data?.data || res.data),
+    userHttp.get(`/categories/${id}`).then((res) => res.data?.data || res.data),
 };

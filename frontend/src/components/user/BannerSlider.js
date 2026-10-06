@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { bannerApi } from "@/apis/user/bannerApi";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -26,10 +28,12 @@ const MAX_SLIDES = 12;
    (LCP par bara asar aur bandwidth waste). */
 const MOUNT_AHEAD = 2;
 
-export default function BannerSlider() {
+export default function BannerSlider({ initialBanners = null }) {
   const { data: banners = [], isLoading } = useQuery({
     queryKey: ["activeBanners"],
     queryFn: bannerApi.getActive,
+    // ✅ SSR initialData (R1): key/fn/polling same; server fail → client fetch
+    initialData: initialBanners ?? undefined,
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });
@@ -126,12 +130,14 @@ export default function BannerSlider() {
             >
               {/* Background — sirf paas ke slides ki image DOM me aati hai */}
               {imgUrl && mountImage ? (
-                <img
+                <Image
                   src={imgUrl}
                   alt={banner.altText || banner.title || banner.heading || "Banner"}
-                  className={`w-full h-full object-cover ${isActive ? "animate-[kenBurns_8s_ease-out_forwards]" : ""}`}
-                  loading={i === 0 ? "eager" : "lazy"}
-                  fetchPriority={i === 0 ? "high" : "auto"}
+                  fill
+                  loader={smartImageLoader}
+                  sizes="100vw"
+                  priority={i === 0}
+                  className={`object-cover ${isActive ? "animate-[kenBurns_8s_ease-out_forwards]" : ""}`}
                 />
               ) : imgUrl ? (
                 <div className="w-full h-full bg-[var(--user-bg-card)]" />

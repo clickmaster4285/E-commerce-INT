@@ -8,6 +8,21 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 
 // ==========================================
+// 🔌 SOCKET HELPER (baqi controllers ki tarah)
+// Admin review actions (hide/unhide, response) sab connected
+// admin panels par live sync hote hain.
+// ==========================================
+const emitSocketEvent = (event, data) => {
+  try {
+    const { getIO } = require("../utils/socket");
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (error) {
+    console.error("⚠️ Review socket emit failed:", error.message);
+  }
+};
+
+// ==========================================
 // ⭐ PRODUCT REVIEWS (delivered orders only)
 // ==========================================
 
@@ -138,7 +153,7 @@ const getProductReviews = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ [getProductReviews] Error:", error.message);
+    log.error("❌ [getProductReviews] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to fetch reviews" });
   }
 };
@@ -253,7 +268,7 @@ const createReview = async (req, res) => {
         message: "You have already reviewed this product — you can edit your review",
       });
     }
-    console.error("❌ [createReview] Error:", error.message);
+    log.error("❌ [createReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to add review" });
   }
 };
@@ -319,7 +334,7 @@ const updateReview = async (req, res) => {
       .lean();
     return res.status(200).json({ success: true, message: "Review updated", review: populated });
   } catch (error) {
-    console.error("❌ [updateReview] Error:", error.message);
+    log.error("❌ [updateReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update review" });
   }
 };
@@ -339,7 +354,7 @@ const deleteReviewMediaFiles = async (review) => {
       const filePath = path.join(process.cwd(), clean);
       if (await fs.pathExists(filePath)) await fs.remove(filePath);
     } catch (err) {
-      console.error("Review media delete error:", err.message);
+      log.error("Review media delete error:", err.message);
     }
   }
 };
@@ -368,7 +383,7 @@ const deleteReview = async (req, res) => {
     await deleteReviewMediaFiles(review);
     return res.status(200).json({ success: true, message: "Review deleted" });
   } catch (error) {
-    console.error("❌ [deleteReview] Error:", error.message);
+    log.error("❌ [deleteReview] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to delete review" });
   }
 };
@@ -392,9 +407,15 @@ const setReviewStatus = async (req, res) => {
     }
     review.status = status;
     await review.save();
+    emitSocketEvent("reviewUpdated", {
+      _id: review._id,
+      product_id: review.product_id,
+      status,
+      statusOnly: true,
+    });
     return res.status(200).json({ success: true, message: `Review ${status}`, review });
   } catch (error) {
-    console.error("❌ [setReviewStatus] Error:", error.message);
+    log.error("❌ [setReviewStatus] Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update status" });
   }
 };
@@ -425,6 +446,12 @@ const setReviewResponse = async (req, res) => {
       responded_by_name: String(req.user?.name || "Store Support").trim().slice(0, 100),
     };
     await review.save();
+    emitSocketEvent("reviewUpdated", {
+      _id: review._id,
+      product_id: review.product_id,
+      hasResponse: true,
+      responseOnly: true,
+    });
     return res.status(200).json({ success: true, message: "Store response published", review });
   } catch (error) {
     console.error("[setReviewResponse] Error:", error.message);
@@ -443,6 +470,11 @@ const deleteReviewResponse = async (req, res) => {
       { new: false },
     );
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    emitSocketEvent("reviewUpdated", {
+      _id: req.params.id,
+      hasResponse: false,
+      responseOnly: true,
+    });
     return res.status(200).json({ success: true, message: "Store response deleted" });
   } catch (error) {
     console.error("[deleteReviewResponse] Error:", error.message);
@@ -556,6 +588,17 @@ const getAdminReviewById = async (req, res) => {
           .limit(3)
           .lean()
       : [];
+    const matchingOrder = customerId && review.product_id
+      ? await Order.findOne({
+          user_id: customerId,
+          "items.product_id": review.product_id,
+          ...(review.verifiedPurchase ? { status: "delivered" } : {}),
+        })
+          .sort({ created_at: -1 })
+          .select("_id order_number status created_at")
+          .lean()
+      : null;
+    review.relatedOrder = matchingOrder;
     return res.status(200).json({ success: true, review });
   } catch (error) {
     console.error("[getAdminReviewById] Error:", error.message);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import axiosInstance from "@/apis/axiosInstance";
+import { userHttp } from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";
@@ -517,7 +517,7 @@ function OrdersContent({ compact = false }) {
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
-    queryFn: async () => { const res = await axiosInstance.get("/users/profile"); return res.data?.user || res.data; },
+    queryFn: async () => { const res = await userHttp.get("/users/profile"); return res.data?.user || res.data; },
     retry: false,
   });
 
@@ -570,7 +570,7 @@ function OrdersContent({ compact = false }) {
 
   const { data: drafts = [] } = useQuery({
     queryKey: ["checkoutDrafts"],
-    queryFn: async () => { const res = await axiosInstance.get("/users/checkout-drafts"); return res.data?.drafts || []; },
+    queryFn: async () => { const res = await userHttp.get("/users/checkout-drafts"); return res.data?.drafts || []; },
     enabled: !!user, staleTime: 0, refetchOnMount: "always",
   });
 
@@ -600,7 +600,7 @@ function OrdersContent({ compact = false }) {
   const deleteDraft = async (draftId, items) => {
     try {
       if (items?.length) restoreItems(items);
-      await axiosInstance.delete(`/users/checkout-drafts/${draftId}`);
+      await userHttp.delete(`/users/checkout-drafts/${draftId}`);
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       toast.success("Draft deleted — items returned to cart!");
     } catch (e) { toast.error("Failed to delete draft"); }
@@ -610,7 +610,7 @@ function OrdersContent({ compact = false }) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await axiosInstance.delete(`/orders/${deleteTarget._id}`);
+      await userHttp.delete(`/orders/${deleteTarget._id}`);
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       toast.success("Order deleted successfully!");
       setDeleteTarget(null);

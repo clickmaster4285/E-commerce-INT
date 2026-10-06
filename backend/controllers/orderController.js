@@ -6,6 +6,7 @@ const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
+const log = require("../utils/logger");
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -58,7 +59,7 @@ const placeOrder = async (req, res) => {
       let product = null;
       try { product = await Product.findById(rawId); } catch (e) { product = null; }
       if (!product || product.is_deleted) {
-        console.error("❌ [placeOrder] Product not found | id:", rawId, "| item:", item.name);
+        log.error("❌ [placeOrder] Product not found | id:", rawId, "| item:", item.name);
         return res.status(400).json({
           success: false,
           message: `Product not found or removed (${item.name || "unknown"})`,
@@ -326,7 +327,7 @@ const placeOrder = async (req, res) => {
     emitOrderEvent("order:updated", { success: true, data: order });
     res.status(201).json({ success: true, data: order });
   } catch (error) {
-    console.error("❌ [placeOrder] Error:", error);
+    log.error("❌ [placeOrder] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -488,7 +489,7 @@ const getAllOrders = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ [getAllOrders] Error:", error);
+    log.error("❌ [getAllOrders] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -544,7 +545,7 @@ const updateOrderStatus = async (req, res) => {
     emitOrderEvent("order:statusChanged", { success: true, data: order });
     res.status(200).json({ success: true, message: `Order status updated to ${status}`, data: order });
   } catch (error) {
-    console.error("❌ [updateOrderStatus] Error:", error);
+    log.error("❌ [updateOrderStatus] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -646,7 +647,7 @@ const editOrder = async (req, res) => {
     emitOrderEvent("order:updated", { success: true, data: order });
     res.status(200).json({ success: true, message: "Order updated successfully", data: order });
   } catch (error) {
-    console.error("❌ [editOrder] Error:", error);
+    log.error("❌ [editOrder] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -694,7 +695,7 @@ const deleteOrder = async (req, res) => {
     emitOrderEvent("order:updated", { success: true, data: { id: req.params.id, deleted: true } });
     res.status(200).json({ success: true, message: "Order deleted successfully" });
   } catch (error) {
-    console.error("❌ [deleteOrder] Error:", error);
+    log.error("❌ [deleteOrder] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -714,7 +715,7 @@ const getOrderByIdAdmin = async (req, res) => {
 
     res.status(200).json({ success: true, data: order });
   } catch (error) {
-    console.error("❌ [getOrderByIdAdmin] Error:", error);
+    log.error("❌ [getOrderByIdAdmin] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -747,7 +748,7 @@ const updatePaymentStatus = async (req, res) => {
       data: order,
     });
   } catch (error) {
-    console.error("❌ [updatePaymentStatus] Error:", error);
+    log.error("❌ [updatePaymentStatus] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

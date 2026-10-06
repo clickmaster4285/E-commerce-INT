@@ -1,5 +1,4 @@
-import axiosInstance from "../axiosInstance";
-
+import adminHttp from "../axiosInstance";
 // ============================================================
 // HELPER: UNWRAP API RESPONSE
 // Backend response: { success: true, data: {...} }
@@ -35,7 +34,7 @@ export const employeeApi = {
   // ==========================================================
   getAll: async () => {
     try {
-      const response = await axiosInstance.get("/employees", { timeout: 10000 });
+      const response = await adminHttp.get("/employees", { timeout: 10000 });
       return unwrap(response.data);
     } catch (error) {
       console.error("❌ getAllEmployees error:", error);
@@ -49,7 +48,7 @@ export const employeeApi = {
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (department && department !== "all") params.department = department;
-    const response = await axiosInstance.get("/employees", { params, timeout: 10000 });
+    const response = await adminHttp.get("/employees", { params, timeout: 10000 });
     return paginated(response, limit);
   },
 
@@ -60,7 +59,7 @@ export const employeeApi = {
     if (!id) throw new Error("Employee ID is required");
 
     try {
-      const response = await axiosInstance.get(`/employees/${id}`, { timeout: 10000 }); // ✅ 10s Timeout Added
+      const response = await adminHttp.get(`/employees/${id}`, { timeout: 10000 }); // ✅ 10s Timeout Added
       return unwrap(response.data);
     } catch (error) {
       console.error(`❌ getEmployeeById (${id}) error:`, error);
@@ -77,7 +76,7 @@ export const employeeApi = {
       throw new Error("Name, email and password are required");
     }
     try {
-      const response = await axiosInstance.post("/employees", data, { timeout: 10000 });
+      const response = await adminHttp.post("/employees", data, { timeout: 10000 });
       return unwrap(response.data);
     } catch (error) {
       console.error("❌ createEmployee error:", error);
@@ -91,7 +90,7 @@ export const employeeApi = {
   update: async (id, data) => {
     if (!id) throw new Error("Employee ID is required");
     try {
-      const response = await axiosInstance.put(`/employees/${id}`, data, { timeout: 10000 });
+      const response = await adminHttp.put(`/employees/${id}`, data, { timeout: 10000 });
       return unwrap(response.data);
     } catch (error) {
       console.error(`❌ updateEmployee (${id}) error:`, error);
@@ -105,7 +104,7 @@ export const employeeApi = {
   delete: async (id) => {
     if (!id) throw new Error("Employee ID is required");
     try {
-      const response = await axiosInstance.delete(`/employees/${id}`, { timeout: 10000 });
+      const response = await adminHttp.delete(`/employees/${id}`, { timeout: 10000 });
       return unwrap(response.data);
     } catch (error) {
       console.error(`❌ deleteEmployee (${id}) error:`, error);
@@ -119,7 +118,7 @@ export const employeeApi = {
   toggleStatus: async (id) => {
     if (!id) throw new Error("Employee ID is required");
     try {
-      const response = await axiosInstance.patch(`/employees/${id}/toggle-status`, { timeout: 10000 });
+      const response = await adminHttp.patch(`/employees/${id}/toggle-status`, { timeout: 10000 });
       return unwrap(response.data);
     } catch (error) {
       console.error(`❌ toggleStatus (${id}) error:`, error);

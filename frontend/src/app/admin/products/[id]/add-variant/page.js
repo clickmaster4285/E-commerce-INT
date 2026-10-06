@@ -6,7 +6,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import {
   Trash2,
   Upload,
@@ -348,7 +348,7 @@ const inputStyle = {
   borderRadius: "8px",
 };
 
-export default function AddVariantPage() {
+function AddVariantPageInner() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -722,7 +722,42 @@ export default function AddVariantPage() {
     }
 
     try {
-      const variant = formData.variants[0];
+  const variant = formData.variants[0];
+
+  // Ghalat / purana `?edit=<id>` ho to crash ki jagah wazeh message dikhao
+  if (!variant) {
+    return (
+      <>
+        <div
+          className="fixed inset-0 z-[9999]"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(5px)" }}
+          onClick={goBackToProduct}
+        />
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
+          <div
+            className="rounded-xl p-6 text-center pointer-events-auto max-w-sm w-full"
+            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+          >
+            <AlertTriangle className="w-8 h-8 mx-auto mb-3 text-red-500" />
+            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              Variant not found
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              Ye variant is product mein maujood nahi — shayad delete ho chuka hai.
+            </p>
+            <button
+              type="button"
+              onClick={goBackToProduct}
+              className="mt-4 px-4 py-2 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
       const sku = (variant.sku || "").trim();
       if (!sku) {
         toast.error("SKU is required");
@@ -879,10 +914,10 @@ export default function AddVariantPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
-                    Add New Variant
+                    {isEditMode ? "Edit Variant" : "Add New Variant"}
                   </h2>
                   <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    Configure variant details for this product.
+                    {isEditMode ? "Update variant details for this product." : "Configure variant details for this product."}
                   </p>
                 </div>
               </div>
@@ -1204,5 +1239,35 @@ export default function AddVariantPage() {
         </div>
       </div>
     </>
+  );
+}
+
+// useSearchParams Next.js 15/16 mein Suspense ke baghair prerender par fail
+// hota hai — isi liye page ko boundary mein wrap kiya gaya hai.
+export default function AddVariantPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="fixed inset-0 flex items-center justify-center z-[9999]"
+          style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+        >
+          <div
+            className="rounded-xl py-10 px-14 flex flex-col items-center gap-3"
+            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
+          >
+            <div
+              className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"
+              style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+            />
+            <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+              Loading...
+            </span>
+          </div>
+        </div>
+      }
+    >
+      <AddVariantPageInner />
+    </Suspense>
   );
 }
