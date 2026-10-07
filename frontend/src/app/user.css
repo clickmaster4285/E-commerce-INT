@@ -23,11 +23,11 @@
   --user-border-soft:   #141414;
   --user-border-hover:  #2a2a2a;
 
-  /* Accent */
-  --user-accent:        #ffffff;
-  --user-accent-hover:  #e5e5e5;
-  --user-accent-text:   #000000;
-  --user-accent-soft:   rgba(255, 255, 255, 0.08);
+  /* Accent — Daraz orange (brand color, dono modes me same) */
+  --user-accent:        #f57224;
+  --user-accent-hover:  #ff8137;
+  --user-accent-text:   #ffffff;
+  --user-accent-soft:   rgba(245, 114, 36, 0.14);
 
   /* Logo background (dono modes mein white) */
   --user-logo-bg:       #ffffff;
@@ -56,10 +56,10 @@
    LIGHT MODE — Overrides
 ========================================== */
 .user-theme.light {
-  --user-bg:            #fafafa;
+  --user-bg:            #eff0f5;
   --user-bg-elevated:   #ffffff;
   --user-bg-card:       #ffffff;
-  --user-bg-hover:      #f0f0f0;
+  --user-bg-hover:      #e6e8ed;
   --user-bg-input:      #f5f5f5;
 
   --user-text:          #0a0a0a;
@@ -73,10 +73,10 @@
   --user-border-soft:   #f0f0f0;
   --user-border-hover:  #cfcfcf;
 
-  --user-accent:        #0a0a0a;
-  --user-accent-hover:  #333333;
+  --user-accent:        #f57224;
+  --user-accent-hover:  #d9621c;
   --user-accent-text:   #ffffff;
-  --user-accent-soft:   rgba(0, 0, 0, 0.06);
+  --user-accent-soft:   rgba(245, 114, 36, 0.10);
 
   --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.06);
   --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);

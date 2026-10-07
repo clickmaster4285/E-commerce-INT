@@ -1,4 +1,4 @@
-import adminHttp from "../adminHttp";
+import adminHttp from "../axiosInstance";
 
 export const purchaseOrderApi = {
   getAll: (params) => adminHttp.get("/purchase-orders/admin/all", { params }).then((res) => res.data),
