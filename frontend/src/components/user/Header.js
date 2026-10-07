@@ -111,6 +111,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
       />
       <input
         value={value}
+        aria-label="Search products"
         onChange={(e) => {
           onChange(e);
           setOpen(true);
@@ -771,7 +772,7 @@ export default function Header() {
               {topCategories.map((category, idx) => (
                 <Link
                   key={category._id}
-                  href={`/?category=${category._id}`}
+                  href={`/filtering-product?category=${category._id}`}
                   onClick={() => setOpen(false)}
                   className="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
                   style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
@@ -810,7 +811,7 @@ export default function Header() {
                 return (
                   <Link
                     key={brand._id}
-                    href={`/?brand=${brand._id}`}
+                    href={`/filtering-product?brand=${brand._id}`}
                     onClick={() => setOpen(false)}
                     className="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
                     style={{ animationDelay: `${0.05 * (idx + 1)}s` }}

@@ -48,12 +48,41 @@ function getDealBadgeText(deal) {
   return deal.type.replace(/_/g, " ").toUpperCase();
 }
 
-function useCountdown(endDate) {
+/* ✅ PERF: countdown sirf tab tick karta hai jab section viewport me ho.
+   Off-screen re-render storm (har second poora DealEngine + 12 ProductCards)
+   khatam — dikhai dene par waqt hamesha Date se fresh compute hota hai,
+   is liye display bilkul same rehta hai. */
+function useInViewport(ref) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref?.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setVisible(true);
+        else setVisible(false);
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+  return visible;
+}
+
+function useCountdown(endDate, active = true) {
   const [time, setTime] = useState(() => calcTime(endDate));
   useEffect(() => {
+    if (!active) return;
+    // Foran sync (invisible period ka gap na dikhe), phir 1s tick
+    setTime(calcTime(endDate));
     const t = setInterval(() => setTime(calcTime(endDate)), 1000);
     return () => clearInterval(t);
-  }, [endDate]);
+  }, [endDate, active]);
   return time;
 }
 
@@ -156,7 +185,9 @@ function DealEngine({ deals }) {
   });
   const cfg = getDealConfig(activeDeal.type);
   const badgeText = getDealBadgeText(activeDeal);
-  const time = useCountdown(activeDeal.endDate);
+  const sectionRef = useRef(null);
+  const sectionVisible = useInViewport(sectionRef);
+  const time = useCountdown(activeDeal.endDate, sectionVisible);
   const products = useMemo(
     () => activeDealDetail?.resolvedProducts || [],
     [activeDealDetail],
@@ -208,7 +239,7 @@ function DealEngine({ deals }) {
   const accent = urgency === "normal" ? null : urgencyHex;
 
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <div ref={sectionRef} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* Slim header — elevated glass bar */}
       <div className="flex items-center justify-between mb-4 px-2.5 sm:px-4 py-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/70 backdrop-blur-md shadow-sm">
         <div className="flex items-center gap-2.5 sm:gap-3">

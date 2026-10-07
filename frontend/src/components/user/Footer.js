@@ -1,16 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { storeApi } from "@/apis/user/storeApi";
-import { Mail, Phone, MapPin, CreditCard, Truck, ShieldCheck, ChevronDown } from "lucide-react";
-import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube, FaLinkedinIn } from "react-icons/fa";
+import { Mail, Phone, MapPin } from "lucide-react";
+import {
+  FaApple,
+  FaInstagram,
+  FaFacebookF,
+  FaYoutube,
+  FaPinterest,
+  FaTiktok,
+  FaLinkedinIn,
+} from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
-function StoreLogo({ store, sizeClass = "w-9 h-9" }) {
+function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
   const logoUrl = store?.logo?.img_url
     ? store.logo.img_url.startsWith("http")
       ? store.logo.img_url
@@ -20,51 +28,33 @@ function StoreLogo({ store, sizeClass = "w-9 h-9" }) {
 
   if (!logoUrl) {
     return (
-      <span className={`${sizeClass} rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] font-black text-lg flex items-center justify-center shrink-0`}>
+      <span className={`${sizeClass} rounded-xl bg-white text-black font-black text-lg flex items-center justify-center shrink-0`}>
         {letter}
       </span>
     );
   }
 
   return (
-    <img src={logoUrl} alt={store?.store_name || "Store"} className={`${sizeClass} rounded-lg object-cover shrink-0`} />
+    <img
+      src={logoUrl}
+      alt={store?.store_name || "Store"}
+      className={`${sizeClass} rounded-xl object-cover shrink-0 bg-white`}
+    />
   );
 }
 
 const SOCIAL_ICONS = {
-  facebook: { Icon: FaFacebookF, color: "#1877F2", label: "Facebook" },
-  instagram: { Icon: FaInstagram, color: "#E4405F", label: "Instagram" },
-  twitter: { Icon: FaTwitter, color: "#1DA1F2", label: "Twitter" },
-  youtube: { Icon: FaYoutube, color: "#FF0000", label: "YouTube" },
-  linkedin: { Icon: FaLinkedinIn, color: "#0A66C2", label: "LinkedIn" },
+  instagram: { Icon: FaInstagram, label: "Instagram" },
+  facebook: { Icon: FaFacebookF, label: "Facebook" },
+  twitter: { Icon: FaXTwitter, label: "X" },
+  tiktok: { Icon: FaTiktok, label: "TikTok" },
+  youtube: { Icon: FaYoutube, label: "YouTube" },
+  pinterest: { Icon: FaPinterest, label: "Pinterest" },
+  linkedin: { Icon: FaLinkedinIn, label: "LinkedIn" },
 };
 
-// ✅ MOBILE COLLAPSIBLE SECTION — desktop pe always open
-function FooterSection({ title, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-b border-[var(--user-border)] lg:border-0">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-4 lg:py-0 lg:mb-3 lg:cursor-default text-left group"
-      >
-        <h3 className="text-[var(--user-text)] font-bold text-sm lg:text-xs uppercase tracking-wider">{title}</h3>
-        <ChevronDown
-          size={16}
-          className={`text-[var(--user-text-muted)] transition-transform duration-200 lg:hidden ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      <div
-        className={`overflow-hidden transition-all duration-300 lg:!max-h-none lg:!opacity-100 lg:!pb-0 ${
-          open ? "max-h-96 opacity-100 pb-4" : "max-h-0 opacity-0 pb-0"
-        }`}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
+const linkCls =
+  "block text-[13px] leading-5 text-[#c7c7c7] hover:text-white hover:underline underline-offset-4 transition";
 
 export default function Footer() {
   const { data: store = null } = useQuery({
@@ -85,190 +75,174 @@ export default function Footer() {
   const supportPhone = store?.support_phone || store?.phone || "";
   const country = store?.country || "";
   const address = store?.address || "";
+  const locationText = address ? (country ? `${address}, ${country}` : address) : country;
+  const phoneHref = `tel:${(supportPhone || "").replace(/[^0-9+]/g, "")}`;
 
   const activeSocials = Object.entries(SOCIAL_ICONS)
     .map(([key, cfg]) => ({ key, ...cfg, url: store?.social_links?.[key] || "" }))
     .filter((s) => s.url);
 
+  const socialsToRender =
+    activeSocials.length > 0
+      ? activeSocials
+      : Object.entries(SOCIAL_ICONS)
+          .filter(([key]) => ["instagram", "facebook", "twitter", "tiktok", "youtube", "pinterest"].includes(key))
+          .map(([key, cfg]) => ({ key, ...cfg, url: "#" }));
+
   const footerCategories = categories.slice(0, 5);
-  const phoneHref = `tel:${supportPhone.replace(/[^0-9+]/g, "")}`;
 
   return (
-    <footer className="bg-[var(--user-bg-elevated)] border-t border-[var(--user-border)]">
-      {/* ✅ TRUST BADGES — Mobile: 2-col compact, Desktop: 4-col */}
-      <div className="border-b border-[var(--user-border)]">
-        <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-5 lg:py-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
-            <TrustBadge icon={<Truck size={18} />} title="Free Delivery" subtitle="Over Rs. 5,000" />
-            <TrustBadge icon={<ShieldCheck size={18} />} title="Secure Payment" subtitle="100% protected" />
-            <TrustBadge icon={<CreditCard size={18} />} title="Easy Returns" subtitle="7-day policy" />
-            <TrustBadge icon={<Phone size={18} />} title="24/7 Support" subtitle="Dedicated help" />
-          </div>
-        </div>
-      </div>
-
-      {/* ✅ MAIN FOOTER — Mobile: accordion, Desktop: grid */}
-      <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-2 lg:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 lg:gap-6">
-          {/* BRAND — Mobile pe accordion, Desktop pe col-span-2 */}
-          <div className="border-b border-[var(--user-border)] lg:border-0 lg:col-span-2 lg:pr-6">
-            <div className="py-4 lg:py-0">
-              <Link href="/" className="inline-block">
-                <h2 className="flex items-center gap-2.5 lg:gap-2">
-                  <StoreLogo store={store} sizeClass="w-9 h-9 lg:w-8 lg:h-8" />
-                  <span className="font-black text-xl lg:text-lg tracking-wide text-[var(--user-text)]">{storeName}</span>
-                </h2>
-              </Link>
-            </div>
-
+    <footer className="bg-[#1a1a1a] text-[#e8e8e8] mt-10">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-10 pb-6">
+        {/* TOP — 4 columns, image jaisa dark layout, data apna */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-[1.3fr_1fr_1fr_1.35fr]">
+          {/* COMPANY INFO — apna store data */}
+          <div className="col-span-2 sm:col-span-1 lg:col-span-1">
+            <h3 className="text-white font-bold text-[14px] mb-4">Company info</h3>
+            <Link href="/" className="inline-flex items-center gap-2.5 mb-3">
+              <StoreLogo store={store} />
+              <span className="font-extrabold text-lg tracking-tight text-white">{storeName}</span>
+            </Link>
             {tagline && (
-              <p className="text-[var(--user-text-muted)] text-sm lg:text-[0.8125rem] leading-6 lg:leading-5 max-w-sm mb-4 lg:mb-3 hidden lg:block">
-                {tagline}
-              </p>
+              <p className="text-[13px] leading-5 text-[#c7c7c7] max-w-xs mb-4">{tagline}</p>
             )}
-
-            {/* Mobile: compact contact info in accordion */}
-            <FooterSection title="Contact" defaultOpen={false}>
-              <div className="space-y-2.5 text-sm text-[var(--user-text-muted)]">
-                {supportEmail && (
-                  <a href={`mailto:${supportEmail}`} className="flex items-center gap-2.5 hover:text-[var(--user-accent)] transition text-[0.8125rem]">
-                    <Mail size={14} className="text-[var(--user-accent)] shrink-0" />
+            <ul className="space-y-2.5 text-[13px] text-[#c7c7c7]">
+              {supportEmail && (
+                <li>
+                  <a href={`mailto:${supportEmail}`} className="flex items-center gap-2 hover:text-white transition">
+                    <Mail size={14} className="shrink-0" />
                     <span className="truncate">{supportEmail}</span>
                   </a>
-                )}
-                {supportPhone && (
-                  <a href={phoneHref} className="flex items-center gap-2.5 hover:text-[var(--user-accent)] transition text-[0.8125rem]">
-                    <Phone size={14} className="text-[var(--user-accent)] shrink-0" />
-                    {supportPhone}
-                  </a>
-                )}
-                {(address || country) && (
-                  <p className="flex items-start gap-2.5 text-[0.8125rem]">
-                    <MapPin size={14} className="text-[var(--user-accent)] shrink-0 mt-0.5" />
-                    <span>{address ? `${address}, ${country}` : country}</span>
-                  </p>
-                )}
-              </div>
-            </FooterSection>
-
-            {/* Desktop: inline contact (always visible) */}
-            <div className="hidden lg:block mt-6 lg:mt-4 space-y-3 lg:space-y-2 text-sm lg:text-[0.8125rem] text-[var(--user-text-muted)]">
-              {supportEmail && (
-                <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 lg:gap-2 hover:text-[var(--user-accent)] transition">
-                  <Mail size={16} className="text-[var(--user-accent)] shrink-0" /> <span className="truncate">{supportEmail}</span>
-                </a>
+                </li>
               )}
               {supportPhone && (
-                <a href={phoneHref} className="flex items-center gap-3 lg:gap-2 hover:text-[var(--user-accent)] transition">
-                  <Phone size={16} className="text-[var(--user-accent)] shrink-0" /> {supportPhone}
-                </a>
+                <li>
+                  <a href={phoneHref} className="flex items-center gap-2 hover:text-white transition">
+                    <Phone size={14} className="shrink-0" />
+                    <span>{supportPhone}</span>
+                  </a>
+                </li>
               )}
-              {(address || country) && (
-                <p className="flex items-center gap-3 lg:gap-2">
-                  <MapPin size={16} className="text-[var(--user-accent)] shrink-0" />
-                  {address ? `${address}, ${country}` : country}
-                </p>
+              {locationText && (
+                <li className="flex items-start gap-2">
+                  <MapPin size={14} className="shrink-0 mt-0.5" />
+                  <span>{locationText}</span>
+                </li>
               )}
-            </div>
+            </ul>
           </div>
 
-          {/* CATEGORIES */}
-          <FooterSection title="Categories">
-            <ul className="space-y-2 lg:space-y-2 text-sm text-[var(--user-text-muted)]">
+          {/* CATEGORIES — apni categories */}
+          <div>
+            <h3 className="text-white font-bold text-[14px] mb-4">Customer service</h3>
+            <ul className="space-y-3">
               {footerCategories.length > 0 ? (
                 footerCategories.map((cat) => (
                   <li key={cat._id}>
-                    <Link href={`/?category=${cat._id}`} className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">
+                    <Link href={`/?category=${cat._id}`} className={linkCls}>
                       {cat.name}
                     </Link>
                   </li>
                 ))
               ) : (
-                <li className="text-[0.8125rem] text-[var(--user-text-subtle)]">No categories</li>
+                <li className="text-[13px] text-[#777]">No categories</li>
               )}
             </ul>
-          </FooterSection>
+          </div>
 
-          {/* SUPPORT */}
-          <FooterSection title="Support">
-            <ul className="space-y-2 lg:space-y-2 text-sm text-[var(--user-text-muted)]">
+          {/* SUPPORT — apne support links */}
+          <div>
+            <h3 className="text-white font-bold text-[14px] mb-4">Help</h3>
+            <ul className="space-y-3">
               {supportEmail && (
                 <li>
-                  <Link href={`mailto:${supportEmail}`} className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">Contact Us</Link>
+                  <Link href={`mailto:${supportEmail}`} className={linkCls}>
+                    Contact Us
+                  </Link>
                 </li>
               )}
-              <li><Link href="#" className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">Privacy Policy</Link></li>
-              <li><Link href="#" className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">Terms & Conditions</Link></li>
-              <li><Link href="#" className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">Returns</Link></li>
-              <li><Link href="/account" className="hover:text-[var(--user-accent)] transition inline-block text-[0.8125rem] lg:text-[0.8125rem]">My Account</Link></li>
+              <li><Link href="#" className={linkCls}>Privacy Policy</Link></li>
+              <li><Link href="#" className={linkCls}>Terms &amp; Conditions</Link></li>
+              <li><Link href="#" className={linkCls}>Returns</Link></li>
+              <li><Link href="/account" className={linkCls}>My Account</Link></li>
             </ul>
-          </FooterSection>
+          </div>
 
-          {/* FOLLOW US — Desktop pe col-span-2 */}
-          <div className="lg:col-span-2 border-b border-[var(--user-border)] lg:border-0 last:border-0">
-            <FooterSection title="Follow Us">
-              <p className="text-[0.8125rem] lg:text-xs text-[var(--user-text-muted)] mb-3 lg:mb-2 hidden lg:block">
-                Stay connected with our latest updates.
-              </p>
-              <div className="flex flex-wrap gap-2 lg:gap-1.5">
-                {activeSocials.length > 0 ? (
-                  activeSocials.map(({ key, Icon, url, label }) => (
-                    <a
-                      key={key}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-9 h-9 lg:w-8 lg:h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] hover:border-[var(--user-accent)] transition active:scale-95"
-                      aria-label={label}
-                    >
-                      <Icon size={14} />
-                    </a>
-                  ))
-                ) : (
-                  Object.entries(SOCIAL_ICONS).map(([key, { Icon, label }]) => (
-                    <button
-                      key={key}
-                      className="w-9 h-9 lg:w-8 lg:h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] hover:border-[var(--user-accent)] transition active:scale-95"
-                      aria-label={label}
-                    >
-                      <Icon size={14} />
-                    </button>
-                  ))
-                )}
-              </div>
-            </FooterSection>
+          {/* SOCIALS — sirf apne socials, app buttons nahi (app hamare paas nahi hai) */}
+          <div className="col-span-2 lg:col-span-1">
+            <h4 className="text-white font-bold text-[14px] mb-3">
+              Connect with {storeName || "us"}
+            </h4>
+            <div className="flex items-center gap-5">
+              {socialsToRender.map(({ key, Icon, url, label }) => (
+                <a
+                  key={key}
+                  href={url || "#"}
+                  target={url?.startsWith("http") ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="text-white hover:text-[#bbb] transition"
+                >
+                  <Icon size={22} />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ✅ BOTTOM BAR — Mobile: stacked center, Desktop: row */}
-      <div className="border-t border-[var(--user-border)] bg-[var(--user-bg)]">
-        <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-4 lg:py-3 flex flex-col sm:flex-row items-center justify-between gap-2 lg:gap-1.5">
-          <p className="text-[0.6875rem] text-[var(--user-text-subtle)] text-center sm:text-left">
-            © {new Date().getFullYear()}{" "}
-            <span className="text-[var(--user-text-muted)] font-semibold">{storeName}</span>. All rights reserved.
-          </p>
-          <div className="flex items-center gap-4 text-[0.6875rem] text-[var(--user-text-subtle)]">
-            <Link href="#" className="hover:text-[var(--user-accent)] transition">Privacy</Link>
-            <Link href="#" className="hover:text-[var(--user-accent)] transition">Terms</Link>
-            <Link href="#" className="hover:text-[var(--user-accent)] transition">Cookies</Link>
+        {/* MIDDLE — image wali strip, sirf layout (koi store data nahi hota isme) */}
+        <div className="grid gap-8 lg:grid-cols-2 mt-10">
+          <div>
+            <h4 className="text-white font-bold text-[14px] mb-3">Security certification</h4>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-black text-[#2e7d32]">PCI DSS</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[10px] font-black italic text-[#1a1f71]">VISA</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-bold text-black">ID Check</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-bold text-[#333]">SafeKey</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[8px] font-bold text-[#2e7d32]">ProtectBuy</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-black text-[#0066b3]">JCB</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-black text-[#2e7d32]">APWG</span>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-white font-bold text-[14px] mb-3">We accept</h4>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-black text-[#e11d2e]">JazzCash</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[9px] font-black text-[#0a8a3c]">easypaisa</span>
+              <span className="h-7 px-2.5 rounded-[3px] bg-white flex items-center text-[11px] font-black italic text-[#1a1f71]">VISA</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center">
+                <span className="w-4 h-4 rounded-full bg-[#eb001b] inline-block" />
+                <span className="w-4 h-4 rounded-full bg-[#f79e1b] -ml-2 inline-block opacity-90" />
+              </span>
+              <span className="h-7 px-2 rounded-[3px] bg-[#2e77bc] flex items-center text-[7px] font-black text-white leading-none text-center">AMERICAN<br />EXPRESS</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[8px] font-black text-black">DISCOVER</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center text-[8px] font-black text-[#1a1f71]">UnionPay</span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center gap-1 text-[10px] font-bold text-black">
+                <FaApple size={13} /> Pay
+              </span>
+              <span className="h-7 px-2 rounded-[3px] bg-white flex items-center gap-1 text-[10px] font-bold text-black">
+                <span className="font-black text-[#4285f4]">G</span> Pay
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* BOTTOM — apna store naam */}
+        <div className="border-t border-white/10 mt-8 pt-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-[#8f8f8f] text-center sm:text-left">
+              © {new Date().getFullYear()}{" "}
+              <span className="text-[#c7c7c7] font-semibold">{storeName}</span>. All rights reserved.
+            </p>
+            <div className="flex items-center gap-5 text-xs text-[#8f8f8f]">
+              <Link href="#" className="hover:text-white transition">Privacy</Link>
+              <Link href="#" className="hover:text-white transition">Terms</Link>
+              <Link href="#" className="hover:text-white transition">Cookies</Link>
+            </div>
           </div>
         </div>
       </div>
     </footer>
-  );
-}
-
-function TrustBadge({ icon, title, subtitle }) {
-  return (
-    <div className="flex items-center gap-2.5 lg:gap-3">
-      <span className="w-9 h-9 lg:w-9 lg:h-9 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] shrink-0">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-[0.6875rem] lg:text-[0.8125rem] font-bold text-[var(--user-text)] leading-tight">{title}</p>
-        <p className="text-[0.5625rem] lg:text-[0.6875rem] text-[var(--user-text-subtle)] mt-0.5 leading-tight">{subtitle}</p>
-      </div>
-    </div>
   );
 }

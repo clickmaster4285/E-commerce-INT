@@ -113,6 +113,10 @@ const sidebarSections = [
     items: ["Manage Stock", "Orders", "Shipping"],
   },
   {
+    title: "PURCHASING",
+    items: ["Vendors", "Purchase Orders"],
+  },
+  {
     title: "STORE",
     items: ["Store Info"],
   },
@@ -148,6 +152,8 @@ const allMenuItems = [
   { name: "Manage Stock", icon: Boxes, path: "/admin/manage-stock", permissionKey: "manageStock" },
   { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "order" },
   { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
+  { name: "Vendors", icon: Users, path: "/admin/vendors", permissionKey: "vendors" },
+  { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
 ];

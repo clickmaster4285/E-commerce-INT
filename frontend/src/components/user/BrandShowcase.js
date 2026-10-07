@@ -83,7 +83,7 @@ function BrandRow({ brand, items }) {
           </p>
         </div>
         <Link
-          href={`/?brand=${brandId}`}
+          href={`/filtering-product?brand=${brandId}`}
           className="group inline-flex shrink-0 items-center gap-1 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent)] transition-opacity hover:opacity-80"
         >
           View all
@@ -120,7 +120,7 @@ function useBrandRowItems(brandId) {
   const { data } = useQuery({
     queryKey: ["brandRowProducts", brandId],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 30, brand_id: brandId }),
+      productApi.getAllPaginated({ page: 1, limit: 30, brand_id: brandId, slim: 1 }),
     enabled: !!brandId,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -174,7 +174,7 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
       <SectionHeading
         title="Brand Spotlight"
         subtitle="Top products from leading brands"
-        href="/"
+        href="/filtering-product"
         linkLabel="All products"
       />
 

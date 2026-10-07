@@ -27,8 +27,9 @@ export const productApi = {
 
   // ✅ Server-side paginated list (User GUI shop/facets/search/brand/related)
   // Backend: ?page&limit&search&sort&brand_id&category_id&minPrice&maxPrice
-  //   &stock=&deal=&discount=&minDiscount=&featured=&ids=
+  //   &stock=&deal=&discount=&minDiscount=&featured=&ids=&slim=
   //   sort: "featured" (default order) | "newest" | "price-asc" | "price-desc" | "discount-desc"
+  //   slim=1: sirf category/brand names populate (tags/createdby nahi)
   // Response: { products: [...], pagination: { total, page, limit, pages, hasNext, hasPrev } }
   getAllPaginated: ({
     page = 1,
@@ -45,6 +46,7 @@ export const productApi = {
     minDiscount = null,
     featured = "",
     ids = [],
+    slim = 0,
   } = {}) =>
     userHttp
       .get("/products", {
@@ -63,6 +65,7 @@ export const productApi = {
           minDiscount: minDiscount ?? undefined,
           featured: featured || undefined,
           ids: (ids || []).length ? ids.join(",") : undefined,
+          slim: slim ? 1 : undefined,
         },
       })
       .then((res) => paginated(res, limit)),

@@ -137,6 +137,7 @@ export default function BannerSlider({ initialBanners = null }) {
                   loader={smartImageLoader}
                   sizes="100vw"
                   priority={i === 0}
+                  fetchPriority={i === 0 ? "high" : "auto"}
                   className={`object-cover ${isActive ? "animate-[kenBurns_8s_ease-out_forwards]" : ""}`}
                 />
               ) : imgUrl ? (
@@ -150,8 +151,7 @@ export default function BannerSlider({ initialBanners = null }) {
 
               {/* Gradient overlays — strong left scrim so the heading/buttons
                   stay readable even when a banner image has baked-in text */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-black/10 to-transparent" />
 
               {/* Content */}
               <div className="absolute inset-0 flex items-center">
@@ -191,36 +191,36 @@ export default function BannerSlider({ initialBanners = null }) {
           );
         })}
 
-        {/* Arrows (desktop only — swipe on mobile) */}
+        {/* Arrows — Daraz jaisa light-grey edge half-pill (all screens) */}
         {slides.length > 1 && (
           <>
             <button
               onClick={goPrev}
               aria-label="Previous banner"
-              className="hidden sm:flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/20 items-center justify-center text-white hover:bg-black/50 hover:scale-110 transition-all duration-200"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex w-6 h-12 sm:w-7 sm:h-14 items-center justify-center rounded-r-full bg-[#d9d9d9]/80 text-[#5a5a5a] hover:bg-[#c6c6c6] hover:text-[#333] active:bg-[#b5b5b5] transition-colors duration-200"
             >
-              <ChevronLeft size={22} />
+              <ChevronLeft size={16} />
             </button>
             <button
               onClick={goNext}
               aria-label="Next banner"
-              className="hidden sm:flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-20 w-11 h-11 lg:w-12 lg:h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/20 items-center justify-center text-white hover:bg-black/50 hover:scale-110 transition-all duration-200"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex w-6 h-12 sm:w-7 sm:h-14 items-center justify-center rounded-l-full bg-[#d9d9d9]/80 text-[#5a5a5a] hover:bg-[#c6c6c6] hover:text-[#333] active:bg-[#b5b5b5] transition-colors duration-200"
             >
-              <ChevronRight size={22} />
+              <ChevronRight size={16} />
             </button>
           </>
         )}
 
         {/* Pill Indicators */}
         {slides.length > 1 && (
-          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 px-3 py-2 rounded-full bg-black/20 backdrop-blur-md border border-white/10">
+          <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20 px-2.5 py-1.5 rounded-full bg-black/25 backdrop-blur-md border border-white/10">
             {slides.map((_, i) => (
               <button
                 key={i}
                 onClick={() => goTo(i)}
                 aria-label={`Go to banner ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === active ? "w-8 bg-white" : "w-1.5 bg-white/50 hover:bg-white/80"
+                  i === active ? "w-5 bg-white" : "w-1.5 bg-white/50 hover:bg-white/80"
                 }`}
               />
             ))}
@@ -237,7 +237,7 @@ function ButtonLink({ button, primary }) {
   return (
     <Link
       href={href}
-      className={`px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl text-[0.6875rem] sm:text-sm font-black uppercase tracking-wider transition-all duration-300 ${
+      className={`inline-flex min-h-8 items-center px-4 sm:px-5 py-2 rounded-lg text-[0.625rem] sm:text-xs font-bold uppercase tracking-wide transition-all duration-300 ${
         primary
           ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg hover:opacity-90"
           : "bg-white/10 backdrop-blur text-white border border-white/30 hover:bg-white/20"

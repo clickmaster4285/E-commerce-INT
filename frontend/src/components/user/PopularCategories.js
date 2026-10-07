@@ -44,7 +44,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
       <SectionHeading
         title="Popular Categories"
         subtitle="Categories with the most products"
-        href="/"
+        href="/filtering-product"
         linkLabel="View All"
       />
 
@@ -52,7 +52,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
         {list.map((category) => (
           <Link
             key={category._id}
-            href={`/?category=${category._id}`}
+            href={`/filtering-product?category=${category._id}`}
             className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:shadow-[var(--user-shadow-md)]"
           >
             <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
@@ -88,7 +88,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
 
       <div className="mt-3 flex justify-center lg:hidden">
         <Link
-          href="/"
+          href="/filtering-product"
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text)]"
         >
           Browse all products
