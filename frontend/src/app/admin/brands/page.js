@@ -1034,8 +1034,8 @@ export default function BrandsPage() {
 
               <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
                 <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={isSubmitting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-                <button type="submit" disabled={isSubmitting || loadingCode} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {isSubmitting ? <><Spinner className="w-3.5 h-3.5 inline mr-1.5" /> Saving...</> : editingBrand ? "Update Brand" : "Save Brand"}
+                <button type="submit" disabled={isSubmitting || loadingCode} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                  {isSubmitting ? <><Spinner className="w-3.5 h-3.5" /> Saving...</> : editingBrand ? "Update Brand" : "Save Brand"}
                 </button>
               </div>
             </form>
