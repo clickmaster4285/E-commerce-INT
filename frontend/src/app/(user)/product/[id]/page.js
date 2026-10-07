@@ -282,6 +282,53 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
 });
 Gallery.displayName = "Gallery";
 
+// ✅ Product details images — pehle sirf pehli image (neeche se fade), "View More" par saari images
+const COLLAPSED_IMAGE_HEIGHT = 620;
+const DetailImages = memo(({ productName, images, onZoom }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!images?.length) return null;
+  const hasMore = images.length > 1;
+  const visible = expanded || !hasMore ? images : images.slice(0, 1);
+  const collapsed = hasMore && !expanded;
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div
+        className="relative overflow-hidden"
+        style={collapsed ? { maxHeight: COLLAPSED_IMAGE_HEIGHT } : undefined}
+      >
+        <div className="flex flex-col items-center gap-2">
+          {visible.map((url, i) => (
+            <img
+              key={url}
+              src={url}
+              alt={`${productName}, image ${i + 1}`}
+              loading="lazy"
+              onClick={() => onZoom(url)}
+              className="h-auto w-full cursor-zoom-in object-contain"
+            />
+          ))}
+        </div>
+        {collapsed && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
+        )}
+      </div>
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-expanded={expanded}
+            className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+          >
+            {expanded ? "View Less" : `View More (${images.length - 1})`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+DetailImages.displayName = "DetailImages";
+
 const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
   if (!show) return null;
   return (
@@ -945,6 +992,18 @@ function ProductDetailContent({ params }) {
             ) : null}
           </div>
         </section>
+
+        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
+        {allImages.length > 0 && (
+          <section className="mt-3 bg-[var(--user-bg-card)]">
+            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+              Product images of {product.name}
+            </h2>
+            <div className="px-3 sm:px-4 py-4">
+              <DetailImages productName={product.name} images={allImages} onZoom={openLightbox} />
+            </div>
+          </section>
+        )}
 
         {/* ===== You may also like — real related ===== */}
         {related.length > 0 && (
