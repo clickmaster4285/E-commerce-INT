@@ -36,7 +36,7 @@ const TAB_PARAMS = {
 
 /* Compact marketplace grid across storefront breakpoints */
 const GRID =
-  "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 4xl:grid-cols-8 5xl:grid-cols-9";
+  "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9";
 
 function TabGrid({ tab }) {
   const [page, setPage] = useState(1);
@@ -66,7 +66,7 @@ function TabGrid({ tab }) {
         {[...Array(8).keys()].map((index) => (
           <div
             key={index}
-            className="h-[18.125rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] md:h-[19.125rem] xl:h-[20.125rem]"
+            className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]"
           />
         ))}
       </div>

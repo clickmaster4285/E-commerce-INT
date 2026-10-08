@@ -48,25 +48,25 @@ function Section({ title, icon: Icon, hint, children }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
       >
-        {Icon ? <Icon size={14} className="shrink-0 text-[var(--user-accent)]" /> : null}
-        <span className="flex-1 text-[0.6875rem] font-black uppercase tracking-[0.14em] text-[var(--user-text)]">
+        {Icon ? <Icon size={13} className="shrink-0 text-[var(--user-accent)]" /> : null}
+        <span className="flex-1 text-xs font-semibold text-[var(--user-text)]">
           {title}
         </span>
         {hint ? (
-          <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
+          <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-medium text-[var(--user-text-subtle)]">
             {hint}
           </span>
         ) : null}
         <ChevronDown
-          size={14}
+          size={13}
           className={`shrink-0 text-[var(--user-text-muted)] transition-transform duration-200 ${
             open ? "rotate-180" : ""
           }`}
         />
       </button>
-      {open ? <div className="px-3 pb-4">{children}</div> : null}
+      {open ? <div className="px-2.5 pb-3">{children}</div> : null}
     </div>
   );
 }
@@ -89,7 +89,7 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       onClick={onClick}
       disabled={disabled}
       title={typeof title === "string" ? title : typeof label === "string" ? label : undefined}
-      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
         disabled
           ? "cursor-not-allowed opacity-45"
           : checked
@@ -98,7 +98,7 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       }`}
     >
       <span
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
           checked
             ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
             : "border-[var(--user-border-hover)]"
@@ -108,14 +108,14 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       </span>
       {icon}
       <span
-        className={`min-w-0 flex-1 line-clamp-2 break-words text-[0.78125rem] font-medium capitalize ${
+        className={`min-w-0 flex-1 line-clamp-2 break-words text-xs font-normal capitalize ${
           checked ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"
         }`}
       >
         {label}
       </span>
       {count !== null ? (
-        <span className="shrink-0 text-[0.625rem] font-bold tabular-nums text-[var(--user-text-subtle)]">
+        <span className="shrink-0 text-[0.625rem] font-normal tabular-nums text-[var(--user-text-subtle)]">
           {count}
         </span>
       ) : null}
@@ -128,7 +128,7 @@ function ShowMore({ open, total, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-1.5 w-full rounded-lg py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
+      className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-medium text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
     >
       {open ? "Show less" : `Show all (${total})`}
     </button>
@@ -554,20 +554,20 @@ export default function HomeSidebar({
 
   return (
     <aside
-      className={`overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
+      className={`overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[var(--user-shadow-sm)] ${className}`}
     >
       <div className={scrollable ? "max-h-[calc(100vh-8.5rem)] overflow-y-auto" : ""}>
         {/* HEADER */}
-        <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-3.5">
-          <SlidersHorizontal size={15} className="shrink-0 text-[var(--user-accent)]" />
-          <h2 className="flex-1 text-[0.8125rem] font-black uppercase tracking-[0.12em] text-[var(--user-text)]">
+      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-3">
+        <SlidersHorizontal size={14} className="shrink-0 text-[var(--user-accent)]" />
+        <h2 className="flex-1 text-xs font-semibold text-[var(--user-text)]">
             Filters
           </h2>
           <button
             type="button"
             onClick={onClear}
             disabled={!filtersActive}
-            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[0.625rem] font-bold uppercase tracking-wider transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[0.625rem] font-medium transition-colors ${
               filtersActive
                 ? "text-[var(--user-accent)] hover:bg-[var(--user-bg-hover)]"
                 : "cursor-not-allowed text-[var(--user-text-disabled)]"
@@ -577,8 +577,8 @@ export default function HomeSidebar({
           </button>
         </div>
 
-        <p className="border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] px-4 py-2 text-[0.6875rem] font-semibold text-[var(--user-text-subtle)]">
-          <span className="font-black text-[var(--user-text)]">{matchCount}</span>{" "}
+        <p className="border-b border-[var(--user-border)] px-3 py-2 text-[0.6875rem] text-[var(--user-text-subtle)]">
+          <span className="font-medium text-[var(--user-text)]">{matchCount}</span>{" "}
           {matchCount === 1 ? "product" : "products"} {filtersActive ? "match your filters" : "available"}
         </p>
 

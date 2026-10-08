@@ -514,7 +514,7 @@ function FilteringContent() {
             }`}
             style={{
               minWidth: 0,
-              width: filtersSidebarExpanded ? "clamp(16.375rem, 20vw, 20rem)" : "3rem",
+              width: filtersSidebarExpanded ? "clamp(14rem, 17vw, 16rem)" : "3rem",
               transition: "width 220ms ease-out",
             }}
             onPointerEnter={(event) => {

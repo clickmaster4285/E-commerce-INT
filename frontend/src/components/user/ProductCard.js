@@ -31,33 +31,6 @@ const getImageUrl = (url) => {
   return `${API_ORIGIN}${url}`;
 };
 
-function getColorOptions(variants) {
-  const options = new Map();
-
-  variants.forEach((variant) => {
-    const entry = Object.entries(variant?.attributes || {}).find(([name]) =>
-      /colou?r/i.test(name),
-    );
-    if (!entry) return;
-
-    const raw = entry[1];
-    const label =
-      typeof raw === "object" && raw !== null
-        ? raw.value ?? raw.label ?? raw.name ?? raw.display ?? raw.text ?? raw.color
-        : raw;
-    if (label === null || label === undefined || String(label).trim() === "") return;
-
-    const text = String(label).trim();
-    const swatch =
-      typeof raw === "object" && raw !== null
-        ? raw.hex ?? raw.colorCode ?? raw.color_code ?? raw.swatch ?? text
-        : text;
-    options.set(text.toLowerCase(), { label: text, swatch: String(swatch).trim() || text });
-  });
-
-  return Array.from(options.values());
-}
-
 function getDealBadgeConfig(deal) {
   if (!deal) return null;
 
@@ -118,7 +91,6 @@ function ProductCardInner({
   deal = null,
   dealId = null,
   showDealPricing = false,
-  compactDealCard = false,
   children,
   // ✅ LCP rows ke liye: pehli 1-2 cards priority (eager+high), baaki lazy — default same
   priority = false,
@@ -185,7 +157,6 @@ function ProductCardInner({
 
   // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
   const hasMultipleVariants = variants.length > 1;
-  const colorOptions = getColorOptions(variants);
   const rating = Number(product.ratingSummary?.avg) || 0;
   const ratingCount = Number(product.ratingSummary?.count) || 0;
   const discountPercent =
@@ -248,16 +219,10 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className={`group relative flex min-w-0 flex-col overflow-hidden bg-[var(--user-bg-card)] transition-colors duration-200 ${
-        compactDealCard
-          ? "h-[13.5rem] rounded-none border-0 shadow-none hover:shadow-none"
-          : "h-full rounded-lg border border-[var(--user-border)] shadow-[var(--user-shadow-sm)] hover:border-[var(--user-border-hover)] hover:shadow-[var(--user-shadow-md)]"
-      }`}
+      className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--user-bg-card)] shadow-none transition-colors duration-200"
     >
       <div
-        className={`relative shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${
-          compactDealCard ? "h-32" : "h-40 md:h-44 xl:h-48"
-        }`}
+        className="relative h-40 w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)]"
       >
         {image && failedImage !== image ? (
           <Image
@@ -268,9 +233,7 @@ function ProductCardInner({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             priority={priority}
             fetchPriority={priority ? "high" : "auto"}
-            className={`object-contain transition-transform duration-200 ease-out ${
-              compactDealCard ? "p-0 group-hover:scale-[1.02]" : "p-2 group-hover:scale-[1.04]"
-            }`}
+            className="object-cover object-center p-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
             onError={() => setFailedImage(image)}
           />
         ) : (
@@ -282,9 +245,7 @@ function ProductCardInner({
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] ${
-                compactDealCard ? "font-normal" : "font-semibold"
-              }`}
+              className={`flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] font-normal`}
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={9} />
@@ -297,17 +258,13 @@ function ProductCardInner({
 
           {out ? (
             <span
-              className={`rounded-full bg-[var(--user-danger)] px-2 py-1 text-[0.6rem] text-white ${
-                compactDealCard ? "font-normal" : "font-semibold"
-              }`}
+              className={`rounded-full bg-[var(--user-danger)] px-2 py-1 text-[0.6rem] text-white font-normal`}
             >
               OUT OF STOCK
             </span>
           ) : totalStock < 5 ? (
             <span
-              className={`rounded-full bg-[var(--user-warning)] px-2 py-1 text-[0.6rem] text-black ${
-                compactDealCard ? "font-normal" : "font-semibold"
-              }`}
+              className={`rounded-full bg-[var(--user-warning)] px-2 py-1 text-[0.6rem] text-black font-normal`}
             >
               LOW STOCK
             </span>
@@ -337,14 +294,12 @@ function ProductCardInner({
             Multi-variant: only "Choose Options" (opens right-side drawer).
             Single variant: "Add to Cart" + "Buy Now".
             Desktop: reveal on hover. Mobile: always visible (no hover). */}
-        {!out && !compactDealCard && (
+        {!out && (
           <div className="absolute inset-x-2 bottom-2 z-10 flex gap-1.5 transition-all duration-200 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
             {hasMultipleVariants ? (
               <button
                 onClick={handleOpenOptions}
-                className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[var(--user-accent)] px-2 text-[0.625rem] text-[var(--user-accent-text)] shadow-sm transition hover:opacity-90 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] ${
-                  compactDealCard ? "font-normal" : "font-semibold"
-                }`}
+                className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[var(--user-accent)] px-2 text-[0.625rem] text-[var(--user-accent-text)] shadow-sm transition hover:opacity-90 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] font-normal`}
               >
                 <SlidersHorizontal size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Choose Options
@@ -357,7 +312,7 @@ function ProductCardInner({
                     added
                       ? "bg-[var(--user-success)] text-white"
                       : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"
-                  } ${compactDealCard ? "font-normal" : "font-semibold"}`}
+                  } font-normal`}
                 >
                   {added ? (
                     <Check size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -368,9 +323,7 @@ function ProductCardInner({
                 </button>
                 <button
                   onClick={handleQuickBuy}
-                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-white/20 bg-black/65 px-2 text-[0.625rem] text-white shadow-sm backdrop-blur-sm transition hover:bg-black/75 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] ${
-                    compactDealCard ? "font-normal" : "font-semibold"
-                  }`}
+                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-white/20 bg-black/65 px-2 text-[0.625rem] text-white shadow-sm backdrop-blur-sm transition hover:bg-black/75 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] font-normal`}
                 >
                  
                   Buy Now
@@ -381,24 +334,18 @@ function ProductCardInner({
         )}
       </div>
 
-      <div className={`flex min-w-0 flex-1 flex-col ${compactDealCard ? "p-1" : "p-2"}`}>
-        {!compactDealCard ? (
-          <p className="h-2.5 truncate text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-[var(--user-text-subtle)]">
-            {brandName || ""}
-          </p>
-        ) : null}
+      <div className="flex min-w-0 flex-1 flex-col p-1">
+        <p className="h-3 truncate text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em] text-[var(--user-text-subtle)]">
+          {brandName || ""}
+        </p>
         <h3
-          className={`text-[0.75rem] leading-4 text-[var(--user-text)] ${
-            compactDealCard
-              ? "line-clamp-1 h-4 font-normal"
-              : "mb-0.5 line-clamp-2 h-8 font-semibold sm:text-[0.8125rem]"
-          }`}
+          className="line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] text-[var(--user-text)] sm:text-[0.8125rem]"
         >
           {product.name}
         </h3>
 
         {ratingCount > 0 ? (
-          <div className={`flex h-3 items-center gap-1 text-[0.625rem] text-[var(--user-text-muted)] ${compactDealCard ? "" : "mb-0.5"}`}>
+          <div className="mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-[var(--user-text-muted)]">
             <span className="flex items-center gap-px" aria-label={`${rating.toFixed(1)} out of 5 stars`}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
@@ -415,96 +362,35 @@ function ProductCardInner({
             <span>{rating.toFixed(1)}</span>
             <span>({ratingCount})</span>
           </div>
-        ) : !compactDealCard ? (
-          <div className={`h-3 ${compactDealCard ? "" : "mb-0.5"}`} aria-hidden="true" />
         ) : null}
 
         <h4
-          className={`truncate text-[0.9rem] leading-5 text-[var(--user-accent)] sm:text-[0.9375rem] ${
-            compactDealCard ? "font-normal" : "font-bold"
-          }`}
+          className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]"
         >
           Rs. {price.toLocaleString()}
         </h4>
-        <div className={`flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem] ${compactDealCard ? "font-normal" : ""}`}>
+        <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
           {oldPrice > price ? (
             <>
               <span className="truncate text-[var(--user-text-subtle)] line-through">
                 Rs. {oldPrice.toLocaleString()}
               </span>
               {discountPercent > 0 ? (
-                <span className={`shrink-0 text-[var(--user-accent)] ${compactDealCard ? "font-normal" : "font-semibold"}`}>
+                <span className={`shrink-0 text-[var(--user-accent)] font-normal`}>
                   -{discountPercent}%
                 </span>
               ) : null}
             </>
           ) : null}
         </div>
-        <div className={`flex h-3 items-center gap-1.5 overflow-hidden ${compactDealCard ? "hidden" : ""}`}>
-          {colorOptions.length > 0 ? (
-            <>
-              {colorOptions.slice(0, 4).map((option) => (
-                <span
-                  key={option.label}
-                  title={option.label}
-                  role="img"
-                  aria-label={option.label}
-                  className="h-3 w-3 shrink-0 rounded-full border border-[var(--user-border-hover)]"
-                  style={{ backgroundColor: option.swatch }}
-                />
-              ))}
-              {colorOptions.length > 4 ? (
-                <span className="text-[0.6rem] text-[var(--user-text-muted)]">
-                  +{colorOptions.length - 4}
-                </span>
-              ) : null}
-              <span className="truncate text-[0.6rem] text-[var(--user-text-muted)]">
-                {colorOptions.length} {colorOptions.length === 1 ? "Color" : "Colors"}
-              </span>
-            </>
-          ) : null}
-        </div>
-        <div className={`flex h-3 min-w-0 items-center ${compactDealCard ? "hidden" : ""}`}>
-          {mentionDeal ? (
-            <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-medium text-[var(--user-accent)]">
+        {mentionDeal && !showDealPricing ? (
+          <div className="flex h-3 min-w-0 items-center">
+            <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
               <Sparkles size={9} className="shrink-0" />
-              <span className="truncate">Also available in deal</span>
+              <span className="truncate">Deal Price</span>
             </span>
-          ) : null}
-        </div>
-
-        {!out && compactDealCard ? (
-          <div className="mt-auto flex h-5 gap-1">
-            {hasMultipleVariants ? (
-              <button
-                onClick={handleOpenOptions}
-                className="flex h-5 min-w-0 flex-1 items-center justify-center gap-1 rounded bg-[var(--user-accent)] px-1.5 text-[0.625rem] font-normal text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
-              >
-                <SlidersHorizontal size={12} />
-                Choose Options
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleQuickAdd}
-                  className={`flex h-5 min-w-0 flex-1 items-center justify-center gap-1 rounded px-1 text-[0.625rem] font-normal text-white transition-opacity hover:opacity-90 ${
-                    added ? "bg-[var(--user-success)]" : "bg-[var(--user-accent)]"
-                  }`}
-                >
-                  {added ? <Check size={12} /> : <ShoppingCart size={12} />}
-                  {added ? "Added!" : "Cart"}
-                </button>
-                <button
-                  onClick={handleQuickBuy}
-                  className="flex h-5 min-w-0 flex-1 items-center justify-center rounded border border-[var(--user-border)] px-1 text-[0.625rem] font-normal text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)]"
-                >
-                  Buy Now
-                </button>
-              </>
-            )}
           </div>
         ) : null}
-
         {children}
       </div>
     </Link>

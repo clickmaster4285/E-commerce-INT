@@ -925,7 +925,6 @@ function ProductsRow({ products, deal, hex }) {
               deal={deal}
               dealId={deal._id}
               showDealPricing
-              compactDealCard
             />
           </div>
         ))}
