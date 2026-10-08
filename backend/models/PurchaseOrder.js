@@ -17,6 +17,8 @@ const poItemSchema = new mongoose.Schema(
     batch_no: { type: String, trim: true, default: "" },
     mfg_date: { type: Date, default: null },
     expiry_date: { type: Date, default: null },
+    expiry_after_delivery: { type: Number, default: 0, min: 0 },
+    expiry_after_delivery_unit: { type: String, enum: ["days", "months", "years"], default: "days" },
   },
   { _id: false }
 );

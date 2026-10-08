@@ -28,6 +28,7 @@ const getImageUrl = (url) => {
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) return url;
   return `${API_ORIGIN}${url}`;
 };
+const formatMoney = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
 
 const createEmptyVariant = (sku = "") => ({
   _id: null, sku, title: "", description: "",
@@ -404,6 +405,7 @@ const ACTIVITY_TYPES = {
   "product-updated": { group: "product", label: "Product Updated", icon: Pencil, bg: "var(--info-soft)", fg: "var(--info)", avatar: "blue" },
   "variant-created": { group: "variant", label: "Variant Created", icon: Layers3, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
   "variant-updated": { group: "variant", label: "Variant Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
+  "purchase-order-received": { group: "purchase-order", label: "Purchase Order Received", icon: Package, bg: "var(--info-soft)", fg: "var(--info)", avatar: "emerald" },
 };
 
 const activityMetaOf = (type) => ACTIVITY_TYPES[type] || ACTIVITY_TYPES["product-updated"];
@@ -682,6 +684,10 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   // ---- Summary tiles ke numbers ----
   const costPrice = Number(variant.cost_price || 0);
   const sellingPrice = Number(variant.selling_price || 0);
+  const expiryAfterDelivery = Math.max(0, Number(variant.expiry_after_delivery) || 0);
+  const expiryAfterDeliveryUnit = ["days", "months", "years"].includes(variant.expiry_after_delivery_unit)
+    ? variant.expiry_after_delivery_unit
+    : "days";
 
   const sku = variant.sku || "";
   const description = variant.description || "";
@@ -812,6 +818,14 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
                 ))}
               </div>
             )}
+          </DrawerSection>
+
+          <DrawerSection title="Expiry After Delivery" delay={150}>
+            <DetailStat
+              label="Usable duration after delivery"
+              value={expiryAfterDelivery > 0 ? `${expiryAfterDelivery} ${expiryAfterDeliveryUnit}` : "Not set"}
+              sub={expiryAfterDelivery > 0 ? "Variant expiry setting" : "No expiry duration configured"}
+            />
           </DrawerSection>
 
           {/* INVENTORY — sirf quantity (min/max qty UI mein nahi) */}
@@ -1739,6 +1753,7 @@ export default function ProductDetailPage() {
   // did not happen:
   //   • Product  → created_at / updated_at  (+ createdby / updatedby)
   //   • Variant  → created_at / updated_at  (+ createdby / updatedby)
+  //   • PO       → persisted receiving entries returned by product detail API
   // The backend only bumps those stamps when isModified() is true, so untouched
   // records produce no event. Tag documents are intentionally not treated as
   // product activity — a tag's own timestamps belong to the shared tag library.
@@ -1802,6 +1817,45 @@ export default function ProductDetailPage() {
       }
     });
 
+    /* ---------------- Purchase orders ---------------- */
+    (product.purchaseOrderHistory || []).forEach((receiving, receivingIndex) => {
+      const receivedItems = receiving.items || [];
+      const details = receivedItems.map((item) => {
+        const expiryDuration = Math.max(0, Number(item.expiry_after_delivery) || 0);
+        const expiryUnit = ["days", "months", "years"].includes(item.expiry_after_delivery_unit)
+          ? item.expiry_after_delivery_unit
+          : "days";
+        return `${item.name || item.sku || "Variant"}: ${item.qty} received, cost ${formatMoney(item.cost_price)}, sell ${formatMoney(item.sell_price)}, expiry after delivery ${expiryDuration > 0 ? `${expiryDuration} ${expiryUnit}` : "not set"}`;
+      });
+      const firstItem = receivedItems[0];
+      const subject = [
+        { label: "PO", value: receiving.po_number || "—", mono: true },
+        ...(receivedItems.length === 1
+          ? [
+              { label: "Variant", value: firstItem.name || firstItem.sku || "Variant" },
+              { label: "Qty Received", value: String(firstItem.qty) },
+              { label: "Cost Price", value: formatMoney(firstItem.cost_price) },
+              { label: "Sell Price", value: formatMoney(firstItem.sell_price) },
+              {
+                label: "Expiry After Delivery",
+                value: Number(firstItem.expiry_after_delivery) > 0
+                  ? `${firstItem.expiry_after_delivery} ${firstItem.expiry_after_delivery_unit || "days"}`
+                  : "Not set",
+              },
+            ]
+          : [{ label: "Received Variants", value: String(receivedItems.length) }]),
+        ...(receiving.invoice_no ? [{ label: "Invoice", value: receiving.invoice_no, mono: true }] : []),
+      ];
+      push({
+        key: `purchase-order-received-${receiving.po_number || "po"}-${receivingIndex}`,
+        type: "purchase-order-received",
+        actor: receiving.received_by_name || null,
+        description: `PO ${receiving.po_number || ""} received: ${details.join("; ")}`,
+        date: receiving.received_at,
+        subject,
+      });
+    });
+
     /* ---------------- Live socket overlay (deduped against DB entries) ---------------- */
     // The refetched document and the socket broadcast describe the same save with
     // the same millisecond, so an exact stamp match drops only true duplicates.
@@ -1847,6 +1901,7 @@ export default function ProductDetailPage() {
   const productEventCount = activityTimeline.filter((e) => e.group === "product").length;
   const variantCreateCount = activityTimeline.filter((e) => e.type === "variant-created").length;
   const variantUpdateCount = activityTimeline.filter((e) => e.type === "variant-updated").length;
+  const purchaseOrderReceiveCount = activityTimeline.filter((e) => e.type === "purchase-order-received").length;
   // Entries the backend never attributed to a user. Surfaced so the empty actor
   // rows are explained instead of looking like a rendering fault.
   const unattributedCount = activityTimeline.filter((e) => !actorInfo(e.actor).known).length;
@@ -1864,12 +1919,14 @@ export default function ProductDetailPage() {
     { id: "product-events", label: "Product Changes", icon: Package, soft: "var(--success-soft)", color: "var(--success)", value: productEventCount, hint: "Created & later edited" },
     { id: "variants-added", label: "Variants Added", icon: Layers3, soft: "var(--purple-soft)", color: "var(--purple)", value: variantCreateCount, hint: "Recorded variant creations" },
     { id: "variant-updates", label: "Variants Edited", icon: Pencil, soft: "var(--warning-soft)", color: "var(--warning)", value: variantUpdateCount, hint: "Recorded variant edits" },
+    { id: "po-receivings", label: "PO Receivings", icon: Package, soft: "var(--info-soft)", color: "var(--info)", value: purchaseOrderReceiveCount, hint: "Received purchase orders" },
   ];
 
   const activityFilters = [
     { id: "all", label: "All Activity", count: activityTimeline.length },
     { id: "product", label: "Product", count: productEventCount },
     { id: "variant", label: "Variants", count: variantCreateCount + variantUpdateCount },
+    { id: "purchase-order", label: "Purchase Orders", count: purchaseOrderReceiveCount },
   ];
 
   // Helper to open gallery
@@ -2691,7 +2748,7 @@ export default function ProductDetailPage() {
               }>
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                     {activitySummary.map((stat) => {
                       const StatIcon = stat.icon;
                       return (
@@ -2758,7 +2815,7 @@ export default function ProductDetailPage() {
                       </h4>
                       <p className="text-[11px] mt-1 max-w-sm" style={{ color: "var(--text-muted)" }}>
                         {activityTimeline.length === 0
-                          ? "This product has only its original creation entry. Every edit you save from now on is listed here."
+                          ? "No product, variant, or received purchase-order activity has been recorded yet."
                           : "No recorded changes match the selected filter. Try “All Activity” to see everything."}
                       </p>
                     </div>

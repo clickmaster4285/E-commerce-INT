@@ -211,7 +211,13 @@ function NewPOPage() {
     qc.invalidateQueries({ queryKey: ["products"] });
     setVDetails((previous) => ({
       ...previous,
-      [String(variant._id)]: { cost_price: costPrice, selling_price: sellPrice, topup: Number(variant.topup) || 0 },
+      [String(variant._id)]: {
+        cost_price: costPrice,
+        selling_price: sellPrice,
+        topup: Number(variant.topup) || 0,
+        expiry_after_delivery: Math.max(0, Number(variant.expiry_after_delivery) || 0),
+        expiry_after_delivery_unit: variant.expiry_after_delivery_unit || "days",
+      },
     }));
     setLines((prev) => {
       const existingIndex = prev.findIndex((line) => String(line.variant_id) === String(variant._id));
@@ -234,7 +240,10 @@ function NewPOPage() {
         sku: variant.sku || "", title: variant.title || "", product_name: productName,
         image: variant.images?.[0]?.img_url || "", in_stock: variant.quantity ?? 0, qty_ordered: 1,
         cost_price: costPrice, sell_price: sellPrice,
-        topup: Number(variant.topup) || 0, tax_rate: 0, batch_no: "", mfg_date: "", expiry_date: "", included: true,
+        topup: Number(variant.topup) || 0,
+        expiry_after_delivery: Number(variant.expiry_after_delivery) || "",
+        expiry_after_delivery_unit: variant.expiry_after_delivery_unit || "days",
+        tax_rate: 0, mfg_date: "", expiry_date: "", included: true,
       }];
     });
     pushEvent(`Variant ${variant.sku || ""} for "${productName}" refreshed with current stock and prices`);
@@ -254,7 +263,13 @@ function NewPOPage() {
       if (missing.length) {
         const res = await Promise.all(missing.map((vid) => variantApi.getById(vid).catch(() => null)));
         res.forEach((full, i) => {
-          if (full) detMap[missing[i]] = { cost_price: Math.max(0, Number(full.cost_price) || 0), selling_price: Math.max(0, Number(full.selling_price) || 0), topup: Number(full.topup) || 0 };
+          if (full)           detMap[missing[i]] = {
+            cost_price: Math.max(0, Number(full.cost_price) || 0),
+            selling_price: Math.max(0, Number(full.selling_price) || 0),
+            topup: Number(full.topup) || 0,
+            expiry_after_delivery: Math.max(0, Number(full.expiry_after_delivery) || 0),
+            expiry_after_delivery_unit: full.expiry_after_delivery_unit || "days",
+          };
         });
         setVDetails((prev) => ({ ...prev, ...detMap }));
       }
@@ -272,7 +287,9 @@ function NewPOPage() {
             in_stock: item.quantity ?? 0, qty_ordered: 1,
             cost_price: det.cost_price ?? 0, sell_price: det.selling_price ?? 0,
             topup: det.topup ?? 0,
-            tax_rate: 0, batch_no: "", mfg_date: "", expiry_date: "", included: true,
+            expiry_after_delivery: det.expiry_after_delivery || "",
+            expiry_after_delivery_unit: det.expiry_after_delivery_unit || "days",
+            tax_rate: 0, mfg_date: "", expiry_date: "", included: true,
           });
           have.add(String(item._id));
         }
@@ -310,9 +327,9 @@ function NewPOPage() {
       sell_price: Math.max(0, Number(l.sell_price) || 0),
       tax_rate: Math.min(100, Math.max(0, Number(l.tax_rate) || 0)),
       topup: Number(l.topup) || 0,
-      batch_no: String(l.batch_no || ""),
       mfg_date: l.mfg_date || undefined,
-      expiry_date: l.expiry_date || undefined,
+      expiry_after_delivery: Math.max(0, Math.floor(Number(l.expiry_after_delivery) || 0)),
+      expiry_after_delivery_unit: l.expiry_after_delivery_unit || "days",
     })),
     shipping: Math.max(0, Number(shipping) || 0),
     discount: Math.max(0, Number(discount) || 0),
@@ -490,7 +507,7 @@ function NewPOPage() {
               <div className="py-12 flex flex-col items-center text-center rounded-2xl" style={{ border: "2px dashed #cbd5e1", background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)" }}>
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner mb-3" style={{ background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)" }}><Package size={32} style={{ color: "#94a3b8" }} /></div>
                 <div className="font-extrabold text-base" style={{ color: "#0f172a" }}>No products added</div>
-                <div className="text-xs mt-1.5 max-w-xs" style={{ color: "#64748b" }}>Add products to enter cost, sell price, batch, and quantity details.</div>
+                <div className="text-xs mt-1.5 max-w-xs" style={{ color: "#64748b" }}>Add products to enter cost, sell price, and quantity details.</div>
                 <button onClick={openPicker} className="h-10 px-5 mt-5 rounded-xl text-[13px] font-bold transition-all duration-200 hover:scale-[1.03] hover:shadow-lg active:scale-[0.98] shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}>Browse products</button>
               </div>
             ) : (
@@ -534,13 +551,13 @@ function NewPOPage() {
                       </div>
                       {expanded[group.id] !== false && (
                         <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
-                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
-                            <span>✓</span><span>Product / Variant</span><span className="text-center">In Stock</span><span className="text-right">Cost Price</span><span className="text-right">Sell Price</span><span className="text-right">Qty</span><span className="text-right">Tax %</span><span className="text-right">Line Total</span><span>Batch No.</span><span>Mfg Date</span><span>Expiry Date</span>
+                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.35fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
+                            <span>✓</span><span>Product / Variant</span><span className="text-center">In Stock</span><span className="text-right">Cost Price</span><span className="text-right">Sell Price</span><span className="text-right">Qty</span><span className="text-right">Tax %</span><span className="text-right">Line Total</span><span>Mfg Date</span><span>Expiry After Delivery</span>
                           </div>
                             {group.lines.map((line) => {
                               const lineTotal = Math.round(Math.max(0, Number(line.cost_price) || 0) * Math.max(1, Math.floor(Number(line.qty_ordered) || 1)));
                               return <div key={String(line.variant_id)} className="min-w-0 px-3 sm:px-4 py-3.5 transition-all duration-200 rounded-xl mx-1 my-0.5" style={{ backgroundColor: line.included === false ? "#f8fafc" : "#fff", opacity: line.included === false ? 0.7 : 1, border: line.included === false ? "1px solid #e2e8f0" : "1px solid transparent" }}>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 xl:items-center">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.35fr)] gap-2 xl:items-center">
                                   <div className="flex items-center"><input type="checkbox" checked={line.included !== false} onChange={(event) => updateLine(line.variant_id, { included: event.target.checked })} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} aria-label={`Include ${line.title || line.sku}`} /></div>
                                   <div className="min-w-0 flex items-center gap-2"><Thumb src={line.image} alt={line.title || line.product_name} size="w-10 h-10" /><div className="min-w-0"><div className="font-semibold text-xs truncate" title={line.title || "Default variant"}>{line.title || "Default variant"}</div><div className="font-mono text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{line.sku || "—"}</div></div></div>
                                   <div className="min-w-0 xl:flex xl:justify-center"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>In Stock</div>{stockPill(line)}</div>
@@ -549,9 +566,18 @@ function NewPOPage() {
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Qty</div><input type="number" min={1} step={1} value={line.qty_ordered} onChange={(event) => updateLine(line.variant_id, { qty_ordered: Math.max(1, Math.floor(Number(event.target.value) || 1)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Tax %</div><input type="number" min={0} max={100} value={line.tax_rate} onChange={(event) => updateLine(line.variant_id, { tax_rate: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Line Total</div><div className="h-9 px-2 rounded-lg flex items-center justify-end font-extrabold text-[11px] tabular-nums whitespace-nowrap overflow-hidden shadow-inner" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>{money(lineTotal, 0)}</div></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Batch No.</div><input value={line.batch_no || ""} onChange={(event) => updateLine(line.variant_id, { batch_no: event.target.value })} placeholder="Batch" className="w-full min-w-0 h-9 px-2 rounded-lg text-[11px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Mfg Date</div><input type="date" value={line.mfg_date || ""} onChange={(event) => updateLine(line.variant_id, { mfg_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Expiry Date</div><input type="date" value={line.expiry_date || ""} onChange={(event) => updateLine(line.variant_id, { expiry_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0">
+                                    <div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Expiry After Delivery</div>
+                                    <div className="grid grid-cols-[minmax(0,1fr)_75px] gap-1.5">
+                                      <input type="number" min={0} step={1} inputMode="numeric" aria-label={`Expiry duration after delivery for ${line.title || line.sku}`} value={line.expiry_after_delivery ?? ""} onChange={(event) => updateLine(line.variant_id, { expiry_after_delivery: event.target.value === "" ? "" : Math.max(0, Math.floor(Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                                      <select aria-label={`Expiry duration unit for ${line.title || line.sku}`} value={line.expiry_after_delivery_unit || "days"} onChange={(event) => updateLine(line.variant_id, { expiry_after_delivery_unit: event.target.value })} className="w-full min-w-0 h-9 px-1 rounded-lg text-[10px] outline-none font-medium shadow-sm focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+                                        <option value="days">Days</option>
+                                        <option value="months">Months</option>
+                                        <option value="years">Years</option>
+                                      </select>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>;
                             })}
@@ -560,7 +586,6 @@ function NewPOPage() {
                     </div>
                   ))}
                 </div>
-                <button onClick={openPicker} className="mt-4 text-[13px] font-extrabold transition-all duration-200 hover:scale-[1.03] hover:shadow-md active:scale-[0.98]" style={{ color: "#2563eb" }}><Plus size={14} strokeWidth={2.5} /> Add Another Product</button>
               </>
             )}
           </section>

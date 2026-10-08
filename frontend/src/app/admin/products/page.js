@@ -957,7 +957,7 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                <tr>{["Product", "Category", "Brand", "Description", "Tax", "Status", "Actions"].map((h) => (
+                <tr>{["Product", "Category", "Brand", "Description", "Variants", "Tax", "Status", "Actions"].map((h) => (
                   <th key={h} className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`} style={{ color: "var(--text-muted)" }}>{h}</th>
                 ))}</tr>
               </thead>
@@ -969,17 +969,18 @@ const [viewMode, setViewMode] = useState(() => {
               <tbody style={{ animation: "fadeIn 0.22s ease" }}>
                 {productsError ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
+                    <td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
                       <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
                       <p className="text-[13px]">Failed to load products. Please check your connection.</p>
                       <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
                 ) : paginatedProducts.map((p) => {
                   const img = p?.variants?.[0]?.images?.[0]?.img_url;
                   const firstVariantSku = p?.variants?.[0]?.sku || "";
+                  const variantCount = Array.isArray(p?.variants) ? p.variants.length : Number(p?.variantCount) || 0;
                   return (
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
@@ -995,6 +996,9 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
                         <span className="inline-block max-w-[220px] truncate align-middle">{p.description ? p.description : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-[13px]">
+                        <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? "variant" : "variants"}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px] font-medium">{p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
@@ -1025,6 +1029,7 @@ const [viewMode, setViewMode] = useState(() => {
             const v = p?.variants?.[0];
             const img = v?.images?.[0]?.img_url;
             const firstSku = v?.sku || "";
+            const variantCount = Array.isArray(p?.variants) ? p.variants.length : Number(p?.variantCount) || 0;
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
@@ -1034,7 +1039,8 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold">{p.name}</p>
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>{p.description ? (p.description.length > 60 ? p.description.slice(0, 60) + "..." : p.description) : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{p.description ? (p.description.length > 60 ? p.description.slice(0, 60) + "..." : p.description) : "—"}</p>
+                  <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>Variants: {variantCount}</p>
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Tax: {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
                 <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>

@@ -61,6 +61,16 @@ const variantSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    expiry_after_delivery: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    expiry_after_delivery_unit: {
+      type: String,
+      enum: ["days", "months", "years"],
+      default: "days",
+    },
     quantity: {
       type: Number,
       default: 0,

@@ -90,7 +90,7 @@ export default function PODetailPage({ params }) {
       invoice_no: invoiceNumber,
     }),
     onSuccess: () => {
-      toast.success("PO received — inventory and variant prices updated");
+      toast.success("PO received — inventory, prices, and expiry settings updated");
       setDeliverOpen(false);
       setInvoiceNo("");
       refresh();
@@ -187,7 +187,7 @@ export default function PODetailPage({ params }) {
           <Panel title="Ordered Items" icon={PackageCheck} trailing={<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ color: "#2878f0", background: "#edf5ff" }}>{items.length} Items</span>}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-xs">
-                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Image", "Product / Variant", "SKU", "Qty Ordered", "Cost Price", "Sell Price", "Line Total", "Tax Rate"].map((label) => <th key={label} className="whitespace-nowrap px-2.5 py-2 font-semibold">{label}</th>)}</tr></thead>
+                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Image", "Product / Variant", "SKU", "Qty Ordered", "Cost Price", "Sell Price", "Line Total", "Tax Rate", "Expiry After Delivery"].map((label) => <th key={label} className="whitespace-nowrap px-2.5 py-2 font-semibold">{label}</th>)}</tr></thead>
                 <tbody>{items.map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                   <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || "Product"} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
@@ -198,8 +198,9 @@ export default function PODetailPage({ params }) {
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-semibold" style={primary}>{money(item.line_total)}</td>
                   <td className="px-2.5 py-2.5" style={muted}>{Number(item.tax_rate || 0)}%</td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${item.expiry_after_delivery} ${item.expiry_after_delivery_unit || "days"}` : item.expiry_date ? `Until ${dateOnly(item.expiry_date)}` : "—"}</td>
                 </tr>)}
-                {!items.length && <tr><td colSpan={9} className="p-8 text-center text-xs" style={muted}>No order items.</td></tr>}</tbody>
+                {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>No order items.</td></tr>}</tbody>
               </table>
             </div>
           </Panel>
@@ -243,7 +244,7 @@ export default function PODetailPage({ params }) {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[320px] text-left text-xs">
                 <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Date", "Amount"].map((label) => <th key={label} className="whitespace-nowrap px-2 py-2 font-semibold">{label}</th>)}</tr></thead>
-                <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t" style={{ borderColor: "#eaf0f8" }}><td className="px-2 py-2" style={muted}>{index + 1}</td><td className="whitespace-nowrap px-2 py-2" style={primary}>{dateOnly(payment.paid_at || payment.created_at)}</td><td className="whitespace-nowrap px-2 py-2 font-semibold" style={primary}>{money(payment.amount)}</td></tr>)}
+                <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t" style={{ borderColor: "#eaf0f8" }}><td className="px-2 py-2" style={muted}>{index + 1}</td><td className="whitespace-nowrap px-2 py-2" style={primary}>{dateTime(payment.paid_at || payment.created_at)}</td><td className="whitespace-nowrap px-2 py-2 font-semibold" style={primary}>{money(payment.amount)}</td></tr>)}
                   {!payments.length && <tr><td colSpan={3} className="p-4 text-center" style={muted}>No payments recorded.</td></tr>}</tbody>
               </table>
             </div>

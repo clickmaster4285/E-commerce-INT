@@ -39,6 +39,16 @@ const buildItems = async (rawItems) => {
     if (!variant) throw new Error("Variant not found");
     const product = await Product.findById(variant.product_id).lean();
     if (!product || product.is_deleted) throw new Error("Product not found or deleted");
+    const expiryAfterDelivery = r.expiry_after_delivery === undefined
+      ? Math.max(0, Number(variant.expiry_after_delivery) || 0)
+      : Number(r.expiry_after_delivery);
+    if (!Number.isInteger(expiryAfterDelivery) || expiryAfterDelivery < 0) {
+      throw new Error("expiry_after_delivery must be a nonnegative whole number");
+    }
+    const expiryUnit = r.expiry_after_delivery_unit || variant.expiry_after_delivery_unit || "days";
+    if (!["days", "months", "years"].includes(expiryUnit)) {
+      throw new Error("expiry_after_delivery_unit must be days, months, or years");
+    }
     const taxRate = Math.min(100, Math.max(0, Number(r.tax_rate ?? 0)));
     const line_total = Math.round(cost * qty);
     subtotal += line_total;
@@ -49,6 +59,7 @@ const buildItems = async (rawItems) => {
       cost_price: cost, sell_price: Math.max(0, Number(r.sell_price ?? variant.selling_price) || 0),
       qty_ordered: qty, received_qty: 0, line_total, tax_rate: taxRate,
       batch_no: String(r.batch_no || ""), mfg_date: r.mfg_date || null, expiry_date: r.expiry_date || null,
+      expiry_after_delivery: expiryAfterDelivery, expiry_after_delivery_unit: expiryUnit,
       topup: Number(r.topup) || 0,
     });
   }
@@ -219,6 +230,7 @@ const deliverPO = async (req, res) => {
 
     if (useTx) { session = await mongoose.startSession(); session.startTransaction(); }
     const touched = [];
+    const receivedAt = new Date();
     for (const n of norm) {
       const variant = await Variant.findById(n.variant_id).session(session || null);
       if (!variant) throw new Error("Variant not found");
@@ -230,6 +242,8 @@ const deliverPO = async (req, res) => {
           $set: {
             cost_price: Math.max(0, Number(n.item.cost_price) || 0),
             selling_price: Math.max(0, Number(n.item.sell_price) || 0),
+            expiry_after_delivery: Math.max(0, Number(n.item.expiry_after_delivery) || 0),
+            expiry_after_delivery_unit: n.item.expiry_after_delivery_unit || "days",
           },
         },
         { session },
@@ -245,7 +259,7 @@ const deliverPO = async (req, res) => {
       n.item.received_qty += n.qty;
       touched.push({ variant_id: variant._id, change: n.qty });
     }
-    po.receivings.push({ invoice_no, explanation, items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })), received_by: req.user?._id || null, received_by_name: req.user?.name || "Admin" });
+    po.receivings.push({ received_at: receivedAt, invoice_no, explanation, items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })), received_by: req.user?._id || null, received_by_name: req.user?.name || "Admin" });
     po.status = "delivered";
     po.updatedby = req.user?._id || null;
     await po.save({ session });
@@ -253,7 +267,7 @@ const deliverPO = async (req, res) => {
     emitStock({ variants: touched, source: "po_delivered" });
     emitPO("po:delivered", { success: true, data: po });
     emitPO("po:updated", { success: true, data: po });
-    res.status(200).json({ success: true, message: "PO delivered — inventory updated", data: po });
+    res.status(200).json({ success: true, message: "PO delivered — inventory, prices, and expiry settings updated", data: po });
   } catch (e) {
     if (session) { try { await session.abortTransaction(); } catch {} }
     log.error("deliverPO error:", e.message);

@@ -8,6 +8,7 @@ const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
 const Deal = require("../models/Deal");
 const Discount = require("../models/Discount");
+const PurchaseOrder = require("../models/PurchaseOrder");
 // ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
 const loadBrandModel = () => {
   const paths = [
@@ -1297,6 +1298,47 @@ const getProductById = async (req, res) => {
       .populate("updatedby", "name email")
       .lean();
 
+    const purchaseOrders = await PurchaseOrder.find({
+      "items.product_id": product._id,
+      "receivings.0": { $exists: true },
+      is_deleted: { $ne: true },
+    })
+      .select("po_number items.product_id items.variant_id items.name items.sku items.variantTitle items.cost_price items.sell_price items.expiry_after_delivery items.expiry_after_delivery_unit receivings.received_at receivings.invoice_no receivings.received_by_name receivings.items.variant_id receivings.items.product_id receivings.items.qty")
+      .lean();
+    const purchaseOrderHistory = purchaseOrders.flatMap((po) => {
+      const poItemsByVariant = new Map(
+        (po.items || [])
+          .filter((item) => String(item.product_id) === String(product._id))
+          .map((item) => [String(item.variant_id), item]),
+      );
+      return (po.receivings || []).flatMap((receiving) => {
+        const receivedItems = (receiving.items || [])
+          .filter((received) => poItemsByVariant.has(String(received.variant_id)))
+          .map((received) => {
+            const item = poItemsByVariant.get(String(received.variant_id));
+            return {
+              variant_id: received.variant_id,
+              name: item.variantTitle || item.name || item.sku || "Variant",
+              sku: item.sku || "",
+              qty: Number(received.qty) || 0,
+              cost_price: Number(item.cost_price) || 0,
+              sell_price: Number(item.sell_price) || 0,
+              expiry_after_delivery: Math.max(0, Number(item.expiry_after_delivery) || 0),
+              expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days",
+            };
+          })
+          .filter((item) => item.qty > 0);
+        if (!receivedItems.length) return [];
+        return [{
+          po_number: po.po_number,
+          received_at: receiving.received_at,
+          received_by_name: receiving.received_by_name || "",
+          invoice_no: receiving.invoice_no || "",
+          items: receivedItems,
+        }];
+      });
+    });
+
     // ⭐ LEGACY TAG HEALING: variant tags used to be saved as plain strings
     // without a Tag document, so the Tags tab showed "—" for Created By.
     // Create any missing Tag docs, attributing them to the user who last
@@ -1363,6 +1405,7 @@ const getProductById = async (req, res) => {
     return res.status(200).json({
       ...product,
       variants,
+      purchaseOrderHistory,
       ratingSummary,
     });
   } catch (error) {
@@ -1740,6 +1783,13 @@ const updateProduct = async (req, res) => {
             variant.selling_price = toNumber(item.selling_price, 0);
           }
 
+          if (item.expiry_after_delivery !== undefined) {
+            variant.expiry_after_delivery = Math.max(0, toNumber(item.expiry_after_delivery, 0));
+          }
+          if (item.expiry_after_delivery_unit !== undefined) {
+            variant.expiry_after_delivery_unit = item.expiry_after_delivery_unit;
+          }
+
           if (item.quantity !== undefined) {
             // ✅ Stock whole units mein hi rakhein (0.09 jaise decimals na aayein)
             variant.quantity = Math.trunc(toNumber(item.quantity, 0));
@@ -1846,6 +1896,8 @@ const updateProduct = async (req, res) => {
             description: item.description || "",
             cost_price: toNumber(item.cost_price, 0),
             selling_price: toNumber(item.selling_price, 0),
+            expiry_after_delivery: Math.max(0, toNumber(item.expiry_after_delivery, 0)),
+            expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days",
             // ✅ Variant stock sirf whole units (decimal point truncate)
             quantity: Math.trunc(toNumber(item.quantity, 0)),
             min_qnt: toNumber(item.min_qnt, 0),

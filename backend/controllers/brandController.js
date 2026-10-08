@@ -80,21 +80,10 @@ const createBrand = async (req, res) => {
       updatedby: null,
     };
 
+    if (req.brandId) brandData._id = req.brandId;
     if (req.brandImage) brandData.logo = req.brandImage;
 
     const brand = await Brand.create(brandData);
-
-    if (req.tempBrandFolder && req.tempBrandFolder.startsWith("temp_")) {
-      const oldFolderPath = path.join(__dirname, "../uploads/brands", req.tempBrandFolder);
-      const newFolderPath = path.join(__dirname, "../uploads/brands", brand._id.toString());
-
-      if (await fs.pathExists(oldFolderPath)) {
-        await fs.rename(oldFolderPath, newFolderPath);
-        const oldImgUrl = brand.logo?.img_url || "";
-        const newImgUrl = oldImgUrl.replace(req.tempBrandFolder, brand._id.toString());
-        await Brand.findByIdAndUpdate(brand._id, { "logo.img_url": newImgUrl });
-      }
-    }
 
     const updatedBrand = await Brand.findById(brand._id)
       .populate("createdby", "name email")
@@ -105,7 +94,7 @@ const createBrand = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    await pushGlobalActivity(io, {
+    void pushGlobalActivity(io, {
       action: `${performerName} created brand "${updatedBrand.brand_name || updatedBrand.name}"`,
       category: "Brand Management",
       performedBy: performerId,
@@ -281,7 +270,7 @@ const updateBrand = async (req, res) => {
       ? `${performerName} updated ${changedFields} for brand "${brand.brand_name || brand.name}"`
       : `${performerName} updated brand "${brand.brand_name || brand.name}"`;
 
-    await pushGlobalActivity(io, {
+    void pushGlobalActivity(io, {
       action: actionMsg,
       category: "Brand Management",
       performedBy: performerId,
@@ -329,7 +318,7 @@ const deleteBrand = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    await pushGlobalActivity(io, {
+    void pushGlobalActivity(io, {
       action: `${performerName} deleted brand "${brand.brand_name || brand.name}"`,
       category: "Brand Management",
       performedBy: performerId,
