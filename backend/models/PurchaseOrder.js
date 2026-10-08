@@ -59,8 +59,8 @@ const purchaseOrderSchema = new mongoose.Schema(
     total: { type: Number, required: true, min: 0 },
     status: {
       type: String,
-      enum: ["draft", "sent", "confirmed", "partially_received", "received", "closed", "cancelled"],
-      default: "draft",
+      enum: ["pending", "confirmed", "delivered", "closed", "cancelled"],
+      default: "pending",
       index: true,
     },
     payment_status: { type: String, enum: ["unpaid", "partial", "paid"], default: "unpaid" },

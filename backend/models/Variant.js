@@ -76,6 +76,12 @@ const variantSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // ✅ Topup quantity/amount field - reusable across variants
+    topup: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     // Dynamic attributes: color, size, weight, height etc.
     attributes: {
       type: mongoose.Schema.Types.Mixed,

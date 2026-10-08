@@ -19,6 +19,7 @@ import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { tagApi } from "@/apis/admin/tagApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
+import VariantForm from "@/components/admin/VariantForm";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -31,6 +32,7 @@ const getImageUrl = (url) => {
 const createEmptyVariant = (sku = "") => ({
   _id: null, sku, title: "", description: "",
   cost_price: "", selling_price: "", quantity: "0",
+  topup: "0",
   attributes: [{ name: "Color", value: "Black", isCustom: false }],
   images: [],
   tags: [],
@@ -1568,6 +1570,7 @@ export default function ProductDetailPage() {
         _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description,
         cost_price: Number(v.cost_price || 0), selling_price: Number(v.selling_price || 0),
         quantity: Number(v.quantity || 0),
+        topup: Number(v.topup || 0),
         attributes, existing_images: existingImages, tags: v.tags || [],
       };
     });
@@ -3068,8 +3071,9 @@ export default function ProductDetailPage() {
 
                               <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
-                                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                                   {[{ l: "Cost Price *", f: "cost_price", p: "1000" }, { l: "Selling Price *", f: "selling_price", p: "1500" },
+                                  { l: "Topup", f: "topup", p: "0" },
                                   { l: "Quantity (whole units)", f: "quantity", p: "50" }
                                   ].map(({ l, f, p }) => (
                                     <div key={f}>

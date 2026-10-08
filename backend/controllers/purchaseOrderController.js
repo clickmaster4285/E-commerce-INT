@@ -48,6 +48,7 @@ const buildItems = async (rawItems) => {
       sku: variant.sku || "", variantTitle: variant.title || "", image: variant.images?.[0]?.img_url || "",
       cost_price: cost, qty_ordered: qty, received_qty: 0, line_total, tax_rate: taxRate,
       batch_no: String(r.batch_no || ""), mfg_date: r.mfg_date || null, expiry_date: r.expiry_date || null,
+      topup: Number(r.topup) || 0,
     });
   }
   return { items, subtotal: Math.round(subtotal), tax: Math.round(tax) };
@@ -69,7 +70,7 @@ const createPO = async (req, res) => {
           po_number: await generateNextPONumber(), vendor_id: vendor._id,
           vendor_snapshot: { name: vendor.name, company_name: vendor.company_name, phone: vendor.phone, email: vendor.email, address: vendor.address, city: vendor.city },
           items, subtotal, tax, shipping: ship, discount: disc, total,
-          status: "draft", payment_status: "unpaid", paid_amount: 0, due_amount: total,
+          status: "pending", payment_status: "unpaid", paid_amount: 0, due_amount: total,
           expected_date: expected_date || null, due_date: due_date || null, notes: notes || "",
           createdby: req.user?._id || null,
         });
@@ -112,7 +113,7 @@ const updatePO = async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
-    if (po.status !== "draft") return res.status(400).json({ success: false, message: "Only draft POs can be edited" });
+    if (po.status !== "pending") return res.status(400).json({ success: false, message: "Only pending POs can be edited" });
     const { items: rawItems, shipping, discount, expected_date, due_date, notes } = req.body;
     if (rawItems) {
       const { items, subtotal, tax } = await buildItems(rawItems);
@@ -148,14 +149,13 @@ const transition = (from, to) => async (req, res) => {
     res.status(200).json({ success: true, message: `PO ${to}`, data: po });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
-const sendPO = transition(["draft"], "sent");
-const confirmPO = transition(["sent"], "confirmed");
-const cancelPO = transition(["draft", "sent", "confirmed", "partially_received"], "cancelled");
+const confirmPO = transition(["pending"], "confirmed");
+const cancelPO = transition(["pending", "confirmed"], "cancelled");
 const closePO = async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
-    if (po.status !== "received") return res.status(400).json({ success: false, message: "Only received POs can be closed" });
+    if (po.status !== "delivered") return res.status(400).json({ success: false, message: "Only delivered POs can be closed" });
     po.status = "closed"; po.updatedby = req.user?._id || null;
     await po.save();
     emitPO("po:updated", { success: true, data: po });
@@ -168,13 +168,17 @@ const supportsTx = async () => {
   catch { return false; }
 };
 
-const receivePO = async (req, res) => {
+const deliverPO = async (req, res) => {
   const useTx = await supportsTx();
   let session = null;
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
-    if (!["confirmed", "partially_received"].includes(po.status)) return res.status(400).json({ success: false, message: `Cannot receive in status ${po.status}. Confirm PO first.` });
+    // Idempotency: delivering twice must NOT add stock twice.
+    if (["delivered", "closed"].includes(po.status)) {
+      return res.status(200).json({ success: true, message: `PO already ${po.status} — no stock change`, data: po });
+    }
+    if (po.status !== "confirmed") return res.status(400).json({ success: false, message: `Cannot deliver in status ${po.status}. Confirm PO first.` });
     const invoice_no = String(req.body?.invoice_no || "").trim();
     const explanation = String(req.body?.explanation || "").trim();
     const lines = Array.isArray(req.body?.items) ? req.body.items : [];
@@ -194,6 +198,12 @@ const receivePO = async (req, res) => {
       if (qty > remaining) return res.status(400).json({ success: false, message: `Over-receive: only ${remaining} remaining for ${item.sku || item.name}` });
       norm.push({ variant_id: item.variant_id, product_id: item.product_id, qty, item });
     }
+    // Delivered means the complete ordered quantity arrived — no partial state.
+    const notFull = po.items.some((i) => {
+      const add = norm.find((n) => String(n.variant_id) === String(i.variant_id))?.qty || 0;
+      return i.received_qty + add < i.qty_ordered;
+    });
+    if (notFull) return res.status(400).json({ success: false, message: "Deliver the full ordered quantity for all lines" });
 
     if (useTx) { session = await mongoose.startSession(); session.startTransaction(); }
     const touched = [];
@@ -214,25 +224,29 @@ const receivePO = async (req, res) => {
       touched.push({ variant_id: variant._id, change: n.qty });
     }
     po.receivings.push({ invoice_no, explanation, items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })), received_by: req.user?._id || null, received_by_name: req.user?.name || "Admin" });
-    po.status = po.items.every((i) => i.received_qty >= i.qty_ordered) ? "received" : "partially_received";
+    po.status = "delivered";
     po.updatedby = req.user?._id || null;
     await po.save({ session });
     if (session) await session.commitTransaction();
-    emitStock({ variants: touched, source: "po_received" });
-    emitPO("po:received", { success: true, data: po });
+    emitStock({ variants: touched, source: "po_delivered" });
+    emitPO("po:delivered", { success: true, data: po });
     emitPO("po:updated", { success: true, data: po });
-    res.status(200).json({ success: true, message: `Goods received (${po.status})`, data: po });
+    res.status(200).json({ success: true, message: "PO delivered — inventory updated", data: po });
   } catch (e) {
     if (session) { try { await session.abortTransaction(); } catch {} }
-    log.error("receivePO error:", e.message);
+    log.error("deliverPO error:", e.message);
     res.status(400).json({ success: false, message: e.message });
   } finally { if (session) { try { await session.endSession(); } catch {} } }
 };
+// Legacy alias — the old POST .../receive endpoint maps to the same deliver logic.
+const receivePO = deliverPO;
 
 const recordPOPayment = async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
+    // Payment is separate from delivery — allowed only after goods arrived.
+    if (!["delivered", "closed"].includes(po.status)) return res.status(400).json({ success: false, message: "Payment allowed only after delivery" });
     const amount = Number(req.body?.amount);
     const method = String(req.body?.method || "");
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "amount must be > 0" });
@@ -256,4 +270,4 @@ const recordPOPayment = async (req, res) => {
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 
-module.exports = { getNextPONumber, createPO, getAllPOs, getPOByIdAdmin, updatePO, sendPO, confirmPO, cancelPO, closePO, receivePO, recordPOPayment };
+module.exports = { getNextPONumber, createPO, getAllPOs, getPOByIdAdmin, updatePO, confirmPO, cancelPO, closePO, deliverPO, receivePO, recordPOPayment };

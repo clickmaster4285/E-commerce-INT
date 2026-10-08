@@ -79,6 +79,7 @@ const createVariant = async (req, res) => {
       quantity: Math.trunc(Number(req.body.quantity || 0)) || 0,
       min_qnt: Number(req.body.min_qnt || 0),
       max_qnt: Number(req.body.max_qnt || 0),
+      topup: Number(req.body.topup) || 0,
       attributes,
       tags, // ✅ Tags saved here
       images: req.savedImages || [],
@@ -166,6 +167,7 @@ const updateVariant = async (req, res) => {
     }
     if (req.body.min_qnt !== undefined) variant.min_qnt = Number(req.body.min_qnt);
     if (req.body.max_qnt !== undefined) variant.max_qnt = Number(req.body.max_qnt);
+    if (req.body.topup !== undefined) variant.topup = Number(req.body.topup);
 
     if (req.body.attributes !== undefined) {
       const nextAttributes = typeof req.body.attributes === "string"

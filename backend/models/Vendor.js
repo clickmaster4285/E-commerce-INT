@@ -14,17 +14,11 @@ const vendorSchema = new mongoose.Schema(
     state: { type: String, trim: true, default: "" },
     country: { type: String, trim: true, default: "" },
     zip_code: { type: String, trim: true, default: "" },
-    payment_terms: {
-      type: String,
-      enum: ["advance", "net_7", "net_15", "net_30", "cod"],
-      default: "net_15",
-    },
     tax_id: { type: String, trim: true, default: "" },
     bank_details: {
       bank: { type: String, trim: true, default: "" },
       account_title: { type: String, trim: true, default: "" },
       account_no: { type: String, trim: true, default: "" },
-      iban: { type: String, trim: true, default: "" },
     },
     lead_time_days: { type: Number, default: 0, min: 0 },
     rating: { type: Number, default: 0, min: 0, max: 5 },
