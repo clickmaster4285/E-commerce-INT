@@ -5,10 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { vendorApi } from "@/apis/admin/vendorApi";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
-import { Country, State, City } from "country-state-city";
+import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import {
   Users, UserCheck, UserX, DollarSign, Star, Plus, Search,
-  X, MoreHorizontal, ChevronLeft, ChevronRight,
+  MoreHorizontal, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // Same tokens as Brands/Products pages — no new design system.
@@ -17,26 +17,6 @@ const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid v
 const accentBtn = { backgroundColor: "var(--accent)", color: "var(--accent-text)" };
 
 const money = (n) => `Rs. ${(Math.max(0, Number(n) || 0)).toLocaleString()}`;
-
-const emptyForm = {
-  name: "", company_name: "", contact_person: "", email: "", phone: "", whatsapp: "",
-  address: "", city: "", state: "", country: "", zip_code: "",
-  tax_id: "", lead_time_days: 0, rating: 0, is_active: true,
-  bank_bank: "", bank_account_title: "", bank_account_no: "",
-};
-const toForm = (v) => ({
-  ...emptyForm, ...Object.fromEntries(Object.entries(v || {}).filter(([k]) => k in emptyForm)),
-  bank_bank: v?.bank_details?.bank || "", bank_account_title: v?.bank_details?.account_title || "",
-  bank_account_no: v?.bank_details?.account_no || "",
-});
-const toPayload = (f) => ({
-  name: f.name, company_name: f.company_name, contact_person: f.contact_person,
-  email: f.email, phone: f.phone, whatsapp: f.whatsapp, address: f.address, city: f.city,
-  state: f.state, country: f.country, zip_code: f.zip_code,
-  tax_id: f.tax_id, lead_time_days: Math.max(0, Number(f.lead_time_days) || 0),
-  rating: Math.min(5, Math.max(0, Number(f.rating) || 0)), is_active: !!f.is_active,
-  bank_details: { bank: f.bank_bank, account_title: f.bank_account_title, account_no: f.bank_account_no },
-});
 
 function StatCard({ icon: Icon, tint, label, value, delta }) {
   return (
@@ -132,7 +112,7 @@ export default function VendorsPage() {
   const [selected, setSelected] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(emptyVendorForm);
   const PAGE_SIZE = 10;
 
   const { data: vendorsRaw, isLoading } = useQuery({ queryKey: ["vendors"], queryFn: () => vendorApi.getAll() });
@@ -153,22 +133,6 @@ export default function VendorsPage() {
 
   const cities = useMemo(() => [...new Set(vendors.map((v) => v.city).filter(Boolean))].sort(), [vendors]);
 
-  // Country → State → City dropdowns (country-state-city package). Form stores names.
-  const allCountries = useMemo(() => Country.getAllCountries(), []);
-  const countryCode = useMemo(() => allCountries.find((c) => c.name === form.country)?.isoCode || "", [allCountries, form.country]);
-  const stateOptions = useMemo(() => (countryCode ? State.getStatesOfCountry(countryCode) : []), [countryCode]);
-  const stateCode = useMemo(() => stateOptions.find((s) => s.name === form.state)?.isoCode || "", [stateOptions, form.state]);
-  const cityOptions = useMemo(() => (countryCode && stateCode ? City.getCitiesOfState(countryCode, stateCode).map((c) => c.name) : []), [countryCode, stateCode]);
-  const stateSelectOptions = useMemo(() => {
-    const names = stateOptions.map((s) => s.name);
-    if (form.state && !names.includes(form.state)) return [form.state, ...names];
-    return names;
-  }, [stateOptions, form.state]);
-  const citySelectOptions = useMemo(() => {
-    if (form.city && !cityOptions.includes(form.city)) return [form.city, ...cityOptions];
-    return cityOptions;
-  }, [cityOptions, form.city]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return vendors.filter((v) => {
@@ -188,8 +152,8 @@ export default function VendorsPage() {
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["vendors"] }); };
 
   const saveMutation = useMutation({
-    mutationFn: () => (editing ? vendorApi.update(editing._id, toPayload(form)) : vendorApi.create(toPayload(form))),
-    onSuccess: () => { toast.success(editing ? "Vendor updated" : "Vendor created"); setShowModal(false); setEditing(null); setForm(emptyForm); invalidate(); },
+    mutationFn: () => (editing ? vendorApi.update(editing._id, toVendorPayload(form)) : vendorApi.create(toVendorPayload(form))),
+    onSuccess: () => { toast.success(editing ? "Vendor updated" : "Vendor created"); setShowModal(false); setEditing(null); setForm(emptyVendorForm); invalidate(); },
     onError: (e) => toast.error(e?.response?.data?.message || "Save failed"),
   });
   const toggleMutation = useMutation({
@@ -203,8 +167,8 @@ export default function VendorsPage() {
     onError: (e) => toast.error(e?.response?.data?.message || "Delete failed"),
   });
 
-  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, country: "Pakistan", state: "", city: "" }); setShowModal(true); };
-  const openEdit = (v) => { setEditing(v); setForm(toForm(v)); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setForm({ ...emptyVendorForm, country: "Pakistan", state: "", city: "" }); setShowModal(true); };
+  const openEdit = (v) => { setEditing(v); setForm(toVendorForm(v)); setShowModal(true); };
 
   const allOnPage = rows.length > 0 && rows.every((r) => selected.includes(r._id));
   const toggleOne = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -303,57 +267,15 @@ export default function VendorsPage() {
         </div>
 
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={cardStyle} onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">{editing ? "Edit Vendor" : "Add New Vendor"}</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 rounded transition hover:opacity-70" style={{ color: "var(--text-muted)" }}><X size={16} /></button>
-            </div>
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2"><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Vendor Name *</label><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Company</label><input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Contact Person</label><input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Phone</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div className="col-span-2"><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>WhatsApp</label><input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div className="col-span-2"><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Address</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
-                  <select value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value, state: "", city: "" })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle}>
-                    <option value="">Select Country</option>
-                    {allCountries.map((c) => <option key={c.isoCode} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>State</label>
-                  <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value, city: "" })} disabled={!countryCode} className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle}>
-                    <option value="">{countryCode ? "Select State" : "Select country first"}</option>
-                    {stateSelectOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>City</label>
-                  <select value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} disabled={!stateCode} className="w-full h-9 px-3 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle}>
-                    <option value="">{stateCode ? "Select City" : "Select state first"}</option>
-                    {citySelectOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-                  </select>
-                </div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Zip Code</label><input value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tax ID</label><input value={form.tax_id} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Lead Time (days)</label><input type="number" min={0} value={form.lead_time_days} onChange={(e) => setForm({ ...form, lead_time_days: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Rating (0–5)</label><input type="number" min={0} max={5} step={0.5} value={form.rating} onChange={(e) => setForm({ ...form, rating: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Bank</label><input value={form.bank_bank} onChange={(e) => setForm({ ...form, bank_bank: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Account Title</label><input value={form.bank_account_title} onChange={(e) => setForm({ ...form, bank_account_title: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Account No</label><input value={form.bank_account_no} onChange={(e) => setForm({ ...form, bank_account_no: e.target.value })} className="w-full h-9 px-3 rounded-md text-sm outline-none" style={inputStyle} /></div>
-                <label className="col-span-2 text-sm flex items-center gap-2"><input type="checkbox" checked={!!form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /> Active</label>
-              </div>
-            </div>
-            <div className="px-5 py-4 flex justify-end gap-2" style={{ borderTop: "1px solid var(--border-color)" }}>
-              <button onClick={() => setShowModal(false)} className="h-9 px-4 rounded-lg text-[13px] font-semibold transition hover:opacity-80" style={{ ...cardStyle, borderRadius: "8px" }}>Cancel</button>
-              <button disabled={saveMutation.isPending || !form.name.trim()} onClick={() => saveMutation.mutate()} className="h-9 px-4 rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-50" style={accentBtn}>{saveMutation.isPending ? "Saving..." : "Save"}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <VendorFormModal
+        open={showModal}
+        form={form}
+        setForm={setForm}
+        editing={!!editing}
+        isPending={saveMutation.isPending}
+        onSave={() => saveMutation.mutate()}
+        onClose={() => setShowModal(false)}
+      />
     </div>
   );
 }

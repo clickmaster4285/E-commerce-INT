@@ -46,7 +46,8 @@ const buildItems = async (rawItems) => {
     items.push({
       product_id: product._id, variant_id: variant._id, name: product.name,
       sku: variant.sku || "", variantTitle: variant.title || "", image: variant.images?.[0]?.img_url || "",
-      cost_price: cost, qty_ordered: qty, received_qty: 0, line_total, tax_rate: taxRate,
+      cost_price: cost, sell_price: Math.max(0, Number(r.sell_price ?? variant.selling_price) || 0),
+      qty_ordered: qty, received_qty: 0, line_total, tax_rate: taxRate,
       batch_no: String(r.batch_no || ""), mfg_date: r.mfg_date || null, expiry_date: r.expiry_date || null,
       topup: Number(r.topup) || 0,
     });
@@ -104,8 +105,21 @@ const getPOByIdAdmin = async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email").lean();
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
-    const payments = await PurchasePayment.find({ po_id: po._id }).sort({ created_at: -1 }).lean();
-    res.status(200).json({ success: true, data: { ...po, payments } });
+    const legacyVariantIds = (po.items || [])
+      .filter((item) => item.sell_price == null)
+      .map((item) => item.variant_id);
+    const [payments, legacyVariants] = await Promise.all([
+      PurchasePayment.find({ po_id: po._id }).sort({ created_at: -1 }).lean(),
+      legacyVariantIds.length ? Variant.find({ _id: { $in: legacyVariantIds } }).select("selling_price").lean() : [],
+    ]);
+    const currentSellPriceByVariant = new Map(legacyVariants.map((variant) => [String(variant._id), Number(variant.selling_price) || 0]));
+    const items = (po.items || []).map((item) => ({
+      ...item,
+      sell_price: item.sell_price ?? currentSellPriceByVariant.get(String(item.variant_id)) ?? 0,
+    }));
+    const safePayments = payments
+      .map((payment) => Object.fromEntries(Object.entries(payment).filter(([key]) => !["reference", "notes"].includes(key))));
+    res.status(200).json({ success: true, data: { ...po, items, payments: safePayments } });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
@@ -180,12 +194,10 @@ const deliverPO = async (req, res) => {
     }
     if (po.status !== "confirmed") return res.status(400).json({ success: false, message: `Cannot deliver in status ${po.status}. Confirm PO first.` });
     const invoice_no = String(req.body?.invoice_no || "").trim();
-    const explanation = String(req.body?.explanation || "").trim();
+    const explanation = String(req.body?.explanation || "All remaining items received").trim();
     const lines = Array.isArray(req.body?.items) ? req.body.items : [];
-    if (!invoice_no) return res.status(400).json({ success: false, message: "invoice_no is required" });
-    if (!explanation) return res.status(400).json({ success: false, message: "explanation is required" });
     if (!lines.length) return res.status(400).json({ success: false, message: "items required" });
-    if (po.receivings?.some((r) => r.invoice_no === invoice_no)) return res.status(400).json({ success: false, message: "Duplicate invoice_no for this PO" });
+    if (invoice_no && po.receivings?.some((r) => r.invoice_no === invoice_no)) return res.status(400).json({ success: false, message: "Duplicate invoice_no for this PO" });
 
     const norm = [];
     for (const l of lines) {
@@ -211,13 +223,23 @@ const deliverPO = async (req, res) => {
       const variant = await Variant.findById(n.variant_id).session(session || null);
       if (!variant) throw new Error("Variant not found");
       const prev = variant.quantity ?? 0;
-      await Variant.updateOne({ _id: variant._id }, { $inc: { quantity: n.qty } }, { session });
+      await Variant.updateOne(
+        { _id: variant._id },
+        {
+          $inc: { quantity: n.qty },
+          $set: {
+            cost_price: Math.max(0, Number(n.item.cost_price) || 0),
+            selling_price: Math.max(0, Number(n.item.sell_price) || 0),
+          },
+        },
+        { session },
+      );
       await StockHistory.create([{
         variant_id: variant._id, product_id: n.product_id, product_name: n.item.name,
         sku: n.item.sku || variant.sku || "", variant_title: n.item.variantTitle || variant.title || "",
         previous_quantity: prev, new_quantity: prev + n.qty, change_quantity: n.qty,
         adjustment_type: "add", reason: "purchase",
-        explanation: `${explanation} | PO ${po.po_number} | Inv ${invoice_no}`,
+        explanation: `${explanation} | PO ${po.po_number}${invoice_no ? ` | Inv ${invoice_no}` : " | No invoice provided"}`,
         performed_by: req.user?._id || null, performed_by_name: req.user?.name || "Admin",
       }], { session });
       n.item.received_qty += n.qty;
@@ -254,12 +276,12 @@ const recordPOPayment = async (req, res) => {
     if (po.paid_amount + amount > po.total + 0.001) return res.status(400).json({ success: false, message: `Over-pay: due is ${po.total - po.paid_amount}` });
     const pay = await PurchasePayment.create({
       po_id: po._id, vendor_id: po.vendor_id, amount, method,
-      reference: String(req.body?.reference || ""), paid_at: req.body?.paid_at || new Date(),
-      notes: String(req.body?.notes || ""), createdby: req.user?._id || null,
+      paid_at: req.body?.paid_at || new Date(), createdby: req.user?._id || null,
     });
     po.paid_amount = Math.round((po.paid_amount + amount) * 100) / 100;
     po.due_amount = Math.max(0, Math.round((po.total - po.paid_amount) * 100) / 100);
     po.payment_status = po.paid_amount <= 0 ? "unpaid" : po.paid_amount >= po.total ? "paid" : "partial";
+    if (po.payment_status === "paid") po.status = "closed";
     await po.save();
     await Vendor.updateOne({ _id: po.vendor_id }, { $inc: { total_paid: amount }, $set: { balance_payable: Math.max(0, po.total - po.paid_amount) } }).catch(() => {});
     const sums = await PurchasePayment.aggregate([{ $match: { vendor_id: po.vendor_id } }, { $group: { _id: null, paid: { $sum: "$amount" } } }]);

@@ -6,9 +6,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ArrowDownToLine, BriefcaseBusiness, CalendarDays, Check, CheckCircle2,
+  ArrowLeft, BriefcaseBusiness, CalendarDays, Check, CheckCircle2,
   ChevronRight, Circle, CreditCard, FileText, MapPin, Mail, Package, PackageCheck,
-  Phone, Printer, Truck, UserRound, Wallet, XCircle,
+  Phone, Truck, UserRound, Wallet, XCircle,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -25,7 +25,7 @@ const imageUrl = (url) => !url ? "" : /^https?:\/\//i.test(url) ? url : `${API_O
 const statusStyles = {
   pending: { label: "Pending", bg: "#fff5df", fg: "#b5760a" },
   confirmed: { label: "Confirmed", bg: "#fff5df", fg: "#b5760a" },
-  delivered: { label: "Delivered", bg: "#e1f8f0", fg: "#079878" },
+  delivered: { label: "Received", bg: "#e1f8f0", fg: "#079878" },
   closed: { label: "Closed", bg: "#edf2fa", fg: "#627b9f" },
   cancelled: { label: "Cancelled", bg: "#ffebed", fg: "#cf3348" },
   unpaid: { label: "Unpaid", bg: "#fff5df", fg: "#b5760a" },
@@ -56,10 +56,13 @@ function LabelValue({ label, value, icon: Icon }) {
   </div>;
 }
 
-function Modal({ title, onClose, children }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
-    <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border shadow-2xl" style={{ background: "#fff", borderColor: "#dce8f8", color: "#173d78" }} onClick={(e) => e.stopPropagation()}>
-      <div className="border-b px-5 py-4" style={{ borderColor: "#e5eef9" }}><h2 className="text-sm font-bold">{title}</h2></div>
+function Modal({ title, onClose, icon: Icon, children }) {
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-md" onClick={onClose}>
+    <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border shadow-2xl" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", borderColor: "#dce8f8", color: "#173d78", boxShadow: "0 24px 70px rgba(15,23,42,0.25)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: "#e5eef9", background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)" }}>
+        {Icon && <div className="flex h-10 w-10 items-center justify-center rounded-xl shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}><Icon size={18} color="#fff" /></div>}
+        <h2 className="text-base font-extrabold tracking-tight" style={primary}>{title}</h2>
+      </div>
       {children}
     </div>
   </div>;
@@ -70,27 +73,39 @@ export default function PODetailPage({ params }) {
   const qc = useQueryClient();
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
-  const [recv, setRecv] = useState({});
   const [invoiceNo, setInvoiceNo] = useState("");
-  const [explanation, setExplanation] = useState("");
   const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("bank");
   const [cancelReason, setCancelReason] = useState("");
   const { data: res, isLoading, isError, refetch } = useQuery({ queryKey: ["po", id], queryFn: () => purchaseOrderApi.getById(id) });
   const po = res?.data || null;
   const refresh = () => qc.invalidateQueries({ queryKey: ["po", id] });
   const act = (fn, ok) => useMutation({ mutationFn: fn, onSuccess: () => { toast.success(ok); refresh(); }, onError: (e) => toast.error(e?.response?.data?.message || "Failed") });
   const confirmM = act(() => purchaseOrderApi.confirm(id), "PO confirmed");
-  const closeM = act(() => purchaseOrderApi.close(id), "PO closed");
   const cancelM = act(() => purchaseOrderApi.cancel(id, cancelReason), "PO cancelled");
   const deliverM = useMutation({
-    mutationFn: () => purchaseOrderApi.deliver(id, { items: Object.entries(recv).filter(([, q]) => Number(q) > 0).map(([variant_id, qty]) => ({ variant_id, qty: Number(qty) })), invoice_no: invoiceNo, explanation }),
-    onSuccess: () => { toast.success("PO delivered — inventory updated"); setDeliverOpen(false); setRecv({}); setInvoiceNo(""); setExplanation(""); refresh(); },
+    mutationFn: (invoiceNumber) => purchaseOrderApi.deliver(id, {
+      items: (po?.items || [])
+        .map((item) => ({ variant_id: item.variant_id, qty: Math.max(0, Number(item.qty_ordered) - Number(item.received_qty)) }))
+        .filter((item) => item.qty > 0),
+      invoice_no: invoiceNumber,
+    }),
+    onSuccess: () => {
+      toast.success("PO received — inventory and variant prices updated");
+      setDeliverOpen(false);
+      setInvoiceNo("");
+      refresh();
+      qc.invalidateQueries({ queryKey: ["stock-all"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["stock-history"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product"] });
+      qc.invalidateQueries({ queryKey: ["variants"] });
+    },
     onError: (e) => toast.error(e?.response?.data?.message || "Delivery failed"),
   });
   const payM = useMutation({
-    mutationFn: () => purchaseOrderApi.recordPayment(id, { amount: Number(payAmount), method: payMethod }),
-    onSuccess: () => { toast.success("Payment recorded"); setPayOpen(false); setPayAmount(""); refresh(); },
+    mutationFn: ({ amount, method }) => purchaseOrderApi.recordPayment(id, { amount, method }),
+    onSuccess: (_, variables) => { toast.success(Number(variables.amount) >= dueAmount ? "PO fully paid and closed" : "Payment recorded"); setPayOpen(false); setPayAmount(""); refresh(); },
     onError: (e) => toast.error(e?.response?.data?.message || "Payment failed"),
   });
 
@@ -102,24 +117,15 @@ export default function PODetailPage({ params }) {
   const payments = po.payments || [];
   const status = String(po.status || "pending").toLowerCase();
   const payStatus = String(po.payment_status || "unpaid").toLowerCase();
-  const chosen = Object.entries(recv).reduce((sum, [, qty]) => sum + Math.max(0, Number(qty) || 0), 0);
+  const dueAmount = Math.max(0, Number(po.due_amount ?? (Number(po.total || 0) - Number(po.paid_amount || 0))) || 0);
   const canDeliver = items.some((item) => Number(item.qty_ordered) > Number(item.received_qty));
-  const canPay = ["delivered", "closed"].includes(status);
+  const canPay = ["delivered", "closed"].includes(status) && dueAmount > 0;
   const vendorId = po.vendor_id?._id || po.vendor_id;
   const vendorActive = po.vendor_id?.is_active;
   const taxPercent = items.length ? items.reduce((sum, item) => sum + Number(item.tax_rate || 0), 0) / items.length : 0;
   const steps = ["pending", "confirmed", "delivered", "closed", "cancelled"];
   const currentStep = steps.indexOf(status);
-  const openDeliver = () => {
-    const full = {};
-    for (const item of items) {
-      const remaining = Math.max(0, Number(item.qty_ordered) - Number(item.received_qty));
-      if (remaining > 0) full[String(item.variant_id)] = remaining;
-    }
-    setRecv(full);
-    setDeliverOpen(true);
-  };
-  const printOrder = () => window.print();
+  const openDeliver = () => { setInvoiceNo(""); setDeliverOpen(true); };
   const smallAction = (label, onClick, Icon, primaryAction = false, disabled = false) => <button key={label} disabled={disabled} onClick={onClick} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45" style={{ borderColor: primaryAction ? "#c8dcff" : "#dce8f8", color: primaryAction ? "#2878f0" : "#36567f", background: "white" }}>{Icon && <Icon size={16} />}{label}</button>;
 
   return <div className="space-y-4">
@@ -140,12 +146,10 @@ export default function PODetailPage({ params }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          {smallAction("Print", printOrder, Printer)}
-          {smallAction("Download PDF", printOrder, ArrowDownToLine)}
           {status === "pending" && smallAction(confirmM.isPending ? "Confirming…" : "Confirm", () => confirmM.mutate(), Check, true, confirmM.isPending)}
           {status === "confirmed" && smallAction("Receive items", openDeliver, Truck, true, !canDeliver)}
-          {status === "delivered" && smallAction(closeM.isPending ? "Closing…" : "Close order", () => closeM.mutate(), PackageCheck, false, closeM.isPending)}
           {canPay && smallAction("Add payment", () => setPayOpen(true), CreditCard, true)}
+          {status === "delivered" && dueAmount > 0 && smallAction(payM.isPending && payM.variables?.type === "full" ? "Paying…" : "Payment done", () => payM.mutate({ amount: dueAmount, method: "bank", type: "full" }), CheckCircle2, false, payM.isPending)}
         </div>
       </div>
 
@@ -183,15 +187,15 @@ export default function PODetailPage({ params }) {
           <Panel title="Ordered Items" icon={PackageCheck} trailing={<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ color: "#2878f0", background: "#edf5ff" }}>{items.length} Items</span>}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-xs">
-                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Image", "Product / Variant", "SKU", "Qty Ordered", "Received Qty", "Cost Price", "Line Total", "Tax Rate"].map((label) => <th key={label} className="whitespace-nowrap px-2.5 py-2 font-semibold">{label}</th>)}</tr></thead>
+                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Image", "Product / Variant", "SKU", "Qty Ordered", "Cost Price", "Sell Price", "Line Total", "Tax Rate"].map((label) => <th key={label} className="whitespace-nowrap px-2.5 py-2 font-semibold">{label}</th>)}</tr></thead>
                 <tbody>{items.map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                   <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || "Product"} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
                   <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "—"}</div><div className="truncate" style={muted}>{item.variantTitle || "—"}</div></td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "—"}</td>
                   <td className="px-2.5 py-2.5 text-center" style={primary}>{item.qty_ordered}</td>
-                  <td className="px-2.5 py-2.5 text-center" style={{ color: Number(item.received_qty) >= Number(item.qty_ordered) ? "#079878" : "#173d78" }}>{item.received_qty || 0}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.cost_price)}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-semibold" style={primary}>{money(item.line_total)}</td>
                   <td className="px-2.5 py-2.5" style={muted}>{Number(item.tax_rate || 0)}%</td>
                 </tr>)}
@@ -200,25 +204,6 @@ export default function PODetailPage({ params }) {
             </div>
           </Panel>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Panel title="Receiving Information" icon={PackageCheck} trailing={<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ color: "#2878f0", background: "#edf5ff" }}>{(po.receivings || []).length} Receivings</span>}>
-              <div className="max-h-[270px] divide-y overflow-auto" style={{ borderColor: "#eaf0f8" }}>
-                {(po.receivings || []).map((receiving, index) => <div key={receiving._id || index} className="p-3 text-xs">
-                  <div className="grid grid-cols-[1fr_1fr_1.2fr_1fr] gap-2" style={muted}><span>{index + 1}. {dateTime(receiving.received_at)}</span><span>{receiving.invoice_no || "—"}</span><span className="truncate">{receiving.explanation || "—"}</span><span className="truncate text-right">{receiving.received_by_name || "Admin"}</span></div>
-                  {!!receiving.items?.length && <div className="mt-2 rounded border p-2" style={{ borderColor: "#e5eef9", background: "#fbfdff" }}><div className="mb-1 grid grid-cols-[1fr_1fr_auto] gap-2 font-semibold" style={muted}><span>Variant ID</span><span>Product ID</span><span>Qty Received</span></div>{receiving.items.map((received, i) => <div key={`${received.variant_id}-${i}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 py-0.5" style={primary}><span className="truncate font-mono">{String(received.variant_id || "—")}</span><span className="truncate font-mono">{String(received.product_id || "—")}</span><span>{received.qty}</span></div>)}</div>}
-                </div>)}
-                {!po.receivings?.length && <p className="p-5 text-center text-sm" style={muted}>No receiving activity yet.</p>}
-              </div>
-            </Panel>
-
-            <Panel title="Notes & Other Information" icon={FileText}>
-              <div className="space-y-2.5 p-4 text-sm">
-                <div><p className="mb-1 font-semibold" style={muted}>Notes</p><p style={primary}>{po.notes || "—"}</p></div>
-                {status === "cancelled" && <div><p className="mb-1 font-semibold" style={muted}>Cancel Reason</p><p style={primary}>{po.cancel_reason || "—"}</p></div>}
-                <div className="space-y-1.5 border-t pt-2" style={{ borderColor: "#e5eef9" }}><LabelValue label="Expected Date" value={dateOnly(po.expected_date)} /><LabelValue label="Due Date" value={dateOnly(po.due_date)} /><LabelValue label="Is Deleted" value={po.is_deleted ? "Yes" : "No"} /></div>
-              </div>
-            </Panel>
-          </div>
         </main>
 
         <aside className="space-y-3.5 lg:col-span-4">
@@ -257,35 +242,63 @@ export default function PODetailPage({ params }) {
           <Panel title="Payment History" icon={Wallet} trailing={<span className="text-xs font-semibold" style={accent}>{payments.length} Total</span>}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[320px] text-left text-xs">
-                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Date", "Method", "Amount", "Reference", "Notes"].map((label) => <th key={label} className="whitespace-nowrap px-2 py-2 font-semibold">{label}</th>)}</tr></thead>
-                <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t" style={{ borderColor: "#eaf0f8" }}><td className="px-2 py-2" style={muted}>{index + 1}</td><td className="whitespace-nowrap px-2 py-2" style={primary}>{dateOnly(payment.paid_at || payment.created_at)}</td><td className="px-2 py-2 capitalize" style={primary}>{String(payment.method || "—").replaceAll("_", " ")}</td><td className="whitespace-nowrap px-2 py-2 font-semibold" style={primary}>{money(payment.amount)}</td><td className="max-w-20 truncate px-2 py-2" style={muted}>{payment.reference || "—"}</td><td className="max-w-20 truncate px-2 py-2" style={muted}>{payment.notes || "—"}</td></tr>)}
-                  {!payments.length && <tr><td colSpan={6} className="p-4 text-center" style={muted}>No payments recorded.</td></tr>}</tbody>
+                <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "Date", "Amount"].map((label) => <th key={label} className="whitespace-nowrap px-2 py-2 font-semibold">{label}</th>)}</tr></thead>
+                <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t" style={{ borderColor: "#eaf0f8" }}><td className="px-2 py-2" style={muted}>{index + 1}</td><td className="whitespace-nowrap px-2 py-2" style={primary}>{dateOnly(payment.paid_at || payment.created_at)}</td><td className="whitespace-nowrap px-2 py-2 font-semibold" style={primary}>{money(payment.amount)}</td></tr>)}
+                  {!payments.length && <tr><td colSpan={3} className="p-4 text-center" style={muted}>No payments recorded.</td></tr>}</tbody>
               </table>
             </div>
             <div className="space-y-2 border-t p-3" style={{ borderColor: "#e5eef9" }}>
               {canPay && <button onClick={() => setPayOpen(true)} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md text-sm font-semibold text-white hover:opacity-90 print:hidden" style={{ background: "#2878f0" }}><CreditCard size={14} />Add Payment</button>}
-              {status === "delivered" && <button onClick={() => closeM.mutate()} disabled={closeM.isPending} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-sm font-semibold disabled:opacity-50 print:hidden" style={{ borderColor: "#cfe0f8", color: "#36567f" }}><CheckCircle2 size={14} />{closeM.isPending ? "Closing…" : "Close Purchase Order"}</button>}
               {["pending", "confirmed"].includes(status) && <div className="flex gap-1.5 print:hidden"><input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Cancellation reason" className="h-8 min-w-0 flex-1 rounded-md border px-2 text-xs outline-none" style={{ borderColor: "#dce8f8", color: "#173d78" }} /><button disabled={cancelM.isPending || !cancelReason.trim()} onClick={() => cancelM.mutate()} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-semibold disabled:opacity-40" style={{ borderColor: "#ffc9d0", color: "#cf3348" }}><XCircle size={13} />Cancel PO</button></div>}
             </div>
           </Panel>
         </aside>
       </div>
-    {deliverOpen && <Modal title="Mark as Delivered" onClose={() => setDeliverOpen(false)}><div className="space-y-4 p-5">
-      <p className="text-xs" style={muted}>Delivery adds the received quantity to inventory. Confirming means the order was accepted; inventory updates on delivery.</p>
-      <div className="overflow-hidden rounded-md border" style={edge}><div className="grid grid-cols-[1fr_repeat(4,auto)] gap-3 px-3 py-2 text-[11px] font-semibold" style={{ background: "#f8fbff", color: "#627b9f" }}><span>Item</span><span>Ordered</span><span>Received</span><span>Remaining</span><span>Now</span></div>
-        {items.map((item) => { const key = String(item.variant_id); const remaining = Math.max(0, Number(item.qty_ordered) - Number(item.received_qty)); const now = Math.max(0, Number(recv[key]) || 0); return <div key={key} className="grid grid-cols-[1fr_repeat(4,auto)] items-center gap-3 border-t px-3 py-2.5 text-xs" style={{ borderColor: "#e5eef9" }}><div className="min-w-0"><p className="truncate font-medium">{item.name || item.sku}</p><p className="font-mono" style={muted}>{item.sku}</p></div><span>{item.qty_ordered}</span><span>{item.received_qty}</span><span style={{ color: "#b5760a" }}>{remaining}</span><input type="number" min={0} max={remaining} value={recv[key] || ""} onChange={(e) => setRecv({ ...recv, [key]: e.target.value })} className="h-8 w-16 rounded border px-2 text-center" style={{ borderColor: "#dce8f8" }} /><div className="col-span-5 -mt-1 text-right" style={muted}>Remaining after delivery: {remaining - now}</div>{now > remaining && <div className="col-span-5 text-right text-xs" style={{ color: "#cf3348" }}>Cannot deliver more than {remaining} remaining.</div>}</div>; })}
+    {deliverOpen && <Modal title="Receive Purchase Order" icon={Truck} onClose={() => setDeliverOpen(false)}><div className="space-y-5 p-5 sm:p-6">
+      <div className="flex items-center gap-3 rounded-2xl border p-4 sm:p-5" style={{ borderColor: "#bfdbfe", background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)" }}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "#dbeafe", color: "#2563eb" }}><PackageCheck size={19} /></div>
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold" style={primary}>Ready to update inventory</p>
+          <p className="mt-1 text-xs leading-5" style={muted}>All items in this purchase order will be received.</p>
+        </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-xs font-medium">Invoice number *<input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} className="h-9 w-full rounded-md border px-3 text-sm outline-none" style={{ borderColor: "#dce8f8" }} /></label><label className="space-y-1 text-xs font-medium">Explanation *<input value={explanation} onChange={(e) => setExplanation(e.target.value)} placeholder="Required stock history note" className="h-9 w-full rounded-md border px-3 text-sm outline-none" style={{ borderColor: "#dce8f8" }} /></label></div>
-      <p className="text-xs" style={muted}>Delivering now: <strong style={primary}>{chosen} units</strong></p>
-      <div className="flex justify-end gap-2 border-t pt-3" style={{ borderColor: "#e5eef9" }}><button onClick={() => setDeliverOpen(false)} className="h-9 rounded-md border px-3 text-sm" style={{ borderColor: "#dce8f8" }}>Cancel</button><button disabled={deliverM.isPending || !invoiceNo.trim() || !explanation.trim() || chosen < 1 || items.some((item) => (Number(recv[String(item.variant_id)]) || 0) > Math.max(0, Number(item.qty_ordered) - Number(item.received_qty)))} onClick={() => deliverM.mutate()} className="h-9 rounded-md px-4 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "#2878f0" }}>{deliverM.isPending ? "Delivering…" : "Confirm delivery"}</button></div>
+      <label className="block text-xs font-bold" style={primary}>
+        <span className="mb-2 block">Invoice number <span className="font-medium" style={muted}>(optional)</span></span>
+        <div className="relative">
+          <FileText size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={muted} />
+          <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Enter invoice number if available" className="h-11 w-full rounded-xl border bg-white pl-9 pr-3 text-sm font-medium outline-none transition focus:ring-2 focus:ring-blue-100" style={{ borderColor: "#cfe0f8", color: "#0f172a" }} />
+        </div>
+      </label>
+      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end" style={{ borderColor: "#e5eef9" }}>
+        <button disabled={deliverM.isPending} onClick={() => deliverM.mutate("")} className="h-10 rounded-xl border bg-white px-4 text-sm font-bold transition hover:bg-slate-50 disabled:opacity-50" style={{ borderColor: "#dce8f8", color: "#36567f" }}>{deliverM.isPending && deliverM.variables === "" ? "Receiving…" : "Skip invoice"}</button>
+        <button disabled={deliverM.isPending || !invoiceNo.trim()} onClick={() => deliverM.mutate(invoiceNo.trim())} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-sm font-extrabold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-45" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", boxShadow: "0 4px 14px rgba(37,99,235,0.28)" }}><CheckCircle2 size={16} />{deliverM.isPending && deliverM.variables !== "" ? "Receiving…" : "Add invoice & receive"}</button>
+      </div>
     </div></Modal>}
 
-    {payOpen && <Modal title="Record payment" onClose={() => setPayOpen(false)}><div className="space-y-4 p-5">
-      <div className="grid grid-cols-3 gap-2 rounded-md border p-3 text-xs" style={{ ...edge, background: "#f8fbff" }}><div><p style={muted}>PO total</p><p className="mt-1 font-semibold">{money(po.total)}</p></div><div><p style={muted}>Paid</p><p className="mt-1 font-semibold">{money(po.paid_amount)}</p></div><div><p style={muted}>Remaining</p><p className="mt-1 font-semibold">{money(po.due_amount)}</p></div></div>
-      <label className="block space-y-1 text-xs font-medium">Payment amount *<input type="number" min={0.01} max={po.due_amount} value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="Amount to pay" className="h-9 w-full rounded-md border px-3 text-sm outline-none" style={{ borderColor: "#dce8f8" }} /></label>
-      <label className="block space-y-1 text-xs font-medium">Payment method<select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="h-9 w-full rounded-md border px-3 text-sm outline-none" style={{ borderColor: "#dce8f8" }}><option value="bank">Bank</option><option value="cash">Cash</option><option value="cod">COD</option><option value="credit">Credit</option></select></label>
-      <p className="text-xs" style={muted}>Remaining after payment: <strong style={primary}>{money(Math.max(0, Number(po.due_amount || 0) - Number(payAmount || 0)))}</strong></p>
-      <div className="flex justify-end gap-2 border-t pt-3" style={{ borderColor: "#e5eef9" }}><button onClick={() => setPayOpen(false)} className="h-9 rounded-md border px-3 text-sm" style={{ borderColor: "#dce8f8" }}>Cancel</button><button disabled={payM.isPending || !(Number(payAmount) > 0)} onClick={() => payM.mutate()} className="h-9 rounded-md px-4 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "#2878f0" }}>{payM.isPending ? "Saving…" : "Save payment"}</button></div>
+    {payOpen && <Modal title="Record Purchase Order Payment" icon={CreditCard} onClose={() => setPayOpen(false)}><div className="space-y-5 p-5 sm:p-6">
+      <div className="grid grid-cols-3 gap-2 rounded-2xl border p-3 sm:gap-3 sm:p-4" style={{ borderColor: "#dce8f8", background: "linear-gradient(135deg, #f8fbff 0%, #eff6ff 100%)" }}>
+        <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider" style={muted}>PO total</p><p className="mt-1 truncate text-sm font-extrabold sm:text-base" style={primary}>{money(po.total)}</p></div>
+        <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider" style={muted}>Paid</p><p className="mt-1 truncate text-sm font-extrabold sm:text-base" style={{ color: "#059669" }}>{money(po.paid_amount)}</p></div>
+        <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider" style={muted}>Balance due</p><p className="mt-1 truncate text-sm font-extrabold sm:text-base" style={{ color: "#b5760a" }}>{money(dueAmount)}</p></div>
+      </div>
+
+      <label className="block text-xs font-bold" style={primary}>Payment amount
+        <div className="relative mt-2">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold" style={muted}>Rs.</span>
+          <input type="number" min={0.01} max={dueAmount} step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="Enter amount" className="h-12 w-full rounded-xl border bg-white pl-12 pr-3 text-base font-semibold outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100" style={{ borderColor: "#cfe0f8", color: "#0f172a" }} />
+        </div>
+      </label>
+
+      <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ borderColor: "#e2e8f0", background: "#f8fafc" }}>
+        <span className="text-xs font-semibold" style={muted}>Balance after payment</span>
+        <strong className="text-sm font-extrabold" style={{ color: Math.max(0, dueAmount - Number(payAmount || 0)) === 0 && Number(payAmount) > 0 ? "#059669" : "#0f172a" }}>{money(Math.max(0, dueAmount - Number(payAmount || 0)))}</strong>
+      </div>
+      {Number(payAmount) >= dueAmount && Number(payAmount) > 0 && <p className="-mt-3 text-xs leading-5" style={{ color: "#059669" }}>This payment will settle the full balance and close the purchase order.</p>}
+
+      <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end" style={{ borderColor: "#e5eef9" }}>
+        <button onClick={() => setPayOpen(false)} disabled={payM.isPending} className="h-10 rounded-xl border bg-white px-4 text-sm font-bold transition hover:bg-slate-50 disabled:opacity-50" style={{ borderColor: "#dce8f8", color: "#36567f" }}>Cancel</button>
+        <button disabled={payM.isPending || !(Number(payAmount) > 0) || Number(payAmount) > dueAmount} onClick={() => payM.mutate({ amount: Number(payAmount), method: "bank" })} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-5 text-sm font-extrabold text-white shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-45" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", boxShadow: "0 4px 14px rgba(37,99,235,0.28)" }}><CreditCard size={16} />{payM.isPending ? "Recording payment…" : "Record payment"}</button>
+      </div>
     </div></Modal>}
   </div>;
 }

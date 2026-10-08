@@ -19,7 +19,7 @@ const money = (n) => `Rs. ${(Math.max(0, Number(n) || 0)).toLocaleString()}`;
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
 const STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"];
-const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", delivered: "Delivered", closed: "Closed", cancelled: "Cancelled" };
+const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", delivered: "Received", closed: "Closed", cancelled: "Cancelled" };
 const PAY_STATUSES = ["unpaid", "partial", "paid"];
 const RANGES = [["all", "All time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]];
 const PAGE_SIZE = 8;
@@ -72,7 +72,7 @@ function useRowMenuClose(open, menuRef, btnRef, onClose) {
 
 // Portal row menu (module level, like Brands page): open-state and position
 // live inside the menu itself so parent re-renders never reset them.
-function PORowMenu({ p, onView, onOpen, onConfirm, onDeliver, onPay, onViewReceiving, onClosePo, onCancel }) {
+function PORowMenu({ p, onView, onOpen, onConfirm, onDeliver, onPay, onViewReceiving, onCancel }) {
   const btnRef = useRef(null);
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -102,10 +102,9 @@ function PORowMenu({ p, onView, onOpen, onConfirm, onDeliver, onPay, onViewRecei
           <button onClick={run(onView)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>View details</button>
           {p.status === "pending" && <button onClick={run(onConfirm)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Confirm</button>}
           {p.status === "pending" && <button onClick={run(onOpen)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Edit</button>}
-          {p.status === "confirmed" && <button onClick={run(onDeliver)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Delivered</button>}
+          {p.status === "confirmed" && <button onClick={run(onDeliver)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Receive</button>}
           {p.status === "delivered" && <button onClick={run(onPay)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Pay</button>}
           {p.status === "delivered" && <button onClick={run(onViewReceiving)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>View receiving details</button>}
-          {p.status === "delivered" && <button onClick={run(onClosePo)} className={itemClass} style={{ color: "var(--text-primary)" }} {...hov}>Close</button>}
           {["pending", "confirmed"].includes(p.status) && <button onClick={(e) => { e.stopPropagation(); setOpen(false); onCancel(); }} className={itemClass} style={{ color: "var(--danger-text)" }} {...hov}>Cancel</button>}
         </div>,
         document.body
@@ -189,7 +188,6 @@ export default function PurchaseOrdersPage() {
     onError: (e) => toast.error(e?.response?.data?.message || "Failed"),
   });
   const confirmM = act((id) => purchaseOrderApi.confirm(id), "PO confirmed");
-  const closeM = act((id) => purchaseOrderApi.close(id), "PO closed");
   const cancelM = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => purchaseOrderApi.cancel(id, "Bulk cancel from list"))),
     onSuccess: () => { toast.success("Selected POs cancelled"); setSelected([]); refresh(); },
@@ -246,7 +244,7 @@ export default function PurchaseOrdersPage() {
               <CheckCircle2 size={20} color="#fff" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>Delivered</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>Received</p>
               <p className="text-xl font-extrabold leading-tight" style={{ color: "#0f172a" }}>{stats.received} <span className="text-[11px] font-bold" style={{ color: stats.receivedDown ? "#dc2626" : "#059669" }}>{stats.receivedDelta}</span></p>
             </div>
           </div>
@@ -329,7 +327,6 @@ export default function PurchaseOrdersPage() {
                             onDeliver={() => router.push(`/admin/purchase-orders/${p._id}`)}
                             onPay={() => router.push(`/admin/purchase-orders/${p._id}`)}
                             onViewReceiving={() => router.push(`/admin/purchase-orders/${p._id}`)}
-                            onClosePo={() => closeM.mutate(p._id)}
                             onCancel={() => cancelWithReason(p._id)}
                           />
                         </td>
@@ -358,4 +355,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-

@@ -766,12 +766,12 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
         toast.error("Variant title is required");
         return;
       }
-      if (variant.cost_price === "" || variant.selling_price === "") {
-        toast.error("Cost & Selling price required");
+      if (variant.selling_price === "") {
+        toast.error("Selling price required");
         return;
       }
-      if (Number(variant.selling_price) <= Number(variant.cost_price)) {
-        toast.error(`Selling Price must be greater than Cost Price for "${title}"`);
+      if (Number(variant.selling_price) <= (Number(variant.cost_price) || 0)) {
+        toast.error(`Selling Price must be greater than the saved cost price for "${title}"`);
         return;
       }
 
@@ -1068,7 +1068,6 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { l: "Cost Price", f: "cost_price", p: "0.00", req: true },
                     { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
                     { l: "Quantity", f: "quantity", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
@@ -1096,13 +1095,12 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                 </div>
                 
 
-                {variant.cost_price !== "" &&
-                  variant.selling_price !== "" &&
-                  Number(variant.selling_price) <= Number(variant.cost_price) && (
+                {variant.selling_price !== "" &&
+                  Number(variant.selling_price) <= (Number(variant.cost_price) || 0) && (
                     <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20 mt-2">
                       <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
                       <p className="text-xs font-medium text-red-500">
-                        Selling Price must be greater than Cost Price
+                        Selling Price must be greater than the saved cost price
                       </p>
                     </div>
                   )}
@@ -1238,6 +1236,5 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
     </>
   );
 }
-
 
 

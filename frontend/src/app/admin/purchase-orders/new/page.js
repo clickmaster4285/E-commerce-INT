@@ -9,8 +9,9 @@ import { variantApi } from "@/apis/admin/variantApi";
 import ProductFormModal from "@/components/admin/ProductFormModal";
 import VariantCard from "@/components/admin/VariantCard";
 import VariantForm from "@/components/admin/VariantForm";
+import VendorFormModal, { emptyVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Building2, CalendarDays, ChevronDown, MoreVertical, Package } from "lucide-react";
+import { Plus, Search, Building2, CalendarDays, ChevronDown, MoreVertical, Package } from "lucide-react";
 
 // Same tokens as the rest of the admin — no new design system.
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
@@ -52,10 +53,13 @@ function NewPOPage() {
   const [prefilled, setPrefilled] = useState(false);
   const [vendorOpen, setVendorOpen] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorFormOpen, setVendorFormOpen] = useState(false);
+  const [vendorForm, setVendorForm] = useState({ ...emptyVendorForm, country: "Pakistan" });
   const [expectedDate, setExpectedDate] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerCategory, setPickerCategory] = useState("all");
+  const [pickerBrand, setPickerBrand] = useState("all");
   const [pickerPage, setPickerPage] = useState(1);
   const [checkedProducts, setCheckedProducts] = useState({}); // product_id -> true means ticked; default unticked
   const [vDetails, setVDetails] = useState({}); // variant_id -> { cost_price, selling_price }
@@ -63,6 +67,7 @@ function NewPOPage() {
   // New-product popup uses the same top-up form as the Products page.
   const [qcOpen, setQcOpen] = useState(false);
   const [newProductId, setNewProductId] = useState("");
+  const [variantProductId, setVariantProductId] = useState("");
   const [lines, setLines] = useState([]); // each line: { ..., included: true }
   const [shipping, setShipping] = useState(0);
   const [discount, setDiscount] = useState(0);
@@ -84,6 +89,25 @@ function NewPOPage() {
     return vendorList.filter((v) => [v.name, v.vendor_code, v.company_name, v.phone].filter(Boolean).join(" ").toLowerCase().includes(q));
   }, [vendorList, vendorSearch]);
   const selectedVendor = vendorList.find((v) => v._id === vendorId);
+
+  const createVendorMutation = useMutation({
+    mutationFn: async () => {
+      const result = await vendorApi.create(toVendorPayload(vendorForm));
+      const vendor = result?.data || result;
+      if (!vendor?._id) throw new Error("Vendor was created but the response did not include its ID");
+      return vendor;
+    },
+    onSuccess: async (vendor) => {
+      await qc.invalidateQueries({ queryKey: ["vendors-all"] });
+      await qc.invalidateQueries({ queryKey: ["vendors"] });
+      setVendorId(vendor._id);
+      setVendorFormOpen(false);
+      setVendorForm({ ...emptyVendorForm, country: "Pakistan" });
+      pushEvent(`Vendor selected: ${vendor.name}`);
+      toast.success("Vendor created and selected");
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || error.message || "Vendor creation failed"),
+  });
 
   // Pre-select vendor when opened from a vendor detail page (?vendor=<id>).
   useEffect(() => {
@@ -109,8 +133,18 @@ function NewPOPage() {
   const categories = useMemo(() => {
     const m = new Map();
     for (const v of stockAll || []) {
-      const id = String(v.category_id || "");
-      if (id && !m.has(id)) m.set(id, v.category_name || "Uncategorized");
+      const id = String(v.category_id?._id || v.category_id || "");
+      const name = String(v.category_name || v.category_id?.name || "").trim();
+      if (id && name && !m.has(id)) m.set(id, name);
+    }
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [stockAll]);
+  const brands = useMemo(() => {
+    const m = new Map();
+    for (const v of stockAll || []) {
+      const id = String(v.brand_id?._id || v.brand_id || "");
+      const name = String(v.brand_name || v.brand_id?.name || "").trim();
+      if (id && name && !m.has(id)) m.set(id, name);
     }
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [stockAll]);
@@ -120,7 +154,7 @@ function NewPOPage() {
     const m = new Map();
     for (const v of stockAll || []) {
       const pid = String(v.product_id || v._id);
-      if (!m.has(pid)) m.set(pid, { product_id: pid, product_name: v.product_name || "Unknown Product", image: v.image || "", category_id: String(v.category_id || ""), category_name: v.category_name || "", variants: [] });
+      if (!m.has(pid)) m.set(pid, { product_id: pid, product_name: v.product_name || "Unknown Product", image: v.image || "", category_id: String(v.category_id?._id || v.category_id || ""), category_name: v.category_name || v.category_id?.name || "", brand_id: String(v.brand_id?._id || v.brand_id || ""), brand_name: v.brand_name || v.brand_id?.name || "", variants: [] });
       const g = m.get(pid);
       g.variants.push(v);
       if (!g.image && v.image) g.image = v.image;
@@ -132,10 +166,11 @@ function NewPOPage() {
     const q = pickerSearch.trim().toLowerCase();
     return productGroups.filter((g) => {
       if (pickerCategory !== "all" && g.category_id !== pickerCategory) return false;
+      if (pickerBrand !== "all" && g.brand_id !== pickerBrand) return false;
       if (q && ![g.product_name, ...g.variants.map((v) => v.sku)].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [productGroups, pickerSearch, pickerCategory]);
+  }, [productGroups, pickerSearch, pickerCategory, pickerBrand]);
   const PICKER_SIZE = 8;
   const pickerPages = Math.max(1, Math.ceil(pickerFiltered.length / PICKER_SIZE));
   const safePickerPage = Math.min(pickerPage, pickerPages);
@@ -145,11 +180,67 @@ function NewPOPage() {
     setPickerSearch("");
     setPickerCategory("all");
     setPickerPage(1);
-    setCheckedProducts({});
+    setCheckedProducts(Object.fromEntries(
+      [...new Set(lines.map((line) => String(line.product_id || "")).filter(Boolean))]
+        .map((productId) => [productId, true]),
+    ));
     setPickerOpen(true);
+  };
+  const closePicker = () => {
+    setCheckedProducts({});
+    setPickerOpen(false);
   };
 
   const updateLine = (id, patch) => setLines((prev) => prev.map((l) => (String(l.variant_id) === String(id) ? { ...l, ...patch } : l)));
+
+  const addCreatedVariantToOrder = ({ product, variant }, fallbackProductId) => {
+    if (!variant?._id) {
+      toast.error("Variant saved but could not be added to this order");
+      return false;
+    }
+    const productId = String(variant.product_id?._id || variant.product_id || product?._id || fallbackProductId || "");
+    if (!productId) {
+      toast.error("Variant saved but its product could not be identified");
+      return false;
+    }
+    const productName = product?.name || product?.product_name || "Unknown Product";
+    const costPrice = Math.max(0, Number(variant.cost_price ?? variant.purchase_price) || 0);
+    const sellPrice = Math.max(0, Number(variant.selling_price ?? variant.sell_price) || 0);
+    qc.invalidateQueries({ queryKey: ["stock-all"] });
+    qc.invalidateQueries({ queryKey: ["product", productId] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+    setVDetails((previous) => ({
+      ...previous,
+      [String(variant._id)]: { cost_price: costPrice, selling_price: sellPrice, topup: Number(variant.topup) || 0 },
+    }));
+    setLines((prev) => {
+      const existingIndex = prev.findIndex((line) => String(line.variant_id) === String(variant._id));
+      if (existingIndex !== -1) {
+        return prev.map((line, index) => index === existingIndex ? {
+          ...line,
+          product_id: productId,
+          product_name: productName,
+          sku: variant.sku || line.sku,
+          title: variant.title || line.title,
+          image: variant.images?.[0]?.img_url || line.image,
+          in_stock: variant.quantity ?? line.in_stock,
+          cost_price: costPrice,
+          sell_price: sellPrice,
+          topup: Number(variant.topup) || 0,
+        } : line);
+      }
+      return [...prev, {
+        variant_id: variant._id, product_id: productId,
+        sku: variant.sku || "", title: variant.title || "", product_name: productName,
+        image: variant.images?.[0]?.img_url || "", in_stock: variant.quantity ?? 0, qty_ordered: 1,
+        cost_price: costPrice, sell_price: sellPrice,
+        topup: Number(variant.topup) || 0, tax_rate: 0, batch_no: "", mfg_date: "", expiry_date: "", included: true,
+      }];
+    });
+    pushEvent(`Variant ${variant.sku || ""} for "${productName}" refreshed with current stock and prices`);
+    toast.success("Variant stock and prices updated in purchase order");
+    return true;
+  };
 
   // Add all variants of ticked products — every variant line starts ticked (included).
   const addSelectedProducts = async () => {
@@ -190,7 +281,7 @@ function NewPOPage() {
       });
       pushEvent(`Added ${chosen.length} product${chosen.length === 1 ? "" : "s"} (${added} new variant${added === 1 ? "" : "s"})`);
       toast.success(added ? `${added} variant${added === 1 ? "" : "s"} added (all ticked)` : "All variants already in order");
-      setPickerOpen(false);
+      closePicker();
     } finally { setAddingAll(false); }
   };
 
@@ -216,6 +307,7 @@ function NewPOPage() {
       variant_id: l.variant_id,
       qty_ordered: Math.max(1, Math.floor(Number(l.qty_ordered) || 1)),
       cost_price: Math.max(0, Number(l.cost_price) || 0),
+      sell_price: Math.max(0, Number(l.sell_price) || 0),
       tax_rate: Math.min(100, Math.max(0, Number(l.tax_rate) || 0)),
       topup: Number(l.topup) || 0,
       batch_no: String(l.batch_no || ""),
@@ -340,14 +432,19 @@ function NewPOPage() {
                     <div className="p-3" style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
                       <input autoFocus value={vendorSearch} onChange={(e) => setVendorSearch(e.target.value)} placeholder="Search vendors..." className="w-full h-10 px-3 rounded-xl text-sm outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                     </div>
-                    <div className="max-h-[240px] overflow-y-auto py-1">
+                    <div className="max-h-[240px] overflow-x-hidden overflow-y-auto py-1 px-2">
                       {vendorOptions.map((v) => (
-                        <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(`Vendor selected: ${v.name}`); }} className="w-full px-4 py-3 text-left text-[13px] transition-all duration-150 rounded-xl mx-2 my-0.5" style={{ backgroundColor: v._id === vendorId ? "rgba(37,99,235,0.08)" : "transparent", border: v._id === vendorId ? "1px solid rgba(37,99,235,0.2)" : "1px solid transparent" }} onMouseEnter={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "#f8fafc"; e.currentTarget.style.borderColor = "#e2e8f0"; } }} onMouseLeave={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "transparent"; } }}>
+                        <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(`Vendor selected: ${v.name}`); }} className="w-full px-4 py-3 text-left text-[13px] transition-all duration-150 rounded-xl my-0.5" style={{ backgroundColor: v._id === vendorId ? "rgba(37,99,235,0.08)" : "transparent", border: v._id === vendorId ? "1px solid rgba(37,99,235,0.2)" : "1px solid transparent" }} onMouseEnter={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "#f8fafc"; e.currentTarget.style.borderColor = "#e2e8f0"; } }} onMouseLeave={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "transparent"; } }}>
                           <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "#2563eb" : "#0f172a" }}>{v.name} <span className="font-mono font-normal text-[11px]" style={{ color: "#64748b" }}>{v.vendor_code}</span></div>
                           <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{[v.company_name, v.city].filter(Boolean).join(" · ")}</div>
                         </button>
                       ))}
                       {!vendorOptions.length && <p className="px-4 py-6 text-center text-sm font-medium" style={{ color: "#94a3b8" }}>No vendor found</p>}
+                    </div>
+                    <div className="p-2" style={{ borderTop: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                      <button type="button" onClick={() => { setVendorForm({ ...emptyVendorForm, country: "Pakistan" }); setVendorFormOpen(true); setVendorOpen(false); setVendorSearch(""); }} className="w-full h-10 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition hover:opacity-80" style={{ color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                        <Plus size={15} /> Add New Vendor
+                      </button>
                     </div>
                   </div>
                 )}
@@ -422,6 +519,7 @@ function NewPOPage() {
                           <div className="font-extrabold text-sm truncate tracking-tight" style={{ color: "#0f172a" }}>{group.name || "Unknown Product"}</div>
                           <div className="text-xs mt-1 font-medium" style={{ color: "#64748b" }}>{group.lines.filter((line) => line.included !== false).length}/{group.lines.length} variants included</div>
                         </div>
+                        <button onClick={() => setVariantProductId(group.id)} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 hover:scale-[1.05] hover:shadow-sm active:scale-[0.95]" style={{ color: "#2563eb", border: "1.5px solid #bfdbfe", background: "#eff6ff" }}>Add variant</button>
                         <button onClick={() => removeProduct(group)} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 hover:scale-[1.05] hover:shadow-sm active:scale-[0.95]" style={{ color: "#dc2626", border: "1.5px solid #fecaca", background: "#fef2f2" }}>Remove product</button>
                         <button
                           type="button"
@@ -436,13 +534,13 @@ function NewPOPage() {
                       </div>
                       {expanded[group.id] !== false && (
                         <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
-                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_50px] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
-                            <span>✓</span><span>Product / Variant</span><span className="text-center">In Stock</span><span className="text-right">Cost Price</span><span className="text-right">Sell Price</span><span className="text-right">Qty</span><span className="text-right">Tax %</span><span className="text-right">Line Total</span><span>Batch No.</span><span>Mfg Date</span><span>Expiry Date</span><span className="text-center">Actions</span>
+                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
+                            <span>✓</span><span>Product / Variant</span><span className="text-center">In Stock</span><span className="text-right">Cost Price</span><span className="text-right">Sell Price</span><span className="text-right">Qty</span><span className="text-right">Tax %</span><span className="text-right">Line Total</span><span>Batch No.</span><span>Mfg Date</span><span>Expiry Date</span>
                           </div>
                             {group.lines.map((line) => {
                               const lineTotal = Math.round(Math.max(0, Number(line.cost_price) || 0) * Math.max(1, Math.floor(Number(line.qty_ordered) || 1)));
                               return <div key={String(line.variant_id)} className="min-w-0 px-3 sm:px-4 py-3.5 transition-all duration-200 rounded-xl mx-1 my-0.5" style={{ backgroundColor: line.included === false ? "#f8fafc" : "#fff", opacity: line.included === false ? 0.7 : 1, border: line.included === false ? "1px solid #e2e8f0" : "1px solid transparent" }}>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_50px] gap-2 xl:items-center">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 xl:items-center">
                                   <div className="flex items-center"><input type="checkbox" checked={line.included !== false} onChange={(event) => updateLine(line.variant_id, { included: event.target.checked })} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} aria-label={`Include ${line.title || line.sku}`} /></div>
                                   <div className="min-w-0 flex items-center gap-2"><Thumb src={line.image} alt={line.title || line.product_name} size="w-10 h-10" /><div className="min-w-0"><div className="font-semibold text-xs truncate" title={line.title || "Default variant"}>{line.title || "Default variant"}</div><div className="font-mono text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{line.sku || "—"}</div></div></div>
                                   <div className="min-w-0 xl:flex xl:justify-center"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>In Stock</div>{stockPill(line)}</div>
@@ -454,7 +552,6 @@ function NewPOPage() {
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Batch No.</div><input value={line.batch_no || ""} onChange={(event) => updateLine(line.variant_id, { batch_no: event.target.value })} placeholder="Batch" className="w-full min-w-0 h-9 px-2 rounded-lg text-[11px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Mfg Date</div><input type="date" value={line.mfg_date || ""} onChange={(event) => updateLine(line.variant_id, { mfg_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Expiry Date</div><input type="date" value={line.expiry_date || ""} onChange={(event) => updateLine(line.variant_id, { expiry_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="flex items-center justify-center"><button onClick={() => setLines((prev) => prev.filter((item) => String(item.variant_id) !== String(line.variant_id)))} className="h-9 w-9 flex items-center justify-center rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-md active:scale-95" style={{ color: "#dc2626", background: "#fef2f2", border: "1.5px solid #fecaca" }} aria-label={`Remove ${line.title || line.product_name}`}><Trash2 size={15} strokeWidth={2.5} /></button></div>
                                 </div>
                               </div>;
                             })}
@@ -504,7 +601,7 @@ function NewPOPage() {
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
-                <div className="flex justify-between items-center pt-3 px-3 font-extrabold text-base rounded-xl overflow-hidden" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="truncate" style={{ color: "#059669" }}>Total</span><span className="truncate whitespace-nowrap ml-2" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
+                <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>Total</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
               </div>
             </section>
           </div>
@@ -583,26 +680,6 @@ function NewPOPage() {
 
           <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}>
-                <span className="text-[10px] font-extrabold text-white">✓</span>
-              </div>
-              <h2 className="text-base font-extrabold tracking-tight" style={{ color: "#0f172a" }}>Status & Payment</h2>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <FieldLabel>Order Status</FieldLabel>
-                <div className="h-10 px-4 rounded-xl text-sm flex items-center font-extrabold shadow-sm" style={{ background: "#fff7ed", border: "1.5px solid #fed7aa", color: "#c2410c" }}>Pending</div>
-              </div>
-              <div>
-                <FieldLabel>Payment Status</FieldLabel>
-                <div className="h-10 px-4 rounded-xl text-sm flex items-center font-extrabold shadow-sm" style={{ background: "#fff7ed", border: "1.5px solid #fed7aa", color: "#c2410c" }}>Unpaid</div>
-              </div>
-              <p className="text-[11px] font-medium leading-relaxed" style={{ color: "#94a3b8" }}>New orders always start as Pending / Unpaid. Payments are recorded after delivery.</p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
-            <div className="flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}>
                 <Building2 size={16} color="#fff" />
               </div>
@@ -626,33 +703,12 @@ function NewPOPage() {
             )}
           </section>
 
-          <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
-                <CalendarDays size={16} color="#fff" />
-              </div>
-              <h2 className="text-base font-extrabold tracking-tight" style={{ color: "#0f172a" }}>Timeline</h2>
-            </div>
-            <div className="space-y-2">
-              {events.slice(-3).map((e, i) => (
-                <div key={i} className="flex gap-3 p-2.5 rounded-xl transition hover:shadow-sm" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
-                    <CalendarDays size={14} color="#fff" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-extrabold text-sm truncate" style={{ color: "#0f172a" }}>{e.label}</div>
-                    <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{e.t}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
         </aside>
       </div>
 
       {/* product picker popup — products only, nothing pre-ticked */}
       {pickerOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setPickerOpen(false)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={closePicker}>
           <div className="w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden rounded-3xl shadow-2xl" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }} onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5" style={{ borderBottom: "1px solid #e2e8f0", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)" }}>
               <div className="flex items-center justify-between">
@@ -662,11 +718,11 @@ function NewPOPage() {
                   </div>
                   <h3 className="text-lg font-extrabold tracking-tight" style={{ color: "#0f172a" }}>Add products</h3>
                 </div>
-                <button onClick={() => setPickerOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center transition hover:scale-110 hover:shadow-md" style={{ background: "#fff", border: "1px solid #e2e8f0", color: "#64748b" }} aria-label="Close">×</button>
+                <button onClick={closePicker} className="w-8 h-8 rounded-full flex items-center justify-center transition hover:scale-110 hover:shadow-md" style={{ background: "#fff", border: "1px solid #e2e8f0", color: "#64748b" }} aria-label="Close">×</button>
               </div>
               <p className="text-xs mt-2 font-medium" style={{ color: "#64748b" }}>Tick products and press Add selected — their variants appear below, all ticked.</p>
-              <div className="grid sm:grid-cols-[1fr_160px] gap-3 mt-4">
-                <div className="relative">
+              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_160px]">
+                <div className="relative min-w-0">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm" style={{ color: "#94a3b8" }}>⌕</span>
                   <input
                     autoFocus value={pickerSearch}
@@ -677,6 +733,9 @@ function NewPOPage() {
                 </div>
                 <select value={pickerCategory} onChange={(e) => { setPickerCategory(e.target.value); setPickerPage(1); }} className="h-11 px-4 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
                   <option value="all">Category: All</option>{categories.map(([cid, name]) => <option key={cid} value={cid}>{name}</option>)}
+                </select>
+                <select value={pickerBrand} onChange={(e) => { setPickerBrand(e.target.value); setPickerPage(1); }} className="h-11 px-4 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+                  <option value="all">Brand: All</option>{brands.map(([brandId, name]) => <option key={brandId} value={brandId}>{name}</option>)}
                 </select>
               </div>
             </div>
@@ -707,7 +766,7 @@ function NewPOPage() {
                 <button disabled={safePickerPage <= 1} onClick={() => setPickerPage((p) => p - 1)} className="h-9 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 hover:shadow-md disabled:opacity-30" style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>Prev</button>
                 <button disabled={safePickerPage >= pickerPages} onClick={() => setPickerPage((p) => p + 1)} className="h-9 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 hover:shadow-md disabled:opacity-30" style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>Next</button>
                 <button disabled={addingAll || !tickedProducts} onClick={addSelectedProducts} className="h-9 px-4 rounded-2xl text-xs font-extrabold transition-all duration-200 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98] shadow-lg disabled:opacity-40" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}>{addingAll ? "Adding..." : `Add selected (${tickedProducts})`}</button>
-                <button onClick={() => setPickerOpen(false)} className="h-9 px-4 rounded-2xl text-xs font-extrabold transition-all duration-200 hover:shadow-md hover:scale-[1.03] active:scale-[0.98]" style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>Close</button>
+                <button onClick={closePicker} className="h-9 px-4 rounded-2xl text-xs font-extrabold transition-all duration-200 hover:shadow-md hover:scale-[1.03] active:scale-[0.98]" style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>Close</button>
               </div>
             </div>
           </div>
@@ -715,6 +774,14 @@ function NewPOPage() {
       )}
 
       {/* New product — same top-up form as the Products page (with variants step for PO) */}
+      <VendorFormModal
+        open={vendorFormOpen}
+        form={vendorForm}
+        setForm={setVendorForm}
+        isPending={createVendorMutation.isPending}
+        onSave={() => createVendorMutation.mutate()}
+        onClose={() => setVendorFormOpen(false)}
+      />
       <ProductFormModal
         open={qcOpen}
         onClose={() => setQcOpen(false)}
@@ -731,23 +798,17 @@ function NewPOPage() {
         <VariantForm
           productId={newProductId}
           onCancel={() => setNewProductId("")}
-          onSuccess={({ product, variant }) => {
-            if (!variant?._id) { toast.error("Variant saved but could not be added to this order"); return; }
-            qc.invalidateQueries({ queryKey: ["stock-all"] });
-            const pname = product?.name || "Unknown Product";
-            setLines((prev) => {
-              if (prev.some((line) => String(line.variant_id) === String(variant._id))) return prev;
-              return [...prev, {
-                variant_id: variant._id, product_id: String(variant.product_id?._id || variant.product_id || newProductId),
-                sku: variant.sku || "", title: variant.title || "", product_name: pname,
-                image: variant.images?.[0]?.img_url || "", in_stock: variant.quantity ?? 0, qty_ordered: 1,
-                cost_price: Math.max(0, Number(variant.cost_price) || 0), sell_price: Math.max(0, Number(variant.selling_price) || 0),
-                topup: Number(variant.topup) || 0, tax_rate: 0, batch_no: "", mfg_date: "", expiry_date: "", included: true,
-              }];
-            });
-            pushEvent(`Created product "${pname}" and added variant ${variant.sku || ""}`);
-            toast.success("Variant added to purchase order");
-            setNewProductId("");
+          onSuccess={(result) => {
+            if (addCreatedVariantToOrder(result, newProductId)) setNewProductId("");
+          }}
+        />
+      )}
+      {variantProductId && (
+        <VariantForm
+          productId={variantProductId}
+          onCancel={() => setVariantProductId("")}
+          onSuccess={(result) => {
+            if (addCreatedVariantToOrder(result, variantProductId)) setVariantProductId("");
           }}
         />
       )}
