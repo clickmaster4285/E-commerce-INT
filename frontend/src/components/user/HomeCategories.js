@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
+import useScrollFade from "@/hooks/useScrollFade";
 
 function getCategoryImage(category) {
   return category?.image || null;
@@ -82,14 +83,12 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   const suppressClickRef = useRef(false);
   const [copyCount, setCopyCount] = useState(3);
   const [dragging, setDragging] = useState(false);
-  const [fadeLeft, setFadeLeft] = useState(false);
-  const [fadeRight, setFadeRight] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
   const categorySignature = categories
     .map((category) => `${category._id}:${getCategoryImage(category) || ""}`)
     .join("|");
+  const { fadeLeft, fadeRight, fadeClassName } = useScrollFade(viewportRef, categorySignature);
+  const canScrollLeft = fadeLeft;
+  const canScrollRight = fadeRight;
 
   const pauseForInteraction = useCallback((duration = 700) => {
     animationPausedRef.current = true;
@@ -150,30 +149,6 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
 
     return () => resizeObserver.disconnect();
   }, [categories.length, categorySignature, copyCount]);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return undefined;
-
-    const updateFadeEdges = () => {
-      const logicalStart = loopStartRef.current;
-      const maxScroll = viewport.scrollWidth - viewport.clientWidth;
-      setFadeLeft(viewport.scrollLeft > logicalStart + 1);
-      setFadeRight(viewport.scrollLeft < maxScroll - 1);
-      setCanScrollLeft(viewport.scrollLeft > 1);
-      setCanScrollRight(viewport.scrollLeft < maxScroll - 1);
-    };
-
-    updateFadeEdges();
-    viewport.addEventListener("scroll", updateFadeEdges, { passive: true });
-    const resizeObserver = new ResizeObserver(updateFadeEdges);
-    resizeObserver.observe(viewport);
-
-    return () => {
-      viewport.removeEventListener("scroll", updateFadeEdges);
-      resizeObserver.disconnect();
-    };
-  }, [categories.length, copyCount, categorySignature]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -291,16 +266,6 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   if (!categories.length && !isLoading) return null;
   const copies = Array.from({ length: categories.length < 2 ? 1 : copyCount }, (_, index) => index);
   const showSkeletons = isLoading && !categories.length;
-  const edgeFadeWidth = "var(--category-edge-fade-width)";
-  const edgeMask =
-    fadeLeft && fadeRight
-      ? `linear-gradient(to right, transparent 0, rgba(0,0,0,0.72) 8px, black ${edgeFadeWidth}, black calc(100% - ${edgeFadeWidth}), rgba(0,0,0,0.72) calc(100% - 8px), transparent 100%)`
-      : fadeLeft
-        ? `linear-gradient(to right, transparent 0, rgba(0,0,0,0.72) 8px, black ${edgeFadeWidth}, black 100%)`
-        : fadeRight
-          ? `linear-gradient(to right, black 0, black calc(100% - ${edgeFadeWidth}), rgba(0,0,0,0.72) calc(100% - 8px), transparent 100%)`
-          : "none";
-
   return (
     <div>
       <SectionHeading
@@ -366,17 +331,13 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
             event.stopPropagation();
           }
         }}
-        className={`[--category-edge-fade-width:24px] max-sm:[--category-edge-fade-width:16px] min-w-0 flex-1 snap-x snap-proximity overflow-x-auto overflow-y-hidden scrollbar-hide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
+        className={`scroll-fade-track min-w-0 flex-1 snap-x snap-proximity overflow-x-auto overflow-y-hidden scrollbar-hide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
           dragging ? "cursor-grabbing select-none" : "cursor-grab"
-        }${fadeLeft ? " fade-left" : ""}${fadeRight ? " fade-right" : ""}`}
+        } ${fadeClassName}`}
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
-          paddingInline: 0,
-          scrollPaddingInline: "24px",
           touchAction: "pan-x pan-y",
-          maskImage: edgeMask,
-          WebkitMaskImage: edgeMask,
         }}
       >
         <div ref={trackRef} className="flex w-max px-6 py-2">

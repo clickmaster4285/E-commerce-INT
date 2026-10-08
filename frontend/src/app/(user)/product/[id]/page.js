@@ -9,7 +9,7 @@ import { useSearchParams } from "next/navigation";
 import {
   ShoppingCart, ChevronRight, ChevronLeft, ChevronDown,
   Minus, Plus, Package, X, Check, Zap, ZoomIn, Tag, Sparkles, Heart, Star,
-  Share2, Store, ShieldCheck, ZoomIn as ZoomHintIcon,
+  Store, ShieldCheck, ZoomIn as ZoomHintIcon,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
@@ -727,15 +727,6 @@ function ProductDetailContent({ params }) {
     setIsCartOpen(true);
   }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, isDealMode, matchedDeal]);
 
-  const handleShare = useCallback(() => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.share) {
-      navigator.share({ title: product?.name || "Product", url }).catch(() => {});
-    } else if (navigator.clipboard && url) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
-  }, [product]);
-
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
   const brandName = extractName(product?.brand_id);
@@ -813,7 +804,7 @@ function ProductDetailContent({ params }) {
 
                 <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{product.name}</h1>
 
-                {/* Rating + share/wishlist */}
+                {/* Rating + wishlist */}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Stars value={ratingAvg} />
@@ -825,9 +816,6 @@ function ProductDetailContent({ params }) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
-                    <button type="button" onClick={handleShare} aria-label="Share this product" className="hover:text-[var(--user-accent)] transition-colors">
-                      <Share2 size={17} />
-                    </button>
                     <button
                       type="button"
                       onClick={() => productId && toggleWishlist(productId)}
@@ -1014,9 +1002,9 @@ function ProductDetailContent({ params }) {
                       <Plus size={13} />
                     </button>
                   </div>
-                  <span className={`text-xs ${stock > 0 ? "text-[var(--user-text-muted)]" : "text-[var(--user-accent)] font-semibold"}`}>
-                    {stock > 0 ? `${stock} in stock` : "Out of stock"}
-                  </span>
+                  {stock < 1 ? (
+                    <span className="text-xs font-semibold text-[var(--user-accent)]">Out of stock</span>
+                  ) : null}
                 </div>
 
                 {/* CTA — Daraz cyan/orange */}

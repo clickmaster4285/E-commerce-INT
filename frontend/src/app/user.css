@@ -143,6 +143,59 @@
   container-type: inline-size;
 }
 
+@property --fade-left {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.scroll-fade-track {
+  --fade-left: 0px;
+  --fade-right: 0px;
+  --scroll-fade-width: 20px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgba(0, 0, 0, 0.6) calc(var(--fade-left) * 0.5),
+    #000 var(--fade-left),
+    #000 calc(100% - var(--fade-right)),
+    rgba(0, 0, 0, 0.6) calc(100% - var(--fade-right) * 0.5),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgba(0, 0, 0, 0.6) calc(var(--fade-left) * 0.5),
+    #000 var(--fade-left),
+    #000 calc(100% - var(--fade-right)),
+    rgba(0, 0, 0, 0.6) calc(100% - var(--fade-right) * 0.5),
+    transparent 100%
+  );
+  transition: --fade-left 200ms ease, --fade-right 200ms ease;
+  padding-inline: 24px;
+  padding-block: 8px;
+}
+
+.scroll-fade-track.fade-left {
+  --fade-left: var(--scroll-fade-width);
+}
+
+.scroll-fade-track.fade-right {
+  --fade-right: var(--scroll-fade-width);
+}
+
+@media (max-width: 639px) {
+  .scroll-fade-track {
+    --scroll-fade-width: 12px;
+  }
+}
+
 @media (hover: hover) {
   @container (max-width: 180px) {
     .product-card-add-label {

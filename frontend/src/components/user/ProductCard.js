@@ -315,7 +315,7 @@ function ProductCardInner({
                   onClick={handleQuickAdd}
                   disabled={adding}
                   aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
-                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                    className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
                     added
                       ? "bg-[var(--user-success)] text-white"
                       : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-[0.92]"

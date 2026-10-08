@@ -234,7 +234,7 @@ export default function Footer() {
         <div className="border-t border-[var(--user-border-soft)] mt-6 pt-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-[var(--user-text-muted)] text-center sm:text-left">
-              © {new Date().getFullYear()}{" "}
+              Â© {new Date().getFullYear()}{" "}
               <span className="text-[var(--user-text-secondary)] font-medium">{storeName}</span>. All rights reserved.
             </p>
             <div className="flex items-center gap-4 text-xs text-[var(--user-text-muted)]">
