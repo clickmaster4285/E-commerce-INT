@@ -51,11 +51,11 @@ function Section({ title, icon: Icon, hint, children }) {
         className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
       >
         {Icon ? <Icon size={13} className="shrink-0 text-[var(--user-accent)]" /> : null}
-        <span className="flex-1 text-xs font-semibold text-[var(--user-text)]">
+        <span className="flex-1 text-xs font-normal text-[var(--user-text)]">
           {title}
         </span>
         {hint ? (
-          <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-medium text-[var(--user-text-subtle)]">
+          <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-normal text-[var(--user-text-subtle)]">
             {hint}
           </span>
         ) : null}
@@ -108,7 +108,7 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       </span>
       {icon}
       <span
-        className={`min-w-0 flex-1 line-clamp-2 break-words text-xs font-normal capitalize ${
+        className={`min-w-0 flex-1 line-clamp-2 break-words text-[0.78125rem] font-normal capitalize ${
           checked ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"
         }`}
       >
@@ -128,7 +128,7 @@ function ShowMore({ open, total, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-medium text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
+      className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-normal text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
     >
       {open ? "Show less" : `Show all (${total})`}
     </button>
@@ -141,7 +141,7 @@ const THUMB_CLASS =
   "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 " +
   "[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full " +
   "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--user-bg-card)] [&::-webkit-slider-thumb]:bg-[var(--user-accent)] " +
-  "[&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 " +
+  "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 " +
   "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full " +
   "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--user-accent)]";
 
@@ -266,11 +266,11 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
   }
 
   const inputClass =
-    "min-w-0 flex-1 bg-transparent text-[0.75rem] font-semibold tabular-nums text-[var(--user-text)] outline-none";
+    "h-9 w-full min-w-0 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2 text-[0.75rem] font-normal tabular-nums text-[var(--user-text)] outline-none focus:border-[var(--user-accent)]";
 
   return (
     <div>
-      <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-bold text-[var(--user-text)]">
+      <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-normal text-[var(--user-text)]">
         <span className="tabular-nums">
           {formatPrice(shownLow)} — {formatPrice(shownHigh)}
         </span>
@@ -285,9 +285,9 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
         onRelease={commitSlider}
       />
 
-      <div className="mt-3 flex items-center gap-2">
-        <label className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2.5 focus-within:border-[var(--user-accent)]">
-          <span className="shrink-0 text-[0.625rem] font-bold uppercase text-[var(--user-text-subtle)]">Min</span>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">Min</span>
           <input
             type="number"
             inputMode="numeric"
@@ -309,8 +309,8 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
             className={inputClass}
           />
         </label>
-        <label className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2.5 focus-within:border-[var(--user-accent)]">
-          <span className="shrink-0 text-[0.625rem] font-bold uppercase text-[var(--user-text-subtle)]">Max</span>
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">Max</span>
           <input
             type="number"
             inputMode="numeric"
@@ -332,23 +332,12 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
             className={inputClass}
           />
         </label>
-        <button
-          type="button"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => applyRange(minDraft, maxDraft)}
-          className="h-9 shrink-0 rounded-lg bg-[var(--user-accent)] px-3.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
-        >
-          Go
-        </button>
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[0.625rem] font-semibold text-[var(--user-text-subtle)]">
+      <div className="mt-2 flex items-center justify-between text-[0.625rem] font-normal text-[var(--user-text-subtle)]">
         <span>{formatPrice(bounds.min)}</span>
         <span>{formatPrice(bounds.max)}</span>
       </div>
-      <p className="mt-1.5 text-[0.625rem] font-medium leading-relaxed text-[var(--user-text-subtle)]">
-        Discount ke baad wali (final) qeemat par lagta hai.
-      </p>
     </div>
   );
 }
@@ -538,7 +527,7 @@ export default function HomeSidebar({
       <aside className={`overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
         <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5">
           <SlidersHorizontal size={15} className="shrink-0 text-[var(--user-accent)]" />
-          <h2 className="flex-1 text-[0.8125rem] font-black uppercase tracking-[0.12em] text-[var(--user-text)]">
+          <h2 className="flex-1 text-[0.8125rem] font-normal uppercase tracking-[0.12em] text-[var(--user-text)]">
             Filters
           </h2>
         </div>
@@ -554,20 +543,20 @@ export default function HomeSidebar({
 
   return (
     <aside
-      className={`overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[var(--user-shadow-sm)] ${className}`}
+      className={`overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
     >
       <div className={scrollable ? "max-h-[calc(100vh-8.5rem)] overflow-y-auto" : ""}>
         {/* HEADER */}
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-3">
         <SlidersHorizontal size={14} className="shrink-0 text-[var(--user-accent)]" />
-        <h2 className="flex-1 text-xs font-semibold text-[var(--user-text)]">
+        <h2 className="flex-1 text-xs font-normal text-[var(--user-text)]">
             Filters
           </h2>
           <button
             type="button"
             onClick={onClear}
             disabled={!filtersActive}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[0.625rem] font-medium transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[0.625rem] font-normal transition-colors ${
               filtersActive
                 ? "text-[var(--user-accent)] hover:bg-[var(--user-bg-hover)]"
                 : "cursor-not-allowed text-[var(--user-text-disabled)]"
@@ -578,7 +567,7 @@ export default function HomeSidebar({
         </div>
 
         <p className="border-b border-[var(--user-border)] px-3 py-2 text-[0.6875rem] text-[var(--user-text-subtle)]">
-          <span className="font-medium text-[var(--user-text)]">{matchCount}</span>{" "}
+          <span className="font-normal text-[var(--user-text)]">{matchCount}</span>{" "}
           {matchCount === 1 ? "product" : "products"} {filtersActive ? "match your filters" : "available"}
         </p>
 
@@ -634,7 +623,7 @@ export default function HomeSidebar({
               onChange={(event) => setBrandQuery(event.target.value)}
               placeholder="Search brand..."
               aria-label="Search brands"
-              className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 pl-7 pr-2.5 text-[0.75rem] text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
+              className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 pl-7 pr-2.5 text-sm text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
             />
           </div>
 
@@ -683,8 +672,8 @@ export default function HomeSidebar({
                   title="All Deals"
                   label={
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate font-bold">All Deals</span>
-                      <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-black uppercase tracking-wider text-[var(--user-accent)]">
+                      <span className="truncate font-normal">All Deals</span>
+                      <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
                         All offers
                       </span>
                     </span>
@@ -711,7 +700,7 @@ export default function HomeSidebar({
                         <span className="flex min-w-0 flex-col gap-0.5">
                           <span className="truncate">{deal.name || "Deal"}</span>
                           {badge ? (
-                            <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-black uppercase tracking-wider text-[var(--user-accent)]">
+                            <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
                               {badge}
                             </span>
                           ) : null}
@@ -726,11 +715,11 @@ export default function HomeSidebar({
                 })}
               </div>
               {showAllDealsView ? (
-                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-semibold leading-relaxed text-[var(--user-text-muted)]">
+                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-normal leading-relaxed text-[var(--user-text-muted)]">
                   Showing all deal cards on the right (10 per page) →
                 </p>
               ) : selectedDealIds.length > 0 ? (
-                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-semibold leading-relaxed text-[var(--user-text-muted)]">
+                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-normal leading-relaxed text-[var(--user-text-muted)]">
                   Showing products from {selectedDealIds.length}{" "}
                   {selectedDealIds.length === 1 ? "deal" : "deals"} on the right →
                 </p>

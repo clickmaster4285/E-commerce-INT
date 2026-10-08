@@ -25,7 +25,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
     return (
       <section>
         <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
-        <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9">
           {[...Array(8).keys()].map((index) => (
             <div
               key={index}
@@ -48,16 +48,15 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
         linkLabel="View All"
       />
 
-      <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+      <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9">
         {list.map((category) => (
           <Link
             key={category._id}
             href={`/filtering-product?category=${category._id}`}
-            className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:shadow-[var(--user-shadow-md)]"
+            className="group flex flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
           >
             <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
               {category.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <Image
                   src={category.image}
                   alt={category.name}
@@ -72,11 +71,11 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
             </span>
 
             <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
-              <span className="w-full line-clamp-2 break-words text-[0.78125rem] font-bold capitalize text-[var(--user-text)]">
+              <span className="w-full line-clamp-2 break-words text-xs font-medium capitalize text-[var(--user-text)] sm:text-[0.8125rem]">
                 {category.name}
               </span>
-              <span className="flex items-center justify-between gap-1 text-[0.65625rem] font-semibold">
-                <span className="truncate text-[var(--user-accent)]">
+              <span className="flex items-center justify-between gap-1 text-[0.625rem] font-normal sm:text-xs">
+                <span className="truncate text-[0.9rem] font-normal leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
                   {category.fromPrice > 0 ? `From ${formatPrice(category.fromPrice)}` : "Explore"}
                 </span>
                 <span className="shrink-0 text-[var(--user-text-subtle)]">{category.count}</span>
@@ -89,7 +88,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
       <div className="mt-3 flex justify-center lg:hidden">
         <Link
           href="/filtering-product"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text)]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
         >
           Browse all products
           <ArrowRight size={13} />

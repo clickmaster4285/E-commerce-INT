@@ -290,11 +290,11 @@ function HomeContent({ initialBanners = null }) {
           <HomeSidebar
             {...sidebarProps}
             scrollable
-            className="sticky top-[7.25rem] hidden w-[16.375rem] shrink-0 rounded-l-none border-l-0 lg:block xl:w-[18rem] 2xl:w-[20rem]"
+            className="sticky top-[7.25rem] hidden w-48 shrink-0 rounded-l-none border-l-0 lg:block xl:w-52 2xl:w-52"
           />
 
           {/* MAIN COLUMN — sirf showcase (koi filter grid nahi → fast) */}
-          <div className="w-full min-w-0 flex-1 space-y-6 lg:space-y-8">
+          <div className="w-full min-w-0 flex-1 space-y-8 lg:space-y-12">
             {/* MOBILE FILTER TRIGGER → filtering page */}
             <div className="flex items-center justify-between gap-3 lg:hidden">
               <button

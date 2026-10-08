@@ -217,7 +217,6 @@ function FilteringContent() {
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [desktopHoverAvailable, setDesktopHoverAvailable] = useState(false);
-  const [filtersSidebarExpanded, setFiltersSidebarExpanded] = useState(false);
   const [showAllDealsView, setShowAllDealsView] = useState(false);
   const [showAllCategoriesView, setShowAllCategoriesView] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
@@ -228,7 +227,6 @@ function FilteringContent() {
     const updateHoverAvailability = () => {
       const hoverAvailable = hoverMedia.matches && window.innerWidth >= 1024;
       setDesktopHoverAvailable(hoverAvailable);
-      if (!hoverAvailable) setFiltersSidebarExpanded(false);
     };
     updateHoverAvailability();
     hoverMedia.addEventListener("change", updateHoverAvailability);
@@ -468,7 +466,7 @@ function FilteringContent() {
         {/* BREADCRUMB */}
         <nav
           aria-label="Breadcrumb"
-          className="mb-3 flex items-center gap-1.5 text-[0.6875rem] text-[var(--user-text-muted)] lg:mb-4 lg:text-xs"
+          className="mb-3 flex items-center gap-1.5 pl-3 text-[0.6875rem] text-[var(--user-text-muted)] lg:mb-4 lg:text-xs"
         >
           <Link href="/" className="transition hover:text-[var(--user-accent)]">
             Home
@@ -481,6 +479,9 @@ function FilteringContent() {
 
         <SectionHeading
           title="Filtered Products"
+          className="pl-3"
+          titleClassName="font-normal"
+          subtitleClassName="font-normal"
           subtitle={
             showingViews
               ? showAllCategoriesView
@@ -513,31 +514,12 @@ function FilteringContent() {
               desktopHoverAvailable ? "lg:block" : ""
             }`}
             style={{
-              minWidth: 0,
-              width: filtersSidebarExpanded ? "clamp(14rem, 17vw, 16rem)" : "3rem",
-              transition: "width 220ms ease-out",
-            }}
-            onPointerEnter={(event) => {
-              if (
-                event.pointerType === "mouse" &&
-                window.matchMedia("(hover: hover) and (pointer: fine)").matches
-              ) {
-                setFiltersSidebarExpanded(true);
-              }
-            }}
-            onPointerLeave={(event) => {
-              if (
-                event.pointerType === "mouse" &&
-                window.matchMedia("(hover: hover) and (pointer: fine)").matches
-              ) {
-                setFiltersSidebarExpanded(false);
-              }
+              width: "clamp(12rem, 14vw, 13rem)",
             }}
           >
             <HomeSidebar
               {...sidebarProps}
               scrollable
-              collapsed={!filtersSidebarExpanded}
               className="w-full rounded-l-none border-l-0"
             />
           </div>

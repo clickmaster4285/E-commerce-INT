@@ -8,9 +8,9 @@ import { smartImageLoader } from "@/utils/smartImageLoader";
 import {
   Heart,
   ShoppingCart,
-  Zap,
   SlidersHorizontal,
   Check,
+  Loader2,
   Package,
   Tag,
   Truck,
@@ -96,6 +96,7 @@ function ProductCardInner({
   priority = false,
 }) {
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [failedImage, setFailedImage] = useState("");
   const router = useRouter();
   const { addToCart } = useCart();
@@ -188,9 +189,13 @@ function ProductCardInner({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
+    setAdding(true);
     addToCart(product, firstVariant, 1, buildDealInfo());
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
+    setTimeout(() => {
+      setAdding(false);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1500);
+    }, 200);
   };
 
   // Single-variant: add + go straight to checkout
@@ -219,7 +224,7 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--user-bg-card)] shadow-none transition-colors duration-200"
+      className="product-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--user-bg-card)] shadow-none transition-colors duration-200"
     >
       <div
         className="relative h-40 w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)]"
@@ -290,42 +295,47 @@ function ProductCardInner({
           />
         </button>
 
-        {/* Hover quick actions — no plus icon.
-            Multi-variant: only "Choose Options" (opens right-side drawer).
-            Single variant: "Add to Cart" + "Buy Now".
-            Desktop: reveal on hover. Mobile: always visible (no hover). */}
+        {/* Desktop actions reveal on hover/focus; touch actions render below the price. */}
         {!out && (
-          <div className="absolute inset-x-2 bottom-2 z-10 flex gap-1.5 transition-all duration-200 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
+          <div className="product-card-action-overlay absolute inset-x-0 bottom-0 z-10 flex translate-y-full items-end gap-1.5 bg-gradient-to-t from-black/45 via-black/20 to-transparent p-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
             {hasMultipleVariants ? (
               <button
+                type="button"
                 onClick={handleOpenOptions}
-                className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[var(--user-accent)] px-2 text-[0.625rem] text-[var(--user-accent-text)] shadow-sm transition hover:opacity-90 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] font-normal`}
+                aria-label={`Select options for ${product.name}`}
+                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] bg-[var(--user-accent)] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] text-[var(--user-accent-text)] transition duration-150 hover:brightness-[0.92] hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
               >
-                <SlidersHorizontal size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                Choose Options
+                <SlidersHorizontal size={14} className="shrink-0" />
+                Select Options
               </button>
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={handleQuickAdd}
-                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-[0.625rem] shadow-sm transition active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] ${
+                  disabled={adding}
+                  aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
+                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
                     added
                       ? "bg-[var(--user-success)] text-white"
-                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"
-                  } font-normal`}
+                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-[0.92]"
+                  }`}
                 >
-                  {added ? (
-                    <Check size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {adding ? (
+                    <Loader2 size={14} className="shrink-0 animate-spin" />
+                  ) : added ? (
+                    <Check size={14} className="shrink-0" />
                   ) : (
-                    <ShoppingCart size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <ShoppingCart size={14} className="shrink-0" />
                   )}
-                  {added ? "Added!" : "Cart"}
+                    <span className="product-card-add-label">{adding ? "Adding..." : added ? "Added" : "Add to Cart"}</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleQuickBuy}
-                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-white/20 bg-black/65 px-2 text-[0.625rem] text-white shadow-sm backdrop-blur-sm transition hover:bg-black/75 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] font-normal`}
+                  aria-label={`Buy ${product.name} now`}
+                  className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] border border-[#E5E7EB] bg-white px-[10px] text-[12.5px] font-semibold tracking-[0.1px] text-gray-900 transition duration-150 hover:-translate-y-px active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
-                 
                   Buy Now
                 </button>
               </>
@@ -389,6 +399,42 @@ function ProductCardInner({
               <Sparkles size={9} className="shrink-0" />
               <span className="truncate">Deal Price</span>
             </span>
+          </div>
+        ) : null}
+        {!out ? (
+          <div className="product-card-touch-actions mt-2">
+            {hasMultipleVariants ? (
+              <button
+                type="button"
+                onClick={handleOpenOptions}
+                aria-label={`Select options for ${product.name}`}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-2 text-[13px] font-semibold text-[var(--user-accent-text)] transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+              >
+                <SlidersHorizontal size={14} className="shrink-0" />
+                Select Options
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleQuickAdd}
+                disabled={adding}
+                aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
+                className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                  added
+                    ? "bg-[var(--user-success)] text-white"
+                    : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                }`}
+              >
+                {adding ? (
+                  <Loader2 size={14} className="shrink-0 animate-spin" />
+                ) : added ? (
+                  <Check size={14} className="shrink-0" />
+                ) : (
+                  <ShoppingCart size={14} className="shrink-0" />
+                )}
+                <span className="product-card-add-label">{adding ? "Adding..." : added ? "Added" : "Add to Cart"}</span>
+              </button>
+            )}
           </div>
         ) : null}
         {children}

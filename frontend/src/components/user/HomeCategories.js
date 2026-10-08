@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ImageOff } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
+import SectionHeading from "./SectionHeading";
 
 function getCategoryImage(category) {
   return category?.image || null;
@@ -20,37 +21,55 @@ function CategoryCard({ category, tabIndex }) {
       tabIndex={tabIndex}
       aria-hidden={tabIndex === -1}
       draggable={false}
-      className="group flex h-[98px] w-[var(--category-card-width)] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left transition-colors duration-200 hover:border-[var(--user-border-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] sm:h-[104px]"
+      className="group flex h-[176px] w-[140px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-[var(--user-accent)]/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] focus-visible:-translate-y-[3px] focus-visible:border-[var(--user-accent)]/40 focus-visible:shadow-[0_8px_20px_rgba(0,0,0,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] active:scale-[0.98] sm:h-[200px] sm:w-[168px]"
     >
-      <span className="relative mb-1 flex h-[56px] w-full shrink-0 items-center justify-center overflow-hidden sm:h-[62px]">
+      <span className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-t-xl bg-[var(--user-bg-hover)]">
         {image && !imageFailed ? (
           <Image
             src={image}
             alt={category.name}
             fill
             loader={smartImageLoader}
-            sizes="(max-width: 639px) 42vw, (max-width: 1023px) 22vw, 13vw"
-            className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+            sizes="(max-width: 639px) 140px, 168px"
+            className="object-cover object-center transition-transform duration-200 ease-out group-hover:scale-105 group-focus-visible:scale-105"
             onError={() => setImageFailed(true)}
             draggable={false}
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--user-bg-card)] text-[var(--user-text-subtle)]">
+          <span className="flex h-full w-full items-center justify-center text-[var(--user-text-subtle)]">
             <ImageOff size={24} strokeWidth={1.5} aria-hidden="true" />
           </span>
         )}
       </span>
 
-      <span className="flex min-h-0 items-start px-1.5 pt-1.5">
-        <span className="min-w-0 line-clamp-2 break-words text-[0.7rem] font-medium leading-tight text-[var(--user-text)] sm:text-xs">
+      <span className="flex min-h-0 flex-1 flex-col p-3">
+        <span className="min-h-8 line-clamp-2 break-words text-sm font-medium leading-4 text-[var(--user-text)]">
           {category.name}
         </span>
+        {category.count != null && category.count !== "" ? (
+          <span className="text-xs font-normal leading-[14px] text-[var(--user-text-muted)]">
+            {category.count} {Number(category.count) === 1 ? "product" : "products"}
+          </span>
+        ) : null}
       </span>
     </Link>
   );
 }
 
-export function CategoryCarousel({ categories = [] }) {
+function CategorySkeletonCard() {
+  return (
+    <div aria-hidden="true" className="flex h-[176px] w-[140px] shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] sm:h-[200px] sm:w-[168px]">
+      <span className="skeleton aspect-[4/3] w-full shrink-0 rounded-t-xl" />
+      <span className="flex flex-1 flex-col p-3">
+        <span className="skeleton mt-0.5 h-3 w-4/5 rounded" />
+        <span className="skeleton mt-1 h-3 w-3/5 rounded" />
+        <span className="skeleton mt-1 h-3 w-1/2 rounded" />
+      </span>
+    </div>
+  );
+}
+
+export function CategoryCarousel({ categories = [], header, isLoading = false }) {
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
   const segmentWidthRef = useRef(0);
@@ -63,6 +82,10 @@ export function CategoryCarousel({ categories = [] }) {
   const suppressClickRef = useRef(false);
   const [copyCount, setCopyCount] = useState(3);
   const [dragging, setDragging] = useState(false);
+  const [fadeLeft, setFadeLeft] = useState(false);
+  const [fadeRight, setFadeRight] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const categorySignature = categories
     .map((category) => `${category._id}:${getCategoryImage(category) || ""}`)
@@ -130,6 +153,30 @@ export function CategoryCarousel({ categories = [] }) {
 
   useEffect(() => {
     const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    const updateFadeEdges = () => {
+      const logicalStart = loopStartRef.current;
+      const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+      setFadeLeft(viewport.scrollLeft > logicalStart + 1);
+      setFadeRight(viewport.scrollLeft < maxScroll - 1);
+      setCanScrollLeft(viewport.scrollLeft > 1);
+      setCanScrollRight(viewport.scrollLeft < maxScroll - 1);
+    };
+
+    updateFadeEdges();
+    viewport.addEventListener("scroll", updateFadeEdges, { passive: true });
+    const resizeObserver = new ResizeObserver(updateFadeEdges);
+    resizeObserver.observe(viewport);
+
+    return () => {
+      viewport.removeEventListener("scroll", updateFadeEdges);
+      resizeObserver.disconnect();
+    };
+  }, [categories.length, copyCount, categorySignature]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
     if (!viewport || categories.length < 2) return undefined;
 
     let frameId;
@@ -177,16 +224,14 @@ export function CategoryCarousel({ categories = [] }) {
   const scrollByCards = useCallback(
     (direction) => {
       const viewport = viewportRef.current;
-      const track = trackRef.current;
-      const firstSet = track?.children[0];
-      const firstCard = firstSet?.children[0];
-      const nextCard = firstSet?.children[1];
-      if (!viewport || !firstCard || !nextCard) return;
+      if (!viewport) return;
 
-      const distance = nextCard.offsetLeft - firstCard.offsetLeft;
       animationPausedRef.current = true;
       window.clearTimeout(interactionTimerRef.current);
-      viewport.scrollBy({ left: direction * distance * 2, behavior: "smooth" });
+      viewport.scrollBy({
+        left: direction * viewport.clientWidth * 0.8,
+        behavior: "smooth",
+      });
       interactionTimerRef.current = window.setTimeout(() => {
         animationPausedRef.current = false;
       }, 850);
@@ -243,25 +288,66 @@ export function CategoryCarousel({ categories = [] }) {
     }
   };
 
-  if (!categories.length) return null;
+  if (!categories.length && !isLoading) return null;
   const copies = Array.from({ length: categories.length < 2 ? 1 : copyCount }, (_, index) => index);
+  const showSkeletons = isLoading && !categories.length;
+  const edgeFadeWidth = "var(--category-edge-fade-width)";
+  const edgeMask =
+    fadeLeft && fadeRight
+      ? `linear-gradient(to right, transparent 0, rgba(0,0,0,0.72) 8px, black ${edgeFadeWidth}, black calc(100% - ${edgeFadeWidth}), rgba(0,0,0,0.72) calc(100% - 8px), transparent 100%)`
+      : fadeLeft
+        ? `linear-gradient(to right, transparent 0, rgba(0,0,0,0.72) 8px, black ${edgeFadeWidth}, black 100%)`
+        : fadeRight
+          ? `linear-gradient(to right, black 0, black calc(100% - ${edgeFadeWidth}), rgba(0,0,0,0.72) calc(100% - 8px), transparent 100%)`
+          : "none";
 
   return (
-    <div className="group/carousel flex items-center gap-1.5 sm:gap-2">
-      <button
-        type="button"
-        onClick={() => scrollByCards(-1)}
-        disabled={categories.length < 2}
-        aria-label="Previous categories"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-button-bg)] text-[var(--user-icon-color)] shadow-sm transition hover:border-[var(--user-border-hover)] hover:text-[var(--user-text)] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
+    <div>
+      <SectionHeading
+        title="Explore Our Categories"
+        titleId="home-categories-heading"
+        subtitle="Find everything you need in one place."
+        className="mb-5"
       >
-        <ArrowLeft size={16} />
-      </button>
-
+        <div className="flex shrink-0 items-end gap-4">
+          <Link
+            href="/filtering-product"
+            className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+          >
+            View All
+            <ArrowRight size={16} className="transition-transform duration-150 group-hover:translate-x-0.5" />
+          </Link>
+          <span
+            aria-hidden="true"
+            className="hidden h-5 w-px bg-[var(--user-border)] sm:block"
+          />
+          <div className="hidden items-center gap-2 sm:flex">
+            <button
+              type="button"
+              onClick={() => scrollByCards(-1)}
+              disabled={!canScrollLeft || categories.length < 2}
+              aria-label="Previous categories"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+            >
+              <ChevronLeft size={16} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollByCards(1)}
+              disabled={!canScrollRight || categories.length < 2}
+              aria-label="Next categories"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+            >
+              <ChevronRight size={16} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </SectionHeading>
       <div
         ref={viewportRef}
         role="region"
         aria-label="Scrollable product categories"
+        aria-busy={showSkeletons}
         tabIndex={0}
         onKeyDown={onKeyDown}
         onMouseEnter={() => {
@@ -280,40 +366,45 @@ export function CategoryCarousel({ categories = [] }) {
             event.stopPropagation();
           }
         }}
-        className={`min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
+        className={`[--category-edge-fade-width:24px] max-sm:[--category-edge-fade-width:16px] min-w-0 flex-1 snap-x snap-proximity overflow-x-auto overflow-y-hidden scrollbar-hide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
           dragging ? "cursor-grabbing select-none" : "cursor-grab"
-        }`}
-        style={{ scrollbarWidth: "none", touchAction: "pan-x pan-y" }}
+        }${fadeLeft ? " fade-left" : ""}${fadeRight ? " fade-right" : ""}`}
+        style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          paddingInline: 0,
+          scrollPaddingInline: "24px",
+          touchAction: "pan-x pan-y",
+          maskImage: edgeMask,
+          WebkitMaskImage: edgeMask,
+        }}
       >
-        <div ref={trackRef} className="flex w-max">
+        <div ref={trackRef} className="flex w-max px-6 py-2">
           {copies.map((copy) => (
             <div
               key={`category-set-${copy}`}
               data-category-set
               aria-hidden={copy !== 1}
-              className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4"
+              className="flex shrink-0 gap-4 pr-4"
             >
-              {categories.map((category) => (
-                <CategoryCard
-                  key={`${copy}:${category._id}:${getCategoryImage(category) || ""}`}
-                  category={category}
-                  tabIndex={copy === 1 ? 0 : -1}
-                />
-              ))}
+              {showSkeletons
+                ? Array.from({ length: 8 }, (_, index) => (
+                    <div key={`category-skeleton-${copy}-${index}`} className="snap-start">
+                      <CategorySkeletonCard />
+                    </div>
+                  ))
+                : categories.map((category) => (
+                    <div
+                      key={`${copy}:${category._id}:${getCategoryImage(category) || ""}`}
+                      className="snap-start"
+                    >
+                      <CategoryCard category={category} tabIndex={copy === 1 ? 0 : -1} />
+                    </div>
+                  ))}
             </div>
           ))}
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => scrollByCards(1)}
-        disabled={categories.length < 2}
-        aria-label="Next categories"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-button-bg)] text-[var(--user-icon-color)] shadow-sm transition hover:border-[var(--user-border-hover)] hover:text-[var(--user-text)] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
-      >
-        <ArrowRight size={16} />
-      </button>
     </div>
   );
 }
@@ -321,61 +412,14 @@ export function CategoryCarousel({ categories = [] }) {
 export default function HomeCategories({ tiles = [], isLoading = false }) {
   const categories = tiles || [];
 
-  if (isLoading && !categories.length) {
-    return (
-      <section aria-label="Shop by category">
-        <div className="mb-3 space-y-1">
-          <div className="h-3 w-32 animate-pulse rounded-full bg-[var(--user-bg-hover)]" />
-          <div className="h-6 w-64 animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
-        </div>
-        <div className="flex gap-3 overflow-hidden sm:gap-4">
-          {[...Array(8).keys()].map((index) => (
-            <div
-              key={index}
-              className="h-[156px] w-[min(42vw,10.5rem)] shrink-0 animate-pulse rounded-[16px] border border-[var(--user-border)] bg-[var(--user-bg-card)] sm:w-[min(22vw,10.5rem)] lg:w-[min(13vw,10.5rem)] 2xl:w-[min(11.5vw,10.5rem)]"
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  if (!categories.length) return null;
+  if (!categories.length && !isLoading) return null;
 
   return (
     <section
       aria-labelledby="home-categories-heading"
       className="home-category-section rounded-2xl"
     >
-      <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 sm:mb-3">
-        <div>
-          <p className="text-[0.675rem] font-medium uppercase tracking-[0.12em] text-[var(--user-accent)]">
-            Shop by category
-          </p>
-          <h2
-            id="home-categories-heading"
-            className="mt-0.5 text-[1.2rem] font-medium tracking-tight text-[var(--user-text)] sm:text-[1.35rem]"
-          >
-            Explore Our Categories
-          </h2>
-          <p className="mt-0.5 text-[0.75rem] font-normal text-[var(--user-text-muted)]">
-            Find everything you need in one place.
-          </p>
-        </div>
-        <Link
-          href="/filtering-product"
-          className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[0.75rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
-        >
-          View All
-          <ArrowRight
-            size={15}
-            className="transition-transform group-hover:translate-x-1"
-            aria-hidden="true"
-          />
-        </Link>
-      </div>
-
-      <CategoryCarousel categories={categories} />
+      <CategoryCarousel categories={categories} isLoading={isLoading} />
     </section>
   );
 }

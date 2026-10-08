@@ -14,6 +14,7 @@ import {
   bundleRuleRequiredQty,
 } from "@/utils/bundleCalculator";
 import ProductCard from "./ProductCard";
+import SectionHeading from "./SectionHeading";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -271,35 +272,19 @@ function DealEngine({ deals }) {
   return (
     <div ref={sectionRef} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* Header — flat, solid */}
-      <div
-        className="deal-anim mb-2.5 flex items-center justify-between gap-3"
-        style={dealAnim("dealFadeIn", 0, 0.5)}
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Flame
-            size={20}
-            className="deal-anim shrink-0"
-            style={{ color: cfg.hex, animation: "dealWiggle 2.6s ease-in-out infinite", transformOrigin: "50% 85%" }}
-          />
-          <div className="flex flex-col">
-            <h2 className="text-lg font-semibold leading-tight tracking-tight text-[var(--user-text)] sm:text-xl lg:text-2xl">
-              Hot <span style={{ color: cfg.hex }} className="transition-colors duration-500">Deals</span>
-            </h2>
-            <span className="mt-0.5 hidden text-[0.5625rem] font-medium uppercase tracking-[0.14em] text-[var(--user-text)] opacity-50 sm:block">
-              Best offers · limited time
-            </span>
-          </div>
-        </div>
+      <div className="deal-anim" style={dealAnim("dealFadeIn", 0, 0.5)}>
+        <SectionHeading title="Hot Deals" subtitle="Best offers · limited time">
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-wide"
+          className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-[var(--user-text-muted)]"
           style={{ color: cfg.hex }}
         >
           <span
-            className="deal-anim w-1.5 h-1.5 rounded-full"
+            className="deal-anim h-1.5 w-1.5 rounded-full"
             style={{ backgroundColor: cfg.hex, animation: "dealBlink 1.4s ease-in-out infinite" }}
           />
           {deals.length} Live
         </span>
+        </SectionHeading>
       </div>
 
       {/* ✅ FEATURED DEAL */}
