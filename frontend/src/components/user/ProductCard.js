@@ -8,14 +8,15 @@ import { smartImageLoader } from "@/utils/smartImageLoader";
 import {
   Heart,
   ShoppingCart,
-  Zap,
   SlidersHorizontal,
   Check,
+  Loader2,
   Package,
   Tag,
   Truck,
   PackageOpen,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
@@ -95,6 +96,8 @@ function ProductCardInner({
   priority = false,
 }) {
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [failedImage, setFailedImage] = useState("");
   const router = useRouter();
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -120,9 +123,7 @@ function ProductCardInner({
 
   let price = variantPrice;
   let oldPrice = variantOldPrice;
-  let hasDiscount = false;
   let matchedDeal = null;
-  let discInfo = null; // ✅ poora discount object rakh lo
 
   try {
     const disc = calculateProductDiscount(
@@ -131,10 +132,8 @@ function ProductCardInner({
       showDealPricing,
       deal,
     );
-    discInfo = disc;
     price = disc.discountedPrice;
     oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
-    hasDiscount = disc.hasDiscount;
     matchedDeal = disc.matchedDeal;
   } catch (e) {
     // Discount calc fail → default prices (purana fallback, bina warn ke)
@@ -157,26 +156,14 @@ function ProductCardInner({
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
   const displayBadgeText = badgeConfig?.text || dealBadge;
 
-  // ✅ SIMPLE DISCOUNT BADGE — percentage / fixed amount / effective %
-  let discountBadgeText = "";
-  if (hasDiscount && !activeDeal) {
-    const d = discInfo || {};
-    const md = d.matchedDiscount || d.discount || null;
-    const t = d.discountType || d.type || (md && md.type) || "";
-    const v = Number(d.discountValue ?? d.value ?? (md && md.value) ?? 0);
-    if (t === "percentage" && v > 0) {
-      discountBadgeText = `${v}% OFF`;
-    } else if ((t === "fixed_amount" || t === "fixed") && v > 0) {
-      discountBadgeText = `Rs. ${v.toLocaleString()} OFF`;
-    } else {
-      const pct =
-        oldPrice > 0 ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0;
-      if (pct > 0) discountBadgeText = `${pct}% OFF`;
-    }
-  }
-
   // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
   const hasMultipleVariants = variants.length > 1;
+  const rating = Number(product.ratingSummary?.avg) || 0;
+  const ratingCount = Number(product.ratingSummary?.count) || 0;
+  const discountPercent =
+    oldPrice > price && oldPrice > 0
+      ? Math.round(((oldPrice - price) / oldPrice) * 100)
+      : 0;
 
   const buildDealInfo = () => {
     if (!activeDeal) return null;
@@ -202,9 +189,13 @@ function ProductCardInner({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
+    setAdding(true);
     addToCart(product, firstVariant, 1, buildDealInfo());
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
+    setTimeout(() => {
+      setAdding(false);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 1500);
+    }, 200);
   };
 
   // Single-variant: add + go straight to checkout
@@ -233,10 +224,12 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden transition-colors duration-300"
+      className="product-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--user-bg-card)] shadow-none transition-colors duration-200"
     >
-      <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
-        {image ? (
+      <div
+        className="relative h-40 w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)]"
+      >
+        {image && failedImage !== image ? (
           <Image
             src={getImageUrl(image)}
             alt={product.name}
@@ -245,20 +238,19 @@ function ProductCardInner({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             priority={priority}
             fetchPriority={priority ? "high" : "auto"}
-            className="object-cover"
+            className="object-cover object-center p-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+            onError={() => setFailedImage(image)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package size={44} className="text-[var(--user-text-subtle)]" />
+            <Package size={36} className="text-[var(--user-text-subtle)]" />
           </div>
         )}
-
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition pointer-events-none" />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}
+              className={`flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] font-normal`}
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={9} />
@@ -269,19 +261,16 @@ function ProductCardInner({
             </span>
           )}
 
-          {/* ✅ SIMPLE DISCOUNT — ab value dikhegi, sirf "Sale" nahi */}
-          {!displayBadgeText && hasDiscount && !hideDiscountBadge && (
-            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <Tag size={9} /> {discountBadgeText || "Sale"}
-            </span>
-          )}
-
           {out ? (
-            <span className="bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
+            <span
+              className={`rounded-full bg-[var(--user-danger)] px-2 py-1 text-[0.6rem] text-white font-normal`}
+            >
               OUT OF STOCK
             </span>
           ) : totalStock < 5 ? (
-            <span className="bg-[var(--user-warning)] text-black text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
+            <span
+              className={`rounded-full bg-[var(--user-warning)] px-2 py-1 text-[0.6rem] text-black font-normal`}
+            >
               LOW STOCK
             </span>
           ) : null}
@@ -293,54 +282,60 @@ function ProductCardInner({
             e.stopPropagation();
             toggleWishlist(productId);
           }}
-          className="absolute top-2.5 right-2.5 z-10 w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/60 transition"
+          aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-icon-color)] shadow-sm transition-colors hover:bg-[var(--user-bg-hover)]"
         >
           <Heart
-            size={15}
+            size={14}
             className={
               liked
                 ? "text-[var(--user-danger)] fill-[var(--user-danger)]"
-                : "text-white"
+                : "text-[var(--user-icon-color)]"
             }
           />
         </button>
 
-        {/* Hover quick actions — no plus icon.
-            Multi-variant: only "Choose Options" (opens right-side drawer).
-            Single variant: "Add to Cart" + "Buy Now".
-            Desktop: reveal on hover. Mobile: always visible (no hover). */}
+        {/* Desktop actions reveal on hover/focus; touch actions render below the price. */}
         {!out && (
-          <div className="absolute inset-x-2.5 bottom-2.5 z-10 flex gap-1.5 md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0 transition-all duration-300">
+          <div className="product-card-action-overlay absolute inset-x-0 bottom-0 z-10 flex translate-y-full items-end gap-1.5 bg-gradient-to-t from-black/45 via-black/20 to-transparent p-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
             {hasMultipleVariants ? (
               <button
+                type="button"
                 onClick={handleOpenOptions}
-                className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:opacity-90 active:scale-[0.98] transition"
+                aria-label={`Select options for ${product.name}`}
+                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] bg-[var(--user-accent)] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] text-[var(--user-accent-text)] transition duration-150 hover:brightness-[0.92] hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
               >
-                <SlidersHorizontal size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                Choose Options
+                <SlidersHorizontal size={14} className="shrink-0" />
+                Select Options
               </button>
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={handleQuickAdd}
-                  className={`flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg active:scale-[0.98] transition ${
+                  disabled={adding}
+                  aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
+                    className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
                     added
                       ? "bg-[var(--user-success)] text-white"
-                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"
+                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-[0.92]"
                   }`}
                 >
-                  {added ? (
-                    <Check size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {adding ? (
+                    <Loader2 size={14} className="shrink-0 animate-spin" />
+                  ) : added ? (
+                    <Check size={14} className="shrink-0" />
                   ) : (
-                    <ShoppingCart size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <ShoppingCart size={14} className="shrink-0" />
                   )}
-                  {added ? "Added!" : "Cart"}
+                    <span className="product-card-add-label">{adding ? "Adding..." : added ? "Added" : "Add to Cart"}</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleQuickBuy}
-                  className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:bg-black/75 active:scale-[0.98] transition"
+                  aria-label={`Buy ${product.name} now`}
+                  className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] border border-[#E5E7EB] bg-white px-[10px] text-[12.5px] font-semibold tracking-[0.1px] text-gray-900 transition duration-150 hover:-translate-y-px active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
-                 
                   Buy Now
                 </button>
               </>
@@ -349,31 +344,99 @@ function ProductCardInner({
         )}
       </div>
 
-      <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
-        <p className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-wider font-bold mb-1 truncate">
+      <div className="flex min-w-0 flex-1 flex-col p-1">
+        <p className="h-3 truncate text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em] text-[var(--user-text-subtle)]">
           {brandName || ""}
         </p>
-        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[0.9375rem] line-clamp-2 leading-snug min-h-[2.6em]">
+        <h3
+          className="line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] text-[var(--user-text)] sm:text-[0.8125rem]"
+        >
           {product.name}
         </h3>
 
-        <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
-          {oldPrice > price && (
-            <span className="text-[0.6875rem] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
-              Rs. {oldPrice.toLocaleString()}
+        {ratingCount > 0 ? (
+          <div className="mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-[var(--user-text-muted)]">
+            <span className="flex items-center gap-px" aria-label={`${rating.toFixed(1)} out of 5 stars`}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={10}
+                  className={
+                    star <= Math.round(rating)
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-[var(--user-border-hover)]"
+                  }
+                />
+              ))}
             </span>
-          )}
-          <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)] whitespace-nowrap">
-            Rs. {price.toLocaleString()}
-          </h4>
-          {mentionDeal && (
-            <span className="mt-1 text-[0.625rem] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
-              <Sparkles size={10} className="text-orange-500" /> Also available
-              in deal
-            </span>
-          )}
-        </div>
+            <span>{rating.toFixed(1)}</span>
+            <span>({ratingCount})</span>
+          </div>
+        ) : null}
 
+        <h4
+          className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]"
+        >
+          Rs. {price.toLocaleString()}
+        </h4>
+        <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
+          {oldPrice > price ? (
+            <>
+              <span className="truncate text-[var(--user-text-subtle)] line-through">
+                Rs. {oldPrice.toLocaleString()}
+              </span>
+              {discountPercent > 0 ? (
+                <span className={`shrink-0 text-[var(--user-accent)] font-normal`}>
+                  -{discountPercent}%
+                </span>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+        {mentionDeal && !showDealPricing ? (
+          <div className="flex h-3 min-w-0 items-center">
+            <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
+              <Sparkles size={9} className="shrink-0" />
+              <span className="truncate">Deal Price</span>
+            </span>
+          </div>
+        ) : null}
+        {!out ? (
+          <div className="product-card-touch-actions mt-2">
+            {hasMultipleVariants ? (
+              <button
+                type="button"
+                onClick={handleOpenOptions}
+                aria-label={`Select options for ${product.name}`}
+                className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-2 text-[13px] font-semibold text-[var(--user-accent-text)] transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+              >
+                <SlidersHorizontal size={14} className="shrink-0" />
+                Select Options
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleQuickAdd}
+                disabled={adding}
+                aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
+                className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                  added
+                    ? "bg-[var(--user-success)] text-white"
+                    : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                }`}
+              >
+                {adding ? (
+                  <Loader2 size={14} className="shrink-0 animate-spin" />
+                ) : added ? (
+                  <Check size={14} className="shrink-0" />
+                ) : (
+                  <ShoppingCart size={14} className="shrink-0" />
+                )}
+                <span className="product-card-add-label">{adding ? "Adding..." : added ? "Added" : "Add to Cart"}</span>
+              </button>
+            )}
+          </div>
+        ) : null}
         {children}
       </div>
     </Link>

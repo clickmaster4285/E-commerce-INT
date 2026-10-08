@@ -568,31 +568,28 @@ function CheckoutContent() {
   const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
-  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90 active:scale-[0.98] transition";
+  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:bg-[var(--user-accent-hover)] transition-colors";
   const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
 
   const StepIndicator = () => (
-    <div className="flex items-center justify-center mb-8 sm:mb-10">
+    <div className="flex items-start justify-center mb-8 sm:mb-10">
       {["Items", "Delivery", "Payment"].map((label, i) => {
         const n = i + 1;
         const active = step === n;
         const done = step > n;
         return (
-          <div key={label} className="flex items-center">
-            <button onClick={() => done && goToStep(n)} className={`flex items-center gap-2.5 sm:gap-3 ${done ? "cursor-pointer" : "cursor-default"}`}>
-              <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-sm font-black border-2 transition-all duration-300 ${
-                done ? "bg-[var(--user-success)] border-[var(--user-success)] text-white shadow-lg"
-                : active ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg shadow-[var(--user-accent)]/30"
-                : "border-[var(--user-border)] text-[var(--user-text-muted)] bg-[var(--user-bg-card)]"}`}>
-                {done ? <Check size={17} /> : n}
-              </div>
-              <div className="text-left hidden sm:block">
-                <p className={`text-[0.5625rem] font-bold uppercase tracking-widest ${active || done ? "text-[var(--user-accent)]" : "text-[var(--user-text-subtle)]"}`}>Step {n}</p>
-                <p className={`text-sm font-bold ${active || done ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>{label}</p>
-              </div>
+          <div key={label} className="flex items-start">
+            <button onClick={() => done && goToStep(n)} className={`flex flex-col items-center gap-1.5 w-20 sm:w-24 ${done ? "cursor-pointer" : "cursor-default"}`}>
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${
+                done || active
+                  ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md shadow-[var(--user-accent)]/30"
+                  : "bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] text-[var(--user-text-muted)]"}`}>
+                {done ? <Check size={15} /> : n}
+              </span>
+              <span className={`text-xs font-bold ${active || done ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>{label}</span>
             </button>
             {n < 3 && (
-              <div className={`w-6 sm:w-14 lg:w-20 h-0.5 mx-2 sm:mx-3 rounded-full ${done ? "bg-[var(--user-success)]" : "bg-[var(--user-border)]"}`} />
+              <div className={`h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
             )}
           </div>
         );
@@ -602,80 +599,56 @@ function CheckoutContent() {
 
   const SummaryPanel = ({ footer }) => (
     <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-          <PackageCheck size={18} className="text-[var(--user-accent-text)]" />
-        </div>
-        <div>
-          <h2 className="text-base font-black text-[var(--user-text)]">Order Summary</h2>
-          <p className="text-xs text-[var(--user-text-muted)]">{itemsWithDiscounts.length} items</p>
-        </div>
-      </div>
+      <h2 className="text-lg font-black text-[var(--user-text)] mb-4">Order Summary</h2>
 
-      <div className="space-y-3 my-4 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-2 mb-5 custom-scrollbar">
+      <div className="space-y-4 my-4 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 mb-5 custom-scrollbar">
         {itemsWithDiscounts.map((i) => (
-          <div key={i.key} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)]">
+          <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="text-xs font-bold text-[var(--user-text)] truncate">{i.name}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] leading-snug line-clamp-2">{i.name}</p>
+              {i.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
               {i.dealActive && i.dealId && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span className="inline-flex items-center gap-1 text-[0.5625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-0.5 rounded-full">
-                    <Gift size={9} />
-                    {i.dealType === 'buy_x_get_y' ? `B${i.dealBuyQuantity || 2}G${i.dealGetQuantity || 1}` : 'Deal'}
-                  </span>
-                  {i.freeItems > 0 && (
-                    <span className="text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-full">+{i.freeItems} FREE</span>
-                  )}
-                </div>
+                <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1">
+                  <Tag size={10} /> Deal
+                </span>
               )}
-              <p className="text-[0.625rem] text-[var(--user-text-muted)]">Qty: {i.qty} {i.freeItems > 0 && `(${i.payableItems} paid)`}</p>
+              <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Qty: {i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
             </div>
-            <div className="text-right space-y-1">
+            <div className="text-right shrink-0">
               {i.hasDiscount && i.originalPrice * i.qty > i.lineTotal && (
-                <p className="text-[0.5625rem] text-[var(--user-text-subtle)] line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
+                <p className="text-[0.625rem] text-[var(--user-text-subtle)] line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
               )}
-              <p className="text-sm font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
-              {((i.savings * i.qty) + i.dealSavings) > 0 && (
-                <p className="text-[0.5625rem] font-black text-[var(--user-success)] flex items-center gap-0.5 justify-end">
-                  <TrendingUp size={9} /> -Rs. {((i.savings * i.qty) + i.dealSavings).toLocaleString()}
-                </p>
-              )}
+              <p className="text-[0.8125rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="space-y-3 pt-4 border-t-2 border-[var(--user-border)]">
-        <div className="flex justify-between text-sm">
-          <span className="text-[var(--user-text-muted)] font-semibold">Subtotal</span>
+      <div className="space-y-2.5 pt-4 border-t border-[var(--user-border)] text-[0.8125rem]">
+        <div className="flex justify-between">
+          <span className="text-[var(--user-text)] font-medium">Subtotal</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
-          <div className="flex justify-between text-sm bg-[var(--user-success)]/10 -mx-5 px-5 py-2 rounded-xl border border-[var(--user-success)]/20">
-            <span className="text-[var(--user-success)] flex items-center gap-2 font-bold"><BadgePercent size={14} /> You Save</span>
-            <span className="text-[var(--user-success)] font-black">-Rs. {totalSavings.toLocaleString()}</span>
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text)] font-medium">You Save</span>
+            <span className="text-[var(--user-success)] font-bold">– Rs. {totalSavings.toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between text-sm">
-          <span className="text-[var(--user-text-muted)] flex items-center gap-2 font-semibold">
-            <Truck size={14} /> Shipping
-            {shipping === 0 && <span className="text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/20 px-2 py-0.5 rounded-full">FREE</span>}
-          </span>
-          <span className="text-[var(--user-text)] font-bold">{shipping === 0 ? "Rs. 0" : `Rs. ${shipping}`}</span>
+        <div className="flex justify-between">
+          <span className="text-[var(--user-text)] font-medium">Shipping</span>
+          <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{shipping === 0 ? "FREE" : `Rs. ${shipping}`}</span>
         </div>
         {tax > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-[var(--user-text-muted)] font-semibold">Tax</span>
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text)] font-medium">Tax</span>
             <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between pt-4 border-t-2 border-[var(--user-border)]">
-          <span className="font-black text-[var(--user-text)]">Total</span>
-          <div className="text-right">
-            <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
-            <p className="text-[0.625rem] text-[var(--user-text-muted)]">Including all taxes</p>
-          </div>
+        <div className="flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
+          <span className="text-base font-black text-[var(--user-text)]">Total</span>
+          <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
         </div>
       </div>
       <div className="mt-5">{footer}</div>
@@ -699,7 +672,7 @@ function CheckoutContent() {
   return (
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
-    <div className="hidden lg:block">
+    <div className="checkout-premium hidden lg:block">
     <main className="max-w-[80rem] mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 lg:py-12 pb-24 sm:pb-28 md:pb-10">
       <style>{`
         @keyframes modalUp { from { opacity: 0; transform: translateY(30px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -730,7 +703,7 @@ function CheckoutContent() {
             <p className="text-sm text-[var(--user-text-muted)] mb-6">We need your phone number for delivery updates and order confirmation.</p>
             <label className={labelCls}>Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className={inputCls} />
-            <button onClick={savePhone} disabled={savingPhone} className={`mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
+            <button onClick={savePhone} disabled={savingPhone} className={`checkout-primary-cta mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
               {savingPhone ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
               Save & Continue
             </button>
@@ -756,35 +729,27 @@ function CheckoutContent() {
                         <p className="text-xs text-[var(--user-text-muted)]">{selectedCartItems.length} of {cart.length} items selected</p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">Edit selection</button>
+                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">Edit Cart</button>
                   </div>
 
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
                   <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[26.25rem] sm:max-h-[32.5rem] lg:max-h-none lg:flex-1 lg:min-h-0 custom-scrollbar">
                     {itemsWithDiscounts.map((item) => {
                       return (
-                        <div key={item.key} className={`flex items-start gap-3 p-4 rounded-xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5`}>
+                        <div key={item.key} className="flex items-start gap-4 p-4 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)]">
                           <ItemThumb item={item} size="w-16 h-16" />
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
-                            {item.variantTitle && <p className="text-[0.625rem] sm:text-xs text-[var(--user-text-muted)]">{item.variantTitle}</p>}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
+                            {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{item.variantTitle}</p>}
                             {item.dealId && (
-                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                <span className="inline-flex items-center gap-1 text-[0.5625rem] sm:text-[0.625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
-                                  <Gift size={9} />
-                                  {item.dealType === 'buy_x_get_y' ? `Buy ${item.dealBuyQuantity} Get ${item.dealGetQuantity} Free` : (item.dealName || 'Active Deal')}
-                                </span>
-                              </div>
+                              <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1.5">
+                                <Tag size={10} /> Deal
+                              </span>
                             )}
-                            <div className="flex items-center gap-2 mt-2">
-                              <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
-                              {item.hasDiscount && item.originalPrice * item.qty > item.lineTotal && (
-                                <p className="text-[0.625rem] text-[var(--user-text-subtle)] line-through">Rs. {(item.originalPrice * item.qty).toLocaleString()}</p>
-                              )}
-                            </div>
                           </div>
-                          <div className="shrink-0 flex flex-col items-end gap-2">
-                            <div className="flex items-center rounded-lg border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                          <div className="shrink-0 flex flex-col items-end gap-2.5">
+                            <p className="text-sm font-black text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
+                            <div className="flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]">
                               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
                                 <Minus size={12} />
                               </button>
@@ -793,7 +758,6 @@ function CheckoutContent() {
                                 <Plus size={12} />
                               </button>
                             </div>
-                            <p className="text-sm font-black text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
                           </div>
                         </div>
                       );
@@ -813,7 +777,7 @@ function CheckoutContent() {
               {/* RIGHT: Summary with Proceed button */}
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
+                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
                     Proceed to Delivery <ArrowRight size={16} />
                   </button>
                   <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
@@ -832,7 +796,7 @@ function CheckoutContent() {
                   <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{selectedCartItems.length} selected</p>
                   <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                 </div>
-                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
+                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
                   Proceed <ArrowRight size={14} />
                 </button>
               </div>
@@ -855,16 +819,28 @@ function CheckoutContent() {
                   </div>
                   {addresses.length > 0 ? (
                     <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                      {addresses.map((a) => (
-                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`text-left rounded-xl border-2 p-4 transition-all duration-200 cursor-pointer ${selectedAddressId === a._id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
-                            {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded">DEFAULT</span>}
+                      {addresses.map((a) => {
+                        const sel = selectedAddressId === a._id;
+                        return (
+                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                          <div className="flex items-start gap-3">
+                            <span className={`mt-0.5 w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center shrink-0 ${sel ? "border-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
+                              {sel && <span className="w-2.5 h-2.5 rounded-full bg-[var(--user-accent)]" />}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
+                                {a.is_default && <span className="text-[0.625rem] font-bold text-[var(--user-accent)] border border-[var(--user-accent)]/40 px-1.5 py-0.5 rounded">Default</span>}
+                              </div>
+                              <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
+                                {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
+                              </p>
+                              <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{a.phone}</p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} aria-label="Edit address" className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
+                              <Pencil size={15} />
+                            </button>
                           </div>
-                          <p className="text-xs text-[var(--user-text-muted)] leading-relaxed line-clamp-2 mb-1">
-                            {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
-                          </p>
-                          <p className="text-xs text-[var(--user-text-secondary)] font-semibold flex items-center gap-1"><Phone size={10} /> {a.phone}</p>
                           <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
                             <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
                               <Pencil size={11} /> Edit
@@ -874,7 +850,8 @@ function CheckoutContent() {
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8 mb-4">
@@ -904,7 +881,7 @@ function CheckoutContent() {
                       <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> Free shipping on orders over Rs. {cfg.free_shipping_over.toLocaleString()}</p>
                     </div>
                   )}
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     {shippingMethods.map((m) => {
                       const active = shippingMethod === m.id;
                       const IconComp = m.icon;
@@ -920,12 +897,12 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          {m.badge && (
-                            <span className={`absolute top-2 right-2 text-[0.5rem] font-black px-2 py-0.5 rounded-full ${m.id === "express" ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "bg-[var(--user-border)] text-[var(--user-text-muted)]"}`}>{m.badge}</span>
-                          )}
-                          <IconComp size={20} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
-                          <div className="flex-1 w-full">
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                          <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                            {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                          </span>
+                          <IconComp size={20} className={active ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
                             <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.time}</p>
                             {active && shippingReason && <p className="text-[0.625rem] text-[var(--user-success)] mt-1 font-semibold">{shippingReason}</p>}
@@ -936,7 +913,7 @@ function CheckoutContent() {
                               </p>
                             )}
                           </div>
-                          <span className={`text-sm font-black ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}</span>
+                          <span className={`text-sm font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}</span>
                         </button>
                       );
                     })}
@@ -955,24 +932,19 @@ function CheckoutContent() {
                   </div>
                   <div className="space-y-3">
                     {[
-                      { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay when your order arrives", badge: "Most Popular" },
-                      { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our account", badge: null },
-                      { id: "card", icon: CreditCard, title: "Debit / Credit Card", sub: "Visa, Mastercard accepted", badge: null },
+                      { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay in cash when your order arrives" },
+                      { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our bank account" },
+                      { id: "card", icon: CreditCard, title: "Card", sub: "Visa, Mastercard, American Express" },
                     ].map((m) => (
-                      <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === m.id ? "bg-[var(--user-accent)]" : "bg-[var(--user-bg-hover)]"}`}>
-                          <m.icon size={18} className={paymentMethod === m.id ? "text-[var(--user-accent-text)]" : "text-[var(--user-text-muted)]"} />
-                        </div>
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                        <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                          {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                        </span>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
-                            {m.badge && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 px-2 py-0.5 rounded-full">{m.badge}</span>}
-                          </div>
+                          <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
                           <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.sub}</p>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
-                          {paymentMethod === m.id && <Check size={12} className="text-[var(--user-accent-text)]" />}
-                        </div>
+                        <m.icon size={20} className={paymentMethod === m.id ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
                       </button>
                     ))}
                   </div>
@@ -1019,7 +991,7 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
+                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
                     Review Order <ArrowRight size={16} />
                   </button>
                   <button onClick={backToStep1} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
@@ -1152,7 +1124,7 @@ function CheckoutContent() {
       // Early-out: loading / empty / needs-phone states render their compact mobile equivalents.
       if (userLoading || !draftReady || (!user && !needsPhone)) {
         return (
-          <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
+          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
             <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
           </div>
         );
@@ -1162,7 +1134,7 @@ function CheckoutContent() {
       // Empty cart on step 1 (mobile)
       if (step === 1 && cart.length === 0 && !placing) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1191,7 +1163,7 @@ function CheckoutContent() {
       // needsPhone state — use the same compact card style
       if (needsPhone) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1238,7 +1210,7 @@ function CheckoutContent() {
       ];
 
       return (
-        <div className="lg:hidden bg-[var(--user-bg)]">
+        <div className="checkout-premium lg:hidden bg-[var(--user-bg)]">
           {/* Sticky top app bar */}
           <div
             className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
@@ -1341,9 +1313,11 @@ function CheckoutContent() {
                         name="shipping-method-mobile"
                         checked={active}
                         onChange={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }}
-                        className="w-4 h-4 shrink-0"
-                        style={{ accentColor: "var(--user-accent)" }}
+                        className="sr-only"
                       />
+                      <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.title}</p>
@@ -1382,6 +1356,9 @@ function CheckoutContent() {
                           : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/40"
                       }`}
                     >
+                      <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <m.icon size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{m.label}</span>
                     </button>
@@ -1491,7 +1468,7 @@ function CheckoutContent() {
                 type="button"
                 onClick={() => setOrderReviewOpen(true)}
                 disabled={placing}
-                className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
+                className="checkout-primary-cta h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
               >
                 {placing ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
                 {placing ? "Placing..." : "Place Order"}
@@ -1624,7 +1601,7 @@ function CheckoutContent() {
                     type="button"
                     onClick={placeOrder}
                     disabled={placing}
-                    className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
+                    className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
                   >
                     {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                     {placing ? "Placing..." : "Confirm & Place Order"}
@@ -1666,7 +1643,7 @@ function CheckoutContent() {
                   </div>
                 </div>
                 <div className="px-4 pt-2 pb-1">
-                  <button type="button" onClick={placeOrder} disabled={placing} className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
+                  <button type="button" onClick={placeOrder} disabled={placing} className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
                     {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                     {placing ? "Placing..." : "Confirm & Place Order"}
                   </button>

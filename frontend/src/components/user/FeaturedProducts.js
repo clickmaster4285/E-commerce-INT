@@ -34,9 +34,9 @@ const TAB_PARAMS = {
   offers: { sort: "discount-desc", minDiscount: 1 },
 };
 
-/* Full-width responsive grid (purana look same) */
+/* Compact marketplace grid across storefront breakpoints */
 const GRID =
-  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8";
+  "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9";
 
 function TabGrid({ tab }) {
   const [page, setPage] = useState(1);
@@ -66,7 +66,7 @@ function TabGrid({ tab }) {
         {[...Array(8).keys()].map((index) => (
           <div
             key={index}
-            className="aspect-[3/4] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+            className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]"
           />
         ))}
       </div>

@@ -349,6 +349,10 @@ export default function BrandsPage() {
       const msg = error.response?.data?.message || error.message || "Brand operation failed";
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
         toast.error(msg, { duration: 6000, description: "Contact an administrator to grant you brand access." });
+      } else if (!editingBrand && (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("duplicate"))) {
+        // ✅ Duplicate code (e.g. stale BRD-002) — fresh code lao, form update karo, user retry kare
+        toast.error(msg, { description: "New brand code generated — please click Save Brand again." });
+        fetchNextBrandCode();
       } else {
         toast.error(msg);
       }
@@ -429,9 +433,17 @@ export default function BrandsPage() {
   /* ---------- Handlers ---------- */
   const handleSubmit = (e) => {
     e.preventDefault();
+    const trimmedName = formData.name?.trim() || "";
+    if (!trimmedName) {
+      toast.error("Brand Name is required");
+      return;
+    }
     const fd = new FormData();
-    fd.append("brand_code", formData.brand_code);
-    fd.append("name", formData.name);
+    // ✅ Create par hamesha fresh auto code bhejo — stale BRD-002 jaisa duplicate kabhi nahi jayega.
+    // Edit par existing code hi rehta hai.
+    const codeToSend = editingBrand ? formData.brand_code : (formData.brand_code?.trim() || autoBrandCode?.trim() || "");
+    fd.append("brand_code", codeToSend);
+    fd.append("name", trimmedName);
     fd.append("description", formData.description || "");
     fd.append("country", formData.country || "");
     fd.append("is_active", formData.is_active.toString());
@@ -927,14 +939,16 @@ export default function BrandsPage() {
               {/* ROW 1: Brand Code + Brand Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code (Auto)</label>
                   <input 
                     type="text" 
-                    value={formData.brand_code} 
-                    onChange={(e) => setFormData({ ...formData, brand_code: e.target.value })} 
-                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 font-mono" 
+                    value={loadingCode ? "Generating..." : formData.brand_code} 
+                    readOnly
+                    disabled
+                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-70 font-mono" 
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
                     placeholder="AUTO-GENERATED" 
+                    title="Brand code auto-generated hai — duplicate se bachne ke liye editable nahi"
                   />
                 </div>
                 <div>

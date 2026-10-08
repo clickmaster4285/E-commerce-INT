@@ -9,7 +9,7 @@ import { useSearchParams } from "next/navigation";
 import {
   ShoppingCart, ChevronRight, ChevronLeft, ChevronDown,
   Minus, Plus, Package, X, Check, Zap, ZoomIn, Tag, Sparkles, Heart, Star,
-  Share2, Store, ShieldCheck,
+  Store, ShieldCheck, ZoomIn as ZoomHintIcon,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
@@ -213,15 +213,137 @@ Stars.displayName = "Stars";
 
 const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
   const stripRef = useRef(null);
+  const imageFrameRef = useRef(null);
+  const lensRef = useRef(null);
+  const zoomPanelRef = useRef(null);
+  const moveFrameRef = useRef(0);
+  const pendingPointRef = useRef(null);
+  const naturalSizeRef = useRef({ width: 1, height: 1 });
+  const hoveredRef = useRef(false);
+  const updateZoomPositionRef = useRef(null);
+  const zoomRequestRef = useRef(0);
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [zoomLoaded, setZoomLoaded] = useState(false);
+  const [hasHovered, setHasHovered] = useState(false);
   const activeIndex = Math.max(0, images.indexOf(mainImage));
+  const lensSize = 112;
+  const zoomFactor = 2.5;
+
+  const preloadZoomImage = useCallback(() => {
+    if (!mainImage || typeof window === "undefined") return;
+    const requestId = ++zoomRequestRef.current;
+    setZoomLoaded(false);
+    const preload = new window.Image();
+    preload.onload = () => {
+      if (requestId !== zoomRequestRef.current) return;
+      naturalSizeRef.current = {
+        width: preload.naturalWidth || 1,
+        height: preload.naturalHeight || 1,
+      };
+      setZoomLoaded(true);
+      if (hoveredRef.current && !moveFrameRef.current) {
+        moveFrameRef.current = window.requestAnimationFrame(() => {
+          updateZoomPositionRef.current?.();
+        });
+      }
+    };
+    preload.onerror = () => {
+      if (requestId === zoomRequestRef.current) setZoomLoaded(false);
+    };
+    preload.src = mainImage;
+  }, [mainImage]);
+
+  const updateZoomPosition = useCallback(() => {
+    moveFrameRef.current = 0;
+    const frame = imageFrameRef.current;
+    const lens = lensRef.current;
+    const panel = zoomPanelRef.current;
+    const point = pendingPointRef.current;
+    if (!frame || !lens || !panel || !point || !hoveredRef.current) return;
+
+    const frameWidth = frame.clientWidth;
+    const frameHeight = frame.clientHeight;
+    const mainImg = frame.querySelector("img");
+    const naturalWidth = mainImg?.naturalWidth || naturalSizeRef.current.width;
+    const naturalHeight = mainImg?.naturalHeight || naturalSizeRef.current.height;
+    const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+    const imageWidth = naturalWidth * scale;
+    const imageHeight = naturalHeight * scale;
+    const offsetX = (frameWidth - imageWidth) / 2;
+    const offsetY = (frameHeight - imageHeight) / 2;
+    const cursorX = Math.max(offsetX, Math.min(point.x, offsetX + imageWidth));
+    const cursorY = Math.max(offsetY, Math.min(point.y, offsetY + imageHeight));
+    const activeLensSize = Math.min(lensSize, imageWidth, imageHeight);
+    lens.style.width = `${activeLensSize}px`;
+    lens.style.height = `${activeLensSize}px`;
+    const lensLeft = Math.max(offsetX, Math.min(cursorX - activeLensSize / 2, offsetX + imageWidth - activeLensSize));
+    const lensTop = Math.max(offsetY, Math.min(cursorY - activeLensSize / 2, offsetY + imageHeight - activeLensSize));
+    const centerX = lensLeft + activeLensSize / 2 - offsetX;
+    const centerY = lensTop + activeLensSize / 2 - offsetY;
+
+    lens.style.transform = `translate3d(${lensLeft}px, ${lensTop}px, 0)`;
+    const panelWidth = panel.clientWidth;
+    const panelHeight = panel.clientHeight;
+    panel.style.backgroundSize = `${imageWidth * zoomFactor}px ${imageHeight * zoomFactor}px`;
+    const backgroundX = Math.min(
+      0,
+      Math.max(panelWidth - imageWidth * zoomFactor, panelWidth / 2 - centerX * zoomFactor),
+    );
+    const backgroundY = Math.min(
+      0,
+      Math.max(panelHeight - imageHeight * zoomFactor, panelHeight / 2 - centerY * zoomFactor),
+    );
+    panel.style.backgroundPosition = `${backgroundX}px ${backgroundY}px`;
+  }, []);
+
+  useEffect(() => {
+    updateZoomPositionRef.current = updateZoomPosition;
+  }, [updateZoomPosition]);
+
+  const handleMouseMove = useCallback((event) => {
+    const bounds = imageFrameRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    pendingPointRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    if (!moveFrameRef.current) {
+      moveFrameRef.current = window.requestAnimationFrame(updateZoomPosition);
+    }
+  }, [updateZoomPosition]);
+
+  const handleMouseEnter = useCallback(() => {
+    hoveredRef.current = true;
+    setZoomVisible(true);
+    setHasHovered(true);
+    preloadZoomImage();
+  }, [preloadZoomImage]);
+
+  useEffect(() => {
+    if (hoveredRef.current && mainImage) preloadZoomImage();
+  }, [mainImage, preloadZoomImage]);
+
+  const handleMouseLeave = useCallback(() => {
+    hoveredRef.current = false;
+    setZoomVisible(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (moveFrameRef.current) window.cancelAnimationFrame(moveFrameRef.current);
+    };
+  }, []);
+
   const scrollStrip = (dir) => {
     stripRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
   };
   return (
-    <div className="min-w-0">
+    <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
+      <div className="product-gallery-main relative">
       <div
-        className="group relative aspect-square cursor-zoom-in overflow-hidden border border-[var(--user-border)] bg-white"
+        ref={imageFrameRef}
+        className="group relative aspect-square cursor-crosshair overflow-hidden border border-[var(--user-border)] bg-white"
         onClick={() => mainImage && onZoom(mainImage)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
       >
         {mainImage ? (
           <Image
@@ -243,6 +365,31 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         {stock > 0 && stock < 5 && (
           <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
         )}
+        <div
+          ref={lensRef}
+          aria-hidden="true"
+          className={`product-image-zoom-lens pointer-events-none absolute left-0 top-0 z-20 h-28 w-28 border border-[var(--user-accent)]/70 bg-[rgba(245,114,36,0.2)] transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ transform: "translate3d(-200px, -200px, 0)" }}
+        />
+        {!hasHovered && mainImage ? (
+          <span className="product-image-zoom-hint pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-[11px] text-white">
+            <ZoomHintIcon size={13} aria-hidden="true" />
+            Hover to zoom
+          </span>
+        ) : null}
+      </div>
+      {mainImage ? (
+        <div
+          ref={zoomPanelRef}
+          aria-hidden="true"
+          className={`product-image-zoom-panel pointer-events-none absolute left-full top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
+        >
+          {!zoomLoaded ? (
+            <div className="absolute inset-0 animate-pulse bg-gray-100" />
+          ) : null}
+        </div>
+      ) : null}
       </div>
       {images.length > 1 && (
         <div className="relative mt-2 flex items-center gap-1">
@@ -282,6 +429,53 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
 });
 Gallery.displayName = "Gallery";
 
+// ✅ Product details images — pehle sirf pehli image (neeche se fade), "View More" par saari images
+const COLLAPSED_IMAGE_HEIGHT = 620;
+const DetailImages = memo(({ productName, images, onZoom }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!images?.length) return null;
+  const hasMore = images.length > 1;
+  const visible = expanded || !hasMore ? images : images.slice(0, 1);
+  const collapsed = hasMore && !expanded;
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div
+        className="relative overflow-hidden"
+        style={collapsed ? { maxHeight: COLLAPSED_IMAGE_HEIGHT } : undefined}
+      >
+        <div className="flex flex-col items-center gap-2">
+          {visible.map((url, i) => (
+            <img
+              key={url}
+              src={url}
+              alt={`${productName}, image ${i + 1}`}
+              loading="lazy"
+              onClick={() => onZoom(url)}
+              className="h-auto w-full cursor-zoom-in object-contain"
+            />
+          ))}
+        </div>
+        {collapsed && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
+        )}
+      </div>
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-expanded={expanded}
+            className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+          >
+            {expanded ? "View Less" : `View More (${images.length - 1})`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+DetailImages.displayName = "DetailImages";
+
 const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
   if (!show) return null;
   return (
@@ -307,6 +501,10 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
 StickyBar.displayName = "StickyBar";
 
 const Lightbox = memo(({ images, index, onClose, onStep }) => {
+  const [zoom, setZoom] = useState({ index, scale: 1 });
+  const zoomScale = zoom.index === index ? zoom.scale : 1;
+  const touchGestureRef = useRef(null);
+
   useEffect(() => {
     if (index === null) return undefined;
     const handleKeyDown = (event) => {
@@ -317,12 +515,54 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [index, onClose, onStep]);
+
   if (index === null || !images?.length) return null;
+
+  const handleTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      const [first, second] = event.touches;
+      touchGestureRef.current = {
+        type: "pinch",
+        distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+        scale: zoomScale,
+      };
+    } else if (event.touches.length === 1) {
+      touchGestureRef.current = { type: "swipe", x: event.touches[0].clientX };
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type !== "pinch" || event.touches.length !== 2) return;
+    event.preventDefault();
+    const [first, second] = event.touches;
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    setZoom({ index, scale: Math.max(1, Math.min(4, gesture.scale * (distance / gesture.distance))) });
+  };
+
+  const handleTouchEnd = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type === "swipe" && event.changedTouches.length && zoomScale === 1) {
+      const delta = event.changedTouches[0].clientX - gesture.x;
+      if (Math.abs(delta) > 55) onStep(delta > 0 ? -1 : 1);
+    }
+    touchGestureRef.current = null;
+  };
+
   return (
     <div role="dialog" aria-modal="true" aria-label="Product image viewer" className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
       <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close"><X size={20} /></button>
       <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Previous"><ChevronLeft size={20} /></button>
-      <img src={images[index]} alt="" className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+      <img
+        src={images[index]}
+        alt=""
+        className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg"
+        style={{ transform: `scale(${zoomScale})`, touchAction: "none" }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
       <button type="button" onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Next"><ChevronRight size={20} /></button>
       <span className="absolute bottom-4 text-white/60 text-xs font-medium">{index + 1} / {images.length}</span>
     </div>
@@ -487,15 +727,6 @@ function ProductDetailContent({ params }) {
     setIsCartOpen(true);
   }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, isDealMode, matchedDeal]);
 
-  const handleShare = useCallback(() => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.share) {
-      navigator.share({ title: product?.name || "Product", url }).catch(() => {});
-    } else if (navigator.clipboard && url) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
-  }, [product]);
-
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
   const brandName = extractName(product?.brand_id);
@@ -573,7 +804,7 @@ function ProductDetailContent({ params }) {
 
                 <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{product.name}</h1>
 
-                {/* Rating + share/wishlist */}
+                {/* Rating + wishlist */}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Stars value={ratingAvg} />
@@ -585,9 +816,6 @@ function ProductDetailContent({ params }) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
-                    <button type="button" onClick={handleShare} aria-label="Share this product" className="hover:text-[var(--user-accent)] transition-colors">
-                      <Share2 size={17} />
-                    </button>
                     <button
                       type="button"
                       onClick={() => productId && toggleWishlist(productId)}
@@ -774,9 +1002,9 @@ function ProductDetailContent({ params }) {
                       <Plus size={13} />
                     </button>
                   </div>
-                  <span className={`text-xs ${stock > 0 ? "text-[var(--user-text-muted)]" : "text-[var(--user-accent)] font-semibold"}`}>
-                    {stock > 0 ? `${stock} in stock` : "Out of stock"}
-                  </span>
+                  {stock < 1 ? (
+                    <span className="text-xs font-semibold text-[var(--user-accent)]">Out of stock</span>
+                  ) : null}
                 </div>
 
                 {/* CTA — Daraz cyan/orange */}
@@ -945,6 +1173,18 @@ function ProductDetailContent({ params }) {
             ) : null}
           </div>
         </section>
+
+        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
+        {allImages.length > 0 && (
+          <section className="mt-3 bg-[var(--user-bg-card)]">
+            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+              Product images of {product.name}
+            </h2>
+            <div className="px-3 sm:px-4 py-4">
+              <DetailImages productName={product.name} images={allImages} onZoom={openLightbox} />
+            </div>
+          </section>
+        )}
 
         {/* ===== You may also like — real related ===== */}
         {related.length > 0 && (

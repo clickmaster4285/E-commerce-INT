@@ -30,9 +30,9 @@ const safePageParam = (raw) => {
   return Number.isInteger(n) && n > 0 ? n : 1;
 };
 
-/* FeaturedProducts wali grid — dono jagah cards ek jaisi chaudai me */
+/* FeaturedProducts wali compact grid — dono jagah cards ek jaisi chaudai me */
 const GRID =
-  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8";
+  "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9";
 
 function Chip({ label, onRemove }) {
   return (
@@ -220,7 +220,7 @@ export default function FilterResults({
           {[...Array(10).keys()].map((index) => (
             <div
               key={index}
-              className="aspect-[3/4] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]"
             />
           ))}
         </div>

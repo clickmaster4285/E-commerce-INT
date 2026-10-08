@@ -6,8 +6,7 @@
 
   import {
     X, Plus, Minus, Trash2, ShoppingBag, Package, Tag, Check,
-    Sparkles, Loader2, Zap, Truck, PackageOpen, ChevronDown, ArrowRight,
-    BadgePercent,
+    Loader2, ChevronDown, BadgePercent, LockKeyhole,
   } from "lucide-react";
   import { toast } from "sonner";
   import { useQuery } from "@tanstack/react-query";          // ✅ ADD
@@ -30,23 +29,6 @@ import { shippingApi } from "@/apis/user/shippingApi";
     if (raw.startsWith("http")) return raw;
     return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
   };
-
-  function getDealBadgeConfig(deal) {
-    if (!deal) return null;
-    const type = deal.type;
-    const val = deal.discountValue || 0;
-    const buyQty = deal.buyQuantity || 0;
-    const getQty = deal.getQuantity || 0;
-
-    if (type === "percentage") return { text: `${val}% OFF`, color: "from-green-500 to-emerald-600", icon: Tag };
-    if (type === "fixed_amount") return { text: `Rs. ${val} OFF`, color: "from-blue-500 to-cyan-600", icon: Tag };
-    if (type === "buy_x_get_y") return { text: buyQty > 0 && getQty > 0 ? `Buy ${buyQty} Get ${getQty}` : "Buy X Get Y", color: "from-purple-500 to-pink-600", icon: PackageOpen };
-    if (type === "bundle") return { text: "Bundle Deal", color: "from-indigo-500 to-purple-600", icon: Package };
-    if (type === "free_shipping") return { text: "Free Shipping", color: "from-orange-500 to-red-600", icon: Truck };
-    if (type === "flash_sale") return { text: "Flash Sale", color: "from-yellow-500 to-orange-600", icon: Zap };
-    
-    return { text: deal.name || "Deal", color: "from-orange-500 to-red-600", icon: Tag };
-  }
 
   export default function CartDrawer() {
     const router = useRouter();
@@ -285,6 +267,11 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const selectedCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
     const selectedLineCount = selectedItems.length;
     const allSelected = hasItems && selectedLineCount === cart.length;
+    const freeShippingThreshold = Number(shipConfig?.free_shipping_over ?? 0) || 0;
+    const freeShippingRemaining = Math.max(0, freeShippingThreshold - totals.subtotal);
+    const freeShippingProgress = freeShippingThreshold > 0
+      ? Math.min(100, (totals.subtotal / freeShippingThreshold) * 100)
+      : 0;
 
     const handleQtyChange = (key, next) => {
       if (next < 1) return;
@@ -318,7 +305,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
           next_.delete(key);
           return next_;
         });
-        toast.success("Item removed", { action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
+        toast.success("Item removed", { duration: 5000, action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
       }, REMOVE_ANIM_MS);
       timersRef.current.push(t);
     };
@@ -348,78 +335,81 @@ import { shippingApi } from "@/apis/user/shippingApi";
     }, [isCartOpen]);
     return (
       <>
-        <div aria-hidden="true" onClick={() => setIsCartOpen(false)} className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${isCartOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+        <div aria-hidden="true" onClick={() => setIsCartOpen(false)} className={`fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] transition-opacity duration-[250ms] ease-out ${isCartOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Shopping cart" className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] shadow-[var(--user-shadow-lg)] outline-none transition-transform duration-300 ease-in-out sm:w-[26.25rem] md:w-[28.75rem] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Shopping cart" className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] font-normal text-[var(--user-text)] shadow-[var(--user-shadow-lg)] outline-none transition-transform duration-[250ms] ease-out sm:w-[26.25rem] md:w-[28.75rem] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
           <span className="sr-only" aria-live="polite">{count} {count === 1 ? "item" : "items"} in cart</span>
 
-          <header className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] px-5 py-3 sm:px-6">
-                    <Link href="/cart" onClick={() => setIsCartOpen(false)} className="group/cartlink min-w-0">
-              <h2 className="flex items-center gap-2.5 text-base font-bold text-[var(--user-text)] sm:text-lg group-hover/cartlink:text-[var(--user-accent)] transition-colors">
-                <ShoppingBag size={20} aria-hidden="true" className="text-[var(--user-accent)]" />
-                Shopping Cart
-                <ArrowRight size={14} className="text-[var(--user-text-muted)] group-hover/cartlink:translate-x-0.5 group-hover/cartlink:text-[var(--user-accent)] transition-all" />
-              </h2>
-              <p className="mt-0.5 text-xs text-[var(--user-text-muted)] group-hover/cartlink:text-[var(--user-accent)] transition-colors">
-                {count} {count === 1 ? "item" : "items"} · View full details
-              </p>
-            </Link>
-            <button type="button" onClick={() => setIsCartOpen(false)} aria-label="Close cart" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+          <header className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] px-4 py-3 sm:px-5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h2 className="text-[18px] font-medium leading-6 text-[var(--user-text)]">Shopping Cart</h2>
+              <span aria-label={`${count} ${count === 1 ? "item" : "items"}`} className="inline-flex min-w-6 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-0.5 text-xs font-normal tabular-nums text-[var(--user-text-muted)]">{count}</span>
+            </div>
+            <button type="button" onClick={() => setIsCartOpen(false)} aria-label="Close cart" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
               <X size={18} aria-hidden="true" />
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6 sm:py-4" aria-live="polite">
+          {hasItems && freeShippingThreshold > 0 && (
+            <section aria-label="Free shipping progress" className="shrink-0 border-b border-[var(--user-border)] px-4 py-3 sm:px-5">
+              {totals.shipping === 0 ? (
+                <p className="flex items-center gap-2 text-sm font-normal text-[var(--user-success)]">
+                  <Check size={16} aria-hidden="true" />
+                  You've unlocked free shipping
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm font-normal text-[var(--user-text-muted)]">Add {fmt(freeShippingRemaining)} more for free shipping</p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label="Free shipping progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(freeShippingProgress)}>
+                    <div className="h-full rounded-full bg-[var(--user-accent)] transition-[width] duration-300 ease-out" style={{ width: `${freeShippingProgress}%` }} />
+                  </div>
+                </>
+              )}
+            </section>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2 sm:px-4 sm:py-3" aria-live="polite">
             {hasItems ? (
               <div className="space-y-4">
                 
                 {groupedItems.deals.map((dealGroup, dealIndex) => {
-                  const badgeConfig = getDealBadgeConfig({ type: dealGroup.dealType, discountValue: dealGroup.items[0]?.raw.dealSavings, buyQuantity: dealGroup.items[0]?.raw.dealBuyQuantity, getQuantity: dealGroup.items[0]?.raw.dealGetQuantity });
-                  const Icon = badgeConfig?.icon || Sparkles;
+                  const Icon = Tag;
                   const isCollapsed = collapsedDeals.has(dealGroup.dealId);
                   
                   return (
-                    <div key={dealGroup.dealId || dealIndex} className="rounded-xl border border-purple-500/30 bg-purple-500/5 overflow-hidden">
-                      {/* ✅ HEADER with Collapse Arrow (Top Left) */}
-                      <div className={`flex items-center gap-2 px-3 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 ${!isCollapsed ? "border-b border-purple-500/20" : ""}`}>
-                        {/* ✅ Collapse Toggle Button */}
+                    <div key={dealGroup.dealId || dealIndex} className="overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                      <div className={`flex items-center gap-3 bg-[var(--user-accent-soft)] px-3 py-3 ${!isCollapsed ? "border-b border-[var(--user-border)]" : ""}`}>
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-bg-card)] text-[var(--user-accent)]">
+                          <Icon size={16} aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-sm font-normal text-[var(--user-text)]">{dealGroup.dealName}</h3>
+                          <p className={`mt-0.5 text-xs font-normal ${dealGroup.dealType === "free_shipping" ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"}`}>
+                            {dealGroup.dealType === "free_shipping" ? "Free Shipping" : "Deal applied"}
+                          </p>
+                        </div>
+                        {isCollapsed && (
+                          <span className="shrink-0 text-xs font-normal text-[var(--user-text-muted)]">
+                            {dealGroup.items.length} {dealGroup.items.length === 1 ? "item" : "items"}
+                          </span>
+                        )}
+                        {dealGroup.totalSavings > 0 && (
+                          <span className="shrink-0 text-xs font-normal text-[var(--user-success)]">Save {fmt(dealGroup.totalSavings)}</span>
+                        )}
                         <button
                           type="button"
                           onClick={() => toggleDealCollapse(dealGroup.dealId)}
                           aria-label={isCollapsed ? "Expand deal section" : "Collapse deal section"}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-purple-500/15 hover:text-[var(--user-text)] transition-colors"
+                          aria-expanded={!isCollapsed}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                         >
-                          <ChevronDown 
-                            size={16} 
-                            className={`transition-transform duration-300 ${isCollapsed ? "" : "rotate-180"}`} 
-                          />
+                          <ChevronDown size={16} className={`transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}`} />
                         </button>
-
-                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-r ${badgeConfig?.color || "from-purple-500 to-pink-600"} flex items-center justify-center shrink-0`}>
-                          <Icon size={16} className="text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-bold text-[var(--user-text)] truncate">{dealGroup.dealName}</h3>
-                          <p className="text-[0.625rem] text-purple-600 font-semibold truncate">{dealGroup.dealBadge || "Active Deal"}</p>
-                        </div>
-
-                        {/* ✅ Items count jab collapsed ho */}
-                        {isCollapsed && (
-                          <span className="text-[0.625rem] font-bold text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-full shrink-0">
-                            {dealGroup.items.length} {dealGroup.items.length === 1 ? "item" : "items"}
-                          </span>
-                        )}
-
-                                            {dealGroup.totalSavings > 0 && (
-                          <span className="text-xs font-bold text-[var(--user-success)] shrink-0">
-                            Save {fmt(dealGroup.totalSavings)}
-                          </span>
-                        )}
                       </div>
 
                       {/* ✅ Items List — sirf jab expanded ho */}
                       {!isCollapsed && (
-                        <ul className="m-0 list-none space-y-2 p-3">
+                        <ul className="m-0 list-none divide-y divide-[var(--user-border)] p-0">
 {dealGroup.items.map((row, index) => (
                           <CartItemRow
                             key={row.key}
@@ -432,8 +422,6 @@ import { shippingApi } from "@/apis/user/shippingApi";
                             onRemove={handleRemove}
                             isSelected={isLineSelected(row.key)}
                             onToggleSelect={() => toggleLineSelected(row.key)}
-                            isDeal
-                            dealBadge={dealGroup.dealBadge}
                             openDealPicker={openDealCardKey === row.key}
                             onToggleDealPicker={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
                             onCloseDealPicker={() => setOpenDealCardKey(null)}
@@ -447,8 +435,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
                 {groupedItems.regular.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--user-text-muted)] mb-2 px-1">Regular Items</h3>
-                    <ul className="m-0 list-none space-y-2 p-0">
+                    <h3 className="mb-2 px-1 text-sm font-normal text-[var(--user-text-muted)]">Regular items</h3>
+                    <ul className="m-0 list-none divide-y divide-[var(--user-border)] p-0">
                       {groupedItems.regular.map((row, index) => (
                         <CartItemRow
                           key={row.key}
@@ -471,107 +459,103 @@ import { shippingApi } from "@/apis/user/shippingApi";
                 )}
               </div>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)]">
-                  <ShoppingBag size={36} aria-hidden="true" className="text-[var(--user-text-subtle)]" />
+              <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--user-accent-soft)]">
+                  <ShoppingBag size={28} aria-hidden="true" className="text-[var(--user-accent)]" />
                 </div>
-                <h3 className="text-xl font-bold text-[var(--user-text)]">Your cart is empty</h3>
-                <p className="mt-1.5 max-w-[16.25rem] text-sm leading-relaxed text-[var(--user-text-muted)]">Add some products to get started.</p>
-                <button type="button" onClick={startShopping} className="mt-6 rounded-xl bg-[var(--user-accent)] px-8 py-3 text-sm font-bold text-[var(--user-accent-text)] transition-all duration-200 hover:scale-[1.02] hover:bg-[var(--user-accent-hover)] active:scale-[0.98]">
-                  Start Shopping
+                <h3 className="text-lg font-normal text-[var(--user-text)]">Your cart is empty</h3>
+                <p className="mt-2 max-w-[16.25rem] text-sm font-normal leading-relaxed text-[var(--user-text-muted)]">Add some products to get started.</p>
+                <button type="button" onClick={startShopping} className="mt-6 inline-flex min-h-12 items-center justify-center rounded-[10px] bg-[var(--user-accent)] px-6 text-sm font-normal text-[var(--user-accent-text)] transition-colors duration-150 hover:bg-[var(--user-accent-hover)] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                  Continue shopping
                 </button>
               </div>
             )}
           </div>
 
           {hasItems && (
-            <footer className="shrink-0 border-t border-[var(--user-border)] bg-[var(--user-bg-card)] pb-[env(safe-area-inset-bottom)]">
-              <div className="px-5 py-3 sm:px-6 space-y-2">
-                {/* ✅ Select All row */}
-                <div className="flex items-center justify-between py-2 border-b border-[var(--user-border)]">
+            <footer className="sticky bottom-0 z-10 shrink-0 border-t border-[var(--user-border)] bg-[var(--user-bg-card)] pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(0,0,0,0.05)]">
+              <div className="space-y-2.5 px-4 py-3 sm:px-5">
+                <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-2">
                   <button
                     type="button"
                     onClick={() => setAllSelected(!allSelected)}
                     aria-pressed={allSelected}
-                    className="flex items-center gap-2 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-[0.98] transition"
+                    className="flex min-h-10 items-center gap-2 rounded-md text-sm font-normal transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                   >
                     <span
-                      className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${allSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
+                      className={`flex h-5 w-5 items-center justify-center rounded border transition-[background,border-color] duration-150 ${allSelected ? "border-[var(--user-accent)] bg-[var(--user-accent)]" : "border-[var(--user-border)] bg-transparent hover:border-[var(--user-accent)]"}`}
                     >
-                      {allSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
+                      {allSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={2} />}
                     </span>
-                    <span className="text-xs font-bold text-[var(--user-text)]">Select All</span>
+                    <span className="font-normal text-[var(--user-text)]">Select all</span>
                   </button>
-                  <span className="text-[0.6875rem] font-bold text-[var(--user-text-muted)] tabular-nums">
+                  <span className="text-sm font-normal tabular-nums text-[var(--user-text-muted)]">
                     {selectedLineCount} of {cart.length} selected
                   </span>
                 </div>
-                <div className="divide-y divide-[var(--user-border)]">
-                  <div className="flex items-center justify-between py-1.5 text-xs">
-                    <span className="font-medium text-[var(--user-text-muted)]">Subtotal</span>
-                    <span className="font-semibold text-[var(--user-text)]">{fmt(totals.subtotal)}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-normal text-[var(--user-text-muted)]">Subtotal</span>
+                    <span key={totals.subtotal} className="cart-qty-pop font-normal tabular-nums text-[var(--user-text)]">{fmt(totals.subtotal)}</span>
                   </div>
                   {totals.totalSavings > 0 && (
-                    <div className="flex items-center justify-between py-1.5 text-xs">
-                      <span className="flex items-center gap-1.5 font-medium text-[var(--user-success)]">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1.5 font-normal text-[var(--user-success)]">
                         <Tag size={12} aria-hidden="true" />
-                        Total Savings
+                        You save
                       </span>
-                      <span className="font-semibold text-[var(--user-success)]">-{fmt(totals.totalSavings)}</span>
+                      <span className="font-normal tabular-nums text-[var(--user-success)]">-{fmt(totals.totalSavings)}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between py-1.5 text-xs">
-                    <span className="flex items-center gap-1.5 font-medium text-[var(--user-text-muted)]">
-                      Shipping
-                      {totals.freeShippingActiveForDefault && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 border border-orange-500/20 px-1.5 py-0.5 text-[0.5625rem] font-bold text-orange-600">
-                          <Truck size={9} /> Deal
-                        </span>
-                      )}
-                    </span>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-normal text-[var(--user-text-muted)]">Shipping</span>
                     {totals.shipping === 0 ? (
-                      <span className="rounded border border-[var(--user-success)]/30 bg-[var(--user-success)]/10 px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-success)]">FREE</span>
+                      <span className="text-xs font-normal text-[var(--user-success)]">FREE</span>
                     ) : (
-                      <span className="font-semibold text-[var(--user-text)]">{fmt(totals.shipping)}</span>
+                      <span className="font-normal tabular-nums text-[var(--user-text)]">{fmt(totals.shipping)}</span>
                     )}
                   </div>
                   {totals.tax > 0 && (
-                    <div className="flex items-center justify-between py-1.5 text-xs">
-                      <span className="font-medium text-[var(--user-text-muted)]">Tax</span>
-                      <span className="font-semibold text-[var(--user-text)]">{fmt(totals.tax)}</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-normal text-[var(--user-text-muted)]">Tax</span>
+                      <span className="font-normal tabular-nums text-[var(--user-text)]">{fmt(totals.tax)}</span>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between rounded-lg bg-[var(--user-bg-hover)] px-3 py-2">
-                  <span className="text-sm font-semibold text-[var(--user-text)]">Total</span>
-                  <span className="text-base font-bold text-[var(--user-accent)]">{fmt(totals.grandTotal)}</span>
+                <div className="flex items-center justify-between border-t border-[var(--user-border)] pt-2.5">
+                  <span className="text-lg font-medium text-[var(--user-text)]">Total</span>
+                  <span key={totals.grandTotal} className="cart-qty-pop text-lg font-medium tabular-nums text-[var(--user-accent)]">{fmt(totals.grandTotal)}</span>
                 </div>
-                              <div className="flex items-center gap-2">
-                  {/* ✅ CLEAR — two-tap confirm */}
+                <div className="flex min-h-7 items-center justify-between gap-3 text-sm">
+                  <Link href="/cart" onClick={() => setIsCartOpen(false)} className="font-normal text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                    View full cart
+                  </Link>
                   <button
                     type="button"
                     onClick={handleClearCart}
                     aria-label="Clear cart"
-                                      className={`h-11 px-3.5 shrink-0 rounded-lg border text-[0.6875rem] font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                    className={`font-normal transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
                       confirmClear
-                        ? "bg-[var(--user-danger)] border-[var(--user-danger)] text-white"
-                        : "border-[var(--user-border)] text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10"
+                        ? "text-[var(--user-danger)]"
+                        : "text-[var(--user-text-muted)] hover:text-[var(--user-danger)]"
                     }`}
                   >
-                    <Trash2 size={13} aria-hidden="true" />
-                    {confirmClear ? "Confirm?" : "Clear"}
+                    {confirmClear ? "Confirm clear?" : "Clear cart"}
                   </button>
-
-                  {/* ✅ CHHOTA CHECKOUT BUTTON */}
-                  <button
+                </div>
+                <button
                     type="button"
                     onClick={goCheckout}
                     disabled={!hasItems || selectedLineCount === 0}
-                    className="flex-1 h-9 rounded-lg bg-[var(--user-accent)] text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-accent-text)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--user-accent)] px-4 text-sm font-normal text-[var(--user-accent-text)] transition-colors duration-150 hover:bg-[var(--user-accent-hover)] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                   >
+                    <LockKeyhole size={16} aria-hidden="true" />
                     {selectedLineCount === 0 && hasItems ? "Select items" : "Proceed to Checkout"}
-                    <ArrowRight size={13} aria-hidden="true" />
                   </button>
+                <div className="flex items-center justify-center gap-4 text-xs font-normal text-[var(--user-text-muted)]">
+                  <span className="inline-flex items-center gap-1.5"><LockKeyhole size={12} aria-hidden="true" />Secure checkout</span>
+                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-[var(--user-border)]" />
+                  <span>Easy returns</span>
                 </div>
               </div>
             </footer>
@@ -581,7 +565,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     );
   }
 
-  function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, isDeal = false, dealBadge = null, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
+  function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
     const { applyDealToItem } = useCart();
     const { getActiveDealsForProduct } = useDiscounts();
     // ✅ Deal button sirf tab dikhao jab is product ke liye koi active deal ho —
@@ -592,131 +576,95 @@ import { shippingApi } from "@/apis/user/shippingApi";
       brand_id: row.raw?.brandId || row.raw?.brand_id || null,
     }) || []).length > 0;
     return (
-      <li className={`relative overflow-hidden cart-item-in group flex items-start gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ease-out ${openDealPicker ? "min-h-[15rem] border-purple-500/40" : ""} ${isDeal ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-border-hover)]"} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`} style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}>
-        {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
+      <li
+        aria-busy={isCommitting}
+        className={`relative grid grid-cols-[32px_72px_minmax(0,1fr)_auto] items-start gap-1.5 overflow-hidden border-b border-[var(--user-border)] p-4 transition-colors duration-150 ease-out last:border-b-0 hover:bg-[var(--user-bg-hover)]/40 sm:gap-3 ${openDealPicker ? "z-10 min-h-[15rem]" : ""} ${!isSelected ? "opacity-60" : ""} ${isRemoving ? "-translate-x-6 opacity-0" : ""}`}
+        style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
+      >
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
           aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
           aria-pressed={isSelected}
-          className="shrink-0 p-1 mt-0.5 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors duration-150 hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
         >
-          <span
-            className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${isSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
-          >
-            {isSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={3} />}
+          <span className={`flex h-5 w-5 items-center justify-center rounded border transition-[background,border-color] duration-150 ${isSelected ? "border-[var(--user-accent)] bg-[var(--user-accent)]" : "border-[var(--user-border)] bg-transparent hover:border-[var(--user-accent)]"}`}>
+            {isSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={2} />}
           </span>
         </button>
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
+
+        <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--user-bg-hover)]">
           {imgUrl ? (<img src={imgUrl} alt={row.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />) : (<Package size={24} aria-hidden="true" className="text-[var(--user-text-subtle)]" />)}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-start justify-between gap-1.5">
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--user-text)]">{row.name}</h3>
-              {row.variantTitle && (<p className="mt-0.5 truncate text-[0.625rem] text-[var(--user-text-muted)]">{row.variantTitle}</p>)}
-              {row.brand && (<p className="mt-0.5 text-[0.625rem] font-medium uppercase tracking-wider text-[var(--user-text-subtle)] truncate">{row.brand}</p>)}
-            </div>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(row); }} aria-label={`Remove ${row.name} from cart`} className="-mr-1 -mt-0.5 rounded-lg p-1.5 text-[var(--user-text-subtle)] transition-colors hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)]">
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
-          </div>
+        <div className="flex min-w-0 flex-col">
+          <h3 className="line-clamp-2 text-sm font-normal leading-5 text-[var(--user-text)]">{row.name}</h3>
+          {row.variantTitle && (<p className="mt-1 truncate text-xs font-normal text-[var(--user-text-muted)]">{row.variantTitle}</p>)}
+          {row.brand && (<p className="mt-1 truncate text-[11px] font-normal uppercase tracking-[0.4px] text-[var(--user-text-subtle)]">{row.brand}</p>)}
 
-          {isDeal && dealBadge && (
-            <div className="mt-1 flex flex-wrap items-center gap-1">
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-purple-600">
-                <Sparkles size={9} aria-hidden="true" />
-                {dealBadge}
-              </span>
-              {row.freeItems > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-green-600">
-                  <Check size={9} aria-hidden="true" />
-                  {row.freeItems} FREE
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* ✅ Bundle deal rules — auto FREE gift line + applied tier */}
           {(row.isGift || row.bundleAppliedRule || (!row.isGift && row.bundleProgress)) && (
-            <div className="mt-1 flex flex-wrap items-center gap-1">
-              {row.isGift && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[0.625rem] font-bold text-amber-600">
-                  🎁 FREE GIFT
-                </span>
-              )}
-              {!row.isGift && row.bundleAppliedRule && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[0.625rem] font-bold text-indigo-500">
-                  🔥 {row.bundleAppliedRule}
-                </span>
-              )}
-              {!row.isGift && !row.bundleAppliedRule && row.bundleProgress && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-semibold text-[var(--user-text-muted)]">
-                  {row.bundleProgress}
-                </span>
-              )}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-normal text-[var(--user-text-muted)]">
+              {row.isGift && <span className="text-[var(--user-accent)]">FREE GIFT</span>}
+              {!row.isGift && row.bundleAppliedRule && <span>{row.bundleAppliedRule}</span>}
+              {!row.isGift && !row.bundleAppliedRule && row.bundleProgress && <span>{row.bundleProgress}</span>}
             </div>
           )}
 
-          <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
-            <div className={`flex items-center gap-0 transition-opacity ${isCommitting ? "opacity-60" : ""}`}>
-              <button type="button" onClick={() => onQtyChange(row.key, row.qty - 1)} disabled={row.qty <= 1} aria-label="Decrease quantity" className="flex h-7 px-2 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-all hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-90 disabled:pointer-events-none disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]">
-                <Minus size={12} aria-hidden="true" />
+          <div className="mt-2 flex items-center gap-2">
+            <div className={`flex h-10 items-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-opacity duration-150 ${isCommitting ? "opacity-70" : ""}`}>
+              <button type="button" onClick={() => onQtyChange(row.key, row.qty - 1)} disabled={row.qty <= 1 || isCommitting} aria-label={`Decrease quantity of ${row.name}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-95 disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--user-accent)]">
+                <Minus size={14} aria-hidden="true" />
               </button>
-              <span key={row.qty} className="cart-qty-pop w-6 text-center text-xs font-bold tabular-nums text-[var(--user-text)]">{row.qty}</span>
-            <button type="button" onClick={() => onQtyChange(row.key, row.qty + 1)} disabled={row.stock != null && row.qty >= row.stock} aria-label="Increase quantity" className="flex h-7 px-2 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-all hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-90 focus-visible:outline-2 focus-visible:outline-[var(--user-accent)] disabled:pointer-events-none disabled:opacity-30">
-    <Plus size={12} aria-hidden="true" />
-  </button>
-            </div>
-
-            <div className="text-right leading-tight relative">
-              <p className="text-[0.8125rem] font-bold text-[var(--user-accent)]">
-                {row.isGift ? "FREE" : fmt(row.lineTotal)}
-                {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
-                  <span className="ml-1.5 text-[0.625rem] font-medium text-[var(--user-text-muted)] line-through align-middle">
-                    {fmt(row.originalPrice * row.qty)}
-                  </span>
-                )}
-              </p>
-
-              {row.freeItems > 0 && (
-                <p className="mt-0.5 text-[0.625rem] text-[var(--user-text-muted)]">
-                  {row.payableItems} paid + {row.freeItems} FREE
-                </p>
+              {isCommitting ? (
+                <Loader2 size={14} aria-label="Updating quantity" className="mx-1.5 animate-spin text-[var(--user-accent)]" />
+              ) : (
+                <span key={row.qty} className="cart-qty-pop min-w-6 text-center text-sm font-normal tabular-nums text-[var(--user-text)]">{row.qty}</span>
               )}
-
-              {row.savings > 0 && (
-                <p className="mt-0.5 flex items-center justify-end gap-0.5 text-[0.625rem] font-semibold text-[var(--user-success)]">
-                  <Tag size={9} aria-hidden="true" />
-                  Save {fmt(row.savings * row.qty)}
-                </p>
-              )}
+              <button type="button" onClick={() => onQtyChange(row.key, row.qty + 1)} disabled={(row.stock != null && row.qty >= row.stock) || isCommitting} aria-label={`Increase quantity of ${row.name}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-95 disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--user-accent)]">
+                <Plus size={14} aria-hidden="true" />
+              </button>
             </div>
+            {hasAvailableDeals && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }} aria-label={`View available deals for ${row.name}`} aria-expanded={openDealPicker} title="View available deals" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                <BadgePercent size={17} aria-hidden="true" />
+              </button>
+            )}
           </div>
+        </div>
 
-          {/* ✅ DEALS BUTTON — sirf jab is product par koi active deal ho */}
-          {hasAvailableDeals && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleDealPicker?.(); }}
-            aria-label="View available deals"
-            className="absolute bottom-2.5 left-2.5 z-20 flex h-6 items-center gap-1 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold text-purple-600 transition-all hover:bg-purple-500/20 hover:border-purple-500/50 active:scale-95"
-          >
-            <BadgePercent size={10} />
-            <span>Deals</span>
+        <div className="flex w-[76px] shrink-0 flex-col items-end">
+          <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(row); }} aria-label={`Remove ${row.name} from cart`} title={`Remove ${row.name}`} className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--user-text-subtle)] transition-colors duration-150 hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)]">
+            <Trash2 size={16} aria-hidden="true" />
           </button>
-          )}
+          <div className="mt-1 text-right leading-5">
+            <p className="whitespace-nowrap text-[15px] font-normal tabular-nums text-[var(--user-accent)]">{row.isGift ? "FREE" : fmt(row.lineTotal)}</p>
+            {row.hasDiscount && row.originalPrice * row.qty > row.lineTotal && (
+              <p className="whitespace-nowrap text-xs font-normal tabular-nums text-[var(--user-text-muted)] line-through">{fmt(row.originalPrice * row.qty)}</p>
+            )}
+            {row.freeItems > 0 && <p className="mt-0.5 whitespace-nowrap text-xs font-normal text-[var(--user-text-muted)]">{row.payableItems} paid + {row.freeItems} FREE</p>}
+          </div>
+        </div>
 
-          {hasAvailableDeals && (
+        {hasAvailableDeals && (
           <DealInfoDropdown
             cartItem={row.raw}
             onApplyDeal={(deal) => applyDealToItem(row.key, deal)}
             open={openDealPicker}
             onClose={onCloseDealPicker}
           />
-          )}
-        </div>
+        )}
+        {isCommitting && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 flex items-center gap-3 bg-[var(--user-bg-card)] px-4">
+            <span className="h-5 w-5 shrink-0 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+            <span className="h-[72px] w-[72px] shrink-0 animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
+            <span className="min-w-0 flex-1 space-y-2">
+              <span className="block h-4 w-4/5 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+              <span className="block h-3 w-1/2 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+              <span className="block h-9 w-28 animate-pulse rounded-full bg-[var(--user-bg-hover)]" />
+            </span>
+            <span className="h-5 w-16 shrink-0 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+          </div>
+        )}
       </li>
     );
   }
