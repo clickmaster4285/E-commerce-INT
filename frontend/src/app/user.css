@@ -3,25 +3,35 @@
 ========================================== */
 :root {
   /* Backgrounds */
-  --user-bg:            #000000;
-  --user-bg-elevated:   #0a0a0a;
-  --user-bg-card:       #111111;
-  --user-bg-hover:      #1a1a1a;
-  --user-bg-input:      #0d0d0d;
+  --user-bg:            #0b0f14;
+  --user-bg-elevated:   #10151c;
+  --user-bg-card:       #151a21;
+  --user-bg-hover:      #1d242d;
+  --user-bg-input:      #111820;
+  --user-bg-surface:    #0f141a;
+  --user-surface:       #10151c;
+  --user-card-surface:  #151a21;
 
   /* Text */
-  --user-text:          #ffffff;
-  --user-text-secondary:#e5e5e5;
-  --user-text-muted:    #a3a3a3;
-  /* ✅ A11Y contrast: #666 black par 3.5:1 tha (AA fail) → #767676 = 4.54:1.
-     Visual farq na hone ke barabar, Lighthouse contrast pass. */
-  --user-text-subtle:   #767676;
-  --user-text-disabled: #404040;
+  --user-text:          #f3f4f6;
+  --user-text-secondary:#d1d5db;
+  --user-text-muted:    #a1aab6;
+  --user-text-subtle:   #858f9c;
+  --user-text-disabled: #56606c;
 
   /* Borders */
-  --user-border:        #1f1f1f;
-  --user-border-soft:   #141414;
-  --user-border-hover:  #2a2a2a;
+  --user-border:        #28313c;
+  --user-border-soft:   #202832;
+  --user-border-hover:  #394553;
+
+  /* Semantic control colors */
+  --user-icon-color:    #b4bdc8;
+  --user-button-bg:     #202832;
+  --user-button-text:   #f3f4f6;
+  --user-banner-cta-bg: #f57224;
+  --user-banner-cta-text: #ffffff;
+  --user-banner-arrow-bg: rgba(16, 21, 28, 0.88);
+  --user-banner-arrow-text: #f3f4f6;
 
   /* Accent — Daraz orange (brand color, dono modes me same) */
   --user-accent:        #f57224;
@@ -39,9 +49,9 @@
   --user-info:          #3b82f6;
 
   /* Shadows */
-  --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.5);
-  --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.5);
-  --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.6);
+  --user-shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.18);
+  --user-shadow-md:     0 5px 16px rgba(0, 0, 0, 0.22);
+  --user-shadow-lg:     0 12px 32px rgba(0, 0, 0, 0.32);
 
   /* Radius */
   --user-radius-sm:     8px;
@@ -61,6 +71,9 @@
   --user-bg-card:       #ffffff;
   --user-bg-hover:      #e6e8ed;
   --user-bg-input:      #f5f5f5;
+  --user-bg-surface:    #eff0f5;
+  --user-surface:       #ffffff;
+  --user-card-surface:  #ffffff;
 
   --user-text:          #0a0a0a;
   --user-text-secondary:#262626;
@@ -72,6 +85,14 @@
   --user-border:        #e6e6e6;
   --user-border-soft:   #f0f0f0;
   --user-border-hover:  #cfcfcf;
+
+  --user-icon-color:    #525252;
+  --user-button-bg:     #f5f5f5;
+  --user-button-text:   #262626;
+  --user-banner-cta-bg: #ffffff;
+  --user-banner-cta-text: #1f2937;
+  --user-banner-arrow-bg: rgba(217, 217, 217, 0.7);
+  --user-banner-arrow-text: #5a5a5a;
 
   --user-accent:        #f57224;
   --user-accent-hover:  #d9621c;
@@ -95,6 +116,29 @@
 .user-theme a {
   color: inherit;
   text-decoration: none;
+}
+
+.user-theme .storefront-footer {
+  --user-bg-card: #151a21;
+  --user-border: #28313c;
+  --user-border-hover: #394553;
+  --user-border-soft: #202832;
+  --user-text: #f3f4f6;
+  --user-text-secondary: #d1d5db;
+  --user-text-muted: #a1aab6;
+  --user-text-subtle: #858f9c;
+  background-color: #0f141a;
+}
+
+.user-theme:not(.light) .home-category-section {
+  padding: 0.75rem;
+  background: linear-gradient(180deg, #0b0f14 0%, #0f141a 100%);
+}
+
+@media (min-width: 640px) {
+  .user-theme:not(.light) .home-category-section {
+    padding: 1rem;
+  }
 }
 
 /* ==========================================
@@ -365,9 +409,314 @@ html:has(.user-theme) {
     margin-inline: auto;
   }
   html:has(.user-theme) {
-    background: #000000;
+    background: var(--user-bg);
   }
   html:has(.user-theme.light) {
     background: #fafafa;
   }
+}
+
+/* Calm, light surfaces for the cart and checkout flow. */
+.cart-premium,
+.checkout-premium {
+  --user-bg: #f7f7f8;
+  --user-bg-elevated: #ffffff;
+  --user-bg-card: #ffffff;
+  --user-bg-hover: #f3f4f6;
+  --user-bg-input: #ffffff;
+  --user-text: #171717;
+  --user-text-secondary: #374151;
+  --user-text-muted: #6b7280;
+  --user-text-subtle: #9ca3af;
+  --user-border: #e5e7eb;
+  --user-border-soft: #e5e7eb;
+  --user-border-hover: #d1d5db;
+  --user-accent: #e87524;
+  --user-accent-hover: #cf641c;
+  --user-accent-text: #ffffff;
+  --user-success: #4f8a68;
+  --user-shadow-sm: none;
+  --user-shadow-md: none;
+  --user-shadow-lg: none;
+  color: var(--user-text);
+  background-color: var(--user-bg);
+}
+
+.checkout-premium {
+  --user-accent: #6b7280;
+  --user-accent-hover: #4b5563;
+  --user-accent-text: #171717;
+}
+
+.cart-premium .font-black,
+.cart-premium .font-extrabold,
+.checkout-premium .font-black,
+.checkout-premium .font-extrabold {
+  font-weight: 600 !important;
+}
+
+.cart-premium .font-bold,
+.checkout-premium .font-bold {
+  font-weight: 500 !important;
+}
+
+.cart-premium [class*="border-2"],
+.checkout-premium [class*="border-2"] {
+  border-width: 1px !important;
+}
+
+.cart-premium [class*="rounded-3xl"],
+.checkout-premium [class*="rounded-3xl"],
+.cart-premium [class*="rounded-2xl"],
+.checkout-premium [class*="rounded-2xl"] {
+  border-radius: 12px !important;
+}
+
+.cart-premium [class*="shadow-"],
+.checkout-premium [class*="shadow-"] {
+  box-shadow: none !important;
+}
+
+.cart-premium [class*="bg-gradient"],
+.checkout-premium [class*="bg-gradient"] {
+  background-image: none !important;
+  background-color: var(--user-bg-hover) !important;
+}
+
+.cart-premium [class*="blur-"],
+.checkout-premium [class*="blur-"] {
+  display: none !important;
+  filter: none !important;
+}
+
+.cart-premium div.h-full[class*="bg-gradient"],
+.checkout-premium div.h-full[class*="bg-gradient"] {
+  background-color: var(--user-success) !important;
+}
+
+.cart-premium [class*="bg-purple-"],
+.cart-premium [class*="bg-pink-"],
+.cart-premium [class*="bg-indigo-"],
+.checkout-premium [class*="bg-purple-"],
+.checkout-premium [class*="bg-pink-"],
+.checkout-premium [class*="bg-indigo-"] {
+  background-color: var(--user-bg-hover) !important;
+}
+
+.cart-premium [class*="border-purple-"],
+.cart-premium [class*="border-pink-"],
+.cart-premium [class*="border-indigo-"],
+.checkout-premium [class*="border-purple-"],
+.checkout-premium [class*="border-pink-"],
+.checkout-premium [class*="border-indigo-"] {
+  border-color: var(--user-border) !important;
+}
+
+.cart-premium [class*="text-purple-"],
+.cart-premium [class*="text-pink-"],
+.cart-premium [class*="text-indigo-"],
+.checkout-premium [class*="text-purple-"],
+.checkout-premium [class*="text-pink-"],
+.checkout-premium [class*="text-indigo-"] {
+  color: var(--user-accent) !important;
+}
+
+.cart-premium .text-white,
+.checkout-premium .text-white {
+  color: var(--user-text-secondary) !important;
+}
+
+.checkout-premium [class*="text-emerald-"] {
+  color: var(--user-text-muted) !important;
+}
+
+.checkout-premium [style*="linear-gradient"] {
+  background-image: none !important;
+  background-color: var(--user-bg-hover) !important;
+}
+
+.checkout-premium [class~="bg-[var(--user-accent)]"]:not(.checkout-primary-cta) {
+  background-color: #f3f4f6 !important;
+}
+
+.checkout-premium [class*=" bg-[var(--user-accent)]/5"],
+.checkout-premium [class*=" bg-[var(--user-accent)]/10"],
+.checkout-premium [class^="bg-[var(--user-accent)]/5"],
+.checkout-premium [class^="bg-[var(--user-accent)]/10"] {
+  background-color: #ffffff !important;
+}
+
+.checkout-premium [class*="border-[var(--user-accent)]"] {
+  border-color: #d1d5db !important;
+}
+
+.checkout-premium [class*="text-[var(--user-accent)]"],
+.checkout-premium [class*="text-[var(--user-accent-text)]"],
+.checkout-premium [class*="text-[var(--user-success)]"],
+.checkout-premium [class*="text-emerald-"],
+.checkout-premium [class*="text-orange-"],
+.checkout-premium [class*="text-green-"] {
+  color: #6b7280 !important;
+}
+
+.checkout-premium [class*="bg-[var(--user-success)]"],
+.checkout-premium [class*="bg-orange-"],
+.checkout-premium [class*="bg-green-"] {
+  background-color: #f3f4f6 !important;
+}
+
+.checkout-premium [class*="border-[var(--user-success)]"],
+.checkout-premium [class*="border-orange-"],
+.checkout-premium [class*="border-green-"] {
+  border-color: #e5e7eb !important;
+}
+
+.checkout-premium [style*="accentColor"] {
+  accent-color: #6b7280 !important;
+}
+
+.checkout-premium button > span[class*="w-8"][class*="h-8"][class*="rounded-full"] {
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #4b5563 !important;
+  box-shadow: none !important;
+}
+
+.checkout-premium div[class*="h-0.5"][class*="bg-[var(--user-accent)]"] {
+  background-color: #e5e7eb !important;
+}
+
+.checkout-premium {
+  --user-bg: #f7f7f8;
+  --user-bg-elevated: #ffffff;
+  --user-bg-card: #ffffff;
+  --user-bg-hover: #f3f4f6;
+  --user-bg-input: #ffffff;
+  --user-text: #171717;
+  --user-text-secondary: #374151;
+  --user-text-muted: #6b7280;
+  --user-text-subtle: #9ca3af;
+  --user-border: #e2e5e9;
+  --user-border-soft: #e2e5e9;
+  --user-border-hover: #d1d5db;
+  --user-accent: #667085;
+  --user-accent-hover: #667085;
+  --user-accent-text: #171717;
+  --user-success: #6b7280;
+}
+
+.checkout-premium [class*=" bg-[var(--user-accent)]/"],
+.checkout-premium [class*=" bg-[var(--user-success)]/"],
+.checkout-premium [class^="bg-[var(--user-accent)]/"],
+.checkout-premium [class^="bg-[var(--user-success)]/"] {
+  background-color: #ffffff !important;
+}
+
+.checkout-premium [class*="hover:bg-"]:hover:not(.checkout-primary-cta):not([class^="bg-"]):not([class*=" bg-"]) {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.checkout-premium [class*="hover:border-"]:hover:not(.checkout-primary-cta) {
+  border-color: #e2e5e9 !important;
+}
+
+.checkout-premium [class*="hover:text-"]:hover:not(.checkout-primary-cta) {
+  color: inherit !important;
+}
+
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-muted)]"]:hover:not(.checkout-primary-cta) {
+  color: #6b7280 !important;
+}
+
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-secondary)]"]:hover:not(.checkout-primary-cta) {
+  color: #374151 !important;
+}
+
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text)]"]:hover:not(.checkout-primary-cta) {
+  color: #171717 !important;
+}
+
+.checkout-premium [class*="focus:border-"]:focus,
+.checkout-premium [class*="focus:border-"]:focus-visible {
+  border-color: #d1d5db !important;
+}
+
+.checkout-premium [class*="focus:ring-"]:focus,
+.checkout-premium [class*="focus:ring-"]:focus-visible {
+  --tw-ring-color: #d1d5db !important;
+}
+
+.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):hover,
+.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):active {
+  box-shadow: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):hover {
+  opacity: 1 !important;
+}
+
+.checkout-premium .checkout-primary-cta {
+  background-color: #e09a2d !important;
+  border: 1px solid #e09a2d !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #000000 !important;
+  font-weight: 500 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  transform: none !important;
+}
+
+.checkout-premium .checkout-primary-cta:hover {
+  background-color: #c98220 !important;
+  border-color: #c98220 !important;
+  color: #000000 !important;
+  opacity: 1 !important;
+}
+
+.checkout-premium .checkout-option-indicator {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #98a2b3;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: transparent;
+}
+
+.checkout-premium .checkout-option-indicator.is-selected {
+  border-color: #e09a2d;
+  color: #e09a2d;
+}
+
+.checkout-premium .checkout-option-indicator--compact {
+  width: 1rem;
+  height: 1rem;
+  flex-basis: 1rem;
+}
+
+.checkout-premium label:has(input[type="radio"]:focus-visible) .checkout-option-indicator {
+  outline: 2px solid #98a2b3;
+  outline-offset: 2px;
+}
+
+.cart-premium :is(a, button)[class*="bg-[var(--user-accent)]"] {
+  border-radius: 9px;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  letter-spacing: normal;
+  text-transform: none;
+  transform: none !important;
+}
+
+.cart-premium :is(a, button)[class*="bg-[var(--user-accent)]"]:hover {
+  background-color: var(--user-accent-hover) !important;
+  opacity: 1 !important;
 }

@@ -372,6 +372,7 @@ export default function HomeSidebar({
   facetsLoading = false,
   scrollable = false,
   className = "",
+  collapsed = false,
   showAllDealsView = false,
   onToggleAllDealsView,
 }) {
@@ -517,6 +518,20 @@ export default function HomeSidebar({
         : [...selectedDealIds, value],
     });
   };
+
+  if (collapsed) {
+    return (
+      <aside
+        aria-label="Filters"
+        title="Filters"
+        className={`flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
+      >
+        <div className="flex h-6 w-6 items-center justify-center">
+          <SlidersHorizontal size={16} />
+        </div>
+      </aside>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -756,4 +771,3 @@ export default function HomeSidebar({
     </aside>
   );
 }
-

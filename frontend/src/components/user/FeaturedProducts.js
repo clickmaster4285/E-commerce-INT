@@ -36,7 +36,7 @@ const TAB_PARAMS = {
 
 /* Full-width responsive grid (purana look same) */
 const GRID =
-  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8";
+  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8 sm:gap-4";
 
 function TabGrid({ tab }) {
   const [page, setPage] = useState(1);

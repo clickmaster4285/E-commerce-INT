@@ -95,6 +95,7 @@ function ProductCardInner({
   priority = false,
 }) {
   const [added, setAdded] = useState(false);
+  const [failedImage, setFailedImage] = useState("");
   const router = useRouter();
   const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -233,10 +234,10 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className="group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden transition-colors duration-300"
+      className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[15px] border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[var(--user-shadow-sm)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--user-border-hover)] hover:shadow-[var(--user-shadow-md)]"
     >
-      <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
-        {image ? (
+      <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-[var(--user-bg-hover)]">
+        {image && failedImage !== image ? (
           <Image
             src={getImageUrl(image)}
             alt={product.name}
@@ -245,20 +246,21 @@ function ProductCardInner({
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             priority={priority}
             fetchPriority={priority ? "high" : "auto"}
-            className="object-cover"
+            className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+            onError={() => setFailedImage(image)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package size={44} className="text-[var(--user-text-subtle)]" />
+            <Package size={36} className="text-[var(--user-text-subtle)]" />
           </div>
         )}
 
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition pointer-events-none" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`${badgeConfig?.color || "bg-gradient-to-r from-red-500 to-orange-600"} text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}
+              className="flex max-w-full items-center gap-1 truncate rounded-full bg-slate-900/80 px-2 py-1 text-[0.6rem] font-semibold text-white shadow-sm backdrop-blur-sm"
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={9} />
@@ -271,17 +273,17 @@ function ProductCardInner({
 
           {/* ✅ SIMPLE DISCOUNT — ab value dikhegi, sirf "Sale" nahi */}
           {!displayBadgeText && hasDiscount && !hideDiscountBadge && (
-            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent)]/90 px-2 py-1 text-[0.6rem] font-semibold text-[var(--user-accent-text)]">
               <Tag size={9} /> {discountBadgeText || "Sale"}
             </span>
           )}
 
           {out ? (
-            <span className="bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-[var(--user-danger)] px-2 py-1 text-[0.6rem] font-semibold text-white">
               OUT OF STOCK
             </span>
           ) : totalStock < 5 ? (
-            <span className="bg-[var(--user-warning)] text-black text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-[var(--user-warning)] px-2 py-1 text-[0.6rem] font-semibold text-black">
               LOW STOCK
             </span>
           ) : null}
@@ -293,14 +295,15 @@ function ProductCardInner({
             e.stopPropagation();
             toggleWishlist(productId);
           }}
-          className="absolute top-2.5 right-2.5 z-10 w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/60 transition"
+          aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-icon-color)] shadow-sm backdrop-blur-sm transition-colors hover:bg-[var(--user-bg-hover)]"
         >
           <Heart
             size={15}
             className={
               liked
                 ? "text-[var(--user-danger)] fill-[var(--user-danger)]"
-                : "text-white"
+                : "text-[var(--user-icon-color)]"
             }
           />
         </button>
@@ -310,11 +313,11 @@ function ProductCardInner({
             Single variant: "Add to Cart" + "Buy Now".
             Desktop: reveal on hover. Mobile: always visible (no hover). */}
         {!out && (
-          <div className="absolute inset-x-2.5 bottom-2.5 z-10 flex gap-1.5 md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0 transition-all duration-300">
+          <div className="absolute inset-x-2 bottom-2 z-10 flex gap-1.5 transition-all duration-200 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
             {hasMultipleVariants ? (
               <button
                 onClick={handleOpenOptions}
-                className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:opacity-90 active:scale-[0.98] transition"
+                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-[var(--user-accent)] px-2 text-[0.625rem] font-semibold text-[var(--user-accent-text)] shadow-sm transition hover:opacity-90 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem]"
               >
                 <SlidersHorizontal size={14} className="shrink-0 w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Choose Options
@@ -323,7 +326,7 @@ function ProductCardInner({
               <>
                 <button
                   onClick={handleQuickAdd}
-                  className={`flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg active:scale-[0.98] transition ${
+                  className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-[0.625rem] font-semibold shadow-sm transition active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem] ${
                     added
                       ? "bg-[var(--user-success)] text-white"
                       : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"
@@ -338,7 +341,7 @@ function ProductCardInner({
                 </button>
                 <button
                   onClick={handleQuickBuy}
-                  className="flex-1 min-w-0 h-8 sm:h-9 lg:h-10 rounded-lg sm:rounded-xl bg-black/60 backdrop-blur-sm border border-white/20 text-white text-[0.625rem] sm:text-[0.6875rem] lg:text-xs font-bold flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-lg hover:bg-black/75 active:scale-[0.98] transition"
+                  className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-white/20 bg-black/65 px-2 text-[0.625rem] font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/75 active:scale-[0.98] sm:gap-1.5 sm:text-[0.6875rem]"
                 >
                  
                   Buy Now
@@ -349,29 +352,34 @@ function ProductCardInner({
         )}
       </div>
 
-      <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
-        <p className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-wider font-bold mb-1 truncate">
+      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-3">
+        <p className="mb-1 truncate text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-[var(--user-text-subtle)]">
           {brandName || ""}
         </p>
-        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[0.9375rem] line-clamp-2 leading-snug min-h-[2.6em]">
+        <h3 className="line-clamp-2 min-h-[2.5em] text-[0.8125rem] font-semibold leading-snug text-[var(--user-text)] sm:text-sm">
           {product.name}
         </h3>
 
-        <div className="mt-auto pt-2 flex flex-col items-start min-w-0">
-          {oldPrice > price && (
-            <span className="text-[0.6875rem] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
-              Rs. {oldPrice.toLocaleString()}
-            </span>
-          )}
-          <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)] whitespace-nowrap">
+        <div className="mt-auto flex min-w-0 flex-col items-start pt-2">
+          <span
+            className={`h-4 truncate text-[0.675rem] text-[var(--user-text-subtle)] line-through ${
+              oldPrice > price ? "" : "invisible"
+            }`}
+            aria-hidden={oldPrice <= price}
+          >
+            Rs. {oldPrice.toLocaleString()}
+          </span>
+          <h4 className="max-w-full truncate text-[0.95rem] font-bold text-[var(--user-text)] sm:text-base">
             Rs. {price.toLocaleString()}
           </h4>
-          {mentionDeal && (
-            <span className="mt-1 text-[0.625rem] font-semibold text-[var(--user-text-subtle)] flex items-center gap-1 whitespace-nowrap">
-              <Sparkles size={10} className="text-orange-500" /> Also available
-              in deal
-            </span>
-          )}
+          <span className="mt-1 flex min-h-[1.125rem] max-w-full items-center">
+            {mentionDeal ? (
+              <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-medium text-[var(--user-accent)]">
+                <Sparkles size={10} className="shrink-0" />
+                <span className="truncate">Also available in deal</span>
+              </span>
+            ) : null}
+          </span>
         </div>
 
         {children}

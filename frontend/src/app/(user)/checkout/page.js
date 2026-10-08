@@ -568,7 +568,7 @@ function CheckoutContent() {
   const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
-  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90 active:scale-[0.98] transition";
+  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:bg-[var(--user-accent-hover)] transition-colors";
   const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
 
   const StepIndicator = () => (
@@ -672,7 +672,7 @@ function CheckoutContent() {
   return (
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
-    <div className="hidden lg:block">
+    <div className="checkout-premium hidden lg:block">
     <main className="max-w-[80rem] mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 lg:py-12 pb-24 sm:pb-28 md:pb-10">
       <style>{`
         @keyframes modalUp { from { opacity: 0; transform: translateY(30px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -703,7 +703,7 @@ function CheckoutContent() {
             <p className="text-sm text-[var(--user-text-muted)] mb-6">We need your phone number for delivery updates and order confirmation.</p>
             <label className={labelCls}>Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className={inputCls} />
-            <button onClick={savePhone} disabled={savingPhone} className={`mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
+            <button onClick={savePhone} disabled={savingPhone} className={`checkout-primary-cta mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
               {savingPhone ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
               Save & Continue
             </button>
@@ -777,7 +777,7 @@ function CheckoutContent() {
               {/* RIGHT: Summary with Proceed button */}
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
+                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
                     Proceed to Delivery <ArrowRight size={16} />
                   </button>
                   <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
@@ -796,7 +796,7 @@ function CheckoutContent() {
                   <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{selectedCartItems.length} selected</p>
                   <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                 </div>
-                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
+                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
                   Proceed <ArrowRight size={14} />
                 </button>
               </div>
@@ -897,9 +897,9 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          <span className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center shrink-0 ${active ? "border-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
-                            {active && <span className="w-2.5 h-2.5 rounded-full bg-[var(--user-accent)]" />}
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                          <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                            {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                           </span>
                           <IconComp size={20} className={active ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
                           <div className="flex-1 min-w-0">
@@ -936,9 +936,9 @@ function CheckoutContent() {
                       { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our bank account" },
                       { id: "card", icon: CreditCard, title: "Card", sub: "Visa, Mastercard, American Express" },
                     ].map((m) => (
-                      <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                        <span className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center shrink-0 ${paymentMethod === m.id ? "border-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
-                          {paymentMethod === m.id && <span className="w-2.5 h-2.5 rounded-full bg-[var(--user-accent)]" />}
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                        <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                          {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
@@ -991,7 +991,7 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
+                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
                     Review Order <ArrowRight size={16} />
                   </button>
                   <button onClick={backToStep1} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
@@ -1124,7 +1124,7 @@ function CheckoutContent() {
       // Early-out: loading / empty / needs-phone states render their compact mobile equivalents.
       if (userLoading || !draftReady || (!user && !needsPhone)) {
         return (
-          <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
+          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
             <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
           </div>
         );
@@ -1134,7 +1134,7 @@ function CheckoutContent() {
       // Empty cart on step 1 (mobile)
       if (step === 1 && cart.length === 0 && !placing) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1163,7 +1163,7 @@ function CheckoutContent() {
       // needsPhone state — use the same compact card style
       if (needsPhone) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1210,7 +1210,7 @@ function CheckoutContent() {
       ];
 
       return (
-        <div className="lg:hidden bg-[var(--user-bg)]">
+        <div className="checkout-premium lg:hidden bg-[var(--user-bg)]">
           {/* Sticky top app bar */}
           <div
             className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
@@ -1313,9 +1313,11 @@ function CheckoutContent() {
                         name="shipping-method-mobile"
                         checked={active}
                         onChange={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }}
-                        className="w-4 h-4 shrink-0"
-                        style={{ accentColor: "var(--user-accent)" }}
+                        className="sr-only"
                       />
+                      <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.title}</p>
@@ -1354,6 +1356,9 @@ function CheckoutContent() {
                           : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/40"
                       }`}
                     >
+                      <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <m.icon size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{m.label}</span>
                     </button>
@@ -1463,7 +1468,7 @@ function CheckoutContent() {
                 type="button"
                 onClick={() => setOrderReviewOpen(true)}
                 disabled={placing}
-                className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
+                className="checkout-primary-cta h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
               >
                 {placing ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
                 {placing ? "Placing..." : "Place Order"}
@@ -1596,7 +1601,7 @@ function CheckoutContent() {
                     type="button"
                     onClick={placeOrder}
                     disabled={placing}
-                    className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
+                    className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
                   >
                     {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                     {placing ? "Placing..." : "Confirm & Place Order"}
@@ -1638,7 +1643,7 @@ function CheckoutContent() {
                   </div>
                 </div>
                 <div className="px-4 pt-2 pb-1">
-                  <button type="button" onClick={placeOrder} disabled={placing} className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
+                  <button type="button" onClick={placeOrder} disabled={placing} className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
                     {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                     {placing ? "Placing..." : "Confirm & Place Order"}
                   </button>

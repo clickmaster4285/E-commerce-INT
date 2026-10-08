@@ -32,7 +32,7 @@ const safePageParam = (raw) => {
 
 /* FeaturedProducts wali grid — dono jagah cards ek jaisi chaudai me */
 const GRID =
-  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8";
+  "grid w-full grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 4xl:grid-cols-7 5xl:grid-cols-8 sm:gap-4";
 
 function Chip({ label, onRemove }) {
   return (

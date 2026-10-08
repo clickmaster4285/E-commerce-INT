@@ -216,10 +216,28 @@ function FilteringContent() {
   });
 
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [desktopHoverAvailable, setDesktopHoverAvailable] = useState(false);
+  const [filtersSidebarExpanded, setFiltersSidebarExpanded] = useState(false);
   const [showAllDealsView, setShowAllDealsView] = useState(false);
   const [showAllCategoriesView, setShowAllCategoriesView] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
   const wasActiveRef = useRef(false);
+
+  useEffect(() => {
+    const hoverMedia = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const updateHoverAvailability = () => {
+      const hoverAvailable = hoverMedia.matches && window.innerWidth >= 1024;
+      setDesktopHoverAvailable(hoverAvailable);
+      if (!hoverAvailable) setFiltersSidebarExpanded(false);
+    };
+    updateHoverAvailability();
+    hoverMedia.addEventListener("change", updateHoverAvailability);
+    window.addEventListener("resize", updateHoverAvailability);
+    return () => {
+      hoverMedia.removeEventListener("change", updateHoverAvailability);
+      window.removeEventListener("resize", updateHoverAvailability);
+    };
+  }, []);
 
   /* Har filter/sort change grid ko page 1 par (FilterResults key). */
   const filtersKey = useMemo(
@@ -490,16 +508,48 @@ function FilteringContent() {
 
         <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
           {/* LEFT SIDEBAR — home wala same component */}
-          <HomeSidebar
-            {...sidebarProps}
-            scrollable
-            className="sticky top-[7.25rem] hidden w-[16.375rem] shrink-0 rounded-l-none border-l-0 lg:block xl:w-[18rem] 2xl:w-[20rem]"
-          />
+          <div
+            className={`filters-sidebar-hover sticky top-[7.25rem] hidden min-w-0 shrink-0 self-start overflow-hidden ${
+              desktopHoverAvailable ? "lg:block" : ""
+            }`}
+            style={{
+              minWidth: 0,
+              width: filtersSidebarExpanded ? "clamp(16.375rem, 20vw, 20rem)" : "3rem",
+              transition: "width 220ms ease-out",
+            }}
+            onPointerEnter={(event) => {
+              if (
+                event.pointerType === "mouse" &&
+                window.matchMedia("(hover: hover) and (pointer: fine)").matches
+              ) {
+                setFiltersSidebarExpanded(true);
+              }
+            }}
+            onPointerLeave={(event) => {
+              if (
+                event.pointerType === "mouse" &&
+                window.matchMedia("(hover: hover) and (pointer: fine)").matches
+              ) {
+                setFiltersSidebarExpanded(false);
+              }
+            }}
+          >
+            <HomeSidebar
+              {...sidebarProps}
+              scrollable
+              collapsed={!filtersSidebarExpanded}
+              className="w-full rounded-l-none border-l-0"
+            />
+          </div>
 
           {/* MAIN COLUMN */}
           <div className="w-full min-w-0 flex-1">
             {/* MOBILE FILTER TRIGGER */}
-            <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
+            <div
+              className={`mb-4 flex items-center justify-between gap-3 ${
+                desktopHoverAvailable ? "lg:hidden" : ""
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => setFiltersOpen(true)}
@@ -568,7 +618,7 @@ function FilteringContent() {
 
       {/* MOBILE FILTER DRAWER — next/dynamic, sirf kholne par load */}
       {filtersOpen ? (
-        <div className="fixed inset-0 z-[70] lg:hidden">
+        <div className={`fixed inset-0 z-[70] ${desktopHoverAvailable ? "lg:hidden" : ""}`}>
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setFiltersOpen(false)}

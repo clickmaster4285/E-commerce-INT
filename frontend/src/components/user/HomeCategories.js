@@ -21,9 +21,9 @@ function CategoryCard({ category, tabIndex }) {
       aria-hidden={tabIndex === -1}
       draggable={false}
       title={`${category.name} — ${category.count} products`}
-      className="group flex h-[156px] w-[var(--category-card-width)] shrink-0 flex-col rounded-[16px] border border-slate-200/80 bg-white p-2.5 text-left shadow-[0_5px_18px_rgba(15,23,42,0.045)] transition duration-300 hover:-translate-y-[2px] hover:border-emerald-200 hover:shadow-[0_9px_22px_rgba(15,23,42,0.09)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 dark:border-white/[0.08] dark:bg-[#151b23] dark:shadow-[0_4px_12px_rgba(0,0,0,0.12)] dark:hover:border-white/[0.16] dark:hover:shadow-[0_7px_18px_rgba(0,0,0,0.2)] sm:h-[164px] sm:p-2.5"
+      className="group flex h-[156px] w-[var(--category-card-width)] shrink-0 cursor-pointer flex-col rounded-[16px] border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2.5 text-left shadow-[var(--user-shadow-sm)] transition duration-300 hover:-translate-y-[2px] hover:border-[var(--user-border-hover)] hover:shadow-[var(--user-shadow-md)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] sm:h-[164px] sm:p-2.5"
     >
-      <span className="relative mb-2 flex h-[74px] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 via-slate-50 to-emerald-50/70 p-2 dark:bg-none dark:bg-[#1d2631] sm:h-[78px]">
+      <span className="relative mb-2 flex h-[74px] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--user-bg-hover)] p-2 sm:h-[78px]">
         {image && !imageFailed ? (
           <Image
             src={image}
@@ -36,7 +36,7 @@ function CategoryCard({ category, tabIndex }) {
             draggable={false}
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center rounded-full bg-white/70 text-slate-300 dark:bg-white/[0.04] dark:text-slate-600">
+          <span className="flex h-full w-full items-center justify-center rounded-full bg-[var(--user-bg-card)] text-[var(--user-text-subtle)]">
             <ImageOff size={24} strokeWidth={1.5} aria-hidden="true" />
           </span>
         )}
@@ -44,14 +44,14 @@ function CategoryCard({ category, tabIndex }) {
 
       <span className="flex min-h-0 flex-1 items-center justify-between gap-1.5">
         <span className="min-w-0">
-          <span className="block line-clamp-2 break-words text-[0.8125rem] font-semibold leading-snug text-slate-900 dark:text-[#f1f5f9]">
+          <span className="block line-clamp-2 break-words text-[0.8125rem] font-semibold leading-snug text-[var(--user-text)]">
             {category.name}
           </span>
-          <span className="mt-0.5 block text-[0.7rem] font-medium text-slate-500 dark:text-[#8490a0]">
+          <span className="mt-0.5 block text-[0.7rem] font-medium text-[var(--user-text-muted)]">
             {Number(category.count || 0).toLocaleString()} products
           </span>
         </span>
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-all duration-300 group-hover:translate-x-0.5 group-hover:border-emerald-600 group-hover:bg-emerald-600 group-hover:text-white dark:border-white/[0.1] dark:bg-white/[0.03] dark:text-slate-300 dark:group-hover:border-emerald-500 dark:group-hover:bg-emerald-500 dark:group-hover:text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-[var(--user-icon-color)] transition-all duration-300 group-hover:translate-x-0.5 group-hover:border-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]">
           <ArrowRight size={14} aria-hidden="true" />
         </span>
       </span>
@@ -213,7 +213,6 @@ export function CategoryCarousel({ categories = [] }) {
       startScroll: event.currentTarget.scrollLeft,
       moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
   };
 
@@ -221,7 +220,10 @@ export function CategoryCarousel({ categories = [] }) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const delta = event.clientX - drag.startX;
-    if (Math.abs(delta) > 4) drag.moved = true;
+    if (Math.abs(delta) > 4 && !drag.moved) {
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     if (drag.moved) event.currentTarget.scrollLeft = drag.startScroll - delta;
   };
 
@@ -260,7 +262,7 @@ export function CategoryCarousel({ categories = [] }) {
         onClick={() => scrollByCards(-1)}
         disabled={categories.length < 2}
         aria-label="Previous categories"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9 dark:border-white/[0.1] dark:bg-[#151b23]/80 dark:text-slate-300 dark:hover:border-white/[0.18] dark:hover:bg-[#1b242e] dark:hover:text-white"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-button-bg)] text-[var(--user-icon-color)] shadow-sm transition hover:border-[var(--user-border-hover)] hover:text-[var(--user-text)] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
       >
         <ArrowLeft size={16} />
       </button>
@@ -317,7 +319,7 @@ export function CategoryCarousel({ categories = [] }) {
         onClick={() => scrollByCards(1)}
         disabled={categories.length < 2}
         aria-label="Next categories"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9 dark:border-white/[0.1] dark:bg-[#151b23]/80 dark:text-slate-300 dark:hover:border-white/[0.18] dark:hover:bg-[#1b242e] dark:hover:text-white"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-button-bg)] text-[var(--user-icon-color)] shadow-sm transition hover:border-[var(--user-border-hover)] hover:text-[var(--user-text)] disabled:cursor-not-allowed disabled:opacity-35 sm:h-9 sm:w-9"
       >
         <ArrowRight size={16} />
       </button>
@@ -352,26 +354,26 @@ export default function HomeCategories({ tiles = [], isLoading = false }) {
   return (
     <section
       aria-labelledby="home-categories-heading"
-      className="rounded-2xl dark:bg-[linear-gradient(180deg,#0b0f14_0%,#0f141a_100%)] dark:px-3 dark:py-3 sm:dark:px-4"
+      className="home-category-section rounded-2xl"
     >
       <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 sm:mb-3">
         <div>
-          <p className="text-[0.675rem] font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-[var(--user-accent)]">
+          <p className="text-[0.675rem] font-semibold uppercase tracking-[0.16em] text-[var(--user-accent)]">
             Shop by category
           </p>
           <h2
             id="home-categories-heading"
-            className="mt-0.5 text-[1.25rem] font-semibold tracking-tight text-slate-950 dark:text-[#f5f7fa] sm:text-[1.45rem]"
+            className="mt-0.5 text-[1.25rem] font-semibold tracking-tight text-[var(--user-text)] sm:text-[1.45rem]"
           >
             Explore Our Categories
           </h2>
-          <p className="mt-0.5 text-[0.8rem] font-normal text-slate-500 dark:text-[#8b95a5]">
+          <p className="mt-0.5 text-[0.8rem] font-normal text-[var(--user-text-muted)]">
             Find everything you need in one place.
           </p>
         </div>
         <Link
           href="/filtering-product"
-          className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[0.8rem] font-semibold text-slate-700 transition-colors hover:text-emerald-700 dark:text-slate-300 dark:hover:text-white"
+          className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[0.8rem] font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
         >
           View All
           <ArrowRight
