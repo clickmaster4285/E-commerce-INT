@@ -105,11 +105,6 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
 
   return (
     <div ref={ref} className="relative flex w-full items-center">
-      <Search
-        size={16}
-        strokeWidth={1.7}
-        className="pointer-events-none absolute left-3.5 z-10 text-[var(--user-text-subtle)]"
-      />
       <input
         value={value}
         aria-label="Search products"
@@ -122,15 +117,14 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
           if (e.key === "Enter") submit();
         }}
         placeholder="Search products..."
-        className="h-10 w-full rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-input)] pl-10 pr-14 text-[0.8125rem] font-normal text-[var(--user-text)] outline-none transition placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-accent)]/60 focus:ring-2 focus:ring-[var(--user-accent)]/10"
+        className="h-10 w-full rounded-md border border-[var(--user-border)] bg-[var(--user-bg-input)] pl-4 pr-14 text-[0.8125rem] font-normal text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-accent)] focus:ring-0"
       />
       <button
         onClick={submit}
         aria-label="Search"
-        className="absolute right-1.5 flex h-7 items-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-2.5 text-[0.7rem] font-medium text-[var(--user-accent-text)] transition hover:opacity-90 active:scale-[0.98]"
+        className="absolute right-0 flex h-10 w-11 items-center justify-center rounded-r-md border-l border-[var(--user-border)] bg-[var(--user-accent)]/10 text-[var(--user-accent)] transition-colors hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
       >
         <Search size={14} strokeWidth={1.7} />
-        <span className="hidden lg:inline">Search</span>
       </button>
 
       {show && (
@@ -446,7 +440,7 @@ export default function Header() {
         <div         className="pointer-events-none absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md" />
 
         <div className="relative w-full max-w-none px-3.5 sm:px-5 lg:px-7 xl:px-9 2xl:px-12">
-          <div className="flex h-14 items-center gap-2 sm:gap-3 lg:h-16 lg:gap-5">
+          <div className="flex h-14 items-center gap-2 sm:gap-3 lg:h-16 lg:gap-4">
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setOpen(true)}
@@ -458,7 +452,7 @@ export default function Header() {
 
               <Link href="/" className="flex min-w-0 items-center gap-2">
                 <StoreLogo store={store} />
-                <span className="hidden max-w-[10rem] truncate text-[0.8125rem] font-medium tracking-tight text-[var(--user-text)] sm:block lg:max-w-[14rem] lg:text-sm">
+                <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-[var(--user-text)] sm:block lg:max-w-[14rem] lg:text-lg">
                   {storeName}
                 </span>
               </Link>

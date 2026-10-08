@@ -20,10 +20,9 @@ function CategoryCard({ category, tabIndex }) {
       tabIndex={tabIndex}
       aria-hidden={tabIndex === -1}
       draggable={false}
-      title={`${category.name} — ${category.count} products`}
-      className="group flex h-[156px] w-[var(--category-card-width)] shrink-0 cursor-pointer flex-col rounded-[16px] border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2.5 text-left shadow-[var(--user-shadow-sm)] transition duration-300 hover:-translate-y-[2px] hover:border-[var(--user-border-hover)] hover:shadow-[var(--user-shadow-md)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] sm:h-[164px] sm:p-2.5"
+      className="group flex h-[98px] w-[var(--category-card-width)] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left transition-colors duration-200 hover:border-[var(--user-border-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] sm:h-[104px]"
     >
-      <span className="relative mb-2 flex h-[74px] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--user-bg-hover)] p-2 sm:h-[78px]">
+      <span className="relative mb-1 flex h-[56px] w-full shrink-0 items-center justify-center overflow-hidden sm:h-[62px]">
         {image && !imageFailed ? (
           <Image
             src={image}
@@ -31,7 +30,7 @@ function CategoryCard({ category, tabIndex }) {
             fill
             loader={smartImageLoader}
             sizes="(max-width: 639px) 42vw, (max-width: 1023px) 22vw, 13vw"
-            className="object-contain p-2 transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+            className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
             onError={() => setImageFailed(true)}
             draggable={false}
           />
@@ -42,17 +41,9 @@ function CategoryCard({ category, tabIndex }) {
         )}
       </span>
 
-      <span className="flex min-h-0 flex-1 items-center justify-between gap-1.5">
-        <span className="min-w-0">
-          <span className="block line-clamp-2 break-words text-[0.8125rem] font-semibold leading-snug text-[var(--user-text)]">
-            {category.name}
-          </span>
-          <span className="mt-0.5 block text-[0.7rem] font-medium text-[var(--user-text-muted)]">
-            {Number(category.count || 0).toLocaleString()} products
-          </span>
-        </span>
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-[var(--user-icon-color)] transition-all duration-300 group-hover:translate-x-0.5 group-hover:border-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)]">
-          <ArrowRight size={14} aria-hidden="true" />
+      <span className="flex min-h-0 items-start px-1.5 pt-1.5">
+        <span className="min-w-0 line-clamp-2 break-words text-[0.7rem] font-medium leading-tight text-[var(--user-text)] sm:text-xs">
+          {category.name}
         </span>
       </span>
     </Link>
@@ -358,22 +349,22 @@ export default function HomeCategories({ tiles = [], isLoading = false }) {
     >
       <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2 sm:mb-3">
         <div>
-          <p className="text-[0.675rem] font-semibold uppercase tracking-[0.16em] text-[var(--user-accent)]">
+          <p className="text-[0.675rem] font-medium uppercase tracking-[0.12em] text-[var(--user-accent)]">
             Shop by category
           </p>
           <h2
             id="home-categories-heading"
-            className="mt-0.5 text-[1.25rem] font-semibold tracking-tight text-[var(--user-text)] sm:text-[1.45rem]"
+            className="mt-0.5 text-[1.2rem] font-medium tracking-tight text-[var(--user-text)] sm:text-[1.35rem]"
           >
             Explore Our Categories
           </h2>
-          <p className="mt-0.5 text-[0.8rem] font-normal text-[var(--user-text-muted)]">
+          <p className="mt-0.5 text-[0.75rem] font-normal text-[var(--user-text-muted)]">
             Find everything you need in one place.
           </p>
         </div>
         <Link
           href="/filtering-product"
-          className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[0.8rem] font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
+          className="group inline-flex shrink-0 items-center gap-1 pb-0.5 text-[0.75rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
         >
           View All
           <ArrowRight

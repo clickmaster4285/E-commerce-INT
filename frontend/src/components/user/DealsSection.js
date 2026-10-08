@@ -272,32 +272,27 @@ function DealEngine({ deals }) {
     <div ref={sectionRef} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* Header — flat, solid */}
       <div
-        className="deal-anim flex items-center justify-between mb-4 px-3 sm:px-4 py-2.5 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+        className="deal-anim mb-2.5 flex items-center justify-between gap-3"
         style={dealAnim("dealFadeIn", 0, 0.5)}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors duration-500"
-            style={{ backgroundColor: cfg.hex }}
-          >
-            <Flame
-              size={18}
-              className="deal-anim text-white"
-              style={{ animation: "dealWiggle 2.6s ease-in-out infinite", transformOrigin: "50% 85%" }}
-            />
-          </div>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Flame
+            size={20}
+            className="deal-anim shrink-0"
+            style={{ color: cfg.hex, animation: "dealWiggle 2.6s ease-in-out infinite", transformOrigin: "50% 85%" }}
+          />
           <div className="flex flex-col">
-            <h2 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight text-[var(--user-text)] leading-none">
+            <h2 className="text-lg font-semibold leading-tight tracking-tight text-[var(--user-text)] sm:text-xl lg:text-2xl">
               Hot <span style={{ color: cfg.hex }} className="transition-colors duration-500">Deals</span>
             </h2>
-            <span className="hidden sm:block text-[0.5625rem] font-bold uppercase tracking-[0.18em] text-[var(--user-text)] opacity-50 mt-1">
+            <span className="mt-0.5 hidden text-[0.5625rem] font-medium uppercase tracking-[0.14em] text-[var(--user-text)] opacity-50 sm:block">
               Best offers · limited time
             </span>
           </div>
         </div>
         <span
-          className="inline-flex items-center gap-1.5 text-[0.625rem] font-black uppercase tracking-wider px-2.5 py-1 rounded-full transition-colors duration-500"
-          style={{ backgroundColor: `${cfg.hex}18`, color: cfg.hex, border: `1px solid ${cfg.hex}45` }}
+          className="inline-flex shrink-0 items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-wide"
+          style={{ color: cfg.hex }}
         >
           <span
             className="deal-anim w-1.5 h-1.5 rounded-full"
@@ -533,7 +528,7 @@ function DealEngine({ deals }) {
         {/* ═══════ PRODUCTS AREA — fixed min-height: products hon ya na hon,
             section ki height same rehti hai (deal badalne par jump nahi) ═══════ */}
         <div
-          className="relative p-3 sm:p-5 lg:p-6 border-t border-[var(--user-border)] min-h-[23rem] sm:min-h-[25rem] lg:min-h-[23rem]"
+          className="relative border-t border-[var(--user-border)] p-2 sm:p-3 min-h-[16.5rem] sm:min-h-[17rem]"
           key={activeDeal._id}
           style={{ animation: "dealFadeIn .45s ease-out" }}
         >
@@ -869,19 +864,19 @@ function ProductsRow({ products, deal, hex }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-between mb-3 px-0.5">
-        <h4 className="text-[0.6875rem] sm:text-xs font-black uppercase tracking-wider flex items-center gap-1.5" style={{ color: hex }}>
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="flex items-center gap-1.5 text-xs font-normal sm:text-sm" style={{ color: hex }}>
           <Package size={13} />
           Products in this deal
         </h4>
         <span className="flex items-center gap-3">
-          <span className="text-[0.625rem] sm:text-[0.6875rem] font-bold" style={{ color: `${hex}cc` }}>
+          <span className="text-[0.625rem] font-normal sm:text-[0.6875rem]" style={{ color: `${hex}cc` }}>
             {products.length} {products.length === 1 ? "item" : "items"}
           </span>
           {products.length > MAX_DEAL_CARDS ? (
             <Link
               href={`/deals/${deal._id}`}
-              className="inline-flex items-center gap-1 text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-wider transition-opacity hover:opacity-80"
+              className="inline-flex items-center gap-1 text-[0.625rem] font-normal transition-opacity hover:opacity-80 sm:text-[0.6875rem]"
               style={{ color: hex }}
             >
               View all
@@ -914,21 +909,24 @@ function ProductsRow({ products, deal, hex }) {
 
       <div
         ref={scrollRef}
-        className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory pb-1"
+        className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {/* Full-width responsive — har screen par poori chaudai me cards:
-            mobile 2 → sm 3 → md 4 → lg 5 → xl 6 → 2xl 7 cards per view */}
+        {/* Wider cards with compact deal-only card styling. */}
         {visibleProducts.map((product) => (
           <div
             key={product._id || product.id}
-            className="group/deal flex-shrink-0 w-[47%] sm:w-[31%] md:w-[23.5%] lg:w-[19%] xl:w-[15.8%] 2xl:w-[13.5%] 4xl:w-[12%] 5xl:w-[10.5%] snap-start"
+            className="group/deal w-[72%] max-w-64 shrink-0 snap-start sm:w-[42%] md:w-[32%] lg:w-[27%] xl:w-[22%] 2xl:w-[18%] 4xl:w-[15%] 5xl:w-[14%]"
             style={{ "--deal-hex": hex }}
           >
-            {/* Card bilkul wahi ProductCard hai jo regular listing me use hota
-                hai — koi extra chrome nahi, sirf deal context (deal badge +
-                deal pricing) ke sath. */}
-            <ProductCard product={product} deal={deal} dealId={deal._id} showDealPricing />
+            {/* Shared product card with deal-only compact styling and pricing. */}
+            <ProductCard
+              product={product}
+              deal={deal}
+              dealId={deal._id}
+              showDealPricing
+              compactDealCard
+            />
           </div>
         ))}
       </div>

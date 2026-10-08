@@ -182,14 +182,14 @@ export default function BannerSlider({ initialBanners = null }) {
             <button
               onClick={goPrev}
               aria-label="Previous banner"
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex w-4 h-9 sm:w-5 sm:h-10 items-center justify-center rounded-r-full bg-[#d9d9d9]/70 text-[#5a5a5a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#c6c6c6] hover:text-[#333] transition-all duration-200"
+              className="absolute left-0 top-1/2 z-20 flex h-10 w-9 -translate-y-1/2 items-center justify-center rounded-r-md bg-black/30 text-white opacity-0 transition-colors duration-200 hover:bg-black/50 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronLeft size={13} />
             </button>
             <button
               onClick={goNext}
               aria-label="Next banner"
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex w-4 h-9 sm:w-5 sm:h-10 items-center justify-center rounded-l-full bg-[#d9d9d9]/70 text-[#5a5a5a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[#c6c6c6] hover:text-[#333] transition-all duration-200"
+              className="absolute right-0 top-1/2 z-20 flex h-10 w-9 -translate-y-1/2 items-center justify-center rounded-l-md bg-black/30 text-white opacity-0 transition-colors duration-200 hover:bg-black/50 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronRight size={13} />
             </button>
@@ -198,7 +198,7 @@ export default function BannerSlider({ initialBanners = null }) {
 
         {/* Pill indicators — active pill me progress bharti hai, khatam hone par agla slide */}
         {slides.length > 1 && (
-          <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 px-3 py-2 rounded-full bg-black/25 border border-white/10">
+          <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border border-white/15 bg-black/30 px-2.5 py-1.5 sm:bottom-4">
             {slides.map((_, i) =>
               i === active ? (
                 <button
@@ -268,12 +268,12 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
       <div className="absolute inset-0 bg-black/35" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
 
-      <div className="relative z-10 flex h-full items-center px-5 sm:px-8 lg:px-12 xl:px-16">
+      <div className="relative z-10 flex h-full items-center px-4 sm:px-6 lg:px-8 xl:px-10">
         {/* COPY — ab image ke upar hi text aa raha hai */}
-        <div className="w-full max-w-2xl sm:w-[60%]">
+        <div className="w-full max-w-xl sm:w-[58%]">
           {banner.eyebrow && (
             <span
-              className="bn-anim mb-2 inline-block rounded-full border border-white/40 bg-white/15 px-3 py-1 text-[0.5625rem] font-black uppercase tracking-[0.22em] text-white sm:mb-3 sm:text-xs"
+              className="bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white sm:mb-2.5 sm:text-xs"
               style={anim(isActive, "bnSlideDown", 0.05, 0.6)}
             >
               {banner.eyebrow}
@@ -282,7 +282,7 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
 
           {words.length > 0 && (
             <h2
-              className="mb-2 text-2xl font-black uppercase italic leading-[0.95] tracking-tight text-white sm:mb-3 sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"
+              className="mb-2 text-2xl font-black uppercase italic leading-[0.95] tracking-tight text-white sm:mb-2.5 sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"
               style={{ textShadow: extrude }}
             >
               {words.map((w, wi) => (
@@ -299,7 +299,7 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
 
           {banner.description && (
             <p
-              className="bn-anim mb-3 hidden max-w-lg text-sm leading-relaxed text-white/85 sm:block sm:text-base lg:mb-4 lg:text-lg line-clamp-2"
+              className="bn-anim mb-2 hidden max-w-lg text-sm leading-relaxed text-white/85 sm:block sm:text-base lg:mb-3 lg:text-lg line-clamp-2"
               style={anim(isActive, "bnSlideLeft", 0.35)}
             >
               {banner.description}
@@ -308,7 +308,7 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
 
           {dateLabel && (
             <span
-              className="bn-anim mb-3 hidden rounded-md bg-white px-4 py-1.5 text-xs font-black uppercase italic tracking-wide sm:inline-block sm:text-sm lg:mb-4"
+              className="bn-anim mb-2 hidden rounded-md bg-white px-3 py-1 text-[0.625rem] font-semibold uppercase tracking-wide sm:inline-block sm:text-xs lg:mb-3"
               style={{ color: palette.from, ...anim(isActive, "bnSlideLeft", 0.45) }}
             >
               {dateLabel}
@@ -362,12 +362,12 @@ function ButtonLink({ button, palette, primary = false, isActive, delay = 0 }) {
   return (
     <Link
       href={href}
-      className={`bn-anim group/btn inline-flex items-center gap-2 rounded-full px-5 py-2 text-[0.6875rem] font-black uppercase tracking-wider transition-transform duration-300 hover:-translate-y-0.5 active:scale-95 sm:px-7 sm:py-3 sm:text-sm ${
+      className={`bn-anim group/btn inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
         primary ? "bg-white" : "border-2 border-white/80 hover:bg-white/15"
       }`}
       style={{ color: primary ? palette.from : "#ffffff", ...anim(isActive, "bnSlideLeft", delay, 0.6) }}
     >
-      {button.text}
+      {primary ? "Shop Now" : button.text}
       {primary && (
         <ArrowRight
           size={15}
