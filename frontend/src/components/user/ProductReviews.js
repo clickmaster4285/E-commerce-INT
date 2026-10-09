@@ -169,13 +169,13 @@ function RatingModal({
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Review title <span className="font-normal text-[var(--user-text-subtle)]">(optional)</span></span>
-            <input type="text" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Review title <span className="text-[var(--user-accent)]">*</span></span>
+            <input type="text" required aria-required="true" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
               placeholder="Summarize your experience" className={inputCls} />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Your review <span className="font-normal text-[var(--user-text-subtle)]">(optional)</span></span>
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Your review</span>
             <textarea value={comment} onChange={(e) => onComment(e.target.value)} rows={4} maxLength={800}
               placeholder="What should other shoppers know?" className={inputCls} />
           </label>
@@ -389,6 +389,7 @@ export default function ProductRating({ productId, productName = "", review = nu
 
   const submit = async (e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (!title.trim()) { setError("Please enter a review title."); return; }
     if (!rating) { setError("Please select a star rating."); return; }
     setSaving(true);
     setError("");
@@ -470,7 +471,7 @@ export default function ProductRating({ productId, productName = "", review = nu
                 <p className="text-[0.625rem] font-black uppercase tracking-[0.14em] text-[var(--user-text-secondary)]">Your rating</p>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRow value={review.rating} size={17} />
-                  <span className="text-xs font-black text-[var(--user-text)]">{RATING_LABELS[review.rating]}</span>
+                  <span className="text-xs font-semibold text-[var(--user-text)]">{RATING_LABELS[review.rating]}</span>
                 </div>
               </div>
             </div>
@@ -481,7 +482,7 @@ export default function ProductRating({ productId, productName = "", review = nu
           </div>
           {(review.title || review.comment) ? (
             <div className="mt-3 pt-3 border-t border-[var(--user-border)] space-y-1">
-              {review.title ? <p className="text-sm font-bold text-[var(--user-text)]">{review.title}</p> : null}
+              {review.title ? <p className="text-sm font-semibold text-[var(--user-text)]">{review.title}</p> : null}
               {review.comment ? <p className="text-sm text-[var(--user-text-muted)] leading-relaxed">{review.comment}</p> : null}
             </div>
           ) : null}

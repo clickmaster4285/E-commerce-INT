@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Flame, Clock, ArrowRight, ChevronLeft, ChevronRight, Package, Zap, Layers, ShoppingCart } from "lucide-react";
+import { Flame, Clock, ArrowRight, ChevronLeft, ChevronRight, Package, PackageOpen, Zap, Layers, ShoppingCart } from "lucide-react";
 import { dealApi } from "@/apis/user/dealApi";
 
 import { useCart } from "./CartContext";
@@ -121,6 +121,24 @@ export default function DealsSection({ embedded = false }) {
     staleTime: 60 * 1000,
     refetchInterval: 3 * 60 * 1000,
   });
+  const prioritizedDeals = useMemo(
+    () =>
+      deals
+        .map((deal, index) => {
+          const hasProductIds = Array.isArray(deal?.productIds) && deal.productIds.length > 0;
+          const hasTargetProducts =
+            deal?.applyTo === "all" ||
+            deal?.applyTo === "collection" ||
+            ((deal?.applyTo === "category" || deal?.applyTo === "specific_categories") &&
+              Array.isArray(deal?.categoryIds) && deal.categoryIds.length > 0) ||
+            ((deal?.applyTo === "brand" || deal?.applyTo === "specific_brands") &&
+              Array.isArray(deal?.brandIds) && deal.brandIds.length > 0);
+          return { deal, index, hasProducts: hasProductIds || hasTargetProducts };
+        })
+        .sort((a, b) => Number(b.hasProducts) - Number(a.hasProducts) || a.index - b.index)
+        .map(({ deal }) => deal),
+    [deals],
+  );
 
   if (isLoading) return <DealsSkeleton embedded={embedded} />;
   if (!deals || deals.length === 0) return null;
@@ -139,10 +157,9 @@ export default function DealsSection({ embedded = false }) {
         @keyframes dealBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes dealTick { from { opacity: 0; transform: translateY(-55%); } to { opacity: 1; transform: translateY(0); } }
         @keyframes dealBarGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-        @keyframes dealProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
         @media (prefers-reduced-motion: reduce) { .deal-anim { animation: none !important; } }
       `}</style>
-      <DealEngine deals={deals} />
+      <DealEngine deals={prioritizedDeals} />
     </section>
   );
 }
@@ -312,7 +329,7 @@ function DealEngine({ deals }) {
 
           <div
             className={`relative px-4 sm:px-8 lg:px-10 pt-4 sm:pt-5 ${
-              deals.length > 1 ? "pb-10" : "pb-4 sm:pb-5"
+              deals.length > 1 ? "pb-14" : "pb-4 sm:pb-5"
             }`}
           >
             <div key={activeDeal._id} className="grid items-center gap-4 lg:grid-cols-12 lg:gap-6">
@@ -336,7 +353,7 @@ function DealEngine({ deals }) {
                 </p>
 
                 <h3
-                  className="deal-anim mt-1.5 text-3xl sm:text-4xl xl:text-5xl font-black uppercase italic leading-[0.95] tracking-tight text-white line-clamp-2 break-words"
+                  className="deal-anim mt-2.5 text-3xl sm:text-4xl xl:text-5xl font-black uppercase italic leading-[0.95] tracking-tight text-white line-clamp-2 break-words"
                   style={{
                     textShadow: `1px 1px 0 ${cfg.hex}, 2px 2px 0 ${cfg.hex}, 3px 3px 0 ${cfg.hex}, 4px 4px 0 ${cfg.hex}, 5px 5px 0 rgba(0,0,0,0.35)`,
                     ...dealAnim("dealSlideLeft", 0.12, 0.7),
@@ -346,14 +363,14 @@ function DealEngine({ deals }) {
                 </h3>
 
                 <span
-                  className="deal-anim mt-3 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[0.6875rem] font-black uppercase tracking-[0.14em] text-white"
+                  className="deal-anim mt-2.5 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[0.6875rem] font-black uppercase tracking-[0.14em] text-white"
                   style={{ backgroundColor: cfg.hex, ...dealAnim("dealSlideLeft", 0.22) }}
                 >
                   <Zap size={11} /> {typeLabel}
                 </span>
 
                 <p
-                  className="deal-anim mt-2 text-xs text-white/65 line-clamp-1"
+                  className="deal-anim mt-2.5 text-xs text-white/65 line-clamp-1"
                   style={dealAnim("dealSlideLeft", 0.3)}
                 >
                   {products.length > 0 ? `${products.length} products · ` : ""}Ends {endsLabel}
@@ -459,7 +476,7 @@ function DealEngine({ deals }) {
           {/* Prev / dots / next — banner ke andar overlay (extra height nahi) */}
           {deals.length > 1 && (
             <>
-              <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-1.5 py-1">
+              <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-1.5 py-1">
                 <button
                   type="button"
                   onClick={goPrev}
@@ -495,30 +512,23 @@ function DealEngine({ deals }) {
                   <ChevronRight size={14} className="transition-transform group-hover/arrow:translate-x-0.5" />
                 </button>
               </div>
-              {/* 8s change timer — banner ke bottom edge par, hover-pause par ruk jata hai */}
-              <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/10">
-                <div
-                  key={current}
-                  className="h-full w-full origin-left bg-white/70"
-                  style={{
-                    animation: "dealProgress 8s linear forwards",
-                    animationPlayState: paused ? "paused" : "running",
-                  }}
-                />
-              </div>
             </>
           )}
         </div>
 
-        {/* ═══════ PRODUCTS AREA — fixed min-height: products hon ya na hon,
-            section ki height same rehti hai (deal badalne par jump nahi) ═══════ */}
-        <div
-          className="relative border-t border-[var(--user-border)] p-2 sm:p-3 min-h-[16.5rem] sm:min-h-[17rem]"
-          key={activeDeal._id}
-          style={{ animation: "dealFadeIn .45s ease-out" }}
-        >
-          <ProductsRow products={products} deal={activeDeal} hex={cfg.hex} />
-        </div>
+        {activeDealDetail ? (
+          products.length > 0 ? (
+            <div
+              className="relative border-t border-[var(--user-border)] p-2 sm:p-3"
+              key={activeDeal._id}
+              style={{ animation: "dealFadeIn .45s ease-out" }}
+            >
+              <ProductsRow products={products} deal={activeDeal} hex={cfg.hex} />
+            </div>
+          ) : (
+            <ProductsRow products={products} deal={activeDeal} hex={cfg.hex} />
+          )
+        ) : null}
       </div>
     </div>
   );
@@ -836,10 +846,20 @@ function ProductsRow({ products, deal, hex }) {
 
   if (products.length === 0) {
     return (
-      <div className="flex min-h-[16rem] sm:min-h-[18rem] items-center justify-center text-center">
-        <p className="text-sm text-[var(--user-text-muted)] py-6">
-          No products attached to this deal yet.
-        </p>
+      <div className="flex flex-col gap-3 border-t border-[var(--user-border)] px-4 py-4 sm:flex-row sm:items-center sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)]">
+            <PackageOpen className="h-5 w-5 text-[var(--user-text-muted)]" />
+          </span>
+          <p className="text-sm font-semibold text-[var(--user-text)]">Products coming soon</p>
+        </div>
+        <Link
+          href="/shop?allDeals=1"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--user-border)] px-5 py-2 text-sm font-medium text-[var(--user-text-secondary)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] sm:ml-auto sm:w-auto"
+        >
+          Browse All Deals
+          <ArrowRight size={14} />
+        </Link>
       </div>
     );
   }

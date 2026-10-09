@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const Order = require("../models/Order");
+const CheckoutDraft = require("../models/CheckoutDraft");
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const Address = require("../models/Address");
@@ -30,7 +32,17 @@ const DELIVERY_FEE = 200;
 // ==========================================
 const placeOrder = async (req, res) => {
   try {
-    const { items, address_id, payment_method, notes, shipping_method: reqShippingMethod } = req.body;
+    const {
+      items,
+      address_id,
+      payment_method,
+      notes,
+      checkout_draft_id: rawCheckoutDraftId,
+      shipping_method: reqShippingMethod,
+    } = req.body;
+    const checkoutDraftId = mongoose.isValidObjectId(rawCheckoutDraftId)
+      ? rawCheckoutDraftId
+      : null;
 
     if (!items || !items.length) {
       return res.status(400).json({ success: false, message: "Cart is empty" });
@@ -287,6 +299,7 @@ const placeOrder = async (req, res) => {
           shipping_method,
           order_number,
           user_id: req.user._id,
+          checkout_draft_id: checkoutDraftId,
           items: orderItems,
           address_id: address._id,
           address_snapshot: {
@@ -316,6 +329,26 @@ const placeOrder = async (req, res) => {
         if (err.code === 11000 && attempt < 4) continue;
         throw err;
       }
+    }
+
+    // Order persisted successfully: complete all active drafts for this user.
+    // Completing every active entry also clears duplicate legacy drafts. When
+    // this checkout supplied an id, the order link is a fallback for the list
+    // endpoint if this status update cannot be written.
+    try {
+      await CheckoutDraft.updateOne(
+        { user_id: req.user._id },
+        {
+          $set: {
+            "drafts.$[draft].status": "completed",
+            "drafts.$[draft].order_id": order._id,
+            "drafts.$[draft].updatedAt": new Date(),
+          },
+        },
+        { arrayFilters: [{ "draft.status": { $ne: "completed" } }] },
+      );
+    } catch (draftError) {
+      log.error("[placeOrder] Draft completion failed after order creation:", draftError);
     }
 
     // ✅ Increment deal usage count
