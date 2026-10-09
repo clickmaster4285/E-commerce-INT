@@ -110,7 +110,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
       el?.removeEventListener("scroll", updateScrollButtons);
       window.removeEventListener("resize", updateScrollButtons);
     };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -157,10 +157,10 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
       aria-label="Available deals for this item"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] bg-[var(--user-accent-soft)] px-3 py-2.5">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] bg-[var(--user-bg-hover)] px-3 py-2.5">
         <div className="flex items-center gap-1.5">
-          <Sparkles size={14} className="text-[var(--user-accent)]" />
-          <span className="text-sm font-normal text-[var(--user-text)]">Available offers</span>
+          <Sparkles size={14} className="text-[var(--user-text-muted)]" />
+          <span className="text-sm font-semibold text-[var(--user-text)]">Available offers</span>
         </div>
         <div className="flex items-center gap-1">
           {availableDeals.length > 1 && (
@@ -170,7 +170,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 onClick={() => scroll(-1)}
                 disabled={!canScrollLeft}
                 aria-label="Scroll offers left"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-accent)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
               >
                 <ChevronLeft size={12} />
               </button>
@@ -179,7 +179,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 onClick={() => scroll(1)}
                 disabled={!canScrollRight}
                 aria-label="Scroll offers right"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-accent)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
               >
                 <ChevronRight size={12} />
               </button>
@@ -211,18 +211,18 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
               onClick={() => handleSelect(deal)}
               className={`snap-start shrink-0 flex flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all min-w-[5.625rem] ${
                 isSelected
-                  ? "border-[var(--user-accent)]/40 bg-[var(--user-accent)]/10"
-                  : "border-[var(--user-border)] hover:border-[var(--user-accent)]/50 hover:bg-[var(--user-accent-soft)]"
+                  ? "border-[var(--user-border-hover)] bg-[var(--user-bg-hover)]"
+                  : "border-[var(--user-border)] hover:border-[var(--user-border-hover)] hover:bg-[var(--user-bg-hover)]"
               }`}
             >
               <span
                 className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                  isSelected ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "bg-[var(--user-accent-soft)] text-[var(--user-accent)]"
+                  isSelected ? "bg-[var(--user-text)] text-[var(--user-bg-elevated)]" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"
                 }`}
               >
                 {isSelected ? <Check size={14} strokeWidth={2} /> : <Icon size={14} />}
               </span>
-              <span className={`line-clamp-2 text-sm font-normal leading-5 ${isSelected ? "text-[var(--user-accent)]" : "text-[var(--user-text)]"}`}>
+              <span className="line-clamp-2 text-sm font-medium leading-5 text-[var(--user-text)]">
                 {deal.name}
               </span>
               {badgeText ? (
@@ -231,13 +231,13 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 </span>
               ) : null}
               {savingsText && (
-                <span className="text-xs font-normal text-[var(--user-success)]">{savingsText}</span>
+                <span className="text-xs font-normal text-[var(--user-text-muted)]">{savingsText}</span>
               )}
               {!meetsMin && (
                 <span className="text-xs font-normal text-[var(--user-text-muted)]">+{gap} more</span>
               )}
               {isSelected && (
-                <span className="text-xs font-normal text-[var(--user-accent)]">Applied</span>
+                <span className="text-xs font-medium text-[var(--user-text-muted)]">Applied</span>
               )}
             </button>
           );

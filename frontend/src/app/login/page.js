@@ -552,7 +552,18 @@ export default function UserLoginPage() {
               <div>
                 <div className="relative">
                   <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
-                  <input type="email" required value={email} onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }} placeholder="Email address" className={getInputCls("email")} />
+                  <input
+                    type="email"
+                    suppressHydrationWarning
+                    required
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setErrors((p) => ({ ...p, email: "" }));
+                    }}
+                    placeholder="Email address"
+                    className={getInputCls("email")}
+                  />
                 </div>
                 {renderFieldError("email")}
               </div>

@@ -284,17 +284,17 @@ function HomeContent({ initialBanners = null }) {
       {/* HEADER ROW 2 — nav */}
       <HomeNav />
 
-      <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
-        <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+      <div className="w-full min-w-0 max-w-full pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-2 lg:pr-8 lg:pt-2 xl:pr-10 2xl:pr-12">
+        <div className="flex w-full min-w-0 max-w-full items-start gap-4">
           {/* LEFT SIDEBAR — same component, click → /filtering-product */}
           <HomeSidebar
             {...sidebarProps}
             scrollable
-            className="sticky top-[7.25rem] hidden w-48 shrink-0 rounded-l-none border-l-0 lg:block xl:w-52 2xl:w-52"
+            className="sticky top-[6.75rem] hidden w-[280px] shrink-0 rounded-l-none border-l-0 lg:block"
           />
 
           {/* MAIN COLUMN — sirf showcase (koi filter grid nahi → fast) */}
-          <div className="w-full min-w-0 flex-1 space-y-8 lg:space-y-12">
+          <div className="w-full min-w-0 max-w-full flex-1 space-y-8 lg:space-y-12">
             {/* MOBILE FILTER TRIGGER → filtering page */}
             <div className="flex items-center justify-between gap-3 lg:hidden">
               <button
@@ -321,12 +321,12 @@ function HomeContent({ initialBanners = null }) {
             </div>
 
             {/* CATEGORY TILES */}
-            <ViewportSection minHeight={220}>
+            <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full px-4 sm:px-6">
               <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
             </ViewportSection>
 
             {/* TODAY'S DEALS */}
-            <ViewportSection minHeight={420}>
+            <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full px-4 sm:px-6">
               <DealsSection embedded />
             </ViewportSection>
 

@@ -48,7 +48,7 @@ function Section({ title, icon: Icon, hint, children }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
       >
         {Icon ? <Icon size={13} className="shrink-0 text-[var(--user-accent)]" /> : null}
         <span className="flex-1 text-xs font-normal text-[var(--user-text)]">
@@ -66,7 +66,7 @@ function Section({ title, icon: Icon, hint, children }) {
           }`}
         />
       </button>
-      {open ? <div className="px-2.5 pb-3">{children}</div> : null}
+      {open ? <div className="px-4 pb-3">{children}</div> : null}
     </div>
   );
 }
@@ -155,7 +155,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
 
   return (
     <div
-      className="relative h-6 select-none"
+      className="relative isolate z-0 h-6 select-none"
       onMouseUp={onRelease}
       onTouchEnd={onRelease}
     >
@@ -175,7 +175,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
         onBlur={onRelease}
         aria-label="Minimum price"
         className={THUMB_CLASS}
-        style={{ zIndex: lowPercent > 70 ? 30 : 10 }}
+        style={{ zIndex: lowPercent > 70 ? 2 : 1 }}
       />
       <input
         type="range"
@@ -188,7 +188,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
         onBlur={onRelease}
         aria-label="Maximum price"
         className={THUMB_CLASS}
-        style={{ zIndex: 20 }}
+        style={{ zIndex: 1 }}
       />
     </div>
   );
@@ -513,7 +513,7 @@ export default function HomeSidebar({
       <aside
         aria-label="Filters"
         title="Filters"
-        className={`flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
+        className={`isolate flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
       >
         <div className="flex h-6 w-6 items-center justify-center">
           <SlidersHorizontal size={16} />
@@ -524,10 +524,12 @@ export default function HomeSidebar({
 
   if (isLoading) {
     return (
-      <aside className={`overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
-        <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5">
-          <SlidersHorizontal size={15} className="shrink-0 text-[var(--user-accent)]" />
-          <h2 className="flex-1 text-[0.8125rem] font-normal uppercase tracking-[0.12em] text-[var(--user-text)]">
+      <aside className={`isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
+        <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5 pb-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
+            <SlidersHorizontal size={15} className="text-orange-500" />
+          </span>
+          <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
             Filters
           </h2>
         </div>
@@ -543,30 +545,38 @@ export default function HomeSidebar({
 
   return (
     <aside
-      className={`overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
+      className={`isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
     >
-      <div className={scrollable ? "max-h-[calc(100vh-8.5rem)] overflow-y-auto" : ""}>
-        {/* HEADER */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-3">
-        <SlidersHorizontal size={14} className="shrink-0 text-[var(--user-accent)]" />
-        <h2 className="flex-1 text-xs font-normal text-[var(--user-text)]">
-            Filters
-          </h2>
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={!filtersActive}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[0.625rem] font-normal transition-colors ${
-              filtersActive
-                ? "text-[var(--user-accent)] hover:bg-[var(--user-bg-hover)]"
-                : "cursor-not-allowed text-[var(--user-text-disabled)]"
-            }`}
-          >
-            <RotateCcw size={11} /> Clear All
-          </button>
-        </div>
+      <div
+        className={
+          scrollable
+            ? "relative z-0 flex-1 min-h-0 max-h-[calc(100vh-8.5rem)] overflow-x-hidden overflow-y-auto"
+            : ""
+        }
+      >
+      {/* HEADER */}
+      <div className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-3 pb-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
+          <SlidersHorizontal size={14} className="text-orange-500" />
+        </span>
+        <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
+          Filters
+        </h2>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!filtersActive}
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+            filtersActive
+              ? "text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] hover:text-orange-500"
+              : "cursor-not-allowed text-[var(--user-text-disabled)]"
+          }`}
+        >
+          <RotateCcw size={11} /> Clear All
+        </button>
+      </div>
 
-        <p className="border-b border-[var(--user-border)] px-3 py-2 text-[0.6875rem] text-[var(--user-text-subtle)]">
+        <p className="border-b border-[var(--user-border)] px-4 py-2 text-xs text-[var(--user-text-muted)]">
           <span className="font-normal text-[var(--user-text)]">{matchCount}</span>{" "}
           {matchCount === 1 ? "product" : "products"} {filtersActive ? "match your filters" : "available"}
         </p>

@@ -192,6 +192,8 @@ function CheckoutContent() {
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
+  const draftCreateInFlight = useRef(false);
+  const placingRef = useRef(false);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -252,24 +254,14 @@ function CheckoutContent() {
     }
   }, [addresses, selectedAddressId, draftReady]);
 
-  useEffect(() => {
-    if (!user || !draftRestored.current || !currentDraftId) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
-        step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
-        shippingMethod, paymentMethod, saved: false, items: draftItems,
-      }).catch(() => {});
-    }, 800);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId]);
-
   const goToStep = async (n) => {
     if (currentDraftId) {
       try {
         await userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
           step: n, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, saved: false, items: draftItems,
+          shippingMethod, paymentMethod, saved: false, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
       } catch {}
     }
@@ -277,7 +269,9 @@ function CheckoutContent() {
   };
 
   const proceedToStep2 = async () => {
+    if (draftCreateInFlight.current) return;
     if (!selectedCartItems.length) return toast.error("Please select at least one item");
+    draftCreateInFlight.current = true;
     const snap = selectedCartItems.map((i) => ({ ...i }));
     setDraftItems(snap);
     removeItems(snap.map((i) => i.key));
@@ -287,7 +281,9 @@ function CheckoutContent() {
       if (!draftId) {
         const createRes = await userHttp.post("/users/checkout-drafts", {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, items: snap,
+          shippingMethod, paymentMethod, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
         draftId = createRes.data?.draft?._id;
         setCurrentDraftId(draftId);
@@ -295,10 +291,21 @@ function CheckoutContent() {
       } else {
         await userHttp.put(`/users/checkout-drafts/${draftId}`, {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, items: snap,
+          shippingMethod, paymentMethod, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
       }
-    } catch (e) { console.error("proceedToStep2 error:", e); }
+    } catch (e) {
+      console.error("proceedToStep2 error:", e);
+      restoreItems(snap);
+      setDraftItems([]);
+      setSelectedKeys(snap.map((item) => item.key));
+      toast.error(e.response?.data?.message || "Could not save checkout draft");
+      return;
+    } finally {
+      draftCreateInFlight.current = false;
+    }
     setStep(2);
   };
 
@@ -468,6 +475,28 @@ function CheckoutContent() {
 
   const tax = Math.round(itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0));
   const grandTotal = Math.round(subtotal + shipping + tax);
+  const draftDiscount = itemsWithDiscounts.reduce((sum, item) => {
+    const originalPrice = Number(item.originalPrice) || 0;
+    const salePrice = Number(item.displayPrice) || 0;
+    const qty = Number(item.qty) || 1;
+    return sum + Math.max(0, originalPrice - salePrice) * qty;
+  }, 0);
+  const draftSubtotal = subtotal + draftDiscount;
+  const draftEstimatedTotal = Math.round(draftSubtotal + shipping + tax - draftDiscount);
+
+  useEffect(() => {
+    if (!user || !draftRestored.current || !currentDraftId || placing) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
+        step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
+        shippingMethod, paymentMethod, saved: false, items: itemsWithDiscounts,
+        subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+        estimatedTotal: draftEstimatedTotal,
+      }).catch(() => {});
+    }, 800);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId, placing, draftSubtotal, shipping, tax, draftDiscount, draftEstimatedTotal]);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
   const needsPhone = !!user && !user.phone;
@@ -503,6 +532,7 @@ function CheckoutContent() {
   };
 
   const placeOrder = async () => {
+    if (placingRef.current) return;
     if (!activeItems.length) return toast.error("No items selected");
     if (!selectedAddressId) return toast.error("Please select a delivery address");
       if (paymentMethod === "card") {
@@ -523,10 +553,26 @@ function CheckoutContent() {
         }
       }
     }
+    placingRef.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
     try {
-           await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod, shipping, bank_sender_name: bankForm.senderName || null, bank_transaction_ref: bankForm.transactionRef || null });
-            queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      await orderApi.place({
+        items: itemsWithDiscounts,
+        address_id: selectedAddressId,
+        payment_method: paymentMethod,
+        shipping_method: shippingMethod,
+        shipping,
+        checkout_draft_id: currentDraftId || null,
+        bank_sender_name: bankForm.senderName || null,
+        bank_transaction_ref: bankForm.transactionRef || null,
+      });
+      queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      if (currentDraftId) {
+        queryClient.setQueryData(["checkoutDrafts"], (drafts = []) =>
+          drafts.filter((draft) => String(draft._id) !== String(currentDraftId)),
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       // ✅ Remove ONLY the selected lines from the cart; the save() helper in
 //    CartContext auto-prunes the selection for the removed keys. Leave any
@@ -534,9 +580,13 @@ function CheckoutContent() {
       const orderedKeys = itemsWithDiscounts.map((i) => i.key);
       removeItems(orderedKeys);
       setDraftItems([]);
-      if (currentDraftId) { await userHttp.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {}); setCurrentDraftId(null); }
+      setCurrentDraftId(null);
       router.push("/orders");
-    } catch (e) { toast.error(e.response?.data?.message || "Order place failed"); setPlacing(false); }
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Order place failed");
+      placingRef.current = false;
+      setPlacing(false);
+    }
   };
 
   if (userLoading || !draftReady || (!user && !needsPhone)) {

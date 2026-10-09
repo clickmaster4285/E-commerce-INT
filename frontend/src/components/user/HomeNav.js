@@ -43,7 +43,7 @@ const MORE_DROPDOWN_LIMIT = 5;
 const ALL_CATEGORY_LIMIT = 24;
 
 const itemClass = (active) =>
-  `shrink-0 inline-flex items-center h-10 lg:h-11 px-2.5 lg:px-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors duration-200 ${
+  `shrink-0 inline-flex items-center h-10 lg:h-11 px-3 py-2 text-sm font-normal whitespace-nowrap border-b-2 transition-colors duration-200 ${
     active
       ? "text-[var(--user-text)] border-[var(--user-accent)]"
       : "text-[var(--user-text-muted)] border-transparent hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)]"
@@ -120,10 +120,15 @@ export default function HomeNav() {
   const activeTab = searchParams?.get("tab");
   const [panel, setPanel] = useState(null);
   const [panelStyle, setPanelStyle] = useState(null);
+  const navScrollRef = useRef(null);
   const moreRef = useRef(null);
   const panelRef = useRef(null);
   const moreCloseTimerRef = useRef(null);
   const morePinnedRef = useRef(false);
+
+  useEffect(() => {
+    if (navScrollRef.current) navScrollRef.current.scrollLeft = 0;
+  }, [pathname, activeTab]);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -273,8 +278,11 @@ export default function HomeNav() {
 
   return (
     <nav aria-label="Primary" className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
-      <div className="w-full max-w-none px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
-        <div className="flex h-10 items-center justify-center gap-0.5 overflow-x-auto scrollbar-hide lg:h-11 lg:gap-1">
+      <div className="w-full min-w-0 max-w-full px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
+        <div
+          ref={navScrollRef}
+          className="flex h-10 w-full min-w-0 items-center justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-0.5 lg:h-11 lg:gap-1"
+        >
           {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
           {NAV_LINKS.map((link) => (
             <Link
