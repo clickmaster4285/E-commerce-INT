@@ -75,10 +75,13 @@ const createVariant = async (req, res) => {
       description: req.body.description || "",
       cost_price: Number(req.body.cost_price || 0),
       selling_price: Number(req.body.selling_price || 0),
+      expiry_after_delivery: Math.max(0, Number(req.body.expiry_after_delivery) || 0),
+      expiry_after_delivery_unit: req.body.expiry_after_delivery_unit || "days",
       // ✅ Stock poore units mein — fractional value truncate ho jati hai
       quantity: Math.trunc(Number(req.body.quantity || 0)) || 0,
       min_qnt: Number(req.body.min_qnt || 0),
       max_qnt: Number(req.body.max_qnt || 0),
+      topup: Number(req.body.topup) || 0,
       attributes,
       tags, // ✅ Tags saved here
       images: req.savedImages || [],
@@ -153,6 +156,12 @@ const updateVariant = async (req, res) => {
     if (req.body.title !== undefined) variant.title = req.body.title;
     if (req.body.description !== undefined) variant.description = req.body.description;
     if (req.body.cost_price !== undefined) variant.cost_price = Number(req.body.cost_price);
+    if (req.body.expiry_after_delivery !== undefined) {
+      variant.expiry_after_delivery = Math.max(0, Number(req.body.expiry_after_delivery) || 0);
+    }
+    if (req.body.expiry_after_delivery_unit !== undefined) {
+      variant.expiry_after_delivery_unit = req.body.expiry_after_delivery_unit;
+    }
     // ✅ Live-update ke liye quantity ka purana value pakad le rahe hain
     const previousQuantity = variant.quantity ?? 0;
     if (req.body.selling_price !== undefined) variant.selling_price = Number(req.body.selling_price);
@@ -168,6 +177,7 @@ const updateVariant = async (req, res) => {
     }
     if (req.body.min_qnt !== undefined) variant.min_qnt = Number(req.body.min_qnt);
     if (req.body.max_qnt !== undefined) variant.max_qnt = Number(req.body.max_qnt);
+    if (req.body.topup !== undefined) variant.topup = Number(req.body.topup);
 
     if (req.body.attributes !== undefined) {
       const nextAttributes = typeof req.body.attributes === "string"

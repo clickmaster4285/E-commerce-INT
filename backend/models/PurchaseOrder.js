@@ -9,6 +9,7 @@ const poItemSchema = new mongoose.Schema(
     variantTitle: { type: String, trim: true, default: "" },
     image: { type: String, default: "" },
     cost_price: { type: Number, required: true, min: 0 },
+    sell_price: { type: Number, default: 0, min: 0 },
     qty_ordered: { type: Number, required: true, min: 1 },
     received_qty: { type: Number, default: 0, min: 0 },
     line_total: { type: Number, required: true, min: 0 },
@@ -16,6 +17,8 @@ const poItemSchema = new mongoose.Schema(
     batch_no: { type: String, trim: true, default: "" },
     mfg_date: { type: Date, default: null },
     expiry_date: { type: Date, default: null },
+    expiry_after_delivery: { type: Number, default: 0, min: 0 },
+    expiry_after_delivery_unit: { type: String, enum: ["days", "months", "years"], default: "days" },
   },
   { _id: false }
 );
@@ -23,7 +26,7 @@ const poItemSchema = new mongoose.Schema(
 const receivingSchema = new mongoose.Schema(
   {
     received_at: { type: Date, default: Date.now },
-    invoice_no: { type: String, required: true, trim: true },
+    invoice_no: { type: String, trim: true, default: "" },
     explanation: { type: String, required: true, trim: true },
     items: [
       {
@@ -59,8 +62,8 @@ const purchaseOrderSchema = new mongoose.Schema(
     total: { type: Number, required: true, min: 0 },
     status: {
       type: String,
-      enum: ["draft", "sent", "confirmed", "partially_received", "received", "closed", "cancelled"],
-      default: "draft",
+      enum: ["pending", "confirmed", "delivered", "closed", "cancelled"],
+      default: "pending",
       index: true,
     },
     payment_status: { type: String, enum: ["unpaid", "partial", "paid"], default: "unpaid" },

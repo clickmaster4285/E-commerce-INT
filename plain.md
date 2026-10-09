@@ -72,9 +72,8 @@ name: String required trim
 company_name, contact_person: String default ""
 email: lowercase trim default "", phone, whatsapp: String default ""
 address, city, state, country, zip_code: String default ""
-payment_terms: enum [advance, net_7, net_15, net_30, cod] default net_15
 tax_id: String default "" // NTN
-bank_details: { bank, account_title, account_no, iban } all String default ""
+bank_details: { bank, account_title, account_no } all String default ""
 lead_time_days: Number default 0 min 0
 rating: Number default 0 min 0 max 5
 is_active: Boolean default true

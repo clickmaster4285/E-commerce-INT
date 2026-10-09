@@ -1,6 +1,7 @@
 const sharp = require("sharp");
 const fs = require("fs-extra");
 const path = require("path");
+const crypto = require("crypto");
 
 
 
@@ -16,10 +17,8 @@ const processBrandLogo = async (req, res, next) => {
 
 
 
-    // update me existing brand id milegi
-    // create me temporary folder banega
-    const brandId =
-      req.params.id || `temp_${Date.now()}`;
+    const isCreate = !req.params.id;
+    const brandId = req.params.id || crypto.randomBytes(12).toString("hex");
 
 
 
@@ -96,12 +95,9 @@ const processBrandLogo = async (req, res, next) => {
 
     };
 
+    if (isCreate) req.brandId = brandId;
 
-    // ✅ Temporary folder ka naam yaad rakho — create ke baad rename karne ke liye
-    req.tempBrandFolder = brandId;
-
-
-    next();
+    return next();
 
 
 

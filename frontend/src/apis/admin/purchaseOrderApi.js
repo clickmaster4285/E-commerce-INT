@@ -6,10 +6,10 @@ export const purchaseOrderApi = {
   getNextCode: () => adminHttp.get("/purchase-orders/next-code").then((res) => res.data?.data || res.data),
   create: (data) => adminHttp.post("/purchase-orders", data).then((res) => res.data),
   update: (id, data) => adminHttp.put(`/purchase-orders/${id}`, data).then((res) => res.data),
-  send: (id) => adminHttp.patch(`/purchase-orders/admin/${id}/send`).then((res) => res.data),
   confirm: (id) => adminHttp.patch(`/purchase-orders/admin/${id}/confirm`).then((res) => res.data),
   cancel: (id, cancel_reason) => adminHttp.patch(`/purchase-orders/admin/${id}/cancel`, { cancel_reason }).then((res) => res.data),
   close: (id) => adminHttp.patch(`/purchase-orders/admin/${id}/close`).then((res) => res.data),
-  receive: (id, payload) => adminHttp.post(`/purchase-orders/admin/${id}/receive`, payload).then((res) => res.data),
+  deliver: (id, payload) => adminHttp.post(`/purchase-orders/admin/${id}/deliver`, payload).then((res) => res.data),
+  receive: (id, payload) => adminHttp.post(`/purchase-orders/admin/${id}/deliver`, payload).then((res) => res.data),
   recordPayment: (id, payload) => adminHttp.patch(`/purchase-orders/admin/${id}/payment`, payload).then((res) => res.data),
 };
