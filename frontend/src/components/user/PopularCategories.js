@@ -4,8 +4,6 @@
    POPULAR CATEGORIES — real category cards
    Har card me:
      - category ka real product image (us category ke kisi product se)
-     - "From Rs. X" (us category ka sab se sasta product)
-     - total products count (parent + children sab mila kar)
    ========================================================== */
 
 import Link from "next/link";
@@ -13,12 +11,11 @@ import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { ArrowRight, ImageOff } from "lucide-react";
 import SectionHeading from "./SectionHeading";
-import { formatPrice } from "@/utils/homeCatalog";
 
 const LIMIT = 12;
 
 export default function PopularCategories({ tiles = [], isLoading = false }) {
-  // ✅ Tiles server se (count + fromPrice + image) — full catalog nahi
+  // ✅ Tiles server se (image) — full catalog nahi
   const list = (tiles || []).slice(0, LIMIT);
 
   if (isLoading && !list.length) {
@@ -73,12 +70,6 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
             <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
               <span className="w-full line-clamp-2 break-words text-xs font-medium capitalize text-[var(--user-text)] sm:text-[0.8125rem]">
                 {category.name}
-              </span>
-              <span className="flex items-center justify-between gap-1 text-[0.625rem] font-normal sm:text-xs">
-                <span className="truncate text-[0.9rem] font-normal leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
-                  {category.fromPrice > 0 ? `From ${formatPrice(category.fromPrice)}` : "Explore"}
-                </span>
-                <span className="shrink-0 text-[var(--user-text-subtle)]">{category.count}</span>
               </span>
             </span>
           </Link>
