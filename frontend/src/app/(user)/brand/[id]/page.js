@@ -29,7 +29,7 @@ export default function BrandPage() {
       <section className="max-w-7xl mx-auto px-3 lg:px-6 py-5 lg:py-12">
         <Suspense
           fallback={
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="space-y-2 lg:space-y-3">
                   <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
@@ -173,7 +173,7 @@ function BrandContent({ brandId }) {
 
       {/* LOADING */}
       {isLoading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2 lg:gap-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="space-y-2 lg:space-y-3">
               <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
@@ -217,7 +217,7 @@ function BrandContent({ brandId }) {
       {/* PRODUCTS */}
       {!isLoading && !isError && total > 0 && (
         <div ref={gridTopRef} className="scroll-mt-24">
-          <div className="grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2 lg:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7">
             {products.map((product, i) => (
               <ProductCard key={product._id} product={product} priority={i < 2} />
             ))}

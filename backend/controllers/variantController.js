@@ -89,6 +89,8 @@ const createVariant = async (req, res) => {
       updatedby: req.user?._id || null,
     });
 
+    emitSocketEvent("productUpdated", { _id: variant.product_id, variantUpdated: true });
+
     res.status(201).json({
       message: "Variant created successfully",
       variant,
@@ -223,6 +225,13 @@ const updateVariant = async (req, res) => {
       variant.updatedby = req.user?._id || null;
       await variant.save();
 
+      if (req.savedImages?.length) {
+        emitSocketEvent("productUpdated", {
+          _id: variant.product_id,
+          variantUpdated: true,
+        });
+      }
+
       // ✅ Stock quantity sach me badli ho to live update emit (manage-stock auto refresh)
       if ((variant.quantity ?? 0) !== previousQuantity) {
         emitSocketEvent("stockUpdated", {
@@ -260,6 +269,8 @@ const deleteVariant = async (req, res) => {
     }
 
     await Variant.findByIdAndDelete(req.params.id);
+
+    emitSocketEvent("productUpdated", { _id: variant.product_id, variantUpdated: true });
 
     res.status(200).json({ message: "Variant deleted successfully" });
   } catch (error) {

@@ -4,18 +4,18 @@ import { use, useState, useMemo, useCallback, useEffect, useRef, memo, Suspense 
 import Link from "next/link";
 import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
-  ShoppingCart, Truck, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
-  Minus, Plus, Package, X, Check, Zap, ZoomIn, MapPin, Tag, Sparkles, Heart, TrendingUp, Search, Star,
+  ShoppingCart, ChevronRight, ChevronLeft, ChevronDown,
+  Minus, Plus, Package, X, Check, Zap, ZoomIn, Tag, Sparkles, Heart, Star,
+  Store, ShieldCheck, ZoomIn as ZoomHintIcon,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import { userHttp } from "@/apis/axiosInstance";
 import { reviewApi } from "@/apis/user/reviewApi";
-import ProductCard from "@/components/user/ProductCard";
 import ProductRating from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
@@ -23,8 +23,7 @@ import { useWishlist } from "@/components/user/WishlistContext";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const DEFAULT_QTY = 1;
-const MAX_RELATED = 8;
-const COLLAPSED_H = 360;
+const MAX_RELATED = 10;
 
 const getImageUrl = (img) => {
   if (!img) return null;
@@ -39,11 +38,8 @@ const extractId = (ref) => (ref && typeof ref === "object" ? ref._id : ref);
 const extractName = (ref) => (ref && typeof ref === "object" ? ref.name : ref || "");
 const toNum = (val) => (isNaN(Number(val)) ? 0 : Number(val));
 
-// ✅ Variant attribute values are not always plain strings — the attribute
-// configuration can store them as nested objects such as
-// { Brand: { Brand: "NIKE" } }, { label, value } or [{ label, value }].
-// Always resolve a readable string so the storefront never prints
-// "[object Object]" in the specs table or the highlight chips.
+// ✅ Variant attribute values are not always plain strings — resolve readable text
+// so the page never prints "[object Object]".
 const attrValueOf = (raw) => {
   if (raw === null || raw === undefined) return "";
   if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return String(raw).trim();
@@ -66,7 +62,6 @@ const attrEntries = (attributes, limit) => {
 
 const getDealBadgeText = (deal) => {
   if (!deal?.type) return deal?.name || "Deal";
-  // ✅ 0% / Rs. 0 OFF — off ho tabhi OFF text dikhao
   if (deal.type === "percentage") return Number(deal.discountValue) > 0 ? `${deal.discountValue}% OFF` : null;
   if (deal.type === "fixed_amount") return Number(deal.discountValue) > 0 ? `Rs. ${deal.discountValue} OFF` : null;
   if (deal.type === "buy_x_get_y") {
@@ -78,12 +73,27 @@ const getDealBadgeText = (deal) => {
   return deal.name || "Deal";
 };
 
-const getStockStatus = (stock) => {
-  if (stock === 0) return { text: "Out of Stock", cls: "bg-[var(--user-danger)]/10 text-[var(--user-danger)]", dot: "bg-[var(--user-danger)]" };
-  if (stock <= 3) return { text: `Only ${stock} left`, cls: "bg-orange-500/10 text-orange-500 [.light_&]:text-orange-600", dot: "bg-orange-500" };
-  if (stock <= 10) return { text: `${stock} in stock`, cls: "bg-yellow-500/10 text-yellow-600 [.light_&]:text-yellow-700", dot: "bg-yellow-500" };
-  return { text: "In Stock", cls: "bg-[var(--user-success)]/10 text-[var(--user-success)]", dot: "bg-[var(--user-success)]" };
-};
+// ✅ Flash-sale countdown — sirf real deal.endDate se
+function useCountdown(endDate) {
+  const target = useMemo(() => {
+    const t = endDate ? new Date(endDate).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  }, [endDate]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!target) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  if (!target) return null;
+  const diff = Math.max(0, target - now);
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return d > 0 ? `${d}d ${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
 
 function useProductDetail(productId) {
   const { data: product, isLoading, isError } = useQuery({
@@ -92,7 +102,7 @@ function useProductDetail(productId) {
   return { product, isLoading, isError };
 }
 
-// ✅ Related — same category, server se (khud ko filter karke 8 tak)
+// ✅ Related — same category, server se (khud ko filter karke 10 tak)
 function useRelatedProducts(product, categoryId) {
   const { data } = useQuery({
     queryKey: ["relatedProducts", product?._id || product?.id, categoryId],
@@ -122,11 +132,6 @@ function useVariant(variants = []) {
   const mainImage = currentImages[imgIndex] || currentImages[0] || null;
   const selectVariant = useCallback((i) => { setIndex(i); setImgIndex(0); }, []);
 
-  // ✅ ALL variant images as flat URL array — for thumbnails (user can click any)
-  const allVariantImages = useMemo(() => {
-    return safeVariants.flatMap((v) => (v.images || []).map(getImageUrl).filter(Boolean));
-  }, [safeVariants]);
-
   // ✅ Click any thumbnail → find which variant owns this URL, switch to it
   const selectImageByUrl = useCallback((url) => {
     for (let vIdx = 0; vIdx < safeVariants.length; vIdx++) {
@@ -146,7 +151,7 @@ function useVariant(variants = []) {
     return Array.from(set);
   }, [safeVariants]);
 
-  return { variantIndex: index, imageIndex: imgIndex, setImageIndex: setImgIndex, currentVariant: current, images: allVariantImages, currentImages, mainImage, selectVariant, selectImageByUrl, allImages };
+  return { variantIndex: index, currentVariant: current, images: allImages, mainImage, selectVariant, selectImageByUrl, allImages };
 }
 
 function useQuantity(maxStock) {
@@ -176,238 +181,318 @@ function useStickyBar() {
   return { show, sentinelRef };
 }
 
+/* ================= Daraz-style pieces (sirf real data) ================= */
+
 const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
-  <nav className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs text-[var(--user-text-muted)] flex-wrap px-0.5">
-    <Link href="/" className="hover:text-[var(--user-accent)] transition-colors">Home</Link>
-    <ChevronRight size={11} className="opacity-60" />
-    {categoryName && categoryId && (
+  <nav className="flex items-center gap-1 text-xs text-[var(--user-text-muted)] flex-wrap py-3">
+    <Link href="/" className="text-[var(--user-accent)] hover:underline">Home</Link>
+    {categoryName && (
       <>
-        <Link href={`/?category=${categoryId}`} className="hover:text-[var(--user-accent)] transition-colors">{categoryName}</Link>
-        <ChevronRight size={11} className="opacity-60" />
+        <ChevronRight size={12} className="opacity-50" />
+        <Link href={`/?category=${categoryId}`} className="text-[var(--user-accent)] hover:underline">{categoryName}</Link>
       </>
     )}
-    <span className="text-[var(--user-text-secondary)] truncate max-w-[10rem] sm:max-w-[12.5rem] lg:max-w-[20rem]">{productName}</span>
+    <ChevronRight size={12} className="opacity-50" />
+    <span className="text-[var(--user-text-secondary)] truncate max-w-[12rem] sm:max-w-[24rem] lg:max-w-[32rem]">{productName}</span>
   </nav>
 ));
 Breadcrumb.displayName = "Breadcrumb";
 
-const Gallery = memo(({ mainImage, images, onImageSelect, stock, onZoom }) => {
-  const [zoomed, setZoomed] = useState(false);
-  const [origin, setOrigin] = useState("50% 50%");
-  const [paused, setPaused] = useState(false);
+const Stars = memo(({ value = 0, size = 13 }) => (
+  <span className="inline-flex items-center gap-[1px]">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <Star
+        key={i}
+        size={size}
+        className={i <= Math.round(value) ? "fill-[#faca51] text-[#faca51]" : "fill-[#dadada] text-[#dadada]"}
+      />
+    ))}
+  </span>
+));
+Stars.displayName = "Stars";
 
-  // ✅ Auto-rotate disabled — user clicks thumbnail to switch variant
-  const handleMove = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    setOrigin(`${Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100))}% ${Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100))}%`);
+const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
+  const stripRef = useRef(null);
+  const imageFrameRef = useRef(null);
+  const lensRef = useRef(null);
+  const zoomPanelRef = useRef(null);
+  const moveFrameRef = useRef(0);
+  const pendingPointRef = useRef(null);
+  const naturalSizeRef = useRef({ width: 1, height: 1 });
+  const hoveredRef = useRef(false);
+  const updateZoomPositionRef = useRef(null);
+  const zoomRequestRef = useRef(0);
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [zoomLoaded, setZoomLoaded] = useState(false);
+  const [hasHovered, setHasHovered] = useState(false);
+  const activeIndex = Math.max(0, images.indexOf(mainImage));
+  const lensSize = 112;
+  const zoomFactor = 2.5;
+
+  const preloadZoomImage = useCallback(() => {
+    if (!mainImage || typeof window === "undefined") return;
+    const requestId = ++zoomRequestRef.current;
+    setZoomLoaded(false);
+    const preload = new window.Image();
+    preload.onload = () => {
+      if (requestId !== zoomRequestRef.current) return;
+      naturalSizeRef.current = {
+        width: preload.naturalWidth || 1,
+        height: preload.naturalHeight || 1,
+      };
+      setZoomLoaded(true);
+      if (hoveredRef.current && !moveFrameRef.current) {
+        moveFrameRef.current = window.requestAnimationFrame(() => {
+          updateZoomPositionRef.current?.();
+        });
+      }
+    };
+    preload.onerror = () => {
+      if (requestId === zoomRequestRef.current) setZoomLoaded(false);
+    };
+    preload.src = mainImage;
+  }, [mainImage]);
+
+  const updateZoomPosition = useCallback(() => {
+    moveFrameRef.current = 0;
+    const frame = imageFrameRef.current;
+    const lens = lensRef.current;
+    const panel = zoomPanelRef.current;
+    const point = pendingPointRef.current;
+    if (!frame || !lens || !panel || !point || !hoveredRef.current) return;
+
+    const frameWidth = frame.clientWidth;
+    const frameHeight = frame.clientHeight;
+    const mainImg = frame.querySelector("img");
+    const naturalWidth = mainImg?.naturalWidth || naturalSizeRef.current.width;
+    const naturalHeight = mainImg?.naturalHeight || naturalSizeRef.current.height;
+    const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+    const imageWidth = naturalWidth * scale;
+    const imageHeight = naturalHeight * scale;
+    const offsetX = (frameWidth - imageWidth) / 2;
+    const offsetY = (frameHeight - imageHeight) / 2;
+    const cursorX = Math.max(offsetX, Math.min(point.x, offsetX + imageWidth));
+    const cursorY = Math.max(offsetY, Math.min(point.y, offsetY + imageHeight));
+    const activeLensSize = Math.min(lensSize, imageWidth, imageHeight);
+    lens.style.width = `${activeLensSize}px`;
+    lens.style.height = `${activeLensSize}px`;
+    const lensLeft = Math.max(offsetX, Math.min(cursorX - activeLensSize / 2, offsetX + imageWidth - activeLensSize));
+    const lensTop = Math.max(offsetY, Math.min(cursorY - activeLensSize / 2, offsetY + imageHeight - activeLensSize));
+    const centerX = lensLeft + activeLensSize / 2 - offsetX;
+    const centerY = lensTop + activeLensSize / 2 - offsetY;
+
+    lens.style.transform = `translate3d(${lensLeft}px, ${lensTop}px, 0)`;
+    const panelWidth = panel.clientWidth;
+    const panelHeight = panel.clientHeight;
+    panel.style.backgroundSize = `${imageWidth * zoomFactor}px ${imageHeight * zoomFactor}px`;
+    const backgroundX = Math.min(
+      0,
+      Math.max(panelWidth - imageWidth * zoomFactor, panelWidth / 2 - centerX * zoomFactor),
+    );
+    const backgroundY = Math.min(
+      0,
+      Math.max(panelHeight - imageHeight * zoomFactor, panelHeight / 2 - centerY * zoomFactor),
+    );
+    panel.style.backgroundPosition = `${backgroundX}px ${backgroundY}px`;
+  }, []);
+
+  useEffect(() => {
+    updateZoomPositionRef.current = updateZoomPosition;
+  }, [updateZoomPosition]);
+
+  const handleMouseMove = useCallback((event) => {
+    const bounds = imageFrameRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    pendingPointRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    if (!moveFrameRef.current) {
+      moveFrameRef.current = window.requestAnimationFrame(updateZoomPosition);
+    }
+  }, [updateZoomPosition]);
+
+  const handleMouseEnter = useCallback(() => {
+    hoveredRef.current = true;
+    setZoomVisible(true);
+    setHasHovered(true);
+    preloadZoomImage();
+  }, [preloadZoomImage]);
+
+  useEffect(() => {
+    if (hoveredRef.current && mainImage) preloadZoomImage();
+  }, [mainImage, preloadZoomImage]);
+
+  const handleMouseLeave = useCallback(() => {
+    hoveredRef.current = false;
+    setZoomVisible(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (moveFrameRef.current) window.cancelAnimationFrame(moveFrameRef.current);
+    };
+  }, []);
+
+  const scrollStrip = (dir) => {
+    stripRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
   };
-
   return (
-    <div className="flex gap-3 sm:gap-4">
+    <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
+      <div className="product-gallery-main relative">
+      <div
+        ref={imageFrameRef}
+        className="group relative aspect-square cursor-crosshair overflow-hidden border border-[var(--user-border)] bg-white"
+        onClick={() => mainImage && onZoom(mainImage)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
+      >
+        {mainImage ? (
+          <Image
+            key={mainImage}
+            src={mainImage}
+            alt={productName}
+            fill
+            loader={smartImageLoader}
+            sizes="(max-width: 1024px) 100vw, 40vw"
+            priority
+            className="object-contain"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-white"><Package size={64} strokeWidth={1.25} className="text-gray-300" /></div>
+        )}
+        {stock === 0 && (
+          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Out of Stock</span>
+        )}
+        {stock > 0 && stock < 5 && (
+          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
+        )}
+        <div
+          ref={lensRef}
+          aria-hidden="true"
+          className={`product-image-zoom-lens pointer-events-none absolute left-0 top-0 z-20 h-28 w-28 border border-[var(--user-accent)]/70 bg-[rgba(245,114,36,0.2)] transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ transform: "translate3d(-200px, -200px, 0)" }}
+        />
+        {!hasHovered && mainImage ? (
+          <span className="product-image-zoom-hint pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-[11px] text-white">
+            <ZoomHintIcon size={13} aria-hidden="true" />
+            Hover to zoom
+          </span>
+        ) : null}
+      </div>
+      {mainImage ? (
+        <div
+          ref={zoomPanelRef}
+          aria-hidden="true"
+          className={`product-image-zoom-panel pointer-events-none absolute left-full top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
+        >
+          {!zoomLoaded ? (
+            <div className="absolute inset-0 animate-pulse bg-gray-100" />
+          ) : null}
+        </div>
+      ) : null}
+      </div>
       {images.length > 1 && (
-        <div className="hidden lg:flex flex-col gap-2.5 shrink-0">
-          {images.map((url, i) => (
-            <button key={i} onClick={() => onImageSelect(url)} aria-label={`View image ${i + 1}`}
-              className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${url === mainImage ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/20" : "border-[var(--user-border)] opacity-60 hover:opacity-100"}`}>
-              <img src={url} alt="" className="w-full h-full object-cover" />
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="relative flex-1 min-w-0">
-        <div className="relative aspect-square overflow-hidden rounded-2xl group cursor-zoom-in bg-transparent border-0"
-          onClick={() => mainImage && onZoom(mainImage)}
-          onMouseEnter={() => { setZoomed(true); setPaused(true); }}
-          onMouseLeave={() => { setZoomed(false); setPaused(false); }}
-          onMouseMove={handleMove}>
-          {mainImage ? (
-            <div key={mainImage} className="relative w-full h-full" style={{ animation: "galleryImgIn .45s ease" }}>
-              <Image
-                src={mainImage}
-                alt="Product"
-                fill
-                loader={smartImageLoader}
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                priority
-                className="object-contain"
-                style={zoomed ? { transform: "scale(1.9)", transformOrigin: origin, transition: "transform .12s ease-out" } : { transform: "scale(1)", transition: "transform .35s ease" }}
-              />
-            </div>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center"><Package size={64} className="text-[var(--user-text-subtle)]" /></div>
-          )}
-          {stock === 0 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2.5 py-1 rounded-full">Out of Stock</span>}
-          {stock > 0 && stock < 5 && <span className="absolute top-3 right-3 bg-[var(--user-danger)] text-white text-[0.625rem] font-bold px-2.5 py-1 rounded-full">Only {stock} left</span>}
-          <button onClick={(e) => { e.stopPropagation(); mainImage && onZoom(mainImage); }} aria-label="Zoom"
-            className="absolute bottom-3 right-3 w-9 h-9 rounded-lg bg-[var(--user-bg-card)]/80 backdrop-blur border border-[var(--user-border)] flex items-center justify-center text-[var(--user-text-secondary)] hover:text-[var(--user-accent)] transition">
-            <Search size={15} />
+        <div className="relative mt-2 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => scrollStrip(-1)}
+            aria-label="Previous images"
+            className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
+          >
+            <ChevronLeft size={18} />
           </button>
-        </div>
-        {images.length > 1 && (
-          <div className="flex gap-2 mt-3 overflow-x-auto lg:hidden pb-1 -mx-4 px-4 sm:-mx-5 sm:px-5" style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+          <div ref={stripRef} className="flex flex-1 gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
             {images.map((url, i) => (
-              <button key={i} onClick={() => onImageSelect(url)} aria-label={`View image ${i + 1}`}
-                className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden border-2 transition-all ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-60"}`}>
-                <img src={url} alt="" className="w-full h-full object-cover" />
+              <button
+                key={i}
+                type="button"
+                onClick={() => onImageSelect(url)}
+                aria-label={`View image ${i + 1}`}
+                className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
+              >
+                <img src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
               </button>
             ))}
           </div>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => scrollStrip(1)}
+            aria-label="Next images"
+            className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 });
 Gallery.displayName = "Gallery";
 
-const SectionTitle = ({ children }) => (
-  <h2 className="flex items-center gap-2.5 text-[0.9375rem] sm:text-base font-bold text-[var(--user-text)]">
-    <span className="w-1 h-5 rounded-full bg-[var(--user-accent)]" />{children}
-  </h2>
-);
-
-const DescriptionCard = memo(({ shortDescription, fullDescription, variantTitle, variantDescription }) => {
+// ✅ Product details images — pehle sirf pehli image (neeche se fade), "View More" par saari images
+const COLLAPSED_IMAGE_HEIGHT = 620;
+const DetailImages = memo(({ productName, images, onZoom }) => {
   const [expanded, setExpanded] = useState(false);
-  const [overflowing, setOverflowing] = useState(false);
-  const bodyRef = useRef(null);
-
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    setOverflowing(el.scrollHeight > COLLAPSED_H + 8);
-  }, [shortDescription, fullDescription, variantDescription]);
-
-  if (!shortDescription && !fullDescription && !variantDescription) return null;
-
+  if (!images?.length) return null;
+  const hasMore = images.length > 1;
+  const visible = expanded || !hasMore ? images : images.slice(0, 1);
+  const collapsed = hasMore && !expanded;
   return (
-    <div className="h-full flex flex-col rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden">
-      <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[var(--user-border)] shrink-0"><SectionTitle>Description</SectionTitle></div>
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div
-          ref={bodyRef}
-          className={`px-4 sm:px-6 py-4 sm:py-5 space-y-3 sm:space-y-4 flex-1 ${expanded ? "overflow-y-auto" : ""}`}
-          style={!expanded ? { maxHeight: COLLAPSED_H, overflow: "hidden" } : undefined}
-        >
-          {shortDescription && (
-            <p className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 font-medium text-[var(--user-text-secondary)]">{shortDescription}</p>
-          )}
-          {fullDescription && (
-            <div className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{fullDescription}</div>
-          )}
-          {variantDescription && (
-            <div className="pt-3 sm:pt-4 border-t border-[var(--user-border)]">
-              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--user-text-secondary)] mb-1.5 sm:mb-2">{variantTitle || "Selected Variant"}</p>
-              <p className="text-[0.8125rem] sm:text-sm leading-6 sm:leading-7 text-[var(--user-text-muted)] whitespace-pre-line break-words">{variantDescription}</p>
-            </div>
-          )}
+    <div className="mx-auto max-w-4xl">
+      <div
+        className="relative overflow-hidden"
+        style={collapsed ? { maxHeight: COLLAPSED_IMAGE_HEIGHT } : undefined}
+      >
+        <div className="flex flex-col items-center gap-2">
+          {visible.map((url, i) => (
+            <img
+              key={url}
+              src={url}
+              alt={`${productName}, image ${i + 1}`}
+              loading="lazy"
+              onClick={() => onZoom(url)}
+              className="h-auto w-full cursor-zoom-in object-contain"
+            />
+          ))}
         </div>
-        {overflowing && (
-          <div className="relative shrink-0">
-            {!expanded && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-full h-12 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
-            )}
-            <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-[var(--user-border)] bg-[var(--user-bg-card)]">
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="inline-flex items-center gap-1.5 text-[0.8125rem] sm:text-sm font-semibold text-[var(--user-accent)] hover:underline"
-              >
-                {expanded ? <>Read less <ChevronUp size={14} /></> : <>Read more <ChevronDown size={14} /></>}
-              </button>
-            </div>
-          </div>
+        {collapsed && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
         )}
       </div>
-    </div>
-  );
-});
-DescriptionCard.displayName = "DescriptionCard";
-
-const SpecsCard = memo(({ attributes }) => {
-  const entries = attrEntries(attributes);
-  if (!entries.length) return null;
-  return (
-    <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden">
-      <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[var(--user-border)]"><SectionTitle>Specifications</SectionTitle></div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse min-w-[17.5rem]">
-          <tbody>
-            {entries.map(([key, value], i) => (
-              <tr key={key} className={i % 2 === 1 ? "bg-[var(--user-bg-hover)]/40" : ""}>
-                <td className={`w-2/5 px-4 sm:px-6 py-3 sm:py-3.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--user-text-muted)] align-top ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{key}</td>
-                <td className={`px-4 sm:px-6 py-3 sm:py-3.5 text-[0.8125rem] sm:text-sm font-medium text-[var(--user-text)] break-words ${i < entries.length - 1 ? "border-b border-[var(--user-border)]" : ""}`}>{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-});
-SpecsCard.displayName = "SpecsCard";
-
-const MoreImagesStack = memo(({ images, onZoom }) => {
-  if (!images || images.length <= 1) return null;
-  return (
-    <section className="mt-10 sm:mt-12 lg:mt-14">
-      <SectionTitle>More Images</SectionTitle>
-      <div className="mt-4 sm:mt-5 space-y-3 sm:space-y-4 lg:space-y-5">
-        {images.map((url, i) => (
-          <button key={i} onClick={() => onZoom(url)} className="block w-full rounded-2xl overflow-hidden group cursor-zoom-in border border-[var(--user-border)]">
-            <img src={url} alt={`Product view ${i + 1}`} loading="lazy" className="w-full h-[15rem] sm:h-[23.75rem] lg:h-[35rem] object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-expanded={expanded}
+            className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+          >
+            {expanded ? "View Less" : `View More (${images.length - 1})`}
           </button>
-        ))}
-      </div>
-    </section>
-  );
-});
-MoreImagesStack.displayName = "MoreImagesStack";
-
-const RelatedProducts = memo(({ products }) => {
-  if (!products || products.length === 0) return null;
-  return (
-    <section className="mt-10 sm:mt-12 lg:mt-14">
-      <SectionTitle>You May Also Like</SectionTitle>
-      <div className="mt-4 sm:mt-5 grid grid-cols-2 lg:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 6xl:grid-cols-7 gap-2.5 sm:gap-4 lg:gap-5">
-        {products.map((p) => <ProductCard key={p._id} product={p} />)}
-      </div>
-    </section>
-  );
-});
-RelatedProducts.displayName = "RelatedProducts";
-
-const DeliveryInfo = memo(({ storeName, stock }) => (
-  <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3.5 sm:p-4">
-    <div className="flex items-start gap-3">
-      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-        <Truck className="text-[var(--user-accent)]" size={17} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[0.8125rem] sm:text-sm font-bold text-[var(--user-text)]">{storeName || "Official Store"}</p>
-        <div className="flex items-center gap-1.5 mt-0.5 text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-muted)]">
-          <MapPin size={11} className="text-[var(--user-accent)]" />
-          {stock > 0 ? <span className="text-[var(--user-success)] font-semibold">In stock, ready to ship</span> : <span>Currently unavailable</span>}
         </div>
-      </div>
+      )}
     </div>
-  </div>
-));
-DeliveryInfo.displayName = "DeliveryInfo";
+  );
+});
+DetailImages.displayName = "DetailImages";
 
-const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded, onWishlist, isWishlisted }) => {
+const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
   if (!show) return null;
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-2xl safe-bottom" style={{ animation: "slideUp .25s ease" }}>
-      <div className="user-shell mx-auto px-3 sm:px-4 h-16 flex items-center gap-2 sm:gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{name}</p>
-          <p className="text-base sm:text-lg font-extrabold text-[var(--user-text)] leading-tight">Rs. {(price * qty).toLocaleString()}</p>
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl md:hidden" style={{ animation: "slideUp .25s ease" }}>
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] text-[var(--user-text-muted)]">{name}</p>
+          <p className="text-base font-bold text-[var(--user-accent)]">Rs. {(price * qty).toLocaleString()}</p>
         </div>
-        <button onClick={onWishlist} className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center transition-all ${isWishlisted ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-danger)]"}`}>
-          <Heart size={17} fill={isWishlisted ? "currentColor" : "none"} />
-        </button>
-        <button onClick={onAdd} disabled={stock < 1}
-          className={`h-10 sm:h-11 px-4 sm:px-6 rounded-xl text-[0.6875rem] sm:text-xs font-bold flex items-center gap-2 transition active:scale-95 disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg"}`}>
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={stock < 1}
+          className={`flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"}`}
+        >
           {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
-          {isAdded ? "Added!" : "Add"}
+          {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : "Add to Cart"}
         </button>
       </div>
     </div>
@@ -416,13 +501,69 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded, onWishl
 StickyBar.displayName = "StickyBar";
 
 const Lightbox = memo(({ images, index, onClose, onStep }) => {
+  const [zoom, setZoom] = useState({ index, scale: 1 });
+  const zoomScale = zoom.index === index ? zoom.scale : 1;
+  const touchGestureRef = useRef(null);
+
+  useEffect(() => {
+    if (index === null) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") onStep(-1);
+      if (event.key === "ArrowRight") onStep(1);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [index, onClose, onStep]);
+
   if (index === null || !images?.length) return null;
+
+  const handleTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      const [first, second] = event.touches;
+      touchGestureRef.current = {
+        type: "pinch",
+        distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+        scale: zoomScale,
+      };
+    } else if (event.touches.length === 1) {
+      touchGestureRef.current = { type: "swipe", x: event.touches[0].clientX };
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type !== "pinch" || event.touches.length !== 2) return;
+    event.preventDefault();
+    const [first, second] = event.touches;
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    setZoom({ index, scale: Math.max(1, Math.min(4, gesture.scale * (distance / gesture.distance))) });
+  };
+
+  const handleTouchEnd = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type === "swipe" && event.changedTouches.length && zoomScale === 1) {
+      const delta = event.changedTouches[0].clientX - gesture.x;
+      if (Math.abs(delta) > 55) onStep(delta > 0 ? -1 : 1);
+    }
+    touchGestureRef.current = null;
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
-      <button className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close"><X size={20} /></button>
-      <button onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Previous"><ChevronLeft size={20} /></button>
-      <img src={images[index]} alt="" className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
-      <button onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Next"><ChevronRight size={20} /></button>
+    <div role="dialog" aria-modal="true" aria-label="Product image viewer" className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close"><X size={20} /></button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Previous"><ChevronLeft size={20} /></button>
+      <img
+        src={images[index]}
+        alt=""
+        className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg"
+        style={{ transform: `scale(${zoomScale})`, touchAction: "none" }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
+      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Next"><ChevronRight size={20} /></button>
       <span className="absolute bottom-4 text-white/60 text-xs font-medium">{index + 1} / {images.length}</span>
     </div>
   );
@@ -430,28 +571,30 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
 Lightbox.displayName = "Lightbox";
 
 const LoadingState = () => (
-  <div className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-6 sm:py-8 lg:py-10">
-    <div className="h-4 w-64 bg-[var(--user-bg-card)] rounded-full animate-pulse mb-6 sm:mb-8" />
-    <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12">
-      <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse" />
-      <div className="space-y-4">
-        <div className="h-4 w-24 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-        <div className="h-8 w-3/4 bg-[var(--user-bg-card)] rounded-full animate-pulse" />
-        <div className="h-24 w-full bg-[var(--user-bg-card)] rounded-2xl animate-pulse" />
-        <div className="h-12 w-full bg-[var(--user-bg-card)] rounded-xl animate-pulse" />
+  <div className="user-shell px-3 lg:px-8 py-4">
+    <div className="h-4 w-64 bg-[var(--user-bg-hover)] rounded animate-pulse mb-3" />
+    <div className="grid lg:grid-cols-12 gap-3">
+      <div className="lg:col-span-9 bg-[var(--user-bg-card)] p-4 grid md:grid-cols-2 gap-6">
+        <div className="aspect-square bg-[var(--user-bg-hover)] animate-pulse" />
+        <div className="space-y-3">
+          <div className="h-5 w-3/4 bg-[var(--user-bg-hover)] rounded animate-pulse" />
+          <div className="h-8 w-1/2 bg-[var(--user-bg-hover)] rounded animate-pulse" />
+          <div className="h-11 w-full bg-[var(--user-bg-hover)] rounded animate-pulse" />
+        </div>
       </div>
+      <div className="lg:col-span-3 bg-[var(--user-bg-card)] p-4 h-48 animate-pulse" />
     </div>
   </div>
 );
 
 const ErrorState = ({ isError }) => (
-  <div className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-16 sm:py-20 lg:py-24 text-center">
-    <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-4 sm:mb-5">
+  <div className="user-shell px-4 py-16 text-center">
+    <div className="w-14 h-14 mx-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-4">
       <Package size={24} className="text-[var(--user-accent)]" />
     </div>
-    <h1 className="text-base sm:text-lg lg:text-xl font-bold text-[var(--user-text)] mb-2">{isError ? "Something Went Wrong" : "Product Not Found"}</h1>
-    <p className="text-[var(--user-text-muted)] text-xs sm:text-sm mb-6 sm:mb-7 max-w-sm mx-auto">{isError ? "We could not load this product. Please try again later." : "This product may have been removed."}</p>
-    <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-5 sm:px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">Back to Home</Link>
+    <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">{isError ? "Something Went Wrong" : "Product Not Found"}</h1>
+    <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">{isError ? "We could not load this product. Please try again later." : "This product may have been removed."}</p>
+    <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 text-sm font-bold hover:opacity-90 transition">Back to Home</Link>
   </div>
 );
 
@@ -466,7 +609,6 @@ export default function ProductDetailPage(props) {
 function ProductDetailContent({ params }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const { product, isLoading, isError } = useProductDetail(id);
 
   // ✅ User ki apni ratings — product page par sirf apni di hui rating dikhani hai.
@@ -489,7 +631,7 @@ function ProductDetailContent({ params }) {
   const storeName = store?.store_name || "";
 
   const variants = product?.variants?.length ? product.variants : [{ _id: "default", images: [] }];
-  const { variantIndex, imageIndex, setImageIndex, currentVariant, images, currentImages, mainImage, selectVariant, selectImageByUrl, allImages } = useVariant(variants);
+  const { variantIndex, currentVariant, images, mainImage, selectVariant, selectImageByUrl, allImages } = useVariant(variants);
 
   const stock = toNum(currentVariant?.quantity);
   const { quantity, increment, decrement, reset } = useQuantity(stock);
@@ -502,22 +644,6 @@ function ProductDetailContent({ params }) {
 
   const [lightbox, setLightbox] = useState(null);
   const { show: showStickyBar, sentinelRef } = useStickyBar();
-  const specsBoxRef = useRef(null);
-  const [descHeight, setDescHeight] = useState(0);
-
-  useEffect(() => {
-    const el = specsBoxRef.current;
-    if (!el) return;
-    const update = () => {
-      const isLg = window.matchMedia("(min-width: 1024px)").matches;
-      setDescHeight(isLg ? el.offsetHeight : 0);
-    };
-    update();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
-    if (ro) ro.observe(el);
-    window.addEventListener("resize", update);
-    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", update); };
-  }, [currentVariant]);
 
   const openLightbox = useCallback((url) => { const i = allImages.indexOf(url); setLightbox(i >= 0 ? i : 0); }, [allImages]);
   const stepLightbox = useCallback((dir) => setLightbox((c) => (c === null ? c : (c + dir + allImages.length) % allImages.length)), [allImages.length]);
@@ -548,6 +674,10 @@ function ProductDetailContent({ params }) {
   const matchedDeal = allDeals.find((d) => String(d._id) === String(selectedDealId)) || allDeals[0] || null;
 
   const [purchaseMode, setPurchaseMode] = useState(cameFromDeal && hasDeal ? "deal" : "regular");
+  const [dealsOpen, setDealsOpen] = useState(false);
+  useEffect(() => {
+    if (cameFromDeal && hasDeal) setDealsOpen(true);
+  }, [cameFromDeal, hasDeal]);
   const userSelectedModeRef = useRef(false);
   useEffect(() => {
     if (userSelectedModeRef.current) return;
@@ -559,8 +689,6 @@ function ProductDetailContent({ params }) {
   const regularPrice = regularDisc.discountedPrice;
   const regularOriginalPrice = regularDisc.hasDiscount ? regularDisc.originalPrice : variantOldPrice;
   const regularHasDiscount = regularDisc.hasDiscount;
-  const regularSavings = regularDisc.hasDiscount ? (regularDisc.originalPrice - regularDisc.discountedPrice) : 0;
-  const regularDiscountName = regularDisc.discountName || "";
 
   const dealDisc = useMemo(
     () => (hasDeal && matchedDeal ? calculateProductDiscount(product, variantPrice, true, matchedDeal) : null),
@@ -568,39 +696,36 @@ function ProductDetailContent({ params }) {
   );
   const dealPrice = dealDisc ? dealDisc.discountedPrice : variantPrice;
   const dealOriginalPrice = dealDisc && dealDisc.hasDiscount ? dealDisc.originalPrice : variantOldPrice;
-  const dealSavings = dealDisc && dealDisc.hasDiscount ? (dealDisc.originalPrice - dealDisc.discountedPrice) : 0;
-
-  const dealInfo = useMemo(() => {
-    if (!matchedDeal) return null;
-    const info = {
-      dealId: matchedDeal._id, dealType: matchedDeal.type, dealName: matchedDeal.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
-      savings: Math.max(0, dealOriginalPrice - dealPrice), originalPrice: dealOriginalPrice,
-      dealDiscountValue: Number(matchedDeal.discountValue) || 0,
-      minQuantity: Number(matchedDeal.minQuantity) || 1,
-    };
-    if (matchedDeal.type === "buy_x_get_y") { info.buyQuantity = matchedDeal.buyQuantity; info.getQuantity = matchedDeal.getQuantity; }
-    return info;
-  }, [matchedDeal, dealOriginalPrice, dealPrice]);
 
   const isDealMode = purchaseMode === "deal" && hasDeal;
   const activePrice = isDealMode ? dealPrice : regularPrice;
   const activeOriginalPrice = isDealMode ? dealOriginalPrice : regularOriginalPrice;
   const activeHasDiscount = isDealMode ? (dealOriginalPrice > dealPrice) : regularHasDiscount;
-  const activeSavings = isDealMode ? dealSavings : regularSavings;
   const discountPct = activeHasDiscount && activeOriginalPrice > 0 ? Math.round(((activeOriginalPrice - activePrice) / activeOriginalPrice) * 100) : 0;
+
+  const countdown = useCountdown(isDealMode ? matchedDeal?.endDate : null);
 
   const handleAdd = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? dealInfo : null);
+    addToCart(product, currentVariant, quantity, isDealMode ? {
+      dealId: matchedDeal?._id,
+      dealType: matchedDeal?.type,
+      dealName: matchedDeal?.name,
+      dealBadge: getDealBadgeText(matchedDeal) || null,
+    } : null);
     trigger();
-  }, [stock, product, currentVariant, quantity, addToCart, trigger, dealInfo, isDealMode]);
+  }, [stock, product, currentVariant, quantity, addToCart, trigger, isDealMode, matchedDeal]);
 
   const handleBuy = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? dealInfo : null);
+    addToCart(product, currentVariant, quantity, isDealMode ? {
+      dealId: matchedDeal?._id,
+      dealType: matchedDeal?.type,
+      dealName: matchedDeal?.name,
+      dealBadge: getDealBadgeText(matchedDeal) || null,
+    } : null);
     setIsCartOpen(true);
-  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, dealInfo, isDealMode]);
+  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, isDealMode, matchedDeal]);
 
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
@@ -609,11 +734,10 @@ function ProductDetailContent({ params }) {
 
   const fullDescription = product?.description || "";
   const shortDescription = product?.short_description || "";
-  const highlightEntries = attrEntries(currentVariant?.attributes, 3);
+  const specEntries = attrEntries(currentVariant?.attributes);
+  const variantAttrName = specEntries.length > 0 ? specEntries[0][0] : (variants.length > 1 ? "Option" : "");
 
   const related = useRelatedProducts(product, categoryId);
-
-  const stockStatus = getStockStatus(stock);
   const productId = product?._id || product?.id;
   const liked = productId ? isWishlisted(productId) : false;
 
@@ -623,253 +747,476 @@ function ProductDetailContent({ params }) {
     return myReviews.find((r) => String(r.product_id?._id || r.product_id) === String(productId)) || null;
   }, [myReviews, productId]);
 
+  // ✅ Public reviews summary — real backend data (avg / count / 5→1 distribution)
+  const { data: publicReviewData = null } = useQuery({
+    queryKey: ["productReviews", productId],
+    queryFn: () => reviewApi.list(productId, { page: 1, limit: 5 }),
+    enabled: !!productId,
+    retry: false,
+  });
+  const summary = publicReviewData?.summary || { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
+  const publicReviews = publicReviewData?.reviews || [];
+  const ratingAvg = Number(summary.avg) || 0;
+  const ratingCount = Number(summary.count) || 0;
+
   if (isLoading) return <LoadingState />;
   if (isError || !product) return <ErrorState isError={isError} />;
 
   return (
-    <main className="user-shell mx-auto px-4 sm:px-5 lg:px-6 py-4 sm:py-6 lg:py-10 pb-20 sm:pb-24 md:pb-12">
+    <main className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
       <style>{`
-        @keyframes galleryImgIn { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
       `}</style>
 
-      <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={product.name} />
+      <div className="user-shell px-3 lg:px-8">
+        <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={product.name} />
 
-      <div className="grid lg:grid-cols-2 gap-5 sm:gap-6 lg:gap-12 mt-4 sm:mt-5 lg:mt-6">
-        <div className="lg:sticky lg:top-24 self-start">
-          <Gallery mainImage={mainImage} images={images} onImageSelect={selectImageByUrl} stock={stock} onZoom={openLightbox} />
+        {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+          <section className="bg-[var(--user-bg-card)] p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+              <Gallery
+                productName={product.name}
+                mainImage={mainImage}
+                images={images}
+                onImageSelect={selectImageByUrl}
+                stock={stock}
+                onZoom={openLightbox}
+              />
+
+              <div className="min-w-0" ref={sentinelRef}>
+                {/* Flash sale — sirf real deal par */}
+                {isDealMode && matchedDeal && (
+                  <div className="mb-2 flex items-stretch justify-between border border-[var(--user-accent)]/30">
+                    <div className="flex items-center gap-2 bg-[var(--user-accent)] px-3 py-1.5">
+                      <Zap size={14} className="fill-[var(--user-accent-text)] text-[var(--user-accent-text)]" />
+                      <span className="text-xs font-black italic tracking-wide text-[var(--user-accent-text)]">FLASH SALE</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--user-text-secondary)]">
+                      {countdown ? (
+                        <span>Ends in <span className="font-bold text-[var(--user-accent)] tabular-nums">{countdown}</span></span>
+                      ) : (
+                        <span className="font-semibold">{matchedDeal.name || "Limited time deal"}</span>
+                      )}
+                    </div>
                   </div>
+                )}
 
-        <div className="min-w-0 space-y-4 sm:space-y-5" ref={sentinelRef}>
-          <div className="space-y-2">
-            {brandName && brandId && (
-              <Link href={`/?brand=${brandId}`} className="inline-block text-[0.625rem] sm:text-[0.6875rem] font-bold text-[var(--user-accent)] uppercase tracking-[0.18em] hover:opacity-80 transition">{brandName}</Link>
-            )}
-            <h1 className="text-[1.25rem] sm:text-2xl lg:text-[1.75rem] font-bold text-[var(--user-text)] tracking-tight leading-snug break-words">{product.name}</h1>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full ${stockStatus.cls}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${stockStatus.dot}`} /> {stockStatus.text}
-              </span>
-              {myReview && (
-                <span className="inline-flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-bold px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-500">
-                  <Star size={11} className="fill-amber-400 text-amber-400" />
-                  Your rating: {myReview.rating}/5
-                </span>
-              )}
-            </div>
-          </div>
+                <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{product.name}</h1>
 
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 space-y-3 sm:space-y-4">
-            {hasDeal && (
-              <div className="inline-flex items-center rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1">
-                {[{ key: "regular", label: "Regular", icon: Tag }, { key: "deal", label: "Deal", icon: Sparkles }].map(({ key, label, icon: Icon }) => {
-                  const active = purchaseMode === key;
-                  return (
-                    <button key={key} type="button" onClick={() => { userSelectedModeRef.current = true; setPurchaseMode(key); }}
-                      className={`h-9 px-3.5 sm:px-4 rounded-lg text-[0.6875rem] sm:text-xs font-bold flex items-center gap-1.5 transition ${active ? (key === "deal" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow") : "text-[var(--user-text-muted)] hover:text-[var(--user-text)]"}`}>
-                      <Icon size={12} /> {label}
+                {/* Rating + wishlist */}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Stars value={ratingAvg} />
+                    <span className="text-xs text-[var(--user-accent)]">
+                      {ratingCount > 0 ? `${ratingAvg}/5 (${ratingCount} Rating${ratingCount > 1 ? "s" : ""})` : "No Ratings"}
+                    </span>
+                    {myReview && (
+                      <span className="text-xs font-bold text-amber-500">· Your rating: {myReview.rating}/5</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
+                    <button
+                      type="button"
+                      onClick={() => productId && toggleWishlist(productId)}
+                      aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+                      className={`${liked ? "text-[var(--user-accent)]" : ""} hover:text-[var(--user-accent)] transition-colors`}
+                    >
+                      <Heart size={17} fill={liked ? "currentColor" : "none"} />
                     </button>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                </div>
 
-            {isDealMode && allDeals.length > 1 && (
-              <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2.5 sm:p-3">
-                <p className="text-[0.5625rem] sm:text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-2 flex items-center gap-1.5">
-              
-                </p>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {allDeals.map((d) => {
-                    const sel = String(d._id) === String(selectedDealId);
-                    const dd = calculateProductDiscount(product, variantPrice, true, d);
-                    const saveAmt = dd && dd.hasDiscount ? (dd.originalPrice - dd.discountedPrice) : 0;
-                    const badge = getDealBadgeText(d) || d.name || "Deal";
-                    return (
-                      <button
-                        key={d._id}
-                        type="button"
-                        onClick={() => setSelectedDealId(d._id)}
-                        aria-pressed={sel}
-                        className={`flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3 rounded-lg text-[0.625rem] sm:text-xs font-bold transition ${sel ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow" : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text)] hover:border-[var(--user-accent)]/50"}`}
-                      >
-                        <Sparkles size={11} className={sel ? "text-white" : "text-purple-500"} />
-                        <span>{badge}</span>
-                        {saveAmt > 0 && (
-                          <span className={`text-[0.5625rem] sm:text-[0.625rem] font-bold px-1.5 py-0.5 rounded ${sel ? "bg-white/20 text-white" : "bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20"}`}>
-                            Save Rs. {saveAmt.toLocaleString()}
-                          </span>
+                {/* Brand row — real brand/category */}
+                {(brandName || categoryName) && (
+                  <p className="mt-2 text-xs text-[var(--user-text-muted)]">
+                    {brandName && (
+                      <>Brand: <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName}</Link></>
+                    )}
+                    {brandName && categoryName && <span className="mx-1.5 text-[var(--user-text-subtle)]">|</span>}
+                    {categoryName && (
+                      <>More {categoryName} from <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName || storeName || "this store"}</Link></>
+                    )}
+                  </p>
+                )}
+
+                <div className="my-3 border-t border-[var(--user-border)]" />
+
+                {/* Price — real */}
+                <div>
+                  <p className="text-3xl font-medium text-[var(--user-accent)]">Rs. {activePrice.toLocaleString()}</p>
+                  {activeHasDiscount && activeOriginalPrice > activePrice && (
+                    <p className="mt-1 text-xs text-[var(--user-text-muted)]">
+                      <span className="line-through">Rs. {activeOriginalPrice.toLocaleString()}</span>
+                      <span className="ml-1.5 font-semibold text-[var(--user-text)]">-{discountPct}%</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Purchase options — 1) Regular (original + admin discount)  2) Deals dropdown */}
+                {hasDeal && (
+                  <div className="mt-3 border border-[var(--user-border)]">
+                    {/* Option 1 — Regular */}
+                    <button
+                      type="button"
+                      onClick={() => { userSelectedModeRef.current = true; setPurchaseMode("regular"); }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${!isDealMode ? "bg-[var(--user-accent)]/5" : "hover:bg-[var(--user-bg-hover)]"}`}
+                    >
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${!isDealMode ? "border-[var(--user-accent)]" : "border-[var(--user-text-subtle)]"}`}>
+                        {!isDealMode && <span className="h-2 w-2 rounded-full bg-[var(--user-accent)]" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold text-[var(--user-text)]">Regular Price</span>
+                        <span className="flex items-center gap-1 text-[11px] text-[var(--user-text-muted)]">
+                          <Tag size={11} />
+                          {regularHasDiscount && regularDisc.discountName
+                            ? `${regularDisc.discountName} applied`
+                            : "Original price"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-sm font-bold text-[var(--user-text)]">Rs. {regularPrice.toLocaleString()}</span>
+                        {regularHasDiscount && regularOriginalPrice > regularPrice && (
+                          <span className="block text-[11px] text-[var(--user-text-muted)] line-through">Rs. {regularOriginalPrice.toLocaleString()}</span>
                         )}
-                      </button>
-                    );
-                  })}
+                      </span>
+                    </button>
+
+                    {/* Option 2 — Deals dropdown header */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        userSelectedModeRef.current = true;
+                        if (!isDealMode) {
+                          setPurchaseMode("deal");
+                          setDealsOpen(true);
+                        } else {
+                          setDealsOpen((o) => !o);
+                        }
+                      }}
+                      className={`flex w-full items-center gap-2.5 border-t border-[var(--user-border)] px-3 py-2.5 text-left transition-colors ${isDealMode ? "bg-[var(--user-accent)]/5" : "hover:bg-[var(--user-bg-hover)]"}`}
+                    >
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${isDealMode ? "border-[var(--user-accent)]" : "border-[var(--user-text-subtle)]"}`}>
+                        {isDealMode && <span className="h-2 w-2 rounded-full bg-[var(--user-accent)]" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-text)]">
+                          <Sparkles size={12} className="text-[var(--user-accent)]" /> Deal Offers
+                          <span className="bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--user-accent)] tabular-nums">{allDeals.length}</span>
+                        </span>
+                        <span className="block text-[11px] text-[var(--user-text-muted)]">
+                          {isDealMode && matchedDeal ? (matchedDeal.name || getDealBadgeText(matchedDeal) || "Deal selected") : "Tap to view all deals on this product"}
+                        </span>
+                      </span>
+                      <ChevronDown size={15} className={`shrink-0 text-[var(--user-text-muted)] transition-transform ${dealsOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {/* Dropdown — is product par lagi tamam real deals */}
+                    {dealsOpen && (
+                      <div className="border-t border-[var(--user-border)]">
+                        <div className="max-h-44 space-y-1 overflow-y-auto p-2">
+                          {allDeals.map((d) => {
+                            const sel = isDealMode && String(d._id) === String(selectedDealId);
+                            const dd = calculateProductDiscount(product, variantPrice, true, d);
+                            const saveAmt = dd && dd.hasDiscount ? (dd.originalPrice - dd.discountedPrice) : 0;
+                            return (
+                              <button
+                                key={d._id}
+                                type="button"
+                                onClick={() => {
+                                  userSelectedModeRef.current = true;
+                                  setSelectedDealId(d._id);
+                                  setPurchaseMode("deal");
+                                }}
+                                className={`flex w-full items-center gap-2 border px-2.5 py-2 text-left text-xs transition-colors ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/50"}`}
+                              >
+                                <Sparkles size={13} className="shrink-0 text-[var(--user-accent)]" />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate font-semibold text-[var(--user-text)]">{d.name || getDealBadgeText(d) || "Deal"}</span>
+                                  <span className="block text-[11px] text-[var(--user-text-muted)]">
+                                    Rs. {dd.discountedPrice.toLocaleString()}
+                                    {saveAmt > 0 && <span className="ml-1.5 font-semibold text-[var(--user-success)]">Save Rs. {saveAmt.toLocaleString()}</span>}
+                                  </span>
+                                </span>
+                                {sel && <Check size={14} className="shrink-0 text-[var(--user-accent)]" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Variant selector — real variants */}
+                {variants.length > 1 && (
+                  <div className="mt-4">
+                    <p className="text-xs text-[var(--user-text-muted)]">
+                      {variantAttrName || "Option"}: <span className="text-[var(--user-text)]">{currentVariant?.title || currentVariant?.sku || `Option ${variantIndex + 1}`}</span>
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {variants.map((variant, index) => {
+                        const selected = index === variantIndex;
+                        const unavailable = toNum(variant.quantity) < 1;
+                        const image = getImageUrl(variant.images?.[0]);
+                        return (
+                          <button
+                            key={variant._id || index}
+                            type="button"
+                            onClick={() => selectVariant(index)}
+                            disabled={unavailable}
+                            title={variant.title || variant.sku || `Option ${index + 1}`}
+                            className={`flex h-11 min-w-11 items-center justify-center gap-2 border px-1.5 text-xs ${selected ? "border-[var(--user-accent)] ring-1 ring-[var(--user-accent)]" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/60"} ${unavailable ? "cursor-not-allowed opacity-40" : ""}`}
+                          >
+                            {image ? (
+                              <img src={image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
+                            ) : (
+                              <span className="px-2 font-medium text-[var(--user-text)]">{variant.title || variant.sku || index + 1}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quantity — real stock */}
+                <div className="mt-4 flex items-center gap-4">
+                  <span className="text-xs text-[var(--user-text-muted)]">Quantity</span>
+                  <div className="flex items-center">
+                    <button
+                      onClick={decrement}
+                      disabled={quantity <= 1}
+                      className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="w-10 text-center text-sm text-[var(--user-text)] tabular-nums">{quantity}</span>
+                    <button
+                      onClick={increment}
+                      disabled={quantity >= Math.max(stock, 1)}
+                      className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                  {stock < 1 ? (
+                    <span className="text-xs font-semibold text-[var(--user-accent)]">Out of stock</span>
+                  ) : null}
+                </div>
+
+                {/* CTA — Daraz cyan/orange */}
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={handleBuy}
+                    disabled={stock < 1}
+                    className="flex h-11 items-center justify-center gap-1.5 border-2 border-[var(--user-accent)] text-sm font-medium text-[var(--user-accent)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.99] transition disabled:opacity-40"
+                  >
+                    Buy Now
+                  </button>
+                  <button
+                    onClick={handleAdd}
+                    disabled={stock < 1}
+                    className={`flex h-11 items-center justify-center gap-1.5 text-sm font-medium active:scale-[0.99] transition disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}
+                  >
+                    {isAdded ? <Check size={15} /> : null}
+                    {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : "Add to Cart"}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </section>
+
+          {/* ===== Right sidebar — sirf real data (no fake fees/location) ===== */}
+          <aside className="space-y-3 lg:col-span-3 xl:col-span-2">
+            <div className="bg-[var(--user-bg-card)]">
+              <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">Sold by</p>
+              <div className="px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center bg-[var(--user-accent)]/10">
+                    <Store size={17} className="text-[var(--user-accent)]" />
+                  </span>
+                  <p className="text-sm font-semibold text-[var(--user-text)]">{storeName || "Official Store"}</p>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-xs">
+                  <ShieldCheck size={14} className={stock > 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"} />
+                  {stock > 0 ? (
+                    <span className="text-[var(--user-text-secondary)]">In stock, ready to ship</span>
+                  ) : (
+                    <span className="text-[var(--user-accent)] font-semibold">Currently unavailable</span>
+                  )}
                 </div>
               </div>
+            </div>
+
+            {specEntries.length > 0 && (
+              <div className="hidden bg-[var(--user-bg-card)] lg:block">
+                <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">Highlights</p>
+                <ul className="space-y-1.5 px-3 py-3">
+                  {specEntries.slice(0, 4).map(([k, v]) => (
+                    <li key={k} className="text-xs text-[var(--user-text-secondary)]">
+                      <span className="font-semibold capitalize text-[var(--user-text)]">{k}: </span>{v}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
+          </aside>
+        </div>
 
-            <div className="flex items-end gap-2 sm:gap-3 flex-wrap">
-              <span className="text-2xl sm:text-3xl lg:text-[2.125rem] font-extrabold text-[var(--user-text)] leading-none">Rs. {activePrice.toLocaleString()}</span>
-              {activeHasDiscount && activeOriginalPrice > activePrice && (
-                <span className="text-sm sm:text-base text-[var(--user-text-subtle)] line-through pb-0.5">Rs. {activeOriginalPrice.toLocaleString()}</span>
-              )}
-              {discountPct > 0 && (
-                <span className="text-[0.625rem] sm:text-xs font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-1 rounded-lg">-{discountPct}%</span>
+        {/* ===== Product details — real description ===== */}
+        {(shortDescription || fullDescription || currentVariant?.description) && (
+          <section className="mt-3 bg-[var(--user-bg-card)]">
+            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+              Product details of {shortDescription || product.name}
+            </h2>
+            <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-[var(--user-text)]">
+              {shortDescription && <p className="font-medium">{shortDescription}</p>}
+              {fullDescription && <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">{fullDescription}</p>}
+              {currentVariant?.description && (
+                <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">
+                  <span className="font-semibold text-[var(--user-text)]">{currentVariant?.title || "Selected option"}: </span>
+                  {currentVariant.description}
+                </p>
               )}
             </div>
+          </section>
+        )}
 
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              {activeSavings > 0 && (
-                <span className="text-[0.625rem] sm:text-xs font-semibold text-[var(--user-success)] flex items-center gap-1.5">
-                  <Tag size={12} /> You save Rs. {activeSavings.toLocaleString()}{regularDiscountName && !isDealMode ? ` · ${regularDiscountName}` : ""}
-                </span>
-              )}
-              {isDealMode && dealInfo && (
-                <span className="text-[0.625rem] sm:text-[0.6875rem] font-bold text-purple-400 [.light_&]:text-purple-700 bg-purple-500/10 border border-purple-500/20 px-2 sm:px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                  <Sparkles size={11} /> {dealInfo.dealBadge}
-                </span>
-              )}
-            </div>
-            {hasDeal && !isDealMode && (
-              <p className="text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <Sparkles size={11} className="text-orange-500" /> Also available in a deal — switch above to grab the deal price.
+        {/* ===== Specifications — sirf real fields ===== */}
+        <section className="mt-3 bg-[var(--user-bg-card)]">
+          <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+            Specifications of {product.name}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 px-3 sm:px-4 py-2">
+            {brandName && (
+              <div className="border-b border-[var(--user-border)] py-3">
+                <p className="text-xs text-[var(--user-text-muted)]">Brand</p>
+                <p className="mt-0.5 text-sm text-[var(--user-text)]">{brandName}</p>
+              </div>
+            )}
+            {currentVariant?.sku && (
+              <div className="border-b border-[var(--user-border)] py-3">
+                <p className="text-xs text-[var(--user-text-muted)]">SKU</p>
+                <p className="mt-0.5 text-sm text-[var(--user-text)] break-all">{currentVariant.sku}</p>
+              </div>
+            )}
+            {specEntries.map(([k, v]) => (
+              <div key={k} className="border-b border-[var(--user-border)] py-3">
+                <p className="text-xs capitalize text-[var(--user-text-muted)]">{k}</p>
+                <p className="mt-0.5 text-sm text-[var(--user-text)] break-words">{v}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ===== Ratings & Reviews — real summary + real reviews ===== */}
+        <section className="mt-3 bg-[var(--user-bg-card)]">
+          <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+            Ratings &amp; Reviews of {product.name}
+          </h2>
+          <div className="grid grid-cols-1 gap-6 px-3 sm:px-4 py-5 md:grid-cols-[12rem_1fr]">
+            <div>
+              <p className="text-4xl font-medium text-[var(--user-text)]">
+                {ratingAvg}<span className="text-lg text-[var(--user-text-muted)]">/5</span>
               </p>
+              <div className="mt-2"><Stars value={ratingAvg} size={16} /></div>
+              <p className="mt-2 text-xs text-[var(--user-text-muted)]">{ratingCount} Rating{ratingCount === 1 ? "" : "s"}</p>
+            </div>
+            <div className="max-w-md space-y-1.5">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const c = Number(summary.distribution?.[star]) || 0;
+                const pct = ratingCount > 0 ? Math.round((c / ratingCount) * 100) : 0;
+                return (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 shrink-0"><Stars value={star} size={11} /></span>
+                    <span className="h-2.5 flex-1 bg-[var(--user-bg-hover)]">
+                      <span className="block h-full bg-[#faca51]" style={{ width: `${pct}%` }} />
+                    </span>
+                    <span className="w-6 shrink-0 text-right text-[var(--user-text-muted)] tabular-nums">{c}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-[var(--user-border)] px-3 sm:px-4 py-5">
+            {myReview && (
+              <div className="mb-4">
+                <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
+              </div>
             )}
+            {publicReviews.length > 0 ? (
+              <ul className="space-y-4">
+                {publicReviews.map((r) => (
+                  <li key={r._id} className="border-b border-[var(--user-border)] pb-4 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <Stars value={r.rating} />
+                      <span className="text-xs font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--user-text-muted)]">
+                      by {r.user_id?.name || "Verified buyer"}
+                      {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+                    </p>
+                    {r.comment && <p className="mt-1.5 text-sm leading-6 text-[var(--user-text-secondary)]">{r.comment}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : !myReview ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-[var(--user-text-muted)]">This product has no reviews.</p>
+                <p className="mt-1 text-xs text-[var(--user-text-muted)]">Let others know what you think — be the first to write a review after delivery.</p>
+              </div>
+            ) : null}
           </div>
+        </section>
 
-          {highlightEntries.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
-              {highlightEntries.map(([k, v]) => (
-                <span key={k} className="text-[0.625rem] sm:text-[0.6875rem] px-2 sm:px-2.5 py-1 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] text-[var(--user-text-secondary)]">
-                  <span className="font-semibold text-[var(--user-text)] capitalize">{k}:</span> {v}
-                </span>
-              ))}
+        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
+        {allImages.length > 0 && (
+          <section className="mt-3 bg-[var(--user-bg-card)]">
+            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+              Product images of {product.name}
+            </h2>
+            <div className="px-3 sm:px-4 py-4">
+              <DetailImages productName={product.name} images={allImages} onZoom={openLightbox} />
             </div>
-          )}
+          </section>
+        )}
 
-          {variants.length > 1 && (
-            <div>
-              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Variant</p>
-              <div className="flex flex-wrap gap-2 sm:gap-2.5">
-                {variants.map((v, i) => {
-                  const isOut = toNum(v.quantity) < 1;
-                  const sel = i === variantIndex;
-                  return (
-                    <button key={v._id || i} onClick={() => selectVariant(i)} disabled={isOut}
-                      className={`h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl border text-[0.8125rem] sm:text-sm font-semibold transition-all ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow" : isOut ? "opacity-40 line-through cursor-not-allowed border-[var(--user-border)] text-[var(--user-text-subtle)]" : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-text)]"}`}>
-                      {v.title || v.sku || `Option ${i + 1}`}
-                    </button>
-                  );
-                })}
-              </div>
+        {/* ===== You may also like — real related ===== */}
+        {related.length > 0 && (
+          <section className="mt-6">
+            <h2 className="mb-3 text-base font-bold text-[var(--user-text)]">You may also like</h2>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {related.slice(0, 10).map((p) => {
+                const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
+                const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
+                return (
+                  <Link key={p._id} href={`/product/${p._id}`} className="group bg-[var(--user-bg-card)] hover:shadow-lg transition-shadow">
+                    <div className="relative aspect-square overflow-hidden bg-white">
+                      {image ? (
+                        <img src={image} alt={p.name || ""} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center"><Package size={28} className="text-gray-300" /></div>
+                      )}
+                    </div>
+                    <div className="p-2.5">
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{p.name}</p>
+                      {price != null && <p className="mt-1.5 text-sm font-medium text-[var(--user-accent)]">Rs. {toNum(price).toLocaleString()}</p>}
+                      <div className="mt-1"><Stars value={0} size={10} /></div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-          )}
-
-          {variants.length > 1 && (
-            <div>
-              <p className="text-[0.625rem] sm:text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-secondary)] mb-2 sm:mb-2.5">Colour</p>
-              <div className="flex flex-wrap gap-2.5 sm:gap-3">
-                {variants.map((v, i) => {
-                  const firstImg = (v.images || [])[0];
-                  const url = firstImg ? getImageUrl(firstImg) : null;
-                  const isOut = toNum(v.quantity) < 1;
-                  const sel = i === variantIndex;
-                  return (
-                    <button key={v._id || i} onClick={() => selectVariant(i)} disabled={isOut} aria-label={v.title || `Option ${i + 1}`} title={v.title || `Option ${i + 1}`}
-                      className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 transition-all ${sel ? "border-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/25 scale-105" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/50"} ${isOut ? "opacity-30 cursor-not-allowed" : ""}`}>
-                      {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[0.6875rem] sm:text-xs font-bold bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]">{(v.title || "?").charAt(0)}</span>}
-                      {sel && <Check size={13} className="absolute inset-0 m-auto text-white drop-shadow-md" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-                <div className="space-y-2.5 sm:space-y-3">
-            {/* ✅ MOBILE Row 1 — qty + wishlist icon + live total */}
-            <div className="flex items-center gap-2 sm:hidden">
-              <div className="flex items-center h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0">
-                <button onClick={decrement} className="px-3 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease"><Minus size={15} /></button>
-                <span className="w-8 text-center text-sm font-bold text-[var(--user-text)]">{quantity}</span>
-                <button onClick={increment} className="px-3 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Increase"><Plus size={15} /></button>
-              </div>
-              <button onClick={() => productId && toggleWishlist(productId)} aria-label="Wishlist"
-                className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 transition-all active:scale-90 ${liked ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-secondary)]"}`}>
-                <Heart size={18} fill={liked ? "currentColor" : "none"} />
-              </button>
-              <div className="flex-1 min-w-0 text-right">
-                <p className="text-[0.5625rem] uppercase tracking-wider text-[var(--user-text-muted)] font-bold">Total</p>
-                <p className="text-base font-black text-[var(--user-accent)] leading-none truncate">Rs. {(activePrice * quantity).toLocaleString()}</p>
-              </div>
-            </div>
-
-            {/* ✅ MOBILE Row 2 — Add + Buy side-by-side */}
-            <div className="grid grid-cols-2 gap-2 sm:hidden">
-              <button onClick={handleAdd} disabled={stock < 1}
-                className={`h-11 rounded-xl flex items-center justify-center gap-1.5 text-[0.75rem] font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
-                {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
-                {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : isDealMode ? "Add Deal" : "Add to Cart"}
-              </button>
-              <button onClick={handleBuy} disabled={stock < 1}
-                className="h-11 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-[0.75rem] font-bold flex items-center justify-center gap-1.5 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
-                <Zap size={14} /><span>Buy Now</span>
-              </button>
-            </div>
-
-            {/* ✅ DESKTOP (unchanged) — qty + add + buy one row */}
-            <div className="hidden sm:flex flex-row gap-3">
-              <div className="flex items-center h-12 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shrink-0">
-                <button onClick={decrement} className="px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Decrease"><Minus size={15} /></button>
-                <span className="w-10 text-center text-sm font-bold text-[var(--user-text)]">{quantity}</span>
-                <button onClick={increment} className="px-3.5 h-full text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors" aria-label="Increase"><Plus size={15} /></button>
-              </div>
-              <button onClick={handleAdd} disabled={stock < 1}
-                className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed shadow-lg ${isAdded ? "bg-[var(--user-success)] text-white" : isDealMode ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:opacity-90" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}>
-                {isAdded ? <Check size={15} /> : <ShoppingCart size={15} />}
-                {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : isDealMode ? "Add Deal" : "Add to Cart"}
-              </button>
-              <button onClick={handleBuy} disabled={stock < 1}
-                className="flex-1 h-12 rounded-xl border-2 border-[var(--user-accent)] text-[var(--user-accent)] text-sm font-bold flex items-center justify-center gap-2 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed">
-                <Zap size={15} /><span>Buy Now</span>
-              </button>
-            </div>
-
-            {/* ✅ DESKTOP wishlist full-width (unchanged) */}
-            <button onClick={() => productId && toggleWishlist(productId)}
-              className={`hidden sm:flex w-full h-11 rounded-xl border items-center justify-center gap-2 text-xs font-bold transition-all ${liked ? "bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30 text-[var(--user-danger)]" : "border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-danger)]/40 hover:text-[var(--user-danger)]"}`}>
-              <Heart size={14} fill={liked ? "currentColor" : "none"} /> {liked ? "Added to Wishlist" : "Add to Wishlist"}
-            </button>
-          </div>
-
-          <DeliveryInfo storeName={storeName} stock={stock} />
-        </div>
+          </section>
+        )}
       </div>
 
-      {/* Stack on mobile, side-by-side on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 lg:gap-8 mt-10 sm:mt-12 lg:mt-14 items-start">
-        <div className="lg:col-span-8" style={descHeight ? { height: descHeight } : undefined}>
-          <DescriptionCard
-            shortDescription={shortDescription}
-            fullDescription={fullDescription}
-            variantTitle={currentVariant?.title}
-            variantDescription={currentVariant?.description}
-          />
-        </div>
-        <div className="lg:col-span-4" ref={specsBoxRef}>
-          <SpecsCard attributes={currentVariant?.attributes} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 lg:gap-8 mt-5 sm:mt-6">
-        <div className="min-w-0 lg:col-span-8">
-      <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
-        </div>
-      </div>
-      <MoreImagesStack images={allImages} onZoom={openLightbox} />
-      <RelatedProducts products={related} />
-
-      <StickyBar show={showStickyBar} name={product.name} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} onWishlist={() => productId && toggleWishlist(productId)} isWishlisted={liked} />
+      <StickyBar show={showStickyBar} name={product.name} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
       <Lightbox images={allImages} index={lightbox} onClose={() => setLightbox(null)} onStep={stepLightbox} />
     </main>
   );

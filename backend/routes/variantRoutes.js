@@ -20,8 +20,13 @@ const {
 } = require("../middleware/productImageMiddleware");
 
 const saveProductImages = require("../middleware/saveProductImages");
+const { invalidate } = require("../utils/publicCache");
 
 const router = express.Router();
+const dropProductsCache = (req, res, next) => {
+  invalidate("products");
+  next();
+};
 
 
 // Product ID set for CREATE
@@ -58,6 +63,7 @@ router.post(
   "/",
   authMiddleware,
   staffPermissionCheck,
+  dropProductsCache,
   productImagesUpload,
   validateProductImages,
   setCreateProductId,
@@ -77,6 +83,7 @@ router.put(
   "/:id",
   authMiddleware,
   staffPermissionCheck,
+  dropProductsCache,
   setUpdateProductId,
   productImagesUpload,
   validateProductImages,
@@ -90,6 +97,7 @@ router.delete(
   "/:id",
   authMiddleware,
   staffPermissionCheck,
+  dropProductsCache,
   deleteVariant
 );
 

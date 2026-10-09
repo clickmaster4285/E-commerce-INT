@@ -454,7 +454,7 @@ export default function CartPage() {
   return (
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
-    <div className="hidden lg:block">
+    <div className="cart-premium hidden lg:block">
     <main className="max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-32 md:pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
@@ -724,7 +724,7 @@ export default function CartPage() {
     </div>
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
-    <div className="lg:hidden">
+    <div className="cart-premium lg:hidden">
       {/* Sticky top app bar */}
       <div
         className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"

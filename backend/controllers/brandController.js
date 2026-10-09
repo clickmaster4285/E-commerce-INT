@@ -12,16 +12,27 @@ const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 // database (active + soft deleted) and adds +1. Numeric comparison is used,
 // so BRD-009 -> BRD-010, BRD-099 -> BRD-100, BRD-999 -> BRD-1000 etc.
 const generateNextBrandCode = async () => {
-  const brands = await Brand.find({ brand_code: { $regex: /^BRD-\d+$/ } })
-    .select("brand_code")
-    .lean();
+  // ✅ DB-side MAX (ek hi fast query) — poori collection Node me lane ki
+  // bajaye numeric part ka max nikalte hain, is liye brands zyada hon par
+  // bhi code generate foran hota hai.
+  const [row] = await Brand.aggregate([
+    { $match: { brand_code: /^BRD-\d+$/ } },
+    {
+      $addFields: {
+        __num: {
+          $convert: {
+            input: { $arrayElemAt: [{ $split: ["$brand_code", "-"] }, 1] },
+            to: "int",
+            onError: 0,
+            onNull: 0,
+          },
+        },
+      },
+    },
+    { $group: { _id: null, maxNum: { $max: "$__num" } } },
+  ]);
 
-  let maxNum = 0;
-  for (const brand of brands) {
-    const num = parseInt(String(brand.brand_code).split("-")[1], 10);
-    if (Number.isFinite(num) && num > maxNum) maxNum = num;
-  }
-
+  const maxNum = Number(row?.maxNum) || 0;
   return `BRD-${String(maxNum + 1).padStart(3, "0")}`;
 };
 
@@ -89,7 +100,9 @@ const createBrand = async (req, res) => {
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
-    // ✅ LOG ACTIVITY
+    // ✅ LOG ACTIVITY (fire-and-forget — response iska wait nahi karta,
+    // warna har create par saare staff users ki activity arrays rewrite hone
+    // tak "Saving..." atka rehta tha)
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -103,7 +116,7 @@ const createBrand = async (req, res) => {
         brandCode: updatedBrand.brand_code,
         brandName: updatedBrand.brand_name || updatedBrand.name,
       },
-    }, performerId);
+    }, performerId).catch(() => {});
 
     try {
       io.emit("brandCreated", updatedBrand.toObject());
@@ -260,7 +273,7 @@ const updateBrand = async (req, res) => {
       .populate("category_id", "name")
       .select("name brand_id category_id status created_at");
 
-    // ✅ LOG ACTIVITY
+    // ✅ LOG ACTIVITY (fire-and-forget — response wait nahi karta)
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -276,7 +289,7 @@ const updateBrand = async (req, res) => {
       performedBy: performerId,
       performedByName: performerName,
       details: { changes, brandId: brand._id },
-    }, performerId);
+    }, performerId).catch(() => {});
 
     try {
       io.emit("brandUpdated", brand.toObject());
@@ -313,7 +326,7 @@ const deleteBrand = async (req, res) => {
 
     await brand.softDelete(req.user._id);
 
-    // ✅ LOG ACTIVITY
+    // ✅ LOG ACTIVITY (fire-and-forget — response wait nahi karta)
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -324,7 +337,7 @@ const deleteBrand = async (req, res) => {
       performedBy: performerId,
       performedByName: performerName,
       details: { brandId: brand._id, brandCode: brand.brand_code },
-    }, performerId);
+    }, performerId).catch(() => {});
 
     try {
       io.emit("brandDeleted", { _id: brand._id.toString() });
