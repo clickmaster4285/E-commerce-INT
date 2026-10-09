@@ -309,4 +309,4 @@ Negative/edge (each must return clean 400/403/404 toast, no partial write):
 2. **`closed` vs `completed`**: this plan uses `closed` per your spec — update any old `completed` references.
 3. **Receive permission**: chained `purchaseOrders + manageStock` (strict). If single-role staff must receive, grant both keys.
 4. **Vendor balance**: cached `balance_payable` can drift; add reconcile-on-read in `getVendorWithPOs` V1, background job V2.
-5. **No vendor portal / returns / multi-currency / GRN print** — explicitly out of scope.
+5. **No vendor portal / returns / multi-currency / GRN print** — explicitly out of scope
