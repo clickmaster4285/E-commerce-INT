@@ -8,6 +8,7 @@ import { addressApi } from "@/apis/user/addressApi";
 import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
 import { userHttp } from "@/apis/axiosInstance"
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 const normalizeStateName = (s) => {
   if (!s) return "";
   return s
@@ -53,7 +54,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
         city: initialAddress.city || "",
         state: initialAddress.state || "",
         zip_code: initialAddress.zip_code || "",
-        phone: initialAddress.phone || "",
+        phone: normalizePhone(initialAddress.phone || ""),
         is_default: !!initialAddress.is_default,
         delivery_instructions: initialAddress.delivery_instructions || "",
       };
@@ -98,7 +99,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
       setForm((f) => ({
         ...f,
         full_name: f.full_name || user.name || "",
-        phone: f.phone || user.phone || "",
+        phone: f.phone || normalizePhone(user.phone || ""),
       }));
     }
   }, [user, initialAddress]);
@@ -233,13 +234,20 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
 
   const handleSave = async () => {
     const f = form;
+    if (!f.phone) return toast.error("Phone number is required");
+    if (!isValidPhone(f.phone)) {
+      return toast.error(
+        f.phone.length < PHONE_MIN
+          ? `Phone number must be at least ${PHONE_MIN} digits`
+          : `Phone number must be at most ${PHONE_MAX} digits`,
+      );
+    }
     if (
       !f.country ||
       !f.full_name.trim() ||
       !f.street_address1.trim() ||
       !f.state.trim() ||
-      !f.city.trim() ||
-      !f.phone.trim()
+      !f.city.trim()
     ) {
       return toast.error("Please fill in all required fields");
     }
@@ -333,17 +341,17 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 <label className={labelCls}>Phone Number</label>
                 <input
                   type="tel"
+                  inputMode="numeric"
                   value={form.phone}
-                  maxLength={14}
+                  maxLength={PHONE_MAX}
                   onChange={(e) => {
-                    const val = e.target.value
-                      .replace(/\D/g, "")
-                      .slice(0, 14);
+                    const val = e.target.value.replace(/\D/g, "").slice(0, PHONE_MAX);
                     setForm({ ...form, phone: val });
                   }}
-                  placeholder="03001234567"
+                  placeholder="Phone number"
                   className={inputCls}
                 />
+                <p className="mt-1 text-xs text-[var(--user-text-muted)]">{form.phone.length}/{PHONE_MAX} digits</p>
               </div>
             </div>
             <div>

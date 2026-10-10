@@ -4,12 +4,20 @@
  * Rules:
  * - Only numeric digits (0-9) allowed
  * - No alphabetic characters, special characters, spaces, or mixed text
- * - Minimum 7 digits, maximum 15 digits (international standard)
+ * - Minimum 10 digits, maximum 16 digits
  * - Returns sanitized numeric string or null if invalid
  */
 
-const PHONE_MIN_LENGTH = 7;
-const PHONE_MAX_LENGTH = 15;
+const PHONE_MIN_LENGTH = 10;
+const PHONE_MAX_LENGTH = 16;
+
+const normalizePhone = (phone) => String(phone ?? "").replace(/\D/g, "").slice(0, PHONE_MAX_LENGTH);
+
+const isValidPhone = (phone) =>
+  typeof phone === "string" &&
+  phone.length >= PHONE_MIN_LENGTH &&
+  phone.length <= PHONE_MAX_LENGTH &&
+  /^\d{10,16}$/.test(phone);
 
 /**
  * Sanitize phone number - strips all non-numeric characters
@@ -76,6 +84,8 @@ const validatePhoneField = (fieldName = "phone") => {
 
 module.exports = {
   sanitizePhone,
+  normalizePhone,
+  isValidPhone,
   validatePhone,
   validatePhoneField,
   PHONE_MIN_LENGTH,

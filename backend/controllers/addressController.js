@@ -1,4 +1,14 @@
 const Address = require("../models/Address");
+const { isValidPhone, normalizePhone } = require("../utils/phoneValidator");
+
+const phoneValidationMessage = (phone) => {
+  if (typeof phone !== "string" || !phone.trim()) return "Phone number is required";
+  const value = phone;
+  if (!/^\d+$/.test(value)) return "Phone number must contain digits only";
+  if (value.length < 10) return "Phone number must be at least 10 digits";
+  if (value.length > 16) return "Phone number must be at most 16 digits";
+  return isValidPhone(value) ? "" : "Please enter a valid phone number";
+};
 
 // GET /api/addresses — meri addresses
 const getMyAddresses = async (req, res) => {
@@ -17,6 +27,8 @@ const createAddress = async (req, res) => {
   try {
     const { country, full_name, street_address1, street_address2, city, state, zip_code, phone, is_default } = req.body;
 
+    const phoneError = phoneValidationMessage(phone);
+    if (phoneError) return res.status(400).json({ success: false, message: phoneError });
     if (!full_name || !street_address1 || !city || !state || !phone) {
       return res.status(400).json({ success: false, message: "Required fields missing" });
     }
@@ -34,7 +46,7 @@ const createAddress = async (req, res) => {
       city,
       state,
       zip_code: zip_code || "",
-      phone,
+      phone: normalizePhone(phone),
       is_default: !!is_default,
     });
 
@@ -49,10 +61,14 @@ const updateAddress = async (req, res) => {
   try {
     const address = await Address.findOne({ _id: req.params.id, user_id: req.user._id });
     if (!address) return res.status(404).json({ success: false, message: "Address not found" });
+    if (req.body.phone !== undefined) {
+      const phoneError = phoneValidationMessage(req.body.phone);
+      if (phoneError) return res.status(400).json({ success: false, message: phoneError });
+    }
 
     const fields = ["country", "full_name", "street_address1", "street_address2", "city", "state", "zip_code", "phone"];
     fields.forEach((f) => {
-      if (req.body[f] !== undefined) address[f] = req.body[f];
+      if (req.body[f] !== undefined) address[f] = f === "phone" ? normalizePhone(req.body[f]) : req.body[f];
     });
 
     if (req.body.is_default === true) {

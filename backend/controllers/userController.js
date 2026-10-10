@@ -14,6 +14,7 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
+const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -69,7 +70,8 @@ const createUser = async (req, res) => {
     const { name, username, phone, email: rawEmail, password } = req.body;
     const email = normalizeEmail(rawEmail);
     const cleanUsername = String(username || "").trim();
-    const cleanPhone = String(phone || "").trim();
+    const rawPhone = typeof phone === "string" ? phone : "";
+    const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
 
     // ✅ Basic validation — User NAHI banega, sirf 400 milega
@@ -84,8 +86,13 @@ const createUser = async (req, res) => {
       else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername))
         errors.username = "Username can only contain letters, numbers, and underscores";
     }
-    if (cleanPhone && cleanPhone.replace(/\D/g, "").length < 4)
-      errors.phone = "Phone number must be at least 4 digits";
+    if (rawPhone && !isValidPhone(rawPhone)) {
+      errors.phone = !/^\d+$/.test(rawPhone)
+        ? "Phone number must contain digits only"
+        : rawPhone.length < 10
+          ? "Phone number must be at least 10 digits"
+          : "Phone number must be at most 16 digits";
+    }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
 
@@ -709,6 +716,17 @@ const updateProfileInfo = async (req, res) => {
       name, email, phone, website, address,
       store_name, tagline, currency, country, city, state, zip_code, store_status
     } = req.body;
+    if (phone !== undefined && String(phone).trim()) {
+      const phoneValue = String(phone);
+      if (!isValidPhone(phoneValue)) {
+        const message = !/^\d+$/.test(phoneValue)
+          ? "Phone number must contain digits only"
+          : phoneValue.length < 10
+            ? "Phone number must be at least 10 digits"
+            : "Phone number must be at most 16 digits";
+        return res.status(400).json({ success: false, message });
+      }
+    }
     // ✅ Store fields sirf tab jab 'store' permission ho (admin bypass).
     // Socket path par req.user.permissions stale ho sakte hain — fresh load karo.
     let requesterRole = req.user?.role || "";
@@ -728,7 +746,7 @@ const updateProfileInfo = async (req, res) => {
     if (name !== undefined) userUpdateFields.name = name;
     if (email !== undefined)
       userUpdateFields.email = email.toLowerCase().trim();
-    if (phone !== undefined) userUpdateFields.phone = phone;
+    if (phone !== undefined) userUpdateFields.phone = phone ? normalizePhone(phone) : phone;
     if (website !== undefined) userUpdateFields.website = website;
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
@@ -755,7 +773,7 @@ const updateProfileInfo = async (req, res) => {
     if (store_status !== undefined)
       storeUpdateFields.store_status = store_status;
     if (email !== undefined) storeUpdateFields.email = email;
-    if (phone !== undefined) storeUpdateFields.phone = phone;
+    if (phone !== undefined) storeUpdateFields.phone = phone ? normalizePhone(phone) : phone;
     if (address !== undefined) storeUpdateFields.address = address;
     if (website !== undefined) storeUpdateFields.website = website;
     if (Object.keys(storeUpdateFields).length > 0 && !canEditStore) {
@@ -1005,12 +1023,21 @@ const googleCustomerLogin = async (req, res) => {
 const updatePhone = async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone || !/^[0-9+\-\s]{7,20}$/.test(String(phone)))
-      return res.status(400).json({ message: "Valid phone number required" });
+    if (typeof phone !== "string" || !phone.trim())
+      return res.status(400).json({ message: "Phone number is required" });
+    const phoneValue = phone;
+    if (!/^\d+$/.test(phoneValue))
+      return res.status(400).json({ message: "Phone number must contain digits only" });
+    if (phoneValue.length < 10)
+      return res.status(400).json({ message: "Phone number must be at least 10 digits" });
+    if (phoneValue.length > 16)
+      return res.status(400).json({ message: "Phone number must be at most 16 digits" });
+    if (!isValidPhone(phoneValue))
+      return res.status(400).json({ message: "Please enter a valid phone number" });
     const Model = req.userType === "employee" ? Employee : User;
     const user = await Model.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    user.phone = String(phone).trim();
+    user.phone = normalizePhone(phoneValue);
     await user.save();
     res
       .status(200)

@@ -91,6 +91,53 @@ import { shippingApi } from "@/apis/user/shippingApi";
       };
     }, []);
 
+    // ✅ Deal badge config (type-based color/text + raw badge text merge)
+    function getDealBadgeConfig(deal) {
+      if (!deal) return null;
+      const type = deal.type;
+      const discountValue = deal.discountValue ?? deal.discount_value ?? deal.savings ?? 0;
+      const buyQuantity = deal.buyQuantity ?? deal.buy_qty ?? deal.minQuantity ?? 1;
+      const getQuantity = deal.getQuantity ?? deal.get_qty ?? 1;
+
+      if (type === "buy_x_get_y") {
+        return {
+          text: `Buy ${buyQuantity} Get ${getQuantity}`,
+          color: "from-purple-500 to-pink-600",
+          icon: Tag,
+        };
+      }
+
+      if (type === "percentage") {
+        return {
+          text: `${discountValue}% OFF`,
+          color: "from-green-500 to-emerald-600",
+          icon: Tag,
+        };
+      }
+
+      if (type === "fixed_amount") {
+        return {
+          text: `Rs. ${discountValue} OFF`,
+          color: "from-blue-500 to-cyan-600",
+          icon: Tag,
+        };
+      }
+
+      if (type === "free_shipping") {
+        return {
+          text: "Free Shipping",
+          color: "from-orange-500 to-red-600",
+          icon: Tag,
+        };
+      }
+
+      return {
+        text: deal.name || "Deal",
+        color: "from-orange-500 to-red-600",
+        icon: Tag,
+      };
+    }
+
     const groupedItems = useMemo(() => {
       const dealGroups = new Map();
       const regularItems = [];
@@ -174,7 +221,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
               dealType: raw.dealType,
               dealName: raw.dealName || "Deal",
               // ✅ discountValue = actual deal value (percent/fixed) — dealSavings rupees hai jo "0% OFF" banata tha
-              dealBadge: sanitizeDealBadge(raw.dealBadge) || sanitizeDealBadge(getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealDiscountValue ?? raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text),
+              dealBadge: sanitizeDealBadge(raw.dealBadge) || getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealDiscountValue ?? raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text,
               items: [],
               totalSavings: 0,
             });
