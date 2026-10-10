@@ -510,6 +510,12 @@ export default function DealsPage() {
       ["Per customer limit", formData.per_user_limit],
     ]);
     if (nonNegativeError) return toast.error(nonNegativeError);
+    if (formData.has_min_quantity) {
+      const minQuantity = Number(formData.min_quantity);
+      if (!Number.isInteger(minQuantity) || minQuantity < 1) {
+        return toast.error("Minimum quantity must be a whole number greater than 0");
+      }
+    }
 
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
@@ -1211,4 +1217,3 @@ function BundleImageUploader({ value, onChange }) {
     </div>
   );
 }
-

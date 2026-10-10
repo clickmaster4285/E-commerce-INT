@@ -13,7 +13,19 @@ import { shippingApi } from "@/apis/user/shippingApi";
   import { useCart } from "./CartContext";
   import { useDiscounts } from "./DiscountContext";
   import DealInfoDropdown from "./DealInfoDropdown";
-  import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule, sanitizeDealBadge } from "@/utils/dealCalculator";
+  import {
+    calculateFreeItems,
+    calculatePayableItems,
+    calculateBuyXGetYSavings,
+    formatDealRequirementIssue,
+    getDealRequirementIssues,
+    isDealActive,
+    hasFreeShippingDeal,
+    isFreeShippingApplicable,
+    getDefaultShippingMethod,
+    matchShippingRule,
+    sanitizeDealBadge,
+  } from "@/utils/dealCalculator";
 
   const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
   const SHIPPING_FEE = 200;
@@ -33,6 +45,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const router = useRouter();
     const { cart, isCartOpen, setIsCartOpen, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems } = useCart();
     const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
+    const dealRequirementIssues = getDealRequirementIssues(selectedItems);
     // ✅ Deal picker — kaunsa card ka popup khula hai (sirf ek waqt pe ek)
     const [openDealCardKey, setOpenDealCardKey] = useState(null);
 
@@ -361,7 +374,14 @@ import { shippingApi } from "@/apis/user/shippingApi";
       timersRef.current.push(t);
     };
 
-    const goCheckout = () => { closeCart(); router.push("/checkout"); };
+    const goCheckout = () => {
+      if (dealRequirementIssues.length) {
+        toast.error(formatDealRequirementIssue(dealRequirementIssues[0]));
+        return;
+      }
+      closeCart();
+      router.push("/checkout");
+    };
     const startShopping = () => { closeCart(); router.push("/"); };
 
     // ✅ CLEAR CART — two-tap confirm (ghalti se clear na ho)
@@ -568,12 +588,17 @@ import { shippingApi } from "@/apis/user/shippingApi";
                 <button
                   type="button"
                   onClick={goCheckout}
-                  disabled={!hasItems || selectedLineCount === 0}
+                  disabled={!hasItems || selectedLineCount === 0 || dealRequirementIssues.length > 0}
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition-colors duration-150 hover:bg-[var(--user-accent-hover)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
                   <LockKeyhole size={15} aria-hidden="true" />
-                  {selectedLineCount === 0 ? "Select items" : "Proceed to Checkout"}
+                  {selectedLineCount === 0 ? "Select items" : dealRequirementIssues.length ? "Complete deal requirements" : "Proceed to Checkout"}
                 </button>
+                {dealRequirementIssues.length > 0 && (
+                  <p role="alert" className="text-center text-xs text-amber-700 dark:text-amber-300">
+                    {formatDealRequirementIssue(dealRequirementIssues[0])}
+                  </p>
+                )}
                 <p className="-mt-2 text-center text-xs text-[var(--user-text-muted)]">Secure checkout · Easy returns</p>
               </div>
             </footer>

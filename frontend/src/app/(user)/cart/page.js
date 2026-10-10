@@ -8,13 +8,25 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, ShoppingBag, Package, Tag, Check, Plus, Minus,
   Trash2, Sparkles, Zap, Truck, PackageOpen, ChevronDown, ShieldCheck, Lock,
-  Gift, CreditCard, Percent, TrendingUp, Box, BadgePercent
+  Gift, CreditCard, Percent, TrendingUp, Box, BadgePercent, CircleAlert
 } from "lucide-react";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import DealInfoDropdown from "@/components/user/DealInfoDropdown";
 import { shippingApi } from "@/apis/user/shippingApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule, sanitizeDealBadge } from "@/utils/dealCalculator";
+import {
+  calculateFreeItems,
+  calculatePayableItems,
+  calculateBuyXGetYSavings,
+  formatDealRequirementIssue,
+  getDealRequirementIssues,
+  isDealActive,
+  hasFreeShippingDeal,
+  isFreeShippingApplicable,
+  getDefaultShippingMethod,
+  matchShippingRule,
+  sanitizeDealBadge,
+} from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -26,6 +38,23 @@ const getImgUrl = (img) => {
   if (raw.startsWith("http")) return raw;
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
+
+function DealRequirementNotice({ issues }) {
+  if (!issues.length) return null;
+  return (
+    <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+      <p className="flex items-center gap-2 font-bold">
+        <CircleAlert size={16} />
+        Complete the deal requirement before checkout
+      </p>
+      <ul className="mt-1.5 space-y-1 pl-6 text-xs">
+        {issues.map((issue) => (
+          <li key={issue.item.key}>{formatDealRequirementIssue(issue)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function getDealBadgeConfig(deal) {
   if (!deal) return null;
@@ -265,7 +294,15 @@ export default function CartPage() {
   const selectedLineCount = selectedItems.length;
   const selectedQtyCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
   const allSelected = hasItems && selectedLineCount === cart.length;
-  const canCheckout = selectedLineCount > 0;
+  const dealRequirementIssues = getDealRequirementIssues(selectedItems);
+  const canCheckout = selectedLineCount > 0 && dealRequirementIssues.length === 0;
+  const goToCheckout = () => {
+    if (dealRequirementIssues.length) {
+      toast.error(formatDealRequirementIssue(dealRequirementIssues[0]));
+      return;
+    }
+    if (selectedLineCount > 0) router.push("/checkout");
+  };
 
   const handleRemove = (row) => {
     removeFromCart(row.key);
@@ -498,6 +535,7 @@ export default function CartPage() {
           </span>
         </div>
       )}
+      {hasItems && <div className="mb-5"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
 
       {!hasItems ? (
         <div className="rounded-3xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 sm:p-16 text-center relative overflow-hidden">
@@ -680,11 +718,11 @@ export default function CartPage() {
 
               <button
                 type="button"
-                onClick={() => canCheckout && router.push("/checkout")}
+                onClick={goToCheckout}
                 disabled={!canCheckout}
                 className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] py-4 text-sm font-black uppercase tracking-widest text-[var(--user-accent-text)] hover:opacity-90 hover:shadow-xl hover:shadow-[var(--user-accent)]/20 active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50"
               >
-                {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : ("Select items to checkout")}
+                {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : dealRequirementIssues.length ? "Complete deal requirements" : "Select items to checkout"}
               </button>
 
               <div className="mt-5 pt-5 border-t-2 border-[var(--user-border)] space-y-2">
@@ -712,10 +750,11 @@ export default function CartPage() {
               <p className="text-lg font-black text-[var(--user-accent)]">{fmt(grandTotal)}</p>
             </div>
             <button
-              onClick={() => router.push("/checkout")}
-              className="h-12 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition"
+              onClick={goToCheckout}
+              disabled={!canCheckout}
+              className="h-12 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition disabled:pointer-events-none disabled:opacity-50"
             >
-              Checkout <ArrowRight size={14} />
+              {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -749,6 +788,7 @@ export default function CartPage() {
 
       {/* Content */}
       <div className="bg-[var(--user-bg)] px-3 pt-3 pb-28 min-h-[60vh]">
+        {hasItems && <div className="mb-3"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
         {!hasItems ? (
           <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center">
             <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
@@ -833,11 +873,11 @@ export default function CartPage() {
             </div>
             <button
               type="button"
-              onClick={() => canCheckout && router.push("/checkout")}
+              onClick={goToCheckout}
               disabled={!canCheckout}
               className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition shadow-lg shadow-[var(--user-accent)]/20 disabled:pointer-events-none disabled:opacity-50"
             >
-              Checkout <ArrowRight size={14} />
+              {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
             </button>
           </div>
         </div>
