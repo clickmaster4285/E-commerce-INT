@@ -128,26 +128,27 @@ const placeOrder = async (req, res) => {
 
       // ✅ MIN QUANTITY CHECK — server-side validation
       if (dealId) {
+        if (!mongoose.isValidObjectId(dealId)) {
+          return res.status(400).json({
+            success: false,
+            message: `"${item.name}" has an invalid deal. Please remove it and try again.`,
+          });
+        }
         const dealDoc = await Deal.findById(dealId).select("minQuantity type buyQuantity isActive").lean();
-        if (dealDoc && dealDoc.isActive) {
-          const minQty = Number(dealDoc.minQuantity) || 1;
-          if (dealDoc.type === "buy_x_get_y") {
-            const buyQty = Number(dealDoc.buyQuantity) || 0;
-            const threshold = Math.max(minQty, buyQty);
-            if (qty < threshold) {
-              return res.status(400).json({
-                success: false,
-                message: `"${item.name}" requires minimum ${threshold} items for this deal. You have: ${qty}`,
-              });
-            }
-          } else {
-            if (qty < minQty) {
-              return res.status(400).json({
-                success: false,
-                message: `"${item.name}" requires minimum ${minQty} items for this deal. You have: ${qty}`,
-              });
-            }
-          }
+        if (!dealDoc || !dealDoc.isActive) {
+          return res.status(400).json({
+            success: false,
+            message: `The deal for "${item.name}" is no longer available. Please update your cart.`,
+          });
+        }
+        const minQty = Number(dealDoc.minQuantity) || 1;
+        const buyQty = dealDoc.type === "buy_x_get_y" ? Number(dealDoc.buyQuantity) || 0 : 0;
+        const threshold = Math.max(minQty, buyQty);
+        if (qty < threshold) {
+          return res.status(400).json({
+            success: false,
+            message: `"${item.name}" requires at least ${threshold} items for this deal. You currently have ${qty}; add ${threshold - qty} more.`,
+          });
         }
       }
 

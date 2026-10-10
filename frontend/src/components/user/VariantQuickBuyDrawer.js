@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   X,
   Minus,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCart } from "./CartContext";
 import { useQuickBuy } from "./QuickBuyContext";
+import { getEffectiveMinQuantity } from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -119,6 +121,13 @@ function QuickBuyBody({ product, dealInfo }) {
   const stock = selected ? toNum(selected.quantity) : 0;
   const out = stock < 1;
   const maxQty = stock > 0 ? stock : 1;
+  const requiredDealQty = dealInfo
+    ? getEffectiveMinQuantity({
+        type: dealInfo.dealType,
+        minQuantity: dealInfo.minQuantity,
+        buyQuantity: dealInfo.buyQuantity,
+      })
+    : 1;
   const selectedPrice = selected ? toNum(selected.selling_price) : 0;
   const selectedOld = selected ? toNum(selected.price) : 0;
   const firstInStockIndex = variants.findIndex((variant) => toNum(variant.quantity) > 0);
@@ -165,6 +174,15 @@ function QuickBuyBody({ product, dealInfo }) {
     if (out || !selected) return;
     addToCart(product, selected, qty, dealInfo || null);
     closeQuickBuy?.();
+    if (dealInfo && qty < getEffectiveMinQuantity({
+      type: dealInfo.dealType,
+      minQuantity: dealInfo.minQuantity,
+      buyQuantity: dealInfo.buyQuantity,
+    })) {
+      toast.info("This deal needs more items. Complete the quantity in your cart before checkout.");
+      router.push("/cart");
+      return;
+    }
     router.push("/checkout");
   };
 
@@ -281,6 +299,13 @@ function QuickBuyBody({ product, dealInfo }) {
               </button>
             </div>
           </section>
+          {dealInfo && requiredDealQty > 1 && (
+            <p role="status" className="text-xs font-medium text-amber-700 dark:text-amber-300">
+              {qty < requiredDealQty
+                ? `Add ${requiredDealQty - qty} more item${requiredDealQty - qty === 1 ? "" : "s"} to unlock this deal.`
+                : `Deal unlocked at ${requiredDealQty} items.`}
+            </p>
+          )}
 
           <div className="flex items-center justify-between border-t border-[var(--user-border)] pt-4">
             <span className="text-sm font-medium text-[var(--user-text-muted)]">Total</span>

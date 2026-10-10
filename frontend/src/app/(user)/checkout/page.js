@@ -12,7 +12,18 @@ const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
   loading: () => null,
 });
 import { orderApi } from "@/apis/user/orderApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
+import {
+  calculateFreeItems,
+  calculatePayableItems,
+  calculateBuyXGetYSavings,
+  formatDealRequirementIssue,
+  getDealRequirementIssues,
+  isDealActive,
+  hasFreeShippingDeal,
+  isFreeShippingApplicable,
+  getDefaultShippingMethod,
+  matchShippingRule,
+} from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
@@ -336,6 +347,15 @@ function CheckoutContent() {
   //    import into CartContext (handled in the draft-restore effect above).
   const selectedCartItems = useMemo(() => selectedItems, [selectedItems]);
   const activeItems = step === 1 ? selectedCartItems : draftItems;
+  useEffect(() => {
+    if (!draftReady || placing || step !== 1 || activeItems.length === 0) return;
+    const dealIssue = getDealRequirementIssues(activeItems)[0];
+    if (dealIssue) {
+      toast.error(formatDealRequirementIssue(dealIssue));
+      router.replace("/cart");
+    }
+  }, [activeItems, draftReady, placing, router, step]);
+
   // ✅ Shared helper — single source of truth for free-shipping qualification.
   const freeShippingByActiveItems = hasFreeShippingDeal(activeItems);
   // ✅ Identify the active free-shipping deal (first match) so we can derive
@@ -544,15 +564,8 @@ function CheckoutContent() {
     if (paymentMethod === "bank" && !bankForm.senderName.trim()) {
       return toast.error("Sender name is required for bank transfer");
     }
-    // ✅ MIN QUANTITY CHECK — reject order if any deal item qty is below minQuantity
-    for (const item of itemsWithDiscounts) {
-      if (item.dealId && item.dealMinQuantity) {
-        const minQty = Number(item.dealMinQuantity) || 1;
-        if (item.qty < minQty) {
-          return toast.error(`"${item.name}" requires minimum ${minQty} items for deal. Current: ${item.qty}`);
-        }
-      }
-    }
+    const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);

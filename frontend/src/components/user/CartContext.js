@@ -4,7 +4,14 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, us
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { userHttp } from "@/apis/axiosInstance";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, maxPayableQty } from "@/utils/dealCalculator";
+import {
+  calculateFreeItems,
+  calculatePayableItems,
+  calculateBuyXGetYSavings,
+  getDealUnitPrice,
+  getEffectiveMinQuantity,
+  maxPayableQty,
+} from "@/utils/dealCalculator";
 import {
   bundleOriginalTotal,
   round2,
@@ -287,15 +294,16 @@ export function CartProvider({ children }) {
     const regularPrice = Number(variant?.selling_price || product.price || 0);
     const stock = getStock(product, variant);
 
-    // ✅ For percentage/fixed_amount deals, store the discounted price on the cart line
-    // so the CartContext `total` reflects the deal consistently across drawer/cart/checkout.
-    // For buy_x_get_y the price stays the regular unit price; free items are handled by qty math.
-    let linePrice = regularPrice;
-    if (dealInfo?.dealType === "percentage" && Number(dealInfo.dealDiscountValue) > 0) {
-      linePrice = Math.round(regularPrice * (1 - Number(dealInfo.dealDiscountValue) / 100));
-    } else if (dealInfo?.dealType === "fixed_amount" && Number(dealInfo.dealDiscountValue) > 0) {
-      linePrice = Math.max(0, regularPrice - Number(dealInfo.dealDiscountValue));
-    }
+    const requiredDealQty = dealInfo
+      ? getEffectiveMinQuantity({
+          type: dealInfo.dealType,
+          minQuantity: dealInfo.minQuantity,
+          buyQuantity: dealInfo.buyQuantity,
+        })
+      : 1;
+    const linePrice = dealInfo && qty >= requiredDealQty
+      ? getDealUnitPrice(regularPrice, dealInfo.dealType, dealInfo.dealDiscountValue)
+      : regularPrice;
 
     const existing = cartRef.current.find((i) => i.key === key);
     const currentQty = existing?.qty || 0;
@@ -325,9 +333,20 @@ export function CartProvider({ children }) {
     }
 
     if (existing) {
+      const nextQty = existing.qty + addQty;
+      const dealType = existing.dealType || dealInfo?.dealType;
+      const dealDiscountValue = existing.dealDiscountValue ?? dealInfo?.dealDiscountValue;
+      const minQuantity = existing.dealMinQuantity ?? dealInfo?.minQuantity;
+      const buyQuantity = existing.dealBuyQuantity ?? dealInfo?.buyQuantity;
+      const requiredQty = existing.dealId || dealInfo?.dealId
+        ? getEffectiveMinQuantity({ type: dealType, minQuantity, buyQuantity })
+        : 1;
+      const unitPrice = nextQty >= requiredQty
+        ? getDealUnitPrice(regularPrice, dealType, dealDiscountValue)
+        : regularPrice;
       save(
         cartRef.current.map((i) =>
-          i.key === key ? { ...i, qty: i.qty + addQty, stock: stock ?? i.stock } : i
+          i.key === key ? { ...i, qty: nextQty, price: unitPrice, stock: stock ?? i.stock } : i
         )
       );
     } else {
@@ -595,34 +614,21 @@ export function CartProvider({ children }) {
       if (qty <= 0) return;
     }
 
-    // ✅ MIN QUANTITY CHECK — if qty falls below deal's minQuantity, remove deal
-    if (item?.dealId && item?.dealMinQuantity) {
-      const minQty = Number(item.dealMinQuantity) || 1;
-      if (qty < minQty) {
-        // Revert to regular price, remove deal info
-        save(cartRef.current.map((i) => {
-          if (i.key !== key) return i;
-          return {
-            ...i,
-            dealId: null,
-            dealType: null,
-            dealName: null,
-            dealBadge: null,
-            dealSavings: 0,
-            dealOriginalPrice: 0,
-            dealDiscountValue: 0,
-            dealMinQuantity: 0,
-            dealBuyQuantity: 0,
-            dealGetQuantity: 0,
-            price: i.dealRegularPrice || i.price,
-          };
-        }));
-        toast.info(`Minimum ${minQty} items required for deal — deal removed`);
-        return;
-      }
+    const requiredQty = item?.dealId
+      ? getEffectiveMinQuantity({
+          type: item.dealType,
+          minQuantity: item.dealMinQuantity,
+          buyQuantity: item.dealBuyQuantity,
+        })
+      : 1;
+    const regularPrice = Number(item?.dealRegularPrice || item?.regularPrice || item?.price || 0);
+    const price = qty >= requiredQty
+      ? getDealUnitPrice(regularPrice, item?.dealType, item?.dealDiscountValue)
+      : regularPrice;
+    save(cartRef.current.map((i) => (i.key === key ? { ...i, qty, price } : i)));
+    if (item?.dealId && qty < requiredQty) {
+      toast.info(`Add ${requiredQty - qty} more item${requiredQty - qty === 1 ? "" : "s"} to qualify for "${item.dealName || "this deal"}".`);
     }
-
-    save(cartRef.current.map((i) => (i.key === key ? { ...i, qty } : i)));
   };
 
   const removeFromCart = (key) => {
@@ -783,7 +789,11 @@ export function CartProvider({ children }) {
     // ✅ Calculate required minimum quantity
     const minQty = Number(deal.minQuantity) || 1;
     const buyQty = deal.type === "buy_x_get_y" ? (Number(deal.buyQuantity) || 0) : 0;
-    const requiredQty = Math.max(minQty, buyQty);
+    const requiredQty = getEffectiveMinQuantity({
+      type: deal.type,
+      minQuantity: minQty,
+      buyQuantity: buyQty,
+    });
 
     // ✅ Auto-fill: if current qty < required, increase to required
     let newQty = item.qty;
@@ -799,12 +809,9 @@ export function CartProvider({ children }) {
     }
 
     // ✅ Calculate deal price
-    let linePrice = regularPrice;
-    if (deal.type === "percentage" && Number(deal.discountValue) > 0) {
-      linePrice = Math.round(regularPrice * (1 - Number(deal.discountValue) / 100));
-    } else if (deal.type === "fixed_amount" && Number(deal.discountValue) > 0) {
-      linePrice = Math.max(0, regularPrice - Number(deal.discountValue));
-    }
+    const linePrice = newQty >= requiredQty
+      ? getDealUnitPrice(regularPrice, deal.type, deal.discountValue)
+      : regularPrice;
 
     save(cartRef.current.map((i) => {
       if (i.key !== key) return i;
@@ -827,7 +834,9 @@ export function CartProvider({ children }) {
       };
     }));
 
-    if (newQty > item.qty) {
+    if (newQty < requiredQty) {
+      toast.warning(`"${deal.name}" requires at least ${requiredQty} items. The deal is selected but not active yet.`);
+    } else if (newQty > item.qty) {
       toast.success(`"${deal.name}" applied — qty auto-set to ${newQty}`);
     } else {
       toast.success(`"${deal.name}" deal applied!`);

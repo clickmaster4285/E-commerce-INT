@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import {
   Heart,
@@ -22,6 +23,7 @@ import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { useDiscounts } from "./DiscountContext";
 import { useQuickBuy } from "./QuickBuyContext";
+import { getEffectiveMinQuantity } from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -155,6 +157,13 @@ function ProductCardInner({
   const activeDeal = showDealPricing ? deal || matchedDeal : deal;
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
   const displayBadgeText = badgeConfig?.text || dealBadge;
+  const requiredDealQty = activeDeal
+    ? getEffectiveMinQuantity({
+        type: activeDeal.type,
+        minQuantity: activeDeal.minQuantity,
+        buyQuantity: activeDeal.buyQuantity,
+      })
+    : 1;
 
   // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
   const hasMultipleVariants = variants.length > 1;
@@ -203,7 +212,17 @@ function ProductCardInner({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
-    addToCart(product, firstVariant, 1, buildDealInfo());
+    const dealInfo = buildDealInfo();
+    addToCart(product, firstVariant, 1, dealInfo);
+    if (dealInfo && getEffectiveMinQuantity({
+      type: dealInfo.dealType,
+      minQuantity: dealInfo.minQuantity,
+      buyQuantity: dealInfo.buyQuantity,
+    }) > 1) {
+      toast.info("This deal needs more items. Complete the quantity in your cart before checkout.");
+      router.push("/cart");
+      return;
+    }
     router.push("/checkout");
   };
 
@@ -258,6 +277,11 @@ function ProductCardInner({
                 <Tag size={9} />
               )}{" "}
               {displayBadgeText}
+            </span>
+          )}
+          {activeDeal && requiredDealQty > 1 && (
+            <span className="rounded-full bg-[var(--user-bg-card)]/95 px-2 py-1 text-[0.6rem] font-bold text-[var(--user-text)] shadow-sm">
+              Buy {requiredDealQty} to unlock
             </span>
           )}
 
