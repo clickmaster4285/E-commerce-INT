@@ -39,6 +39,12 @@ const placeOrder = async (req, res) => {
       notes,
       checkout_draft_id: rawCheckoutDraftId,
       shipping_method: reqShippingMethod,
+      bank_sender_name,
+      bank_transaction_ref,
+      card_number,
+      card_holder_name,
+      card_expiry,
+      card_cvv,
     } = req.body;
     const checkoutDraftId = mongoose.isValidObjectId(rawCheckoutDraftId)
       ? rawCheckoutDraftId
@@ -49,6 +55,134 @@ const placeOrder = async (req, res) => {
     }
     if (!["cod", "bank", "card"].includes(payment_method)) {
       return res.status(400).json({ success: false, message: "Invalid payment method" });
+    }
+
+    // ✅ Validate card fields when payment method is card
+    if (payment_method === "card") {
+      const trimmedCardNumber = (card_number || "").replace(/\s/g, "").trim();
+      const trimmedCardHolderName = (card_holder_name || "").trim();
+      const trimmedCardExpiry = (card_expiry || "").trim();
+      const trimmedCardCVV = (card_cvv || "").trim();
+
+      // 1. Card Number validation
+      if (!trimmedCardNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter your card number.",
+        });
+      }
+      if (trimmedCardNumber.length < 13 || trimmedCardNumber.length > 19) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid card number.",
+        });
+      }
+      // Luhn algorithm check
+      let sum = 0;
+      let isEven = false;
+      for (let i = trimmedCardNumber.length - 1; i >= 0; i--) {
+        let digit = parseInt(trimmedCardNumber[i], 10);
+        if (isEven) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        isEven = !isEven;
+      }
+      if (sum % 10 !== 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid card number.",
+        });
+      }
+
+      // 2. Card Holder Name validation
+      if (!trimmedCardHolderName) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter the card holder name.",
+        });
+      }
+      if (trimmedCardHolderName.length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid card holder name.",
+        });
+      }
+      if (!/^[a-zA-Z\s.\-']+$/.test(trimmedCardHolderName)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid card holder name.",
+        });
+      }
+
+      // 3. Expiry validation
+      if (!trimmedCardExpiry) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter the card expiry date.",
+        });
+      }
+      if (!/^\d{2}\/\d{2}$/.test(trimmedCardExpiry)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid expiry date (MM/YY).",
+        });
+      }
+      const [month, year] = trimmedCardExpiry.split("/").map(Number);
+      if (month < 1 || month > 12) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid expiry date (MM/YY).",
+        });
+      }
+      const now = new Date();
+      const currentYear = now.getFullYear() % 100;
+      const currentMonth = now.getMonth() + 1;
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        return res.status(400).json({
+          success: false,
+          message: "Your card has expired. Please use a valid card.",
+        });
+      }
+
+      // 4. CVV validation
+      if (!trimmedCardCVV) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter the CVV.",
+        });
+      }
+      const isAmex = trimmedCardNumber.startsWith("34") || trimmedCardNumber.startsWith("37");
+      const expectedCVVLength = isAmex ? 4 : 3;
+      if (trimmedCardCVV.length !== expectedCVVLength) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid CVV.",
+        });
+      }
+      
+      // ✅ IMPORTANT: DO NOT store or log raw card data
+      // Card data should only be validated, never saved to database
+    }
+
+    // ✅ Validate bank transfer fields when payment method is bank
+    if (payment_method === "bank") {
+      const trimmedSenderName = (bank_sender_name || "").trim();
+      const trimmedTransactionRef = (bank_transaction_ref || "").trim();
+      
+      if (!trimmedSenderName) {
+        return res.status(400).json({
+          success: false,
+          message: "Sender name is required for bank transfer",
+        });
+      }
+      if (!trimmedTransactionRef) {
+        return res.status(400).json({
+          success: false,
+          message: "Transaction ID / Reference is required for bank transfer",
+        });
+      }
     }
 
     const address = await Address.findOne({ _id: address_id, user_id: req.user._id });
@@ -145,9 +279,10 @@ const placeOrder = async (req, res) => {
         const buyQty = dealDoc.type === "buy_x_get_y" ? Number(dealDoc.buyQuantity) || 0 : 0;
         const threshold = Math.max(minQty, buyQty);
         if (qty < threshold) {
+          const remaining = threshold - qty;
           return res.status(400).json({
             success: false,
-            message: `"${item.name}" requires at least ${threshold} items for this deal. You currently have ${qty}; add ${threshold - qty} more.`,
+            message: `"${item.name}" requires at least ${threshold} items for this deal. You have selected only ${qty}. Please add ${remaining} more item${remaining === 1 ? '' : 's'}.`,
           });
         }
       }

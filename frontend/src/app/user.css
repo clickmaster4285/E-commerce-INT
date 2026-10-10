@@ -528,9 +528,8 @@ html:has(.user-theme) {
   }
 }
 
-/* Calm, light surfaces for the cart and checkout flow. */
-.cart-premium,
-.checkout-premium {
+/* The cart intentionally keeps its existing light premium treatment. */
+.cart-premium {
   --user-bg: #f7f7f8;
   --user-bg-elevated: #ffffff;
   --user-bg-card: #ffffff;
@@ -555,9 +554,78 @@ html:has(.user-theme) {
 }
 
 .checkout-premium {
-  --user-accent: #6b7280;
-  --user-accent-hover: #4b5563;
+  --checkout-surface: var(--user-bg-card);
+  --checkout-neutral-surface: var(--user-bg-elevated);
+  --checkout-subtle-surface: var(--user-bg-hover);
+  --checkout-border: var(--user-border);
+  --checkout-border-strong: var(--user-border-hover);
+  --checkout-neutral-text: var(--user-text-muted);
+  --checkout-accent-text: var(--user-accent);
+  --checkout-icon-text: var(--user-text-secondary);
+  --checkout-status-text: var(--user-success);
+  --checkout-control-accent: var(--user-accent);
+  --checkout-step-active-border: color-mix(in srgb, var(--user-accent) 50%, var(--user-border));
+  --checkout-step-active-bg: color-mix(in srgb, var(--user-accent) 12%, var(--user-bg-card));
+  --checkout-step-active-text: color-mix(in srgb, var(--user-accent) 58%, #ffffff);
+  --checkout-step-complete-border: color-mix(in srgb, var(--user-accent) 35%, var(--user-border));
+  --checkout-step-complete-bg: color-mix(in srgb, var(--user-accent) 10%, var(--user-bg-card));
+  --checkout-step-complete-text: color-mix(in srgb, var(--user-accent) 58%, #ffffff);
+  --checkout-step-complete-label: color-mix(in srgb, var(--user-accent) 42%, var(--user-text-secondary));
+  --checkout-selection-border: color-mix(in srgb, var(--user-accent) 46%, var(--user-border));
+  --checkout-selection-bg: color-mix(in srgb, var(--user-accent) 9%, var(--user-bg-card));
+  --checkout-selection-mark-bg: color-mix(in srgb, var(--user-accent) 14%, var(--user-bg-card));
+  --checkout-selection-mark: var(--user-accent);
+  --checkout-indicator-border: var(--user-border-hover);
+  --checkout-connector: var(--user-border);
+  --user-shadow-sm: none;
+  --user-shadow-md: none;
+  --user-shadow-lg: none;
+  color: var(--user-text);
+  background-color: var(--user-bg);
+}
+
+/* Preserve checkout's existing light palette while dark mode inherits the storefront theme. */
+.user-theme.light .checkout-premium {
+  --user-bg: #f7f7f8;
+  --user-bg-elevated: #ffffff;
+  --user-bg-card: #ffffff;
+  --user-bg-hover: #f3f4f6;
+  --user-bg-input: #ffffff;
+  --user-text: #171717;
+  --user-text-secondary: #374151;
+  --user-text-muted: #6b7280;
+  --user-text-subtle: #9ca3af;
+  --user-border: #e2e5e9;
+  --user-border-soft: #e2e5e9;
+  --user-border-hover: #d1d5db;
+  --user-accent: #667085;
+  --user-accent-hover: #667085;
   --user-accent-text: #171717;
+  --user-success: #6b7280;
+
+  --checkout-surface: #ffffff;
+  --checkout-neutral-surface: #ffffff;
+  --checkout-subtle-surface: #f3f4f6;
+  --checkout-border: #e2e5e9;
+  --checkout-border-strong: #d1d5db;
+  --checkout-neutral-text: #6b7280;
+  --checkout-accent-text: #6b7280;
+  --checkout-icon-text: #6b7280;
+  --checkout-status-text: #6b7280;
+  --checkout-control-accent: #6b7280;
+  --checkout-step-active-border: #df9a62;
+  --checkout-step-active-bg: #fff8f1;
+  --checkout-step-active-text: #a94b14;
+  --checkout-step-complete-border: #efc69e;
+  --checkout-step-complete-bg: #fff4e9;
+  --checkout-step-complete-text: #c1571a;
+  --checkout-step-complete-label: #8a6549;
+  --checkout-selection-border: #e5ae7d;
+  --checkout-selection-bg: #fffaf5;
+  --checkout-selection-mark-bg: #fff4e9;
+  --checkout-selection-mark: #c1571a;
+  --checkout-indicator-border: #98a2b3;
+  --checkout-connector: #e2e5e9;
 }
 
 .cart-premium .font-black,
@@ -650,84 +718,67 @@ html:has(.user-theme) {
 /* ✅ `.primary-btn` (shared PrimaryButton) in overrides se exempt hai —
    naye glow/gradient states yahan flatten NAHI hone chahiye. */
 .checkout-premium [class~="bg-[var(--user-accent)]"]:not(.primary-btn) {
-  background-color: #f3f4f6 !important;
+  background-color: var(--checkout-subtle-surface) !important;
 }
 
 .checkout-premium [class*=" bg-[var(--user-accent)]/5"],
 .checkout-premium [class*=" bg-[var(--user-accent)]/10"],
 .checkout-premium [class^="bg-[var(--user-accent)]/5"],
 .checkout-premium [class^="bg-[var(--user-accent)]/10"] {
-  background-color: #ffffff !important;
+  background-color: var(--checkout-neutral-surface) !important;
 }
 
 .checkout-premium [class*="border-[var(--user-accent)]"] {
-  border-color: #d1d5db !important;
+  border-color: var(--checkout-border-strong) !important;
 }
 
-.checkout-premium [class*="text-[var(--user-accent)]"],
-.checkout-premium [class*="text-[var(--user-accent-text)]"],
+.checkout-premium [class*="text-[var(--user-accent)]"] {
+  color: var(--checkout-accent-text) !important;
+}
+
+.checkout-premium [class*="text-[var(--user-accent-text)]"] {
+  color: var(--checkout-icon-text) !important;
+}
+
 .checkout-premium [class*="text-[var(--user-success)]"],
 .checkout-premium [class*="text-emerald-"],
 .checkout-premium [class*="text-orange-"],
 .checkout-premium [class*="text-green-"] {
-  color: #6b7280 !important;
+  color: var(--checkout-status-text) !important;
 }
 
 .checkout-premium [class*="bg-[var(--user-success)]"],
 .checkout-premium [class*="bg-orange-"],
 .checkout-premium [class*="bg-green-"] {
-  background-color: #f3f4f6 !important;
+  background-color: var(--checkout-subtle-surface) !important;
 }
 
 .checkout-premium [class*="border-[var(--user-success)]"],
 .checkout-premium [class*="border-orange-"],
 .checkout-premium [class*="border-green-"] {
-  border-color: #e5e7eb !important;
+  border-color: var(--checkout-border) !important;
 }
 
 .checkout-premium [style*="accentColor"] {
-  accent-color: #6b7280 !important;
+  accent-color: var(--checkout-control-accent) !important;
 }
 
 .checkout-premium button > span[class*="w-8"][class*="h-8"][class*="rounded-full"] {
-  background-color: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  color: #4b5563 !important;
+  background-color: var(--checkout-neutral-surface) !important;
+  border: 1px solid var(--checkout-border-strong) !important;
+  color: var(--checkout-neutral-text) !important;
   box-shadow: none !important;
 }
 
 .checkout-premium div[class*="h-0.5"][class*="bg-[var(--user-accent)]"] {
-  background-color: #e5e7eb !important;
-}
-
-.checkout-premium {
-  --user-bg: #f7f7f8;
-  --user-bg-elevated: #ffffff;
-  --user-bg-card: #ffffff;
-  --user-bg-hover: #f3f4f6;
-  --user-bg-input: #ffffff;
-  --user-text: #171717;
-  --user-text-secondary: #374151;
-  --user-text-muted: #6b7280;
-  --user-text-subtle: #9ca3af;
-  --user-border: #e2e5e9;
-  --user-border-soft: #e2e5e9;
-  --user-border-hover: #d1d5db;
-  --user-accent: #667085;
-  --user-accent-hover: #667085;
-  --user-accent-text: #171717;
-  --user-success: #6b7280;
-
-  --primary: #d96a24;
-  --primary-hover: #c35b1d;
-  --primary-contrast: #ffffff;
+  background-color: var(--checkout-connector) !important;
 }
 
 .checkout-premium [class*=" bg-[var(--user-accent)]/"],
 .checkout-premium [class*=" bg-[var(--user-success)]/"],
 .checkout-premium [class^="bg-[var(--user-accent)]/"],
 .checkout-premium [class^="bg-[var(--user-success)]/"] {
-  background-color: #ffffff !important;
+  background-color: var(--checkout-neutral-surface) !important;
 }
 
 .checkout-premium [class*="hover:bg-"]:hover:not(.primary-btn):not([class^="bg-"]):not([class*=" bg-"]) {
@@ -737,7 +788,7 @@ html:has(.user-theme) {
 }
 
 .checkout-premium [class*="hover:border-"]:hover:not(.primary-btn) {
-  border-color: #e2e5e9 !important;
+  border-color: var(--checkout-border) !important;
 }
 
 .checkout-premium [class*="hover:text-"]:hover:not(.primary-btn) {
@@ -745,25 +796,25 @@ html:has(.user-theme) {
 }
 
 .checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-muted)]"]:hover:not(.primary-btn) {
-  color: #6b7280 !important;
+  color: var(--checkout-neutral-text) !important;
 }
 
 .checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-secondary)]"]:hover:not(.primary-btn) {
-  color: #374151 !important;
+  color: var(--user-text-secondary) !important;
 }
 
 .checkout-premium [class*="hover:text-"][class*="text-[var(--user-text)]"]:hover:not(.primary-btn) {
-  color: #171717 !important;
+  color: var(--user-text) !important;
 }
 
 .checkout-premium [class*="focus:border-"]:focus,
 .checkout-premium [class*="focus:border-"]:focus-visible {
-  border-color: #d1d5db !important;
+  border-color: var(--checkout-border-strong) !important;
 }
 
 .checkout-premium [class*="focus:ring-"]:focus,
 .checkout-premium [class*="focus:ring-"]:focus-visible {
-  --tw-ring-color: #d1d5db !important;
+  --tw-ring-color: var(--checkout-border-strong) !important;
 }
 
 .checkout-premium :is(button, a, [role="button"]):not(.primary-btn):hover,
@@ -784,15 +835,15 @@ html:has(.user-theme) {
   flex: 0 0 1.25rem;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #98a2b3;
+  border: 1.5px solid var(--checkout-indicator-border);
   border-radius: 9999px;
-  background: #ffffff;
+  background: var(--checkout-surface);
   color: transparent;
 }
 
 .checkout-premium .checkout-option-indicator.is-selected {
-  border-color: #c1571a;
-  color: #c1571a;
+  border-color: var(--checkout-selection-mark);
+  color: var(--checkout-selection-mark);
 }
 
 .checkout-premium .checkout-option-indicator--compact {
@@ -802,7 +853,7 @@ html:has(.user-theme) {
 }
 
 .checkout-premium label:has(input[type="radio"]:focus-visible) .checkout-option-indicator {
-  outline: 2px solid #98a2b3;
+  outline: 2px solid var(--checkout-indicator-border);
   outline-offset: 2px;
 }
 
@@ -843,63 +894,63 @@ html:has(.user-theme) {
   height: 2rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e5e9;
+  border: 1px solid var(--checkout-border);
   border-radius: 9999px;
-  background-color: #ffffff;
-  color: #6b7280;
+  background-color: var(--checkout-surface);
+  color: var(--checkout-neutral-text);
   font-size: 0.875rem;
   font-weight: 600;
   transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
 .checkout-premium .checkout-step-marker.is-active {
-  border-color: #df9a62;
-  background-color: #fff8f1;
-  color: #a94b14;
+  border-color: var(--checkout-step-active-border);
+  background-color: var(--checkout-step-active-bg);
+  color: var(--checkout-step-active-text);
 }
 
 .checkout-premium .checkout-step-marker.is-complete {
-  border-color: #efc69e;
-  background-color: #fff4e9;
-  color: #c1571a;
+  border-color: var(--checkout-step-complete-border);
+  background-color: var(--checkout-step-complete-bg);
+  color: var(--checkout-step-complete-text);
 }
 
 .checkout-premium .checkout-step-label {
-  color: #6b7280;
+  color: var(--checkout-neutral-text);
   font-size: 0.75rem;
   font-weight: 500;
 }
 
 .checkout-premium .checkout-step-label.is-active {
-  color: #a94b14;
+  color: var(--checkout-step-active-text);
   font-weight: 600;
 }
 
 .checkout-premium .checkout-step-label.is-complete {
-  color: #8a6549;
+  color: var(--checkout-step-complete-label);
 }
 
 .checkout-premium .checkout-step-connector {
-  background-color: #e2e5e9;
+  background-color: var(--checkout-connector);
 }
 
 .checkout-premium .checkout-step-connector.is-complete {
-  background-color: #efc69e;
+  background-color: var(--checkout-step-complete-border);
 }
 
 .checkout-premium .checkout-selection-card {
-  border-color: #e2e5e9;
-  background-color: #ffffff;
+  border-color: var(--checkout-border);
+  background-color: var(--checkout-surface);
 }
 
 .checkout-premium .checkout-selection-card.is-selected {
-  border-color: #e5ae7d;
-  background-color: #fffaf5;
+  border-color: var(--checkout-selection-border);
+  background-color: var(--checkout-selection-bg);
 }
 
 .checkout-premium .checkout-cart-item {
-  border-color: #e2e5e9;
-  background-color: #ffffff;
+  border-color: var(--checkout-border);
+  background-color: var(--checkout-surface);
   transition: border-color 150ms ease, background-color 150ms ease;
 }
 
@@ -909,8 +960,8 @@ html:has(.user-theme) {
 }
 
 .checkout-premium .checkout-cart-item.is-selected {
-  border-color: #e5ae7d;
-  background-color: #fffaf5;
+  border-color: var(--checkout-selection-border);
+  background-color: var(--checkout-selection-bg);
 }
 
 .checkout-premium .checkout-item-selection {
@@ -922,10 +973,10 @@ html:has(.user-theme) {
   height: 1rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e5ae7d;
+  border: 1px solid var(--checkout-selection-border);
   border-radius: 9999px;
-  background-color: #fff4e9;
-  color: #c1571a;
+  background-color: var(--checkout-selection-mark-bg);
+  color: var(--checkout-selection-mark);
 }
 
 .checkout-premium .checkout-address-indicator {
@@ -934,26 +985,26 @@ html:has(.user-theme) {
   height: 1.25rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--checkout-border-strong);
   border-radius: 9999px;
-  background-color: #ffffff;
+  background-color: var(--checkout-surface);
 }
 
 .checkout-premium .checkout-address-indicator.is-selected {
-  border-color: #c1571a;
+  border-color: var(--checkout-selection-mark);
 }
 
 .checkout-premium .checkout-address-indicator-dot {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 9999px;
-  background-color: #c1571a;
+  background-color: var(--checkout-selection-mark);
 }
 
 .checkout-premium .checkout-selection-check {
-  color: #c1571a;
+  color: var(--checkout-selection-mark);
 }
 
 .checkout-premium label:has(input[type="radio"]:focus-visible) .checkout-option-indicator {
-  outline-color: #c1571a;
+  outline-color: var(--checkout-selection-mark);
 }

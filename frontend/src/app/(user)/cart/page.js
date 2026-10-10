@@ -297,10 +297,15 @@ export default function CartPage() {
   const dealRequirementIssues = getDealRequirementIssues(selectedItems);
   const canCheckout = selectedLineCount > 0 && dealRequirementIssues.length === 0;
   const goToCheckout = () => {
+    // ✅ Validate deal requirements BEFORE navigation
     if (dealRequirementIssues.length) {
-      toast.error(formatDealRequirementIssue(dealRequirementIssues[0]));
+      const firstIssue = dealRequirementIssues[0];
+      toast.error(formatDealRequirementIssue(firstIssue));
+      // ❌ BLOCK navigation - user stays on cart page
       return;
     }
+    
+    // ✅ All validations passed - proceed to checkout
     if (selectedLineCount > 0) router.push("/checkout");
   };
 
@@ -601,6 +606,10 @@ export default function CartPage() {
               const Icon = badgeConfig?.icon || Sparkles;
               const isCollapsed = collapsedDeals.has(dealGroup.dealId);
               
+              // ✅ Check deal requirement for this group
+              const selectedDealItems = dealGroup.items.filter(item => isLineSelected(item.key));
+              const dealIssue = selectedDealItems.length > 0 ? getDealRequirementIssues(selectedDealItems)[0] : null;
+              
               return (
                 <div key={dealGroup.dealId || di} className="rounded-2xl border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-pink-500/5 overflow-hidden">
                   <div className={`flex items-center gap-3 px-4 py-3.5 ${!isCollapsed ? "border-b-2 border-purple-500/20" : ""}`}>
@@ -636,6 +645,15 @@ export default function CartPage() {
                       {dealGroup.items.map((row) => (
                         <ItemRow key={row.key} row={row} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
                       ))}
+                      {/* ✅ Deal requirement warning */}
+                      {dealIssue && (
+                        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 flex items-start gap-2">
+                          <CircleAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-200 font-semibold">
+                            Add {dealIssue.remainingQuantity} more item{dealIssue.remainingQuantity === 1 ? '' : 's'} to unlock this deal ({dealIssue.quantity}/{dealIssue.requiredQuantity} selected)
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -719,7 +737,7 @@ export default function CartPage() {
               <button
                 type="button"
                 onClick={goToCheckout}
-                disabled={!canCheckout}
+                disabled={selectedLineCount === 0}
                 className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] py-4 text-sm font-black uppercase tracking-widest text-[var(--user-accent-text)] hover:opacity-90 hover:shadow-xl hover:shadow-[var(--user-accent)]/20 active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50"
               >
                 {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : dealRequirementIssues.length ? "Complete deal requirements" : "Select items to checkout"}
@@ -751,7 +769,7 @@ export default function CartPage() {
             </div>
             <button
               onClick={goToCheckout}
-              disabled={!canCheckout}
+              disabled={selectedLineCount === 0}
               className="h-12 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition disabled:pointer-events-none disabled:opacity-50"
             >
               {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
@@ -874,7 +892,7 @@ export default function CartPage() {
             <button
               type="button"
               onClick={goToCheckout}
-              disabled={!canCheckout}
+              disabled={selectedLineCount === 0}
               className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition shadow-lg shadow-[var(--user-accent)]/20 disabled:pointer-events-none disabled:opacity-50"
             >
               {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
