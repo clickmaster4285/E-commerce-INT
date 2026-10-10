@@ -39,6 +39,11 @@
   --user-accent-text:   #ffffff;
   --user-accent-soft:   rgba(245, 114, 36, 0.14);
 
+  /* Checkout primary actions */
+  --primary:            #d96a24;
+  --primary-hover:      #c35b1d;
+  --primary-contrast:   #ffffff;
+
   /* Logo background (dono modes mein white) */
   --user-logo-bg:       #ffffff;
 
@@ -98,6 +103,11 @@
   --user-accent-hover:  #d9621c;
   --user-accent-text:   #ffffff;
   --user-accent-soft:   rgba(245, 114, 36, 0.10);
+
+  /* Checkout primary actions */
+  --primary:            #d96a24;
+  --primary-hover:      #c35b1d;
+  --primary-contrast:   #ffffff;
 
   --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.06);
   --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);
@@ -575,12 +585,12 @@ html:has(.user-theme) {
 }
 
 .cart-premium [class*="shadow-"],
-.checkout-premium [class*="shadow-"] {
+.checkout-premium [class*="shadow-"]:not(.primary-btn) {
   box-shadow: none !important;
 }
 
 .cart-premium [class*="bg-gradient"],
-.checkout-premium [class*="bg-gradient"] {
+.checkout-premium [class*="bg-gradient"]:not(.primary-btn) {
   background-image: none !important;
   background-color: var(--user-bg-hover) !important;
 }
@@ -637,7 +647,9 @@ html:has(.user-theme) {
   background-color: var(--user-bg-hover) !important;
 }
 
-.checkout-premium [class~="bg-[var(--user-accent)]"]:not(.checkout-primary-cta) {
+/* ✅ `.primary-btn` (shared PrimaryButton) in overrides se exempt hai —
+   naye glow/gradient states yahan flatten NAHI hone chahiye. */
+.checkout-premium [class~="bg-[var(--user-accent)]"]:not(.primary-btn) {
   background-color: #f3f4f6 !important;
 }
 
@@ -705,6 +717,10 @@ html:has(.user-theme) {
   --user-accent-hover: #667085;
   --user-accent-text: #171717;
   --user-success: #6b7280;
+
+  --primary: #d96a24;
+  --primary-hover: #c35b1d;
+  --primary-contrast: #ffffff;
 }
 
 .checkout-premium [class*=" bg-[var(--user-accent)]/"],
@@ -714,29 +730,29 @@ html:has(.user-theme) {
   background-color: #ffffff !important;
 }
 
-.checkout-premium [class*="hover:bg-"]:hover:not(.checkout-primary-cta):not([class^="bg-"]):not([class*=" bg-"]) {
+.checkout-premium [class*="hover:bg-"]:hover:not(.primary-btn):not([class^="bg-"]):not([class*=" bg-"]) {
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
 }
 
-.checkout-premium [class*="hover:border-"]:hover:not(.checkout-primary-cta) {
+.checkout-premium [class*="hover:border-"]:hover:not(.primary-btn) {
   border-color: #e2e5e9 !important;
 }
 
-.checkout-premium [class*="hover:text-"]:hover:not(.checkout-primary-cta) {
+.checkout-premium [class*="hover:text-"]:hover:not(.primary-btn) {
   color: inherit !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-muted)]"]:hover:not(.checkout-primary-cta) {
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-muted)]"]:hover:not(.primary-btn) {
   color: #6b7280 !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-secondary)]"]:hover:not(.checkout-primary-cta) {
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-secondary)]"]:hover:not(.primary-btn) {
   color: #374151 !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text)]"]:hover:not(.checkout-primary-cta) {
+.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text)]"]:hover:not(.primary-btn) {
   color: #171717 !important;
 }
 
@@ -750,33 +766,14 @@ html:has(.user-theme) {
   --tw-ring-color: #d1d5db !important;
 }
 
-.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):hover,
-.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):active {
+.checkout-premium :is(button, a, [role="button"]):not(.primary-btn):hover,
+.checkout-premium :is(button, a, [role="button"]):not(.primary-btn):active {
   box-shadow: none !important;
   transform: none !important;
   opacity: 1 !important;
 }
 
-.checkout-premium :is(button, a, [role="button"]):not(.checkout-primary-cta):hover {
-  opacity: 1 !important;
-}
-
-.checkout-premium .checkout-primary-cta {
-  background-color: #e09a2d !important;
-  border: 1px solid #e09a2d !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  color: #000000 !important;
-  font-weight: 500 !important;
-  letter-spacing: normal !important;
-  text-transform: none !important;
-  transform: none !important;
-}
-
-.checkout-premium .checkout-primary-cta:hover {
-  background-color: #c98220 !important;
-  border-color: #c98220 !important;
-  color: #000000 !important;
+.checkout-premium :is(button, a, [role="button"]):not(.primary-btn):hover {
   opacity: 1 !important;
 }
 
@@ -794,8 +791,8 @@ html:has(.user-theme) {
 }
 
 .checkout-premium .checkout-option-indicator.is-selected {
-  border-color: #e09a2d;
-  color: #e09a2d;
+  border-color: #c1571a;
+  color: #c1571a;
 }
 
 .checkout-premium .checkout-option-indicator--compact {
@@ -821,4 +818,142 @@ html:has(.user-theme) {
 .cart-premium :is(a, button)[class*="bg-[var(--user-accent)]"]:hover {
   background-color: var(--user-accent-hover) !important;
   opacity: 1 !important;
+}
+
+.primary-btn {
+  background-color: var(--primary, #d96a24);
+  border-color: var(--primary, #d96a24);
+  color: var(--primary-contrast, #ffffff);
+  box-shadow: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background-color: var(--primary-hover, #c35b1d);
+  border-color: var(--primary-hover, #c35b1d);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: none;
+}
+
+.checkout-premium .checkout-step-marker {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e5e9;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.checkout-premium .checkout-step-marker.is-active {
+  border-color: #df9a62;
+  background-color: #fff8f1;
+  color: #a94b14;
+}
+
+.checkout-premium .checkout-step-marker.is-complete {
+  border-color: #efc69e;
+  background-color: #fff4e9;
+  color: #c1571a;
+}
+
+.checkout-premium .checkout-step-label {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.checkout-premium .checkout-step-label.is-active {
+  color: #a94b14;
+  font-weight: 600;
+}
+
+.checkout-premium .checkout-step-label.is-complete {
+  color: #8a6549;
+}
+
+.checkout-premium .checkout-step-connector {
+  background-color: #e2e5e9;
+}
+
+.checkout-premium .checkout-step-connector.is-complete {
+  background-color: #efc69e;
+}
+
+.checkout-premium .checkout-selection-card {
+  border-color: #e2e5e9;
+  background-color: #ffffff;
+}
+
+.checkout-premium .checkout-selection-card.is-selected {
+  border-color: #e5ae7d;
+  background-color: #fffaf5;
+}
+
+.checkout-premium .checkout-cart-item {
+  border-color: #e2e5e9;
+  background-color: #ffffff;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.checkout-premium .checkout-cart-item-mobile {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+.checkout-premium .checkout-cart-item.is-selected {
+  border-color: #e5ae7d;
+  background-color: #fffaf5;
+}
+
+.checkout-premium .checkout-item-selection {
+  position: absolute;
+  top: -0.25rem;
+  left: -0.25rem;
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5ae7d;
+  border-radius: 9999px;
+  background-color: #fff4e9;
+  color: #c1571a;
+}
+
+.checkout-premium .checkout-address-indicator {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 9999px;
+  background-color: #ffffff;
+}
+
+.checkout-premium .checkout-address-indicator.is-selected {
+  border-color: #c1571a;
+}
+
+.checkout-premium .checkout-address-indicator-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #c1571a;
+}
+
+.checkout-premium .checkout-selection-check {
+  color: #c1571a;
+}
+
+.checkout-premium label:has(input[type="radio"]:focus-visible) .checkout-option-indicator {
+  outline-color: #c1571a;
 }

@@ -16,6 +16,8 @@ import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, is
 import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
+import PrimaryButton from "@/components/shared/PrimaryButton";
 import {
   ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
@@ -24,6 +26,12 @@ import {
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+const getPhoneValidationError = (value) => {
+  if (!value) return "Phone number is required";
+  if (value.length < PHONE_MIN) return `Phone number must be at least ${PHONE_MIN} digits`;
+  if (!isValidPhone(value)) return `Phone number must be at most ${PHONE_MAX} digits`;
+  return "";
+};
 const getImgUrl = (img) => {
   const raw = typeof img === "string" ? img : img?.img_url;
   if (!raw) return null;
@@ -191,9 +199,15 @@ function CheckoutContent() {
   const [placing, setPlacing] = useState(false);
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [phoneSubmitted, setPhoneSubmitted] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
+  const savingPhoneRef = useRef(false);
   const draftCreateInFlight = useRef(false);
   const placingRef = useRef(false);
+  const phoneValidationError = getPhoneValidationError(phone);
+  const phoneError = phoneTouched || phoneSubmitted ? phoneValidationError : "";
+  const phoneIsValid = !phoneValidationError;
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -320,7 +334,19 @@ function CheckoutContent() {
     setStep(1);
   };
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
+  useEffect(() => { if (user?.phone) setPhone((p) => p || normalizePhone(user.phone)); }, [user]);
+
+  const handlePhoneChange = (event) => {
+    setPhone(event.target.value.replace(/\D/g, "").slice(0, PHONE_MAX));
+  };
+  const handlePhonePaste = (event) => {
+    event.preventDefault();
+    setPhone(event.clipboardData.getData("text").replace(/\D/g, "").slice(0, PHONE_MAX));
+  };
+  const handlePhoneKeyDown = (event) => {
+    if (event.ctrlKey || event.metaKey || event.key.length !== 1) return;
+    if (!/\d/.test(event.key)) event.preventDefault();
+  };
 
   // ✅ If the user arrives at /checkout with 0 selected items (and cart has items),
   //    send them back to /cart so they can pick what to buy.
@@ -502,14 +528,22 @@ function CheckoutContent() {
   const needsPhone = !!user && !user.phone;
 
   const savePhone = async () => {
-    if (!/^[0-9+\-\s]{7,20}$/.test(phone)) return toast.error("Please enter a valid phone number");
+    setPhoneSubmitted(true);
+    const normalizedPhone = normalizePhone(phone);
+    const validationError = getPhoneValidationError(normalizedPhone);
+    if (validationError) {
+      setPhone(normalizedPhone);
+      return;
+    }
+    if (savingPhoneRef.current) return;
+    savingPhoneRef.current = true;
     setSavingPhone(true);
     try {
-      await userHttp.put("/users/phone", { phone });
+      await userHttp.put("/users/phone", { phone: normalizedPhone });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       toast.success("Phone number saved!");
     } catch (e) { toast.error(e.response?.data?.message || "Phone save failed"); }
-    finally { setSavingPhone(false); }
+    finally { savingPhoneRef.current = false; setSavingPhone(false); }
   };
 
   const openAddressModal = () => {
@@ -615,10 +649,15 @@ function CheckoutContent() {
 
   // ✅ THEME-SAFE classes — no hardcoded white/black on accent
   const inputCls = "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] hover:border-[var(--user-accent)]/40";
+  const phoneInputCls = `w-full h-11 rounded-lg border bg-[var(--user-bg-card)] px-3.5 text-sm text-[var(--user-text)] outline-none transition-colors ${
+    phoneError
+      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+      : "border-[var(--user-border)] focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+  }`;
   const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
-  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:bg-[var(--user-accent-hover)] transition-colors";
+  // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
   const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
 
   const StepIndicator = () => (
@@ -629,17 +668,20 @@ function CheckoutContent() {
         const done = step > n;
         return (
           <div key={label} className="flex items-start">
-            <button onClick={() => done && goToStep(n)} className={`flex flex-col items-center gap-1.5 w-20 sm:w-24 ${done ? "cursor-pointer" : "cursor-default"}`}>
-              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all duration-300 ${
-                done || active
-                  ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md shadow-[var(--user-accent)]/30"
-                  : "bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] text-[var(--user-text-muted)]"}`}>
+            <button
+              type="button"
+              onClick={() => done && goToStep(n)}
+              disabled={!done}
+              aria-current={active ? "step" : undefined}
+              className={`checkout-step flex flex-col items-center gap-1.5 w-20 sm:w-24 ${done ? "cursor-pointer" : "cursor-default"}`}
+            >
+              <span className={`checkout-step-marker ${done ? "is-complete" : active ? "is-active" : "is-upcoming"}`}>
                 {done ? <Check size={15} /> : n}
               </span>
-              <span className={`text-xs font-bold ${active || done ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>{label}</span>
+              <span className={`checkout-step-label ${active ? "is-active" : done ? "is-complete" : "is-upcoming"}`}>{label}</span>
             </button>
             {n < 3 && (
-              <div className={`h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
+              <div className={`checkout-step-connector h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "is-complete" : ""}`} />
             )}
           </div>
         );
@@ -749,14 +791,43 @@ function CheckoutContent() {
             <div className="w-14 h-14 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-5">
               <Phone size={24} className="text-[var(--user-accent-text)]" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-2">Phone Number Required</h2>
-            <p className="text-sm text-[var(--user-text-muted)] mb-6">We need your phone number for delivery updates and order confirmation.</p>
-            <label className={labelCls}>Phone Number</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className={inputCls} />
-            <button onClick={savePhone} disabled={savingPhone} className={`checkout-primary-cta mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
-              {savingPhone ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-              Save & Continue
-            </button>
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
+              <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+            </div>
+            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+            <input
+              id="checkout-phone-desktop"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={PHONE_MAX}
+              pattern="[0-9]*"
+              required
+              aria-invalid={phoneError ? "true" : undefined}
+              aria-describedby={phoneError ? "checkout-phone-helper-desktop checkout-phone-error-desktop" : "checkout-phone-helper-desktop"}
+              value={phone}
+              onChange={handlePhoneChange}
+              onPaste={handlePhonePaste}
+              onKeyDown={handlePhoneKeyDown}
+              onBlur={() => setPhoneTouched(true)}
+              placeholder="Enter phone number"
+              className={phoneInputCls}
+            />
+            <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
+              {phoneError ? <p id="checkout-phone-error-desktop" className="text-xs text-red-600">{phoneError}</p> : <span />}
+              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+            </div>
+            <PrimaryButton
+              onClick={savePhone}
+              disabled={!phoneIsValid}
+              loading={savingPhone}
+              loadingText="Saving..."
+              iconEnd={ArrowRight}
+              className="mt-6 h-12"
+            >
+              Save &amp; Continue
+            </PrimaryButton>
           </div>
         </div>
       ) : (
@@ -785,9 +856,14 @@ function CheckoutContent() {
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
                   <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[26.25rem] sm:max-h-[32.5rem] lg:max-h-none lg:flex-1 lg:min-h-0 custom-scrollbar">
                     {itemsWithDiscounts.map((item) => {
+                      const isSelected = selectedItems.some((selectedItem) => selectedItem.key === item.key)
+                        || draftItems.some((draftItem) => draftItem.key === item.key);
                       return (
-                        <div key={item.key} className="flex items-start gap-4 p-4 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)]">
-                          <ItemThumb item={item} size="w-16 h-16" />
+                        <div key={item.key} className={`checkout-cart-item flex items-start gap-4 p-4 rounded-xl border ${isSelected ? "is-selected" : ""}`}>
+                          <div className="checkout-item-thumb relative shrink-0">
+                            <ItemThumb item={item} size="w-16 h-16" />
+                            {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
                             {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{item.variantTitle}</p>}
@@ -827,9 +903,14 @@ function CheckoutContent() {
               {/* RIGHT: Summary with Proceed button */}
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
-                    Proceed to Delivery <ArrowRight size={16} />
-                  </button>
+                  <PrimaryButton
+                    onClick={proceedToStep2}
+                    disabled={!selectedCartItems.length}
+                    iconEnd={ArrowRight}
+                    className="h-12"
+                  >
+                    Proceed to Delivery
+                  </PrimaryButton>
                   <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
                     <span className="font-semibold">Secure checkout · SSL encrypted</span>
@@ -846,9 +927,14 @@ function CheckoutContent() {
                   <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{selectedCartItems.length} selected</p>
                   <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                 </div>
-                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`checkout-primary-cta h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
-                  Proceed <ArrowRight size={14} />
-                </button>
+                <PrimaryButton
+                  onClick={proceedToStep2}
+                  disabled={!selectedCartItems.length}
+                  iconEnd={ArrowRight}
+                    className="h-11 w-auto shrink-0 px-5"
+                >
+                  Proceed
+                </PrimaryButton>
               </div>
             </div>
           )}
@@ -872,10 +958,10 @@ function CheckoutContent() {
                       {addresses.map((a) => {
                         const sel = selectedAddressId === a._id;
                         return (
-                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`checkout-selection-card text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${sel ? "is-selected" : ""}`}>
                           <div className="flex items-start gap-3">
-                            <span className={`mt-0.5 w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center shrink-0 ${sel ? "border-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
-                              {sel && <span className="w-2.5 h-2.5 rounded-full bg-[var(--user-accent)]" />}
+                            <span className={`checkout-address-indicator mt-0.5 shrink-0 ${sel ? "is-selected" : ""}`}>
+                              {sel && <span className="checkout-address-indicator-dot" />}
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -947,7 +1033,7 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${active ? "is-selected" : ""}`}>
                           <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
                             {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                           </span>
@@ -986,7 +1072,7 @@ function CheckoutContent() {
                       { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our bank account" },
                       { id: "card", icon: CreditCard, title: "Card", sub: "Visa, Mastercard, American Express" },
                     ].map((m) => (
-                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${paymentMethod === m.id ? "is-selected" : ""}`}>
                         <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
                           {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                         </span>
@@ -1041,9 +1127,13 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`checkout-primary-cta w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
-                    Review Order <ArrowRight size={16} />
-                  </button>
+                  <PrimaryButton
+                    onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")}
+                    iconEnd={ArrowRight}
+                    className="h-12"
+                  >
+                    Review Order
+                  </PrimaryButton>
                   <button onClick={backToStep1} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back to Cart
                   </button>
@@ -1132,10 +1222,15 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={placeOrder} disabled={placing} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 ${accentBtn}`}>
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing Order..." : "Place Order"}
-                  </button>
+                  <PrimaryButton
+                    onClick={placeOrder}
+                    loading={placing}
+                    loadingText="Placing Order..."
+                    icon={Lock}
+                    className="h-12"
+                  >
+                    Place Order
+                  </PrimaryButton>
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back
                   </button>
@@ -1230,14 +1325,43 @@ function CheckoutContent() {
                 <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-4">
                   <Phone size={22} className="text-[var(--user-accent-text)]" />
                 </div>
-                <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Phone Number Required</h2>
-                <p className="text-xs text-[var(--user-text-muted)] mb-5">We need your phone number for delivery updates and order confirmation.</p>
-                <label className="block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider">Phone Number</label>
-                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className="w-full h-12 px-4 rounded-xl text-sm outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)]" />
-                <button onClick={savePhone} disabled={savingPhone} className="mt-5 w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50">
-                  {savingPhone ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-                  Save & Continue
-                </button>
+                <div className="space-y-1.5">
+                  <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
+                  <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+                </div>
+                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+                <input
+                  id="checkout-phone-mobile"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={PHONE_MAX}
+                  pattern="[0-9]*"
+                  required
+                  aria-invalid={phoneError ? "true" : undefined}
+                  aria-describedby={phoneError ? "checkout-phone-helper-mobile checkout-phone-error-mobile" : "checkout-phone-helper-mobile"}
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  onPaste={handlePhonePaste}
+                  onKeyDown={handlePhoneKeyDown}
+                  onBlur={() => setPhoneTouched(true)}
+                  placeholder="Enter phone number"
+                  className={phoneInputCls}
+                />
+                <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
+                  {phoneError ? <p id="checkout-phone-error-mobile" className="text-xs text-red-600">{phoneError}</p> : <span />}
+                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+                </div>
+                <PrimaryButton
+                  onClick={savePhone}
+                  disabled={!phoneIsValid}
+                  loading={savingPhone}
+                  loadingText="Saving..."
+                  iconEnd={ArrowRight}
+                  className="mt-5 h-12"
+                >
+                  Save &amp; Continue
+                </PrimaryButton>
               </div>
             </div>
           </div>
@@ -1317,9 +1441,15 @@ function CheckoutContent() {
 
               {/* Compact item rows */}
               <div className="space-y-2 max-h-[16.25rem] overflow-y-auto pr-1 custom-scrollbar">
-                {itemsWithDiscounts.map((i) => (
-                  <div key={i.key} className="flex items-center gap-2.5">
-                    <ItemThumb item={i} size="w-12 h-12" />
+                {itemsWithDiscounts.map((i) => {
+                  const isSelected = selectedItems.some((selectedItem) => selectedItem.key === i.key)
+                    || draftItems.some((draftItem) => draftItem.key === i.key);
+                  return (
+                  <div key={i.key} className={`checkout-cart-item checkout-cart-item-mobile flex items-center gap-2.5 rounded-lg border p-1.5 ${isSelected ? "is-selected" : ""}`}>
+                    <div className="checkout-item-thumb relative shrink-0">
+                      <ItemThumb item={i} size="w-12 h-12" />
+                      {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -1329,7 +1459,8 @@ function CheckoutContent() {
                     </div>
                     <p className="text-[0.75rem] font-black text-[var(--user-text)] shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Free shipping threshold banner (matches desktop) */}
@@ -1346,7 +1477,7 @@ function CheckoutContent() {
                 <Truck size={13} /> Delivery Method
               </p>
               <div className="space-y-1.5">
-                {shippingMethodsMob.map((m) => {
+                  {shippingMethodsMob.map((m) => {
                   const active = shippingMethod === m.id;
                   const IconComp = m.icon;
                   // ✅ Custom method => uska apna fee; warna standard/express config fee
@@ -1356,7 +1487,7 @@ function CheckoutContent() {
                   return (
                     <label
                       key={m.id}
-                      className={`flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}
+                      className={`checkout-selection-card flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition-colors duration-150 ${active ? "is-selected" : ""}`}
                     >
                       <input
                         type="radio"
@@ -1400,10 +1531,8 @@ function CheckoutContent() {
                       type="button"
                       onClick={() => setPaymentMethod(m.id)}
                       aria-pressed={active}
-                      className={`w-full flex flex-col items-center justify-center px-2 py-2 rounded-xl border-2 transition active:scale-95 ${
-                        active
-                          ? "border-[var(--user-accent)] bg-[var(--user-accent)]/10 text-[var(--user-accent)]"
-                          : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/40"
+                      className={`checkout-selection-card w-full flex flex-col items-center justify-center px-2 py-2 rounded-xl border-2 transition-colors duration-150 ${
+                        active ? "is-selected" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
                       }`}
                     >
                       <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
@@ -1514,15 +1643,15 @@ function CheckoutContent() {
                 </p>
                 <p className="text-base font-black text-[var(--user-accent)] leading-none mt-0.5">Rs. {grandTotal.toLocaleString()}</p>
               </div>
-              <button
-                type="button"
+              <PrimaryButton
                 onClick={() => setOrderReviewOpen(true)}
-                disabled={placing}
-                className="checkout-primary-cta h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
+                loading={placing}
+                loadingText="Placing..."
+                icon={Lock}
+                className="h-11 w-auto shrink-0 px-6"
               >
-                {placing ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {placing ? "Placing..." : "Place Order"}
-              </button>
+                Place Order
+              </PrimaryButton>
             </div>
           </div>
 
@@ -1569,7 +1698,7 @@ function CheckoutContent() {
                       return (
                         <div
                           key={a._id}
-                          className={`w-full text-left rounded-xl border-2 p-3 transition ${isSel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)]"}`}
+                          className={`checkout-selection-card w-full text-left rounded-xl border-2 p-3 transition-colors duration-150 ${isSel ? "is-selected" : ""}`}
                         >
                           <button
                             type="button"
@@ -1580,7 +1709,7 @@ function CheckoutContent() {
                               <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">{a.full_name}</p>
                               <span className="text-[0.6875rem] text-[var(--user-text-muted)] font-semibold">· {a.phone}</span>
                               {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">DEFAULT</span>}
-                              {isSel && <Check size={14} className="text-[var(--user-accent)] ml-auto shrink-0" />}
+                              {isSel && <Check size={14} className="checkout-selection-check ml-auto shrink-0" />}
                             </div>
                             <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 leading-snug">
                               {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
@@ -1647,15 +1776,15 @@ function CheckoutContent() {
 
                 {/* Confirm button — calls EXISTING submit handler */}
                 <div className="px-4 pt-2 pb-1">
-                  <button
-                    type="button"
+                  <PrimaryButton
                     onClick={placeOrder}
-                    disabled={placing}
-                    className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
+                    loading={placing}
+                    loadingText="Placing..."
+                    icon={Lock}
+                    className="h-12"
                   >
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing..." : "Confirm & Place Order"}
-                  </button>
+                    Confirm &amp; Place Order
+                  </PrimaryButton>
                 </div>
               </div>
             </div>
@@ -1693,10 +1822,15 @@ function CheckoutContent() {
                   </div>
                 </div>
                 <div className="px-4 pt-2 pb-1">
-                  <button type="button" onClick={placeOrder} disabled={placing} className="checkout-primary-cta w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing..." : "Confirm & Place Order"}
-                  </button>
+                  <PrimaryButton
+                    onClick={placeOrder}
+                    loading={placing}
+                    loadingText="Placing..."
+                    icon={Lock}
+                    className="h-12"
+                  >
+                    Confirm &amp; Place Order
+                  </PrimaryButton>
                 </div>
               </div>
             </div>

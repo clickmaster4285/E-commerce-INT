@@ -37,7 +37,12 @@ export function smartImageLoader({ src, width, quality }) {
     // Fast image CDN → direct (optimizer round-trip se bacho, LCP fast)
     if (FAST_CDN.test(host)) return absolute;
     // Optimizer block karega (400) → direct src (koi regression nahi)
-    if (PRIVATE_HOST.test(host) && !LOCAL_OPTIMIZE) return absolute;
+    if (PRIVATE_HOST.test(host) && !LOCAL_OPTIMIZE) {
+      const directUrl = new URL(absolute);
+      directUrl.searchParams.set("w", String(width));
+      directUrl.searchParams.set("q", String(q));
+      return directUrl.toString();
+    }
   } catch {
     return src;
   }
