@@ -214,16 +214,45 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
 // ✅ Card validation helper function
 const validateCardDetails = (cardData) => {
   const trimmedName = String(cardData.name || "").trim();
-  const cleanNumber = String(cardData.number || "").replace(/[\s-]/g, "");
+  const cleanNumber = String(cardData.number || "").replace(/\s/g, "");
   const cleanExpiry = String(cardData.expiry || "").trim();
 
   // 1. Card Number validation
   if (!cleanNumber) {
     return { valid: false, field: "number", message: "Please enter your card number." };
   }
-  if (!/^\d{13,19}$/.test(cleanNumber)) {
-    return { valid: false, field: "number", message: "Please enter a valid card number." };
+  if (!/^\d+$/.test(cleanNumber)) {
+    return { valid: false, field: "number", message: "Card number can contain digits only." };
   }
+
+  const brand = getCardBrand(cleanNumber);
+  const supportedLengths = {
+    VISA: [13, 16, 19],
+    Mastercard: [16],
+    AMEX: [15],
+  };
+  const brandName = {
+    VISA: "Visa",
+    Mastercard: "Mastercard",
+    AMEX: "American Express",
+  }[brand];
+
+  if (!brandName) {
+    return {
+      valid: false,
+      field: "number",
+      message: "Please enter a Visa, Mastercard, or American Express card number.",
+    };
+  }
+  if (!supportedLengths[brand].includes(cleanNumber.length)) {
+    const lengths = supportedLengths[brand].join(", ");
+    return {
+      valid: false,
+      field: "number",
+      message: `Please enter a valid ${brandName} card number (${lengths} digits).`,
+    };
+  }
+
   // Luhn algorithm check
   let sum = 0;
   let isEven = false;
@@ -237,7 +266,7 @@ const validateCardDetails = (cardData) => {
     isEven = !isEven;
   }
   if (sum % 10 !== 0) {
-    return { valid: false, field: "number", message: "Please enter a valid card number." };
+    return { valid: false, field: "number", message: `Please enter a valid ${brandName} card number.` };
   }
 
   // 2. Card Holder Name validation
@@ -433,6 +462,7 @@ function CheckoutContent() {
       name: validation.field === "name" ? validation.message : "",
       expiry: validation.field === "expiry" ? validation.message : "",
     });
+    if (validation.field === "number") toast.error(validation.message);
     setOrderReviewOpen(false);
     if (step === 3) setStep(2);
 
@@ -928,7 +958,7 @@ function CheckoutContent() {
     <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
       <h2 className="text-lg font-black text-[var(--user-text)] mb-4">Order Summary</h2>
 
-      <div className="space-y-4 my-4 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 mb-5 custom-scrollbar">
+      <div className="space-y-3 mt-4 mb-0 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 custom-scrollbar">
         {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
@@ -952,7 +982,7 @@ function CheckoutContent() {
         ))}
       </div>
 
-      <div className="space-y-2.5 pt-4 border-t border-[var(--user-border)] text-[0.8125rem]">
+      <div className="space-y-2.5 pt-3 border-t border-[var(--user-border)] text-[0.8125rem]">
         <div className="flex justify-between">
           <span className="text-[var(--user-text)] font-medium">Subtotal</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
@@ -1402,8 +1432,8 @@ function CheckoutContent() {
           {step === 3 && (
             <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
               <div className="space-y-4 sm:space-y-5">
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
+                <div className={`${cardCls} p-6`}>
+                  <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
                       <ShieldCheck size={18} className="text-[var(--user-accent-text)]" />
                     </div>
@@ -1419,7 +1449,7 @@ function CheckoutContent() {
                         <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
                       </div>
                       {selectedAddress && (
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <p className="text-sm font-bold text-[var(--user-text)]">{selectedAddress.full_name}</p>
                           <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
                             {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}<br />
@@ -1450,13 +1480,13 @@ function CheckoutContent() {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4">
-                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider mb-3">Order Items ({itemsWithDiscounts.length})</p>
-                    <div className="divide-y-2 divide-[var(--user-border)] space-y-3">
+                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4 space-y-5">
+                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Order Items ({itemsWithDiscounts.length})</p>
+                    <div className="divide-y divide-[var(--user-border)]">
                       {itemsWithDiscounts.map((i) => (
-                        <div key={i.key} className="flex items-start gap-3 pt-3 first:pt-0">
+                        <div key={i.key} className="flex items-start gap-4 py-1.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-14 h-14" />
-                          <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{i.name}</p>
 {i.dealActive && i.dealId && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -1490,7 +1520,7 @@ function CheckoutContent() {
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back
                   </button>
-                  <div className="flex items-center justify-center gap-2 pt-3 border-t border-[var(--user-border)]">
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--user-border)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
                     <span className="text-xs text-[var(--user-text-muted)] font-semibold">Your payment is secure and encrypted</span>
                   </div>
@@ -1654,7 +1684,7 @@ function CheckoutContent() {
             </div>
           </div>
 
-          <div className="px-3 pt-3 pb-28 space-y-2">
+          <div className="px-3 pt-3 pb-28 space-y-3">
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] overflow-hidden">
               <p className="px-3 pt-2.5 pb-1.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
@@ -2097,9 +2127,10 @@ function CheckoutContent() {
                   <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">Order Review</h3>
                   <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
                 </div>
-                <div className="p-3 space-y-2">
+                <div className="p-4 space-y-3">
+                  <div className="divide-y divide-[var(--user-border)]">
                   {itemsWithDiscounts.map((i) => (
-                    <div key={i.key} className="flex items-center gap-2.5">
+                    <div key={i.key} className="flex items-center gap-4 py-1.5 first:pt-0 last:pb-0">
                       <ItemThumb item={i} size="w-12 h-12" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
@@ -2108,19 +2139,20 @@ function CheckoutContent() {
                       <p className="text-[0.75rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
                     </div>
                   ))}
-                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-2.5 text-[0.6875rem] space-y-1">
+                  </div>
+                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-3 text-[0.6875rem] space-y-1.5">
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : "No address selected"}</p>
                     {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}</p>
                   </div>
-                  <div className="space-y-1.5 text-[0.75rem] pt-1">
+                  <div className="space-y-2.5 text-[0.75rem] pt-3">
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Items Total</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
                     {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">You Save</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-bold">{shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}</span></div>
-                    <div className="flex justify-between items-baseline pt-2 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>
-                <div className="px-4 pt-2 pb-1">
+                <div className="px-4 pt-3 pb-1">
                   <PrimaryButton
                     onClick={placeOrder}
                     loading={placing}

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { smartImageLoader } from "@/utils/smartImageLoader";
+import { formatPrice } from "@/utils/homeCatalog";
 import {
   Heart,
   ShoppingCart,
@@ -93,6 +94,7 @@ function ProductCardInner({
   deal = null,
   dealId = null,
   showDealPricing = false,
+  dealCarousel = false,
   children,
   // ✅ LCP rows ke liye: pehli 1-2 cards priority (eager+high), baaki lazy — default same
   priority = false,
@@ -101,7 +103,7 @@ function ProductCardInner({
   const [adding, setAdding] = useState(false);
   const [failedImage, setFailedImage] = useState("");
   const router = useRouter();
-  const { addToCart } = useCart();
+  const { addToCart, cart = [] } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
   const { calculateProductDiscount, getActiveDealForProduct } = useDiscounts();
   const { openQuickBuy } = useQuickBuy() || {};
@@ -113,15 +115,19 @@ function ProductCardInner({
 
   const variants = product.variants || [];
   const firstVariant = variants[0];
+  const pricedVariant = variants.find((variant) => Number(variant?.selling_price) > 0) || firstVariant;
 
   const image =
     firstVariant?.images?.[0]?.img_url ||
     product.image ||
     product.images?.[0]?.img_url;
-  const variantPrice = Number(
-    firstVariant?.selling_price || product.price || product.selling_price || 0,
-  );
-  const variantOldPrice = Number(firstVariant?.price || product.price || 0);
+  const variantPrice =
+    Number(pricedVariant?.selling_price) ||
+    Number(product.price) ||
+    Number(product.selling_price) ||
+    Number(pricedVariant?.price) ||
+    0;
+  const variantOldPrice = Number(pricedVariant?.price || product.regularPrice || product.price || variantPrice || 0);
 
   let price = variantPrice;
   let oldPrice = variantOldPrice;
@@ -134,8 +140,16 @@ function ProductCardInner({
       showDealPricing,
       deal,
     );
-    price = disc.discountedPrice;
-    oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
+    const calculatedPrice = Number(disc.discountedPrice);
+    const originalPrice = Number(disc.originalPrice) || variantPrice || variantOldPrice;
+    if (dealCarousel) {
+      const validCalculatedPrice = Number.isFinite(calculatedPrice) && calculatedPrice > 0 && calculatedPrice <= originalPrice;
+      price = validCalculatedPrice ? calculatedPrice : originalPrice;
+      oldPrice = validCalculatedPrice && calculatedPrice < originalPrice ? originalPrice : price;
+    } else {
+      price = disc.discountedPrice;
+      oldPrice = disc.hasDiscount ? disc.originalPrice : variantOldPrice;
+    }
     matchedDeal = disc.matchedDeal;
   } catch (e) {
     // Discount calc fail → default prices (purana fallback, bina warn ke)
@@ -156,7 +170,6 @@ function ProductCardInner({
 
   const activeDeal = showDealPricing ? deal || matchedDeal : deal;
   const badgeConfig = activeDeal ? getDealBadgeConfig(activeDeal) : null;
-  const displayBadgeText = badgeConfig?.text || dealBadge;
   const requiredDealQty = activeDeal
     ? getEffectiveMinQuantity({
         type: activeDeal.type,
@@ -164,15 +177,37 @@ function ProductCardInner({
         buyQuantity: activeDeal.buyQuantity,
       })
     : 1;
+  const selectedDealQuantity = activeDeal && (activeDeal._id || dealId)
+    ? cart.reduce(
+        (quantity, item) =>
+          String(item.dealId || "") === String(activeDeal._id || dealId || "")
+            ? quantity + (Number(item.qty) || 0)
+            : quantity,
+        0,
+      )
+    : 0;
 
   // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
   const hasMultipleVariants = variants.length > 1;
   const rating = Number(product.ratingSummary?.avg) || 0;
   const ratingCount = Number(product.ratingSummary?.count) || 0;
   const discountPercent =
-    oldPrice > price && oldPrice > 0
+    oldPrice > price && oldPrice > 0 && price > 0
       ? Math.round(((oldPrice - price) / oldPrice) * 100)
       : 0;
+  const safeDiscountPercent = discountPercent > 0 && discountPercent < 100 ? discountPercent : 0;
+  const productSavings = oldPrice > price && price > 0 ? oldPrice - price : 0;
+  const displayBadgeText = dealCarousel
+    ? activeDeal?.type === "bundle"
+      ? null
+      : activeDeal?.type === "percentage" || activeDeal?.type === "fixed_amount"
+        ? safeDiscountPercent > 0
+          ? `-${safeDiscountPercent}%`
+          : productSavings > 0
+            ? `Save Rs. ${productSavings.toLocaleString()}`
+            : null
+        : badgeConfig?.text || dealBadge
+    : badgeConfig?.text || dealBadge;
 
   const buildDealInfo = () => {
     if (!activeDeal) return null;
@@ -243,10 +278,10 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className="product-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[var(--user-bg-card)] shadow-none transition-colors duration-200"
+      className={`product-card group relative flex min-w-0 flex-col overflow-hidden bg-[var(--user-bg-card)] transition-colors duration-200 ${dealCarousel ? "h-auto rounded-xl border border-[var(--user-border)] shadow-sm" : "h-full rounded-none border-0 shadow-none"}`}
     >
       <div
-        className="relative h-40 w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)]"
+        className={`relative w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-40"}`}
       >
         {image && failedImage !== image ? (
           <Image
@@ -266,22 +301,33 @@ function ProductCardInner({
           </div>
         )}
 
-        <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
+        <div className={`absolute top-2 left-2 z-20 flex flex-col items-start gap-1.5 ${dealCarousel ? "right-14 max-w-[calc(100%_-_56px)]" : showDealPricing ? "right-11" : ""}`}>
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] font-normal`}
+              className={`flex max-w-full min-w-0 items-center gap-1 truncate ${dealCarousel ? "whitespace-nowrap rounded-full border border-white/10 bg-gray-900/75 px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white shadow-sm backdrop-blur-sm" : showDealPricing ? "whitespace-nowrap rounded-full bg-orange-600 px-2.5 py-1 text-[0.6875rem] font-semibold leading-none text-white" : "rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] font-normal"}`}
             >
               {badgeConfig?.icon ? (
-                <badgeConfig.icon size={9} />
+                <badgeConfig.icon size={dealCarousel ? 12 : 9} className="shrink-0" />
               ) : (
-                <Tag size={9} />
+                <Tag size={dealCarousel ? 12 : 9} className="shrink-0" />
               )}{" "}
-              {displayBadgeText}
+              <span className="min-w-0 truncate">{displayBadgeText}</span>
             </span>
           )}
-          {activeDeal && requiredDealQty > 1 && (
+          {activeDeal && requiredDealQty > 1 && !showDealPricing && (
             <span className="rounded-full bg-[var(--user-bg-card)]/95 px-2 py-1 text-[0.6rem] font-bold text-[var(--user-text)] shadow-sm">
               Buy {requiredDealQty} to unlock
+            </span>
+          )}
+          {showDealPricing && activeDeal && requiredDealQty > 1 && selectedDealQuantity > 0 && (
+            <span
+              className={`max-w-full truncate whitespace-nowrap rounded-full px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white ${
+                selectedDealQuantity >= requiredDealQty ? "bg-emerald-600" : "bg-black/70"
+              }`}
+            >
+              {selectedDealQuantity >= requiredDealQty
+                ? "Unlocked"
+                : `${selectedDealQuantity}/${requiredDealQty} selected`}
             </span>
           )}
 
@@ -307,7 +353,7 @@ function ProductCardInner({
             toggleWishlist(productId);
           }}
           aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
-          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-icon-color)] shadow-sm transition-colors hover:bg-[var(--user-bg-hover)]"
+          className={`absolute right-2 top-2 z-20 flex items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-icon-color)] shadow-sm transition-colors hover:bg-[var(--user-bg-hover)] ${dealCarousel ? "h-8 w-8" : "h-7 w-7"}`}
         >
           <Heart
             size={14}
@@ -368,12 +414,16 @@ function ProductCardInner({
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col p-1">
-        <p className="h-3 truncate text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em] text-[var(--user-text-subtle)]">
+      <div className={`flex min-w-0 ${dealCarousel ? "flex-col px-2.5 py-2" : "flex-1 flex-col p-1"}`}>
+        <p
+          title={dealCarousel ? brandName || undefined : undefined}
+          className={`truncate text-[var(--user-text-subtle)] ${dealCarousel ? "mb-1 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em]" : "h-3 text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em]"}`}
+        >
           {brandName || ""}
         </p>
         <h3
-          className="line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] text-[var(--user-text)] sm:text-[0.8125rem]"
+          title={dealCarousel ? product.name || undefined : undefined}
+          className={`text-[var(--user-text)] ${dealCarousel ? "line-clamp-2 text-sm font-medium leading-5" : "line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] sm:text-[0.8125rem]"}`}
         >
           {product.name}
         </h3>
@@ -398,33 +448,61 @@ function ProductCardInner({
           </div>
         ) : null}
 
-        <h4
-          className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]"
-        >
-          Rs. {price.toLocaleString()}
-        </h4>
-        <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
-          {oldPrice > price ? (
-            <>
-              <span className="truncate text-[var(--user-text-subtle)] line-through">
-                Rs. {oldPrice.toLocaleString()}
-              </span>
-              {discountPercent > 0 ? (
-                <span className={`shrink-0 text-[var(--user-accent)] font-normal`}>
-                  -{discountPercent}%
+        {dealCarousel ? (
+          <div className="mt-1 min-w-0">
+            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
+              {price > 0 ? formatPrice(price) : "Price unavailable"}
+            </h4>
+            {oldPrice > price && price > 0 ? (
+              <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
+                <span className="truncate text-[var(--user-text-subtle)] line-through">
+                  {formatPrice(oldPrice)}
                 </span>
-              ) : null}
-            </>
-          ) : null}
-        </div>
-        {mentionDeal && !showDealPricing ? (
-          <div className="flex h-3 min-w-0 items-center">
-            <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
-              <Sparkles size={9} className="shrink-0" />
-              <span className="truncate">Deal Price</span>
-            </span>
+                {safeDiscountPercent > 0 ? (
+                  <span className="shrink-0 font-normal text-[var(--user-accent)]">
+                    -{safeDiscountPercent}%
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {oldPrice > price && price > 0 ? (
+              <div className="mt-1 flex h-3 min-w-0 items-center">
+                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
+                  <Sparkles size={9} className="shrink-0" />
+                  <span className="truncate">Deal Price</span>
+                </span>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        ) : (
+          <>
+            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
+              {price > 0 ? formatPrice(price) : "Price unavailable"}
+            </h4>
+            <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
+              {oldPrice > price && price > 0 ? (
+                <>
+                  <span className="truncate text-[var(--user-text-subtle)] line-through">
+                    {formatPrice(oldPrice)}
+                  </span>
+                  {safeDiscountPercent > 0 ? (
+                    <span className="shrink-0 font-normal text-[var(--user-accent)]">
+                      -{safeDiscountPercent}%
+                    </span>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            {mentionDeal && !showDealPricing ? (
+              <div className="flex h-3 min-w-0 items-center">
+                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
+                  <Sparkles size={9} className="shrink-0" />
+                  <span className="truncate">Deal Price</span>
+                </span>
+              </div>
+            ) : null}
+          </>
+        )}
         {!out ? (
           <div className="product-card-touch-actions mt-2">
             {hasMultipleVariants ? (

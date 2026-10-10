@@ -86,7 +86,8 @@ const createVariant = async (req, res) => {
       tags, // ✅ Tags saved here
       images: req.savedImages || [],
       createdby: req.user?._id || null,
-      updatedby: req.user?._id || null,
+      // A newly-created variant has no editor yet. Set this only on a real edit.
+      updatedby: null,
     });
 
     emitSocketEvent("productUpdated", { _id: variant.product_id, variantUpdated: true });

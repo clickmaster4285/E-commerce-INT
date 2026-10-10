@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
 import { toast } from "sonner";
-import { Check, ChevronDown, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Clock3, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { productApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { brandApi } from "@/apis/admin/brandApi";
@@ -146,7 +146,7 @@ const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries 
   );
 };
 
-const blankForm = () => ({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [], topup: "0" });
+const blankForm = () => ({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [], topup: "0", isPerishable: false, expiryDuration: "", expiryUnit: "days" });
 
 /* Shared product create/edit form used by the Products and Purchase Orders pages. */
 export default function ProductFormModal({ open, initialProduct = null, onClose, onCreated, onUpdated, zIndex = "z-50" }) {
@@ -177,10 +177,14 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
     if (!open) return;
     if (initialProduct) {
       const currentTagNames = (initialProduct.tag_ids || []).map((t) => (typeof t === "object" ? t.name : t)).filter(Boolean);
+      const isPerishable = initialProduct?.isPerishable === true;
       setFormData({
         category_id: normalizeId(initialProduct?.category_id), brand_id: normalizeId(initialProduct?.brand_id),
         name: initialProduct?.name || "", description: initialProduct?.description || "", tax: String(initialProduct?.tax ?? 0),
         status: initialProduct?.status || "active", tag_names: currentTagNames, variants: [],
+        isPerishable,
+        expiryDuration: isPerishable ? String(initialProduct?.expiryDuration ?? "") : "",
+        expiryUnit: isPerishable ? initialProduct?.expiryUnit || "days" : "days",
       });
     } else {
       setFormData(blankForm());
@@ -230,6 +234,10 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
 
   const submitProductForm = () => {
     if (!formData.name.trim()) { toast.error("Product name is required"); return; }
+    if (formData.isPerishable && (!Number.isInteger(Number(formData.expiryDuration)) || Number(formData.expiryDuration) <= 0)) {
+      toast.error("Enter a valid positive expiry duration");
+      return;
+    }
     const data = new FormData();
     data.append("category_id", formData.category_id);
     data.append("brand_id", formData.brand_id);
@@ -238,6 +246,9 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
     data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
+    data.append("isPerishable", String(formData.isPerishable));
+    data.append("expiryDuration", formData.isPerishable ? String(formData.expiryDuration) : "0");
+    data.append("expiryUnit", formData.isPerishable ? formData.expiryUnit : "days");
     if (initialProduct?._id) updateMutation.mutate({ id: initialProduct._id, data });
     else createMutation.mutate(data);
   };
@@ -401,6 +412,81 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
                       </select>
                     </Field>
                    </div>
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={formData.isPerishable}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setFormData((previous) => ({
+                            ...previous,
+                            isPerishable: checked,
+                            expiryDuration: checked ? previous.expiryDuration : "",
+                            expiryUnit: checked ? previous.expiryUnit : "days",
+                          }));
+                        }}
+                        className="mt-0.5 h-4 w-4 rounded"
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      <span>
+                        <span className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>Perishable</span>
+                        <span className="mt-0.5 block text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          Enable this if the product expires after delivery.
+                        </span>
+                      </span>
+                    </label>
+                    <div
+                      aria-hidden={!formData.isPerishable}
+                      className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-in-out ${formData.isPerishable ? "mt-4 max-h-64 opacity-100" : "mt-0 max-h-0 opacity-0"}`}
+                    >
+                      <div className="rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--accent) 22%, var(--border-color))", background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--bg-card)) 0%, var(--bg-card) 100%)" }}>
+                        <div className="mb-3 flex items-start gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>
+                            <Clock3 size={16} />
+                          </span>
+                          <div className="min-w-0">
+                            <label className="block text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                              Expiry After Delivery
+                            </label>
+                            <p className="mt-0.5 text-[11px] leading-4" style={{ color: "var(--text-muted)" }}>
+                              Set how long this product remains valid after delivery.
+                            </p>
+                          </div>
+                          <span className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Required</span>
+                        </div>
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(112px,0.65fr)] gap-2.5">
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputMode="numeric"
+                            aria-label="Expiry duration after delivery"
+                            placeholder="Enter duration"
+                            required={formData.isPerishable}
+                            disabled={!formData.isPerishable}
+                            value={formData.expiryDuration}
+                            onChange={(event) => setFormData((previous) => ({ ...previous, expiryDuration: event.target.value }))}
+                            className="h-11 w-full rounded-lg px-3.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:opacity-50"
+                            style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
+                          />
+                          <select
+                            value={formData.expiryUnit}
+                            onChange={(event) => setFormData((previous) => ({ ...previous, expiryUnit: event.target.value }))}
+                            aria-label="Expiry duration unit"
+                            disabled={!formData.isPerishable}
+                            className="h-11 w-full rounded-lg px-3 text-sm font-medium outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:opacity-50"
+                            style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
+                          >
+                            <option value="days">Days</option>
+                            <option value="months">Months</option>
+                            <option value="years">Years</option>
+                          </select>
+                        </div>
+                        <p className="mt-2 text-[10px] leading-4" style={{ color: "var(--text-muted)" }}>Saved as a product setting only. PO expiry dates are not changed automatically.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               <div className="flex justify-end border-t pt-4" style={{ borderColor: "var(--border-color)" }}>
                 <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{isSubmitting ? "Saving..." : initialProduct ? "Update Product" : "Create Product"}<Check className="h-4 w-4" /></button>

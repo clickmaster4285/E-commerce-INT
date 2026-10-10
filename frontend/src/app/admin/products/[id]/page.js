@@ -662,14 +662,14 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   const attributes = Object.entries(variant.attributes || {})
     .map(([name, raw]) => ({ name, value: attrValueOf(raw) }))
     .filter((attribute) => attribute.value);
-  const createdBy = variant.createdby && typeof variant.createdby === "object" ? variant.createdby : null;
-  const updatedBy = variant.updatedby && typeof variant.updatedby === "object" ? variant.updatedby : null;
+  const createdBy = actorInfo(variant.createdby).known ? variant.createdby : null;
+  const updatedBy = actorInfo(variant.updatedby).known ? variant.updatedby : null;
   const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
   // "Updated By" card sirf tab dikhta hai jab variant waqai update hua ho —
   // warna creation timestamp hi update lagta hai (jaisa seed data mein hota hai).
   const auditEntries = [
     { label: "Created By", user: createdBy, date: variant.created_at, color: "emerald" },
-    ...(hasRealUpdate(variant.created_at, variant.updated_at)
+    ...(updatedBy && hasRealUpdate(variant.created_at, variant.updated_at)
       ? [{ label: "Updated By", user: updatedBy, date: variant.updated_at, color: "blue" }]
       : []),
   ];

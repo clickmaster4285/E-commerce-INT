@@ -7,7 +7,7 @@ import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
-  ShoppingCart, ChevronRight, ChevronLeft, ChevronDown,
+  ShoppingCart, ChevronRight, ChevronLeft, ChevronDown, Clock3,
   Minus, Plus, Package, X, Check, Zap, ZoomIn, Tag, Sparkles, Heart, Star,
   Store, ShieldCheck, ZoomIn as ZoomHintIcon,
 } from "lucide-react";
@@ -16,7 +16,7 @@ import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import { userHttp } from "@/apis/axiosInstance";
 import { reviewApi } from "@/apis/user/reviewApi";
-import ProductRating from "@/components/user/ProductReviews";
+import ProductRating, { ReviewMediaGallery, StoreResponse } from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
@@ -210,6 +210,17 @@ const Stars = memo(({ value = 0, size = 13 }) => (
   </span>
 ));
 Stars.displayName = "Stars";
+
+function ReviewComment({ comment }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!comment) return null;
+  return (
+    <div>
+      <p className={`whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-4"}`}>{comment}</p>
+      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? "Read less" : "Read more"}</button>}
+    </div>
+  );
+}
 
 const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
   const stripRef = useRef(null);
@@ -703,29 +714,39 @@ function ProductDetailContent({ params }) {
   const activeHasDiscount = isDealMode ? (dealOriginalPrice > dealPrice) : regularHasDiscount;
   const discountPct = activeHasDiscount && activeOriginalPrice > 0 ? Math.round(((activeOriginalPrice - activePrice) / activeOriginalPrice) * 100) : 0;
 
+  const selectedDealInfo = useMemo(() => {
+    if (!isDealMode || !matchedDeal) return null;
+    return {
+      dealId: matchedDeal._id,
+      dealType: matchedDeal.type,
+      dealName: matchedDeal.name,
+      dealBadge: getDealBadgeText(matchedDeal) || null,
+      savings: dealDisc?.hasDiscount ? dealDisc.originalPrice - dealDisc.discountedPrice : 0,
+      originalPrice: Number(dealDisc?.originalPrice) || variantPrice,
+      dealDiscountValue: Number(matchedDeal.discountValue) || 0,
+      minQuantity: Number(matchedDeal.minQuantity) || 1,
+      ...(matchedDeal.type === "buy_x_get_y"
+        ? {
+            buyQuantity: Number(matchedDeal.buyQuantity) || 0,
+            getQuantity: Number(matchedDeal.getQuantity) || 0,
+          }
+        : {}),
+    };
+  }, [isDealMode, matchedDeal, dealDisc, variantPrice]);
+
   const countdown = useCountdown(isDealMode ? matchedDeal?.endDate : null);
 
   const handleAdd = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? {
-      dealId: matchedDeal?._id,
-      dealType: matchedDeal?.type,
-      dealName: matchedDeal?.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
-    } : null);
+    addToCart(product, currentVariant, quantity, selectedDealInfo);
     trigger();
-  }, [stock, product, currentVariant, quantity, addToCart, trigger, isDealMode, matchedDeal]);
+  }, [stock, product, currentVariant, quantity, addToCart, trigger, selectedDealInfo]);
 
   const handleBuy = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? {
-      dealId: matchedDeal?._id,
-      dealType: matchedDeal?.type,
-      dealName: matchedDeal?.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
-    } : null);
+    addToCart(product, currentVariant, quantity, selectedDealInfo);
     setIsCartOpen(true);
-  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, isDealMode, matchedDeal]);
+  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, selectedDealInfo]);
 
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
@@ -736,6 +757,14 @@ function ProductDetailContent({ params }) {
   const shortDescription = product?.short_description || "";
   const specEntries = attrEntries(currentVariant?.attributes);
   const variantAttrName = specEntries.length > 0 ? specEntries[0][0] : (variants.length > 1 ? "Option" : "");
+  const expiryDuration = Number(product?.expiryDuration);
+  const expiryUnit = String(product?.expiryUnit || "").toLowerCase();
+  const expiryUnitName = { days: "Day", months: "Month", years: "Year" }[expiryUnit] || "";
+  const expiryUnitLabel = expiryUnitName ? `${expiryUnitName}${expiryDuration === 1 ? "" : "s"}` : "";
+  const showExpiryInfo = product?.isPerishable === true
+    && Number.isFinite(expiryDuration)
+    && expiryDuration > 0
+    && !!expiryUnitLabel;
 
   const related = useRelatedProducts(product, categoryId);
   const productId = product?._id || product?.id;
@@ -756,6 +785,9 @@ function ProductDetailContent({ params }) {
   });
   const summary = publicReviewData?.summary || { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
   const publicReviews = publicReviewData?.reviews || [];
+  const reviewsToDisplay = myReview?._id
+    ? publicReviews.filter((review) => String(review._id) !== String(myReview._id))
+    : publicReviews;
   const ratingAvg = Number(summary.avg) || 0;
   const ratingCount = Number(summary.count) || 0;
 
@@ -980,6 +1012,37 @@ function ProductDetailContent({ params }) {
                   </div>
                 )}
 
+                {showExpiryInfo && (
+                  <div
+                    className="mt-3 rounded-xl border p-3.5 sm:p-4"
+                    style={{
+                      backgroundColor: "color-mix(in srgb, var(--user-accent) 8%, var(--user-bg-card))",
+                      borderColor: "color-mix(in srgb, var(--user-accent) 24%, var(--user-border))",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: "color-mix(in srgb, var(--user-accent) 14%, transparent)",
+                          color: "var(--user-accent)",
+                        }}
+                      >
+                        <Clock3 size={17} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-[var(--user-text)]">Perishable Product</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--user-text)]">
+                          Valid for {expiryDuration} {expiryUnitLabel} after delivery
+                        </p>
+                        <p className="mt-1 text-[11px] leading-4 text-[var(--user-text-muted)]">
+                          Please consume or use before the validity period ends.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Quantity — real stock */}
                 <div className="mt-4 flex items-center gap-4">
                   <span className="text-xs text-[var(--user-text-muted)]">Quantity</span>
@@ -1149,21 +1212,37 @@ function ProductDetailContent({ params }) {
                 <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
               </div>
             )}
-            {publicReviews.length > 0 ? (
-              <ul className="space-y-4">
-                {publicReviews.map((r) => (
-                  <li key={r._id} className="border-b border-[var(--user-border)] pb-4 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <Stars value={r.rating} />
-                      <span className="text-xs font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--user-text-muted)]">
-                      by {r.user_id?.name || "Verified buyer"}
-                      {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
-                    </p>
-                    {r.comment && <p className="mt-1.5 text-sm leading-6 text-[var(--user-text-secondary)]">{r.comment}</p>}
-                  </li>
-                ))}
+            {reviewsToDisplay.length > 0 ? (
+              <ul className="divide-y divide-[var(--user-border)]">
+                {reviewsToDisplay.map((r) => {
+                  const reviewerName = r.user_id?.name || "Customer";
+                  const reviewDate = r.created_at
+                    ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    : "";
+                  return (
+                    <li key={r._id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3">
+                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text-secondary)] ring-1 ring-[var(--user-border)]">
+                          {reviewerName.trim().charAt(0).toUpperCase() || "C"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="text-sm font-semibold text-[var(--user-text)]">{reviewerName}</p>
+                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={12} strokeWidth={2.5} /> Verified buyer</span>}
+                            </div>
+                            {reviewDate && <time className="text-xs text-[var(--user-text-muted)]">{reviewDate}</time>}
+                          </div>
+                          <div className="mt-2"><Stars value={r.rating} size={15} /></div>
+                          <p className="mt-1.5 text-base font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</p>
+                          {r.comment && <div className="mt-1"><ReviewComment comment={r.comment} /></div>}
+                          {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
+                          {r.storeResponse?.message && <div className="mt-3"><StoreResponse response={r.storeResponse} /></div>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : !myReview ? (
               <div className="py-6 text-center">

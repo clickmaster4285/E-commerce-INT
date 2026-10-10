@@ -127,10 +127,11 @@ export function getDealUnitPrice(price, dealType, discountValue) {
   const regularPrice = Number(price) || 0;
   const value = Number(discountValue) || 0;
   if (dealType === "percentage" && value > 0) {
-    return Math.round(regularPrice * (1 - value / 100));
+    const discountedPrice = Math.round(regularPrice * (1 - value / 100));
+    return discountedPrice > 0 ? discountedPrice : regularPrice;
   }
-  if (dealType === "fixed_amount" && value > 0) {
-    return Math.max(0, regularPrice - value);
+  if (dealType === "fixed_amount" && value > 0 && value < regularPrice) {
+    return regularPrice - value;
   }
   return regularPrice;
 }
