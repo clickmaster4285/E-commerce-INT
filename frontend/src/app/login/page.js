@@ -11,6 +11,7 @@ import {
 import { storeApi } from "@/apis/user/storeApi";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import OtpVerifyCard from "@/components/user/OtpVerifyCard";
 import ResetPasswordCard from "@/components/user/ResetPasswordCard";
 import { toast } from "sonner";
@@ -129,6 +130,16 @@ export default function UserLoginPage() {
     e.preventDefault();
     setErrors({});
     setGeneralError("");
+    if (!isLogin && !isValidPhone(phone)) {
+      setErrors({
+        phone: !phone
+          ? "Phone number is required"
+          : phone.length < PHONE_MIN
+            ? `Phone number must be at least ${PHONE_MIN} digits`
+            : `Phone number must be at most ${PHONE_MAX} digits`,
+      });
+      return;
+    }
     setLoading(true);
     try {
       if (isLogin) {
@@ -535,12 +546,13 @@ export default function UserLoginPage() {
                         value={phone}
                         onChange={(e) => {
                           // ✅ Sirf digits allow + 14 character limit
-                          const val = e.target.value.replace(/\D/g, "").slice(0, 14);
+                          const val = normalizePhone(e.target.value);
                           setPhone(val);
                           setErrors((p) => ({ ...p, phone: "" }));
                         }}
-                        maxLength={14}
-                        placeholder="Phone number (03001234567)"
+                        inputMode="numeric"
+                        maxLength={PHONE_MAX}
+                        placeholder="Phone number"
                         className={getInputCls("phone")}
                       />
                     </div>
