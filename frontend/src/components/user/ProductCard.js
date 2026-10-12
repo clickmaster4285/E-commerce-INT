@@ -281,7 +281,7 @@ function ProductCardInner({
       className={`product-card group relative flex min-w-0 flex-col overflow-hidden bg-[var(--user-bg-card)] transition-colors duration-200 ${dealCarousel ? "h-auto rounded-xl border border-[var(--user-border)] shadow-sm" : "h-full rounded-none border-0 shadow-none"}`}
     >
       <div
-        className={`relative w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-40"}`}
+        className={`relative w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
       >
         {image && failedImage !== image ? (
           <Image
@@ -367,15 +367,15 @@ function ProductCardInner({
 
         {/* Desktop actions reveal on hover/focus; touch actions render below the price. */}
         {!out && (
-          <div className="product-card-action-overlay absolute inset-x-0 bottom-0 z-10 flex translate-y-full items-end gap-1.5 bg-gradient-to-t from-black/45 via-black/20 to-transparent p-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+          <div className="product-card-action-overlay absolute inset-x-0 bottom-0 z-10 flex translate-y-full items-end gap-1.5 bg-gradient-to-t from-black/45 via-black/20 to-transparent p-1.5 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
             {hasMultipleVariants ? (
               <button
                 type="button"
                 onClick={handleOpenOptions}
                 aria-label={`Select options for ${product.name}`}
-                className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] bg-[var(--user-accent)] px-[10px] text-[12.5px] font-semibold tracking-[0.1px] text-[var(--user-accent-text)] transition duration-150 hover:brightness-[0.92] hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-[var(--user-accent)] px-2 text-[11.5px] font-semibold tracking-[0.1px] text-[var(--user-accent-text)] transition duration-150 hover:brightness-[0.92] hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
               >
-                <SlidersHorizontal size={14} className="shrink-0" />
+                <SlidersHorizontal size={12} className="shrink-0" />
                 Select Options
               </button>
             ) : (
@@ -385,18 +385,18 @@ function ProductCardInner({
                   onClick={handleQuickAdd}
                   disabled={adding}
                   aria-label={adding ? `Adding ${product.name} to cart` : added ? `${product.name} added to cart` : `Add ${product.name} to cart`}
-                    className={`flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] px-[10px] text-xs font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                    className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold tracking-[0.1px] transition duration-150 hover:-translate-y-px active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
                     added
                       ? "bg-[var(--user-success)] text-white"
                       : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-[0.92]"
                   }`}
                 >
                   {adding ? (
-                    <Loader2 size={14} className="shrink-0 animate-spin" />
+                    <Loader2 size={12} className="shrink-0 animate-spin" />
                   ) : added ? (
-                    <Check size={14} className="shrink-0" />
+                    <Check size={12} className="shrink-0" />
                   ) : (
-                    <ShoppingCart size={12} className="shrink-0" />
+                    <ShoppingCart size={11} className="shrink-0" />
                   )}
                     <span className="product-card-add-label">{adding ? "Adding..." : added ? "Added" : "Add to Cart"}</span>
                 </button>
@@ -404,7 +404,7 @@ function ProductCardInner({
                   type="button"
                   onClick={handleQuickBuy}
                   aria-label={`Buy ${product.name} now`}
-                  className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-[6px] border border-[#E5E7EB] bg-white px-[10px] text-xs font-semibold tracking-[0.1px] text-gray-900 transition duration-150 hover:-translate-y-px active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                  className="flex h-7 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-[#E5E7EB] bg-white px-2 text-[11px] font-semibold tracking-[0.1px] text-gray-900 transition duration-150 hover:-translate-y-px active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
                   Buy Now
                 </button>
