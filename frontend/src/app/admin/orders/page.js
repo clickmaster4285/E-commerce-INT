@@ -759,7 +759,7 @@ export default function OrdersPage() {
         )}
 
         {/* Pagination - Mobile Optimized */}
-        {!isLoading && !isError && total > 0 && (
+        {!isLoading && !isError && total > pageSize && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>

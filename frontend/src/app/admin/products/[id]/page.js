@@ -2533,6 +2533,52 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
 
+                    {/* Perishable Information */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Perishable Info</h3>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${product.isPerishable ? 'bg-amber-500/10' : 'bg-gray-500/10'}`}>
+                            <Clock className={`w-5 h-5 ${product.isPerishable ? 'text-amber-500' : 'text-gray-400'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                product.isPerishable 
+                                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                                  : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${product.isPerishable ? 'bg-amber-500' : 'bg-gray-400'}`} />
+                                {product.isPerishable ? 'Perishable' : 'Non-Perishable'}
+                              </span>
+                            </div>
+                            
+                            {product.isPerishable ? (
+                              <div className="space-y-2">
+                                <div>
+                                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Expiry After Delivery</p>
+                                  <p className="text-[14px] font-semibold text-[var(--text-primary)]">
+                                    {product.expiryDuration || 0} {product.expiryUnit || 'days'}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg p-2.5 bg-amber-500/5 border border-amber-500/10">
+                                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                                    <span className="font-semibold">Note:</span> This product expires {product.expiryDuration || 0} {product.expiryUnit || 'days'} after delivery to the customer.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
+                                This product does not have an expiry date after delivery.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Created By */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                       <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
