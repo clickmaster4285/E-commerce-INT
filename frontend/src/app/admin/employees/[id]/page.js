@@ -53,7 +53,6 @@ import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
 // (admin chahe to koi bhi toggle off kar sakta hai)
 // ==========================================
 const ALLOWED_PERMISSIONS = {
-  dashboard: { label: "Dashboard", default: true },
   employees: { label: "Employees", default: true },
   products: { label: "Products", default: true },
   featuredProducts: { label: "Featured Products", default: true },
@@ -1068,7 +1067,6 @@ export default function EmployeeDetailPage() {
     permissionsData,
     setPermissionsData,
   ] = useState({
-    dashboard: true,
     employees: true,
     products: true,
     featuredProducts: true,

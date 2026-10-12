@@ -281,7 +281,7 @@ export default function BrandsPage() {
     return `BRD-${String(nextNum).padStart(3, "0")}`;
   };
 
-  const fetchNextBrandCode = async () => {
+  const fetchNextBrandCode = async ({ replaceCurrent = false } = {}) => {
     try {
       setLoadingCode(true);
       const res = await adminBrandApi.getNextCode();
@@ -290,17 +290,24 @@ export default function BrandsPage() {
       
       // If API returns valid code use it, otherwise calculate locally
       const validNextCode = /^BRD-\d+$/.test(trimmed) ? trimmed : await computeFallbackBrandCode();
-      
       setAutoBrandCode(validNextCode);
       if (!editingBrand) {
-        setFormData((prev) => ({ ...prev, brand_code: validNextCode }));
+        setFormData((prev) => (
+          !prev.brand_code.trim() || (replaceCurrent && prev.brand_code.trim() === autoBrandCode.trim())
+            ? { ...prev, brand_code: validNextCode }
+            : prev
+        ));
       }
     } catch (err) {
       console.error("Failed to fetch next brand code:", err);
       const fallbackCode = await computeFallbackBrandCode();
       setAutoBrandCode(fallbackCode);
       if (!editingBrand) {
-        setFormData((prev) => ({ ...prev, brand_code: fallbackCode }));
+        setFormData((prev) => (
+          !prev.brand_code.trim() || (replaceCurrent && prev.brand_code.trim() === autoBrandCode.trim())
+            ? { ...prev, brand_code: fallbackCode }
+            : prev
+        ));
       }
     } finally {
       setLoadingCode(false);
@@ -350,9 +357,13 @@ export default function BrandsPage() {
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
         toast.error(msg, { duration: 6000, description: "Contact an administrator to grant you brand access." });
       } else if (!editingBrand && (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("duplicate"))) {
-        // ✅ Duplicate code (e.g. stale BRD-002) — fresh code lao, form update karo, user retry kare
-        toast.error(msg, { description: "New brand code generated — please click Save Brand again." });
-        fetchNextBrandCode();
+        const usedGeneratedCode = formData.brand_code?.trim() === autoBrandCode?.trim();
+        toast.error(msg, {
+          description: usedGeneratedCode
+            ? "A new brand code has been generated — review it and click Save Brand again."
+            : "Please enter a different brand code and try again.",
+        });
+        if (usedGeneratedCode) fetchNextBrandCode({ replaceCurrent: true });
       } else {
         toast.error(msg);
       }
@@ -439,8 +450,7 @@ export default function BrandsPage() {
       return;
     }
     const fd = new FormData();
-    // ✅ Create par hamesha fresh auto code bhejo — stale BRD-002 jaisa duplicate kabhi nahi jayega.
-    // Edit par existing code hi rehta hai.
+    // New brand codes are prefilled but can be customized; existing codes stay unchanged on edit.
     const codeToSend = editingBrand ? formData.brand_code : (formData.brand_code?.trim() || autoBrandCode?.trim() || "");
     fd.append("brand_code", codeToSend);
     fd.append("name", trimmedName);
@@ -939,16 +949,16 @@ export default function BrandsPage() {
               {/* ROW 1: Brand Code + Brand Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code (Auto)</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
                   <input 
                     type="text" 
-                    value={loadingCode ? "Generating..." : formData.brand_code} 
-                    readOnly
-                    disabled
-                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-70 font-mono" 
+                    value={formData.brand_code}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, brand_code: e.target.value }))}
+                    readOnly={!!editingBrand}
+                    disabled={isSubmitting}
+                    className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 font-mono"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder="AUTO-GENERATED" 
-                    title="Brand code auto-generated hai — duplicate se bachne ke liye editable nahi"
+                    placeholder={loadingCode ? "Generating..." : "BRD-001"}
                   />
                 </div>
                 <div>
