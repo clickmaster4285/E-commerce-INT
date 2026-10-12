@@ -28,13 +28,47 @@ import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
-import PrimaryButton from "@/components/shared/PrimaryButton";
 import {
   ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
   Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2, Tag,
   TrendingUp, Gift, BadgePercent,
 } from "lucide-react";
+
+function PrimaryButton({
+  children,
+  icon: Icon,
+  iconEnd: IconEnd,
+  loading = false,
+  loadingText,
+  disabled = false,
+  className = "",
+  type = "button",
+  ...buttonProps
+}) {
+  const isDisabled = disabled || loading;
+  const widthClass = className.split(/\s+/).includes("w-auto") ? "" : "w-full";
+
+  return (
+    <button
+      {...buttonProps}
+      type={type}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
+      className={`primary-btn inline-flex ${widthClass} items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`.trim()}
+    >
+      {loading ? (
+        <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
+      ) : Icon ? (
+        <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+      ) : null}
+      <span>{loading && loadingText ? loadingText : children}</span>
+      {!loading && IconEnd ? (
+        <IconEnd aria-hidden="true" className="h-4 w-4 shrink-0" />
+      ) : null}
+    </button>
+  );
+}
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getPhoneValidationError = (value) => {
@@ -76,7 +110,7 @@ const BANK_DETAILS = {
 };
 
 // 🏦 Bank Transfer Panel — mobile + desktop dono ke liye (compact = mobile)
-const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
+const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormErrors, compact = false }) => {
   const [copied, setCopied] = useState("");
   const copy = async (text, key) => {
     try {
@@ -89,11 +123,26 @@ const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
     }
   };
   const inp = compact
-    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition"
-    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition";
+    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition"
+    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition";
   const lbl = compact
     ? "block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider"
     : "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+  const errCls = compact ? "text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium" : "text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium";
+
+  const handleSenderNameChange = (e) => {
+    setBankForm({ ...bankForm, senderName: e.target.value });
+    if (bankFormErrors.senderName) {
+      setBankFormErrors({ ...bankFormErrors, senderName: "" });
+    }
+  };
+
+  const handleTransactionRefChange = (e) => {
+    setBankForm({ ...bankForm, transactionRef: e.target.value });
+    if (bankFormErrors.transactionRef) {
+      setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+    }
+  };
 
   return (
     <div className={`rounded-xl border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] overflow-hidden ${compact ? "" : "mt-4"}`}>
@@ -138,16 +187,142 @@ const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
         <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
           <div>
             <label className={lbl}>Sender Name (as per bank)</label>
-            <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inp} />
+            <input 
+              value={bankForm.senderName} 
+              onChange={handleSenderNameChange}
+              placeholder="e.g. Ahsan Younas" 
+              className={`${inp} ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+            />
+            {bankFormErrors.senderName && <p className={errCls}>{bankFormErrors.senderName}</p>}
           </div>
           <div>
-            <label className={lbl}>Transaction ID / Reference (optional)</label>
-            <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inp} />
+            <label className={lbl}>Transaction ID / Reference</label>
+            <input 
+              value={bankForm.transactionRef} 
+              onChange={handleTransactionRefChange}
+              placeholder="Add after transferring" 
+              className={`${inp} ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+            />
+            {bankFormErrors.transactionRef && <p className={errCls}>{bankFormErrors.transactionRef}</p>}
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+// ✅ Card validation helper function
+const validateCardDetails = (cardData) => {
+  const trimmedName = String(cardData.name || "").trim();
+  const cleanNumber = String(cardData.number || "").replace(/\s/g, "");
+  const cleanExpiry = String(cardData.expiry || "").trim();
+
+  // 1. Card Number validation
+  if (!cleanNumber) {
+    return { valid: false, field: "number", message: "Please enter your card number." };
+  }
+  if (!/^\d+$/.test(cleanNumber)) {
+    return { valid: false, field: "number", message: "Card number can contain digits only." };
+  }
+
+  const brand = getCardBrand(cleanNumber);
+  const supportedLengths = {
+    VISA: [13, 16, 19],
+    Mastercard: [16],
+    AMEX: [15],
+  };
+  const brandName = {
+    VISA: "Visa",
+    Mastercard: "Mastercard",
+    AMEX: "American Express",
+  }[brand];
+
+  if (!brandName) {
+    return {
+      valid: false,
+      field: "number",
+      message: "Please enter a Visa, Mastercard, or American Express card number.",
+    };
+  }
+  if (!supportedLengths[brand].includes(cleanNumber.length)) {
+    const lengths = supportedLengths[brand].join(", ");
+    return {
+      valid: false,
+      field: "number",
+      message: `Please enter a valid ${brandName} card number (${lengths} digits).`,
+    };
+  }
+
+  // Luhn algorithm check
+  let sum = 0;
+  let isEven = false;
+  for (let i = cleanNumber.length - 1; i >= 0; i--) {
+    let digit = parseInt(cleanNumber[i], 10);
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    isEven = !isEven;
+  }
+  if (sum % 10 !== 0) {
+    return { valid: false, field: "number", message: `Please enter a valid ${brandName} card number.` };
+  }
+
+  // 2. Card Holder Name validation
+  if (!trimmedName) {
+    return { valid: false, field: "name", message: "Please enter the card holder name." };
+  }
+  if (trimmedName.length < 3) {
+    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+  }
+  if (!/^[a-zA-Z\s.\-']+$/.test(trimmedName)) {
+    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+  }
+
+  // 3. Expiry validation
+  if (!cleanExpiry) {
+    return { valid: false, field: "expiry", message: "Please enter the card expiry date." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(cleanExpiry)) {
+    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+  }
+  const [datePart, timePart] = cleanExpiry.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const expiryDate = new Date(year, month - 1, day, hour, minute);
+  if (
+    expiryDate.getFullYear() !== year ||
+    expiryDate.getMonth() !== month - 1 ||
+    expiryDate.getDate() !== day ||
+    expiryDate.getHours() !== hour ||
+    expiryDate.getMinutes() !== minute
+  ) {
+    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+  }
+  const now = new Date();
+  now.setSeconds(0, 0);
+  if (expiryDate < now) {
+    return { valid: false, field: "expiry", message: "Your card has expired. Please use a valid card." };
+  }
+
+  return { valid: true };
+};
+
+const formatPreviewExpiry = (expiry) => {
+  const match = String(expiry || "").match(/^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}$/);
+  return match ? `${match[2]}/${match[3]}/${match[1]}` : "MM/DD/YYYY";
+};
+
+const getCardBrand = (number) => {
+  const digits = String(number || "").replace(/\D/g, "");
+  if (digits.startsWith("4")) return "VISA";
+  const firstFourDigits = Number(digits.slice(0, 4));
+  if (/^5[1-5]/.test(digits) || (firstFourDigits >= 2221 && firstFourDigits <= 2720)) {
+    return "Mastercard";
+  }
+  if (/^3[47]/.test(digits)) return "AMEX";
+  return "CARD";
 };
 
 // 💳 Card Preview — intentionally dark (credit-card look), white text OK
@@ -161,7 +336,7 @@ const CardPreview = ({ number, name, expiry }) => (
       <div className="flex items-center justify-between">
         <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 shadow-lg" />
         <span className="text-white/90 text-sm font-black italic tracking-wider">
-          {number.replace(/\s/g, "").endsWith("4") ? "VISA" : "MasterCard"}
+          {getCardBrand(number)}
         </span>
       </div>
       <div className="space-y-1">
@@ -171,11 +346,11 @@ const CardPreview = ({ number, name, expiry }) => (
       <div className="flex items-end justify-between">
         <div>
           <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Card Holder</p>
-          <p className="text-white text-sm font-bold uppercase tracking-wider">{name || "YOUR NAME"}</p>
+          <p className="text-white text-sm font-bold uppercase tracking-wider">{name.trim() || "YOUR NAME"}</p>
         </div>
         <div>
           <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Expires</p>
-          <p className="text-white text-sm font-bold">{expiry || "MM/YY"}</p>
+          <p className="text-white text-sm font-bold">{formatPreviewExpiry(expiry)}</p>
         </div>
       </div>
     </div>
@@ -205,8 +380,10 @@ function CheckoutContent() {
   const [shippingMethod, setShippingMethod] = useState(() => getDefaultShippingMethod(null));
   const [userSelectedShipping, setUserSelectedShipping] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
-   const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "", cvv: "" });
+  const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "" });
+  const [cardFormErrors, setCardFormErrors] = useState({ number: "", name: "", expiry: "" });
   const [bankForm, setBankForm] = useState({ senderName: "", transactionRef: "" });
+  const [bankFormErrors, setBankFormErrors] = useState({ senderName: "", transactionRef: "" });
   const [placing, setPlacing] = useState(false);
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [phone, setPhone] = useState("");
@@ -279,7 +456,64 @@ function CheckoutContent() {
     }
   }, [addresses, selectedAddressId, draftReady]);
 
+  const showCardValidationError = (validation) => {
+    setCardFormErrors({
+      number: validation.field === "number" ? validation.message : "",
+      name: validation.field === "name" ? validation.message : "",
+      expiry: validation.field === "expiry" ? validation.message : "",
+    });
+    if (validation.field === "number") toast.error(validation.message);
+    setOrderReviewOpen(false);
+    if (step === 3) setStep(2);
+
+    setTimeout(() => {
+      const fields = document.querySelectorAll(`input[name="card-${validation.field}"]`);
+      const input = Array.from(fields).find((field) => field.getClientRects().length > 0);
+      if (input) {
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        input.focus();
+      }
+    }, 100);
+  };
+
   const goToStep = async (n) => {
+    // ✅ Validate card fields when moving from step 2 to step 3
+    if (n === 3 && paymentMethod === "card") {
+      const validation = validateCardDetails(cardForm);
+      if (!validation.valid) {
+        showCardValidationError(validation);
+        return;
+      }
+      // Clear any previous errors
+      setCardFormErrors({ number: "", name: "", expiry: "" });
+    }
+
+    // ✅ Validate bank transfer fields when moving from step 2 to step 3
+    if (n === 3 && paymentMethod === "bank") {
+      const trimmedSenderName = bankForm.senderName.trim();
+      const trimmedTransactionRef = bankForm.transactionRef.trim();
+      const errors = { senderName: "", transactionRef: "" };
+      let hasError = false;
+
+      if (!trimmedSenderName) {
+        errors.senderName = "Please enter the sender name as shown on your bank account.";
+        hasError = true;
+      }
+      if (!trimmedTransactionRef) {
+        errors.transactionRef = "Please enter your bank transaction ID or reference.";
+        hasError = true;
+      }
+
+      if (hasError) {
+        setBankFormErrors(errors);
+        toast.error("Please fill in all required bank transfer fields.");
+        return;
+      }
+
+      // ✅ Update bankForm with trimmed values
+      setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
+    }
+
     if (currentDraftId) {
       try {
         await userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
@@ -296,6 +530,9 @@ function CheckoutContent() {
   const proceedToStep2 = async () => {
     if (draftCreateInFlight.current) return;
     if (!selectedCartItems.length) return toast.error("Please select at least one item");
+    const dealIssue = getDealRequirementIssues(selectedCartItems)[0];
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+
     draftCreateInFlight.current = true;
     const snap = selectedCartItems.map((i) => ({ ...i }));
     setDraftItems(snap);
@@ -589,14 +826,29 @@ function CheckoutContent() {
     if (placingRef.current) return;
     if (!activeItems.length) return toast.error("No items selected");
     if (!selectedAddressId) return toast.error("Please select a delivery address");
-      if (paymentMethod === "card") {
-      if (cardForm.number.replace(/\s/g, "").length !== 16) return toast.error("Card number must be 16 digits");
-      if (!cardForm.name.trim()) return toast.error("Card holder name is required");
-      if (!/^\d{2}\/\d{2}$/.test(cardForm.expiry)) return toast.error("Expiry must be in MM/YY format");
-      if (cardForm.cvv.length < 3) return toast.error("Please enter a valid CVV");
+    
+    // ✅ Validate card fields for card payment
+    if (paymentMethod === "card") {
+      const validation = validateCardDetails(cardForm);
+      if (!validation.valid) {
+        showCardValidationError(validation);
+        return;
+      }
+      // Clear any previous errors
+      setCardFormErrors({ number: "", name: "", expiry: "" });
     }
-    if (paymentMethod === "bank" && !bankForm.senderName.trim()) {
-      return toast.error("Sender name is required for bank transfer");
+    
+    if (paymentMethod === "bank") {
+      const trimmedSenderName = bankForm.senderName.trim();
+      const trimmedTransactionRef = bankForm.transactionRef.trim();
+      if (!trimmedSenderName) {
+        return toast.error("Sender name is required for bank transfer");
+      }
+      if (!trimmedTransactionRef) {
+        return toast.error("Transaction ID / Reference is required for bank transfer");
+      }
+      // ✅ Update bankForm with trimmed values for order submission
+      setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
     }
     const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
     if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
@@ -611,8 +863,8 @@ function CheckoutContent() {
         shipping_method: shippingMethod,
         shipping,
         checkout_draft_id: currentDraftId || null,
-        bank_sender_name: bankForm.senderName || null,
-        bank_transaction_ref: bankForm.transactionRef || null,
+        bank_sender_name: paymentMethod === "bank" ? bankForm.senderName.trim() : null,
+        bank_transaction_ref: paymentMethod === "bank" ? bankForm.transactionRef.trim() : null,
       });
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       if (currentDraftId) {
@@ -706,7 +958,7 @@ function CheckoutContent() {
     <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
       <h2 className="text-lg font-black text-[var(--user-text)] mb-4">Order Summary</h2>
 
-      <div className="space-y-4 my-4 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 mb-5 custom-scrollbar">
+      <div className="space-y-3 mt-4 mb-0 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 custom-scrollbar">
         {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
@@ -730,7 +982,7 @@ function CheckoutContent() {
         ))}
       </div>
 
-      <div className="space-y-2.5 pt-4 border-t border-[var(--user-border)] text-[0.8125rem]">
+      <div className="space-y-2.5 pt-3 border-t border-[var(--user-border)] text-[0.8125rem]">
         <div className="flex justify-between">
           <span className="text-[var(--user-text)] font-medium">Subtotal</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
@@ -1108,11 +1360,29 @@ function CheckoutContent() {
                       <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
                         <div>
                           <label className={labelCls}>Sender Name (as per bank)</label>
-                          <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inputCls} />
+                          <input 
+                            value={bankForm.senderName} 
+                            onChange={(e) => {
+                              setBankForm({ ...bankForm, senderName: e.target.value });
+                              if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
+                            }}
+                            placeholder="e.g. Ahsan Younas" 
+                            className={`${inputCls} ${bankFormErrors.senderName ? "!border-red-500 focus:!border-red-500" : ""}`}
+                          />
+                          {bankFormErrors.senderName && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.senderName}</p>}
                         </div>
                         <div>
-                          <label className={labelCls}>Transaction ID / Reference (optional)</label>
-                          <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inputCls} />
+                          <label className={labelCls}>Transaction ID / Reference</label>
+                          <input 
+                            value={bankForm.transactionRef} 
+                            onChange={(e) => {
+                              setBankForm({ ...bankForm, transactionRef: e.target.value });
+                              if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+                            }}
+                            placeholder="Add after transferring" 
+                            className={`${inputCls} ${bankFormErrors.transactionRef ? "!border-red-500 focus:!border-red-500" : ""}`}
+                          />
+                          {bankFormErrors.transactionRef && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.transactionRef}</p>}
                         </div>
                         <p className="text-[0.625rem] text-[var(--user-text-muted)]">Add your transaction ID after transferring the total amount for faster verification.</p>
                       </div>
@@ -1123,14 +1393,17 @@ function CheckoutContent() {
                       <CardPreview number={cardForm.number} name={cardForm.name} expiry={cardForm.expiry} />
                       <div className="space-y-3 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4">
                         <div><label className={labelCls}>Card Number</label>
-                          <input value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 16); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); }} placeholder="1234 5678 9012 3456" className={inputCls} /></div>
+                          <input name="card-number" value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 19); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" }); }} placeholder="1234 5678 9012 3456" className={`${inputCls} ${cardFormErrors.number ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.number && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.number}</p>}
+                        </div>
                         <div><label className={labelCls}>Card Holder Name</label>
-                          <input value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} placeholder="John Doe" className={inputCls} /></div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div><label className={labelCls}>Expiry</label>
-                            <input value={cardForm.expiry} onChange={(e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); setCardForm({ ...cardForm, expiry: v }); }} placeholder="MM/YY" className={inputCls} /></div>
-                          <div><label className={labelCls}>CVV</label>
-                            <input type="password" value={cardForm.cvv} onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" className={inputCls} /></div>
+                          <input name="card-name" value={cardForm.name} onChange={(e) => { setCardForm({ ...cardForm, name: e.target.value }); if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" }); }} placeholder="John Doe" className={`${inputCls} ${cardFormErrors.name ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.name && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.name}</p>}
+                        </div>
+                        <div>
+                          <label className={labelCls}>Expiry Date</label>
+                          <input name="card-expiry" type="datetime-local" value={cardForm.expiry} onChange={(e) => { setCardForm({ ...cardForm, expiry: e.target.value }); if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" }); }} className={`${inputCls} ${cardFormErrors.expiry ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.expiry && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.expiry}</p>}
                         </div>
                       </div>
                     </div>
@@ -1159,8 +1432,8 @@ function CheckoutContent() {
           {step === 3 && (
             <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
               <div className="space-y-4 sm:space-y-5">
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
+                <div className={`${cardCls} p-6`}>
+                  <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
                       <ShieldCheck size={18} className="text-[var(--user-accent-text)]" />
                     </div>
@@ -1176,7 +1449,7 @@ function CheckoutContent() {
                         <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
                       </div>
                       {selectedAddress && (
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <p className="text-sm font-bold text-[var(--user-text)]">{selectedAddress.full_name}</p>
                           <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
                             {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}<br />
@@ -1207,13 +1480,13 @@ function CheckoutContent() {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4">
-                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider mb-3">Order Items ({itemsWithDiscounts.length})</p>
-                    <div className="divide-y-2 divide-[var(--user-border)] space-y-3">
+                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4 space-y-5">
+                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Order Items ({itemsWithDiscounts.length})</p>
+                    <div className="divide-y divide-[var(--user-border)]">
                       {itemsWithDiscounts.map((i) => (
-                        <div key={i.key} className="flex items-start gap-3 pt-3 first:pt-0">
+                        <div key={i.key} className="flex items-start gap-4 py-1.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-14 h-14" />
-                          <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{i.name}</p>
 {i.dealActive && i.dealId && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -1247,7 +1520,7 @@ function CheckoutContent() {
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back
                   </button>
-                  <div className="flex items-center justify-center gap-2 pt-3 border-t border-[var(--user-border)]">
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--user-border)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
                     <span className="text-xs text-[var(--user-text-muted)] font-semibold">Your payment is secure and encrypted</span>
                   </div>
@@ -1411,7 +1684,7 @@ function CheckoutContent() {
             </div>
           </div>
 
-          <div className="px-3 pt-3 pb-28 space-y-2">
+          <div className="px-3 pt-3 pb-28 space-y-3">
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] overflow-hidden">
               <p className="px-3 pt-2.5 pb-1.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
@@ -1570,11 +1843,29 @@ function CheckoutContent() {
                   <div className="pt-2 border-t border-[var(--user-border)] space-y-2.5">
                     <div>
                       <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Sender Name</label>
-                      <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                      <input 
+                        value={bankForm.senderName} 
+                        onChange={(e) => {
+                          setBankForm({ ...bankForm, senderName: e.target.value });
+                          if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
+                        }}
+                        placeholder="e.g. Ahsan Younas" 
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                      />
+                      {bankFormErrors.senderName && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.senderName}</p>}
                     </div>
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID (optional)</label>
-                      <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID</label>
+                      <input 
+                        value={bankForm.transactionRef} 
+                        onChange={(e) => {
+                          setBankForm({ ...bankForm, transactionRef: e.target.value });
+                          if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+                        }}
+                        placeholder="Add after transferring" 
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                      />
+                      {bankFormErrors.transactionRef && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.transactionRef}</p>}
                     </div>
                   </div>
                 </div>
@@ -1585,21 +1876,46 @@ function CheckoutContent() {
                 <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
                   <div>
                     <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Number</label>
-                    <input value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 16); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); }} placeholder="1234 5678 9012 3456" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    <input 
+                      name="card-number"
+                      value={cardForm.number} 
+                      onChange={(e) => { 
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 19); 
+                        setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); 
+                        if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" });
+                      }} 
+                      placeholder="1234 5678 9012 3456" 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.number ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                    />
+                    {cardFormErrors.number && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.number}</p>}
                   </div>
                   <div>
                     <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Holder Name</label>
-                    <input value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} placeholder="John Doe" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    <input 
+                      name="card-name"
+                      value={cardForm.name} 
+                      onChange={(e) => {
+                        setCardForm({ ...cardForm, name: e.target.value });
+                        if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" });
+                      }} 
+                      placeholder="John Doe" 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.name ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                    />
+                    {cardFormErrors.name && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.name}</p>}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry</label>
-                      <input value={cardForm.expiry} onChange={(e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); setCardForm({ ...cardForm, expiry: v }); }} placeholder="MM/YY" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
-                    </div>
-                    <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">CVV</label>
-                      <input type="password" value={cardForm.cvv} onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
-                    </div>
+                  <div>
+                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry Date</label>
+                    <input
+                      name="card-expiry"
+                      type="datetime-local"
+                      value={cardForm.expiry}
+                      onChange={(e) => {
+                        setCardForm({ ...cardForm, expiry: e.target.value });
+                        if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" });
+                      }}
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.expiry ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                    />
+                    {cardFormErrors.expiry && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.expiry}</p>}
                   </div>
                 </div>
               )}
@@ -1811,9 +2127,10 @@ function CheckoutContent() {
                   <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">Order Review</h3>
                   <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
                 </div>
-                <div className="p-3 space-y-2">
+                <div className="p-4 space-y-3">
+                  <div className="divide-y divide-[var(--user-border)]">
                   {itemsWithDiscounts.map((i) => (
-                    <div key={i.key} className="flex items-center gap-2.5">
+                    <div key={i.key} className="flex items-center gap-4 py-1.5 first:pt-0 last:pb-0">
                       <ItemThumb item={i} size="w-12 h-12" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
@@ -1822,19 +2139,20 @@ function CheckoutContent() {
                       <p className="text-[0.75rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
                     </div>
                   ))}
-                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-2.5 text-[0.6875rem] space-y-1">
+                  </div>
+                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-3 text-[0.6875rem] space-y-1.5">
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : "No address selected"}</p>
                     {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}</p>
                   </div>
-                  <div className="space-y-1.5 text-[0.75rem] pt-1">
+                  <div className="space-y-2.5 text-[0.75rem] pt-3">
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Items Total</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
                     {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">You Save</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-bold">{shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}</span></div>
-                    <div className="flex justify-between items-baseline pt-2 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>
-                <div className="px-4 pt-2 pb-1">
+                <div className="px-4 pt-3 pb-1">
                   <PrimaryButton
                     onClick={placeOrder}
                     loading={placing}

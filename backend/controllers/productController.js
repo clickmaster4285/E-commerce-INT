@@ -3,6 +3,8 @@ const log = require("../utils/logger");
 
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const Tag = require("../models/Tag");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
@@ -75,6 +77,8 @@ const toNumber = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
+
+const toBoolean = (value) => value === true || String(value).toLowerCase() === "true";
 
 // ======================================================
 // SKU NORMALIZER
@@ -1289,14 +1293,34 @@ const getProductById = async (req, res) => {
 
     // ⭐ Populate audit users so the Activity tab can show WHO created /
     // updated each variant by name (instead of a raw ObjectId).
-    const variants = await Variant.find({
+    const variantDocs = await Variant.find({
       product_id: product._id,
       is_deleted: { $ne: true },
     })
       .sort({ created_at: 1 })
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
       .lean();
+
+    // Variant audit ids can refer to either an admin User or an Employee.
+    // The schema's legacy ref points to User, so populate alone renders staff
+    // creators as null; resolve both collections before returning the detail.
+    const actorIds = [...new Set(variantDocs.flatMap((variant) =>
+      [variant.createdby, variant.updatedby].filter(Boolean).map((actor) => String(actor))
+    ))];
+    const [auditUsers, auditEmployees] = actorIds.length
+      ? await Promise.all([
+          User.find({ _id: { $in: actorIds } }).select("name email").lean(),
+          Employee.find({ _id: { $in: actorIds } }).select("name email").lean(),
+        ])
+      : [[], []];
+    const auditActors = new Map();
+    auditUsers.forEach((actor) => auditActors.set(String(actor._id), actor));
+    auditEmployees.forEach((actor) => auditActors.set(String(actor._id), actor));
+    const resolveAuditActor = (actorId) => actorId ? auditActors.get(String(actorId)) || null : null;
+    const variants = variantDocs.map((variant) => ({
+      ...variant,
+      createdby: resolveAuditActor(variant.createdby),
+      updatedby: resolveAuditActor(variant.updatedby),
+    }));
 
     const purchaseOrders = await PurchaseOrder.find({
       "items.product_id": product._id,
@@ -1437,6 +1461,16 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ message: "Brand is required" });
     }
 
+    const isPerishable = toBoolean(req.body.isPerishable);
+    const expiryDuration = toNumber(req.body.expiryDuration, 0);
+    const expiryUnit = String(req.body.expiryUnit || "days");
+    if (isPerishable && (!Number.isInteger(expiryDuration) || expiryDuration <= 0)) {
+      return res.status(400).json({ message: "Expiry duration must be a positive whole number" });
+    }
+    if (isPerishable && !["days", "months", "years"].includes(expiryUnit)) {
+      return res.status(400).json({ message: "Expiry unit must be days, months, or years" });
+    }
+
     const variants = parseJSON(req.body.variants, []);
 
     // Variants are optional — can be empty (will be created later from Product Detail)
@@ -1473,6 +1507,9 @@ const createProduct = async (req, res) => {
       specifications,
       description: String(req.body.description || "").trim(),
       tax: toNumber(req.body.tax, 0),
+      isPerishable,
+      expiryDuration: isPerishable ? expiryDuration : 0,
+      expiryUnit: isPerishable ? expiryUnit : "days",
       status: req.body.status === "inactive" ? "inactive" : "active",
       // ✅ Featured — create form se bhi mark ho sakta hai (default false)
       is_featured: req.body.is_featured === true,
@@ -1548,7 +1585,7 @@ const createProduct = async (req, res) => {
         tags: variantTags,
         images: imagesByVariant[index] || [],
         createdby: req.user?._id || null,
-        updatedby: req.user?._id || null,
+        updatedby: null,
       });
 
       createdVariants.push(variant);
@@ -1687,6 +1724,31 @@ const updateProduct = async (req, res) => {
 
     if (req.body.tax !== undefined) {
       product.tax = toNumber(req.body.tax, 0);
+    }
+
+    if (["isPerishable", "expiryDuration", "expiryUnit"].some((field) => req.body[field] !== undefined)) {
+      const isPerishable = req.body.isPerishable === undefined
+        ? Boolean(product.isPerishable)
+        : toBoolean(req.body.isPerishable);
+      if (isPerishable) {
+        const expiryDuration = req.body.expiryDuration === undefined
+          ? Number(product.expiryDuration)
+          : Number(req.body.expiryDuration);
+        const expiryUnit = String(req.body.expiryUnit || product.expiryUnit || "days");
+        if (!Number.isInteger(expiryDuration) || expiryDuration <= 0) {
+          return res.status(400).json({ message: "Expiry duration must be a positive whole number" });
+        }
+        if (!["days", "months", "years"].includes(expiryUnit)) {
+          return res.status(400).json({ message: "Expiry unit must be days, months, or years" });
+        }
+        product.isPerishable = true;
+        product.expiryDuration = expiryDuration;
+        product.expiryUnit = expiryUnit;
+      } else {
+        product.isPerishable = false;
+        product.expiryDuration = 0;
+        product.expiryUnit = "days";
+      }
     }
 
     if (req.body.status !== undefined) {
@@ -1907,7 +1969,7 @@ const updateProduct = async (req, res) => {
             status: item.status === "inactive" ? "inactive" : "active",
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
-            updatedby: req.user?._id || null,
+            updatedby: null,
           });
           addedVariantCount += 1;
         }

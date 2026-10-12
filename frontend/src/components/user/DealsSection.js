@@ -224,7 +224,7 @@ function DealEngine({ deals }) {
     retry: 1,
   });
   const cfg = getDealConfig(activeDeal.type);
-  const badgeText = getDealBadgeText(activeDeal);
+  const badgeText = activeDeal.type === "fixed_amount" ? null : getDealBadgeText(activeDeal);
   const sectionRef = useRef(null);
   const sectionVisible = useInViewport(sectionRef);
   const time = useCountdown(activeDeal.endDate, sectionVisible);
@@ -866,15 +866,28 @@ function ProductsRow({ products, deal, hex }) {
 
   const visibleProducts =
     products.length > MAX_DEAL_CARDS ? products.slice(0, MAX_DEAL_CARDS) : products;
+  const fixedDealAmount = Number(deal?.discountValue) || 0;
+  const bundleDealPrice = Number(deal?.type === "bundle" ? deal.bundlePrice : 0) || 0;
+  const headerDealSummary =
+    deal?.type === "fixed_amount" && fixedDealAmount > 0
+      ? `Deal total Rs. ${fixedDealAmount.toLocaleString()} OFF`
+      : deal?.type === "bundle" && bundleDealPrice > 0
+        ? `Bundle total Rs. ${bundleDealPrice.toLocaleString()}`
+        : null;
 
   return (
     <div className="relative">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h4 className="flex items-center gap-1.5 text-xs font-normal sm:text-sm" style={{ color: hex }}>
           <Package size={13} />
           Products in this deal
         </h4>
-        <span className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {headerDealSummary ? (
+            <span className="rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] px-2 py-1 text-[0.625rem] font-medium text-[var(--user-text-secondary)]">
+              {headerDealSummary}
+            </span>
+          ) : null}
           <span className="text-[0.625rem] font-normal sm:text-[0.6875rem]" style={{ color: `${hex}cc` }}>
             {products.length} {products.length === 1 ? "item" : "items"}
           </span>
@@ -888,34 +901,31 @@ function ProductsRow({ products, deal, hex }) {
               <ArrowRight size={12} />
             </Link>
           ) : null}
+          {canScrollL ? (
+            <button
+              onClick={() => scroll("left")}
+              aria-label="Scroll left"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
+            >
+              <ChevronLeft size={15} />
+            </button>
+          ) : null}
+          {canScrollR ? (
+            <button
+              onClick={() => scroll("right")}
+              aria-label="Scroll right"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
+            >
+              <ChevronRight size={15} />
+            </button>
+          ) : null}
         </span>
       </div>
 
-      {canScrollL && (
-        <button
-          onClick={() => scroll("left")}
-          aria-label="Scroll left"
-          className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full items-center justify-center shadow-xl border-2 transition-all active:scale-95 hover:scale-110"
-          style={{ backgroundColor: "var(--user-bg-card)", borderColor: `${hex}66`, color: hex }}
-        >
-          <ChevronLeft size={18} />
-        </button>
-      )}
-      {canScrollR && (
-        <button
-          onClick={() => scroll("right")}
-          aria-label="Scroll right"
-          className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full items-center justify-center text-white shadow-xl transition-all active:scale-95 hover:scale-110"
-          style={{ background: `linear-gradient(135deg, ${hex}, ${hex}cc)` }}
-        >
-          <ChevronRight size={18} />
-        </button>
-      )}
-
       <div
         ref={scrollRef}
-        className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex gap-3 overflow-x-auto pr-3 scrollbar-hide scroll-smooth snap-x snap-mandatory"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", scrollPaddingRight: "12px" }}
       >
         {/* Wider cards with compact deal-only card styling. */}
         {visibleProducts.map((product) => (
@@ -930,6 +940,7 @@ function ProductsRow({ products, deal, hex }) {
               deal={deal}
               dealId={deal._id}
               showDealPricing
+              dealCarousel
             />
           </div>
         ))}

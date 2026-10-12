@@ -97,17 +97,41 @@ export function getDealRequirementIssues(items) {
 export function formatDealRequirementIssue(issue) {
   if (!issue) return "";
   const name = issue.item?.name || "This item";
-  return `Complete the deal requirement for "${name}": add ${issue.requiredQuantity} items (currently ${issue.quantity}).`;
+  const required = issue.requiredQuantity;
+  const current = issue.quantity;
+  const remaining = issue.remainingQuantity;
+  return `"${name}" requires at least ${required} items for this deal. You have selected only ${current}. Please add ${remaining} more item${remaining === 1 ? '' : 's'}.`;
+}
+
+/**
+ * Validates deal requirements for cart items
+ * Returns first validation error or null if all valid
+ * @param {Array} items - Cart items to validate (should be selected items only)
+ * @returns {{ valid: boolean, message?: string, issue?: object }}
+ */
+export function validateDealRequirements(items) {
+  const issues = getDealRequirementIssues(items);
+  if (issues.length === 0) {
+    return { valid: true };
+  }
+  
+  const firstIssue = issues[0];
+  return {
+    valid: false,
+    message: formatDealRequirementIssue(firstIssue),
+    issue: firstIssue
+  };
 }
 
 export function getDealUnitPrice(price, dealType, discountValue) {
   const regularPrice = Number(price) || 0;
   const value = Number(discountValue) || 0;
   if (dealType === "percentage" && value > 0) {
-    return Math.round(regularPrice * (1 - value / 100));
+    const discountedPrice = Math.round(regularPrice * (1 - value / 100));
+    return discountedPrice > 0 ? discountedPrice : regularPrice;
   }
-  if (dealType === "fixed_amount" && value > 0) {
-    return Math.max(0, regularPrice - value);
+  if (dealType === "fixed_amount" && value > 0 && value < regularPrice) {
+    return regularPrice - value;
   }
   return regularPrice;
 }
