@@ -16,7 +16,6 @@ import {
   ArrowLeft,
   ChevronDown,
   Layers,
-  Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
@@ -40,8 +39,6 @@ const createEmptyVariant = (sku = "") => ({
   description: "",
   cost_price: "",
   selling_price: "",
-  expiry_after_delivery: "",
-  expiry_after_delivery_unit: "days",
   quantity: "0",
   images: [],
 });
@@ -439,8 +436,6 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
       description: v.description || "",
       cost_price: String(v.cost_price ?? ""),
       selling_price: String(v.selling_price ?? ""),
-      expiry_after_delivery: String(v.expiry_after_delivery ?? ""),
-      expiry_after_delivery_unit: v.expiry_after_delivery_unit || "days",
       quantity: String(v.quantity ?? 0),
       attributes: v.attributes || {},
       images: (v.images || []).map((img) => ({
@@ -817,8 +812,6 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
           description: v.description || "",
           cost_price: Number(v.cost_price || 0),
           selling_price: Number(v.selling_price || 0),
-          expiry_after_delivery: Math.max(0, Number(v.expiry_after_delivery) || 0),
-          expiry_after_delivery_unit: v.expiry_after_delivery_unit || "days",
           quantity: Number(v.quantity || 0),
           attributes: variantAttributes,
           existing_images: existingImages,
@@ -1099,49 +1092,6 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       />
                     </div>
                   ))}
-                </div>
-
-                <div className="mt-4 rounded-xl border p-4 sm:p-5" style={{ borderColor: "color-mix(in srgb, var(--accent) 22%, var(--border-color))", background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 5%, var(--bg-card)) 0%, var(--bg-card) 100%)" }}>
-                  <div className="mb-3 flex items-start gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "color-mix(in srgb, var(--accent) 12%, transparent)", color: "var(--accent)" }}>
-                      <Clock3 size={16} />
-                    </span>
-                    <div className="min-w-0">
-                      <label className="block text-xs font-bold" style={{ color: "var(--text-primary)" }}>
-                        Expiry After Delivery
-                      </label>
-                      <p className="mt-0.5 text-[11px] leading-4" style={{ color: "var(--text-muted)" }}>
-                        Set how long this variant remains valid after delivery.
-                      </p>
-                    </div>
-                    <span className="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Optional</span>
-                  </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(112px,0.65fr)] gap-2.5">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      aria-label="Expiry duration after delivery"
-                      placeholder="Enter duration"
-                      value={variant.expiry_after_delivery}
-                      onChange={(event) => updateVariant("expiry_after_delivery", event.target.value === "" ? "" : Math.max(0, Math.floor(Number(event.target.value) || 0)))}
-                      className="h-11 w-full rounded-lg px-3.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                      style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
-                    />
-                    <select
-                      value={variant.expiry_after_delivery_unit}
-                      onChange={(event) => updateVariant("expiry_after_delivery_unit", event.target.value)}
-                      aria-label="Expiry duration unit"
-                      className="h-11 w-full rounded-lg px-3 text-sm font-medium outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
-                      style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
-                    >
-                      <option value="days">Days</option>
-                      <option value="months">Months</option>
-                      <option value="years">Years</option>
-                    </select>
-                  </div>
-                  <p className="mt-2 text-[10px] leading-4" style={{ color: "var(--text-muted)" }}>Saved as a variant setting only. PO expiry dates are not changed automatically.</p>
                 </div>
 
                 {variant.selling_price !== "" &&

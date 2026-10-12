@@ -375,10 +375,15 @@ import { shippingApi } from "@/apis/user/shippingApi";
     };
 
     const goCheckout = () => {
+      // ✅ Validate deal requirements BEFORE navigation
       if (dealRequirementIssues.length) {
-        toast.error(formatDealRequirementIssue(dealRequirementIssues[0]));
+        const firstIssue = dealRequirementIssues[0];
+        toast.error(formatDealRequirementIssue(firstIssue));
+        // ❌ BLOCK navigation - user stays in drawer
         return;
       }
+      
+      // ✅ All validations passed - proceed to checkout
       closeCart();
       router.push("/checkout");
     };
@@ -444,6 +449,10 @@ import { shippingApi } from "@/apis/user/shippingApi";
                   const Icon = Tag;
                   const isCollapsed = collapsedDeals.has(dealGroup.dealId);
                   
+                  // ✅ Check deal requirement for this group
+                  const selectedDealItems = dealGroup.items.filter(item => isLineSelected(item.key));
+                  const dealIssue = selectedDealItems.length > 0 ? getDealRequirementIssues(selectedDealItems)[0] : null;
+                  
                   return (
                     <div key={dealGroup.dealId || dealIndex} className="overflow-hidden border-b border-[var(--user-border)]">
                       <div className={`flex items-center gap-3 py-3 ${!isCollapsed ? "border-b border-[var(--user-border)]" : ""}`}>
@@ -477,25 +486,36 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
                       {/* ✅ Items List — sirf jab expanded ho */}
                       {!isCollapsed && (
-                        <ul className="m-0 list-none p-0">
-                          {dealGroup.items.map((row, index) => (
-                          <CartItemRow
-                            key={row.key}
-                            row={row}
-                            index={index}
-                            imgUrl={getImgUrl(row.image)}
-                            isRemoving={removingKeys.has(row.key)}
-                            isCommitting={pendingQty[row.key] !== undefined && pendingQty[row.key] !== row.raw.qty}
-                            onQtyChange={handleQtyChange}
-                            onRemove={handleRemove}
-                            isSelected={isLineSelected(row.key)}
-                            onToggleSelect={() => toggleLineSelected(row.key)}
-                            openDealPicker={openDealCardKey === row.key}
-                            onToggleDealPicker={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
-                            onCloseDealPicker={() => setOpenDealCardKey(null)}
-                          />
-                          ))}
-                        </ul>
+                        <>
+                          <ul className="m-0 list-none p-0">
+                            {dealGroup.items.map((row, index) => (
+                            <CartItemRow
+                              key={row.key}
+                              row={row}
+                              index={index}
+                              imgUrl={getImgUrl(row.image)}
+                              isRemoving={removingKeys.has(row.key)}
+                              isCommitting={pendingQty[row.key] !== undefined && pendingQty[row.key] !== row.raw.qty}
+                              onQtyChange={handleQtyChange}
+                              onRemove={handleRemove}
+                              isSelected={isLineSelected(row.key)}
+                              onToggleSelect={() => toggleLineSelected(row.key)}
+                              openDealPicker={openDealCardKey === row.key}
+                              onToggleDealPicker={() => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key))}
+                              onCloseDealPicker={() => setOpenDealCardKey(null)}
+                            />
+                            ))}
+                          </ul>
+                          {/* ✅ Deal requirement warning */}
+                          {dealIssue && (
+                            <div className="mx-3 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 flex items-start gap-2">
+                              <span className="text-amber-600 shrink-0 mt-0.5" aria-hidden="true">⚠</span>
+                              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                                Add {dealIssue.remainingQuantity} more item{dealIssue.remainingQuantity === 1 ? '' : 's'} to unlock this deal ({dealIssue.quantity}/{dealIssue.requiredQuantity} selected)
+                              </p>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );
@@ -588,7 +608,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                 <button
                   type="button"
                   onClick={goCheckout}
-                  disabled={!hasItems || selectedLineCount === 0 || dealRequirementIssues.length > 0}
+                  disabled={!hasItems || selectedLineCount === 0}
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition-colors duration-150 hover:bg-[var(--user-accent-hover)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
                   <LockKeyhole size={15} aria-hidden="true" />

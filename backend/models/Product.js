@@ -45,6 +45,23 @@ const productSchema = new mongoose.Schema(
       max: 100,
     },
 
+    isPerishable: {
+      type: Boolean,
+      default: false,
+    },
+
+    expiryDuration: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    expiryUnit: {
+      type: String,
+      enum: ["days", "months", "years"],
+      default: "days",
+    },
+
     // ✅ NEW: Dynamic specifications from category attributes
     specifications: {
       type: mongoose.Schema.Types.Mixed,

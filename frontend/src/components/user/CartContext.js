@@ -304,6 +304,25 @@ export function CartProvider({ children }) {
     const linePrice = dealInfo && qty >= requiredDealQty
       ? getDealUnitPrice(regularPrice, dealInfo.dealType, dealInfo.dealDiscountValue)
       : regularPrice;
+    const dealData = dealInfo
+      ? {
+          dealId: dealInfo.dealId || null,
+          dealType: dealInfo.dealType || null,
+          dealName: dealInfo.dealName || null,
+          dealBadge: dealInfo.dealBadge || null,
+          dealSavings: Number(dealInfo.savings) || 0,
+          dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
+          dealDiscountValue: Number(dealInfo.dealDiscountValue) || 0,
+          dealMinQuantity: Number(dealInfo.minQuantity) || 1,
+          dealRegularPrice: regularPrice,
+          ...(dealInfo.dealType === "buy_x_get_y"
+            ? {
+                dealBuyQuantity: dealInfo.buyQuantity || 0,
+                dealGetQuantity: dealInfo.getQuantity || 0,
+              }
+            : {}),
+        }
+      : {};
 
     const existing = cartRef.current.find((i) => i.key === key);
     const currentQty = existing?.qty || 0;
@@ -334,10 +353,10 @@ export function CartProvider({ children }) {
 
     if (existing) {
       const nextQty = existing.qty + addQty;
-      const dealType = existing.dealType || dealInfo?.dealType;
-      const dealDiscountValue = existing.dealDiscountValue ?? dealInfo?.dealDiscountValue;
-      const minQuantity = existing.dealMinQuantity ?? dealInfo?.minQuantity;
-      const buyQuantity = existing.dealBuyQuantity ?? dealInfo?.buyQuantity;
+      const dealType = dealInfo?.dealType || existing.dealType;
+      const dealDiscountValue = dealInfo?.dealDiscountValue ?? existing.dealDiscountValue;
+      const minQuantity = dealInfo?.minQuantity ?? existing.dealMinQuantity;
+      const buyQuantity = dealInfo?.buyQuantity ?? existing.dealBuyQuantity;
       const requiredQty = existing.dealId || dealInfo?.dealId
         ? getEffectiveMinQuantity({ type: dealType, minQuantity, buyQuantity })
         : 1;
@@ -346,30 +365,10 @@ export function CartProvider({ children }) {
         : regularPrice;
       save(
         cartRef.current.map((i) =>
-          i.key === key ? { ...i, qty: nextQty, price: unitPrice, stock: stock ?? i.stock } : i
+          i.key === key ? { ...i, ...dealData, qty: nextQty, price: unitPrice, stock: stock ?? i.stock } : i
         )
       );
     } else {
-      const dealData = dealInfo
-        ? {
-            dealId: dealInfo.dealId || null,
-            dealType: dealInfo.dealType || null,
-            dealName: dealInfo.dealName || null,
-            dealBadge: dealInfo.dealBadge || null,
-            dealSavings: Number(dealInfo.savings) || 0,
-            dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
-            dealDiscountValue: Number(dealInfo.dealDiscountValue) || 0,
-            dealMinQuantity: Number(dealInfo.minQuantity) || 1,
-            dealRegularPrice: regularPrice,
-            ...(dealInfo.dealType === "buy_x_get_y"
-              ? {
-                  dealBuyQuantity: dealInfo.buyQuantity || 0,
-                  dealGetQuantity: dealInfo.getQuantity || 0,
-                }
-              : {}),
-          }
-        : {};
-
       save([
         ...cartRef.current,
         {

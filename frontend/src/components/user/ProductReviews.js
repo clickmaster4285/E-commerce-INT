@@ -71,24 +71,60 @@ function StarRow({ value = 0, hover = 0, size = 16, interactive = false, onPick,
 
 /* ---------- Saved media thumbnails (already uploaded) ---------- */
 function SavedMedia({ images = [], videos = [], onPreview }) {
-  const imgs = images.map((m) => mediaUrl(m.img_url)).filter(Boolean);
-  const vids = videos.map((m) => mediaUrl(m.video_url)).filter(Boolean);
-  if (!imgs.length && !vids.length) return null;
-  const thumb =
-    "relative w-14 h-14 rounded-xl overflow-hidden border border-[var(--user-border)] bg-[var(--user-bg-hover)] shrink-0";
+  const entries = [
+    ...images.map((item) => ({ type: "image", url: mediaUrl(reviewImageUrl(item)) })).filter((item) => item.url),
+    ...videos.map((item) => ({ type: "video", url: mediaUrl(item?.video_url), duration: item?.duration })).filter((item) => item.url),
+  ];
+  if (!entries.length) return null;
+  const visible = entries.slice(0, 6);
+  const hiddenCount = Math.max(0, entries.length - visible.length);
+  const thumb = "relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]";
   return (
-    <div className="flex gap-2 overflow-x-auto pb-0.5">
-      {imgs.map((url, i) => (
-        <button key={`i-${i}`} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview && onPreview({ type: "image", url }); }} className={thumb} aria-label="View photo">
-          <img src={url} alt="" className="w-full h-full object-cover" />
+    <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Review photos and videos">
+      {visible.map((item, i) => (
+        <button key={`${item.type}-${i}`} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview && onPreview(item); }} className={`${thumb} group`} aria-label={item.type === "video" ? "Play video" : "View photo"}>
+          {item.type === "video" ? (
+            <>
+              <video src={item.url} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-200 group-hover:scale-105" />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/10"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/65"><Play size={14} className="ml-0.5 fill-white text-white" /></span></span>
+              {Number(item.duration) > 0 && <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[10px] font-semibold text-white">{Math.floor(item.duration / 60)}:{String(Math.floor(item.duration % 60)).padStart(2, "0")}</span>}
+            </>
+          ) : (
+            <>
+              <img src={item.url} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+              <span className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
+            </>
+          )}
+          {hiddenCount > 0 && i === visible.length - 1 && <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-sm font-semibold text-white">+{hiddenCount}</span>}
         </button>
       ))}
-      {vids.map((url, i) => (
-        <button key={`v-${i}`} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview && onPreview({ type: "video", url }); }} className={`${thumb} flex items-center justify-center bg-black`} aria-label="Play video">
-          <video src={url} muted preload="metadata" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-          <span className="relative w-7 h-7 rounded-full bg-black/60 flex items-center justify-center"><Play size={13} className="text-white fill-white" /></span>
-        </button>
-      ))}
+    </div>
+  );
+}
+
+export function ReviewMediaGallery({ images = [], videos = [] }) {
+  const [preview, setPreview] = useState(null);
+  return <><SavedMedia images={images} videos={videos} onPreview={setPreview} />{preview && <MediaLightbox preview={preview} onClose={() => setPreview(null)} />}</>;
+}
+
+export function StoreResponse({ response }) {
+  const [expanded, setExpanded] = useState(false);
+  const message = response?.message?.trim();
+  if (!message) return null;
+  const paragraphs = message.split(/\n+/).filter(Boolean);
+  const date = response?.responded_at
+    ? new Date(response.responded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
+  return (
+    <div className="rounded-xl border-l-[3px] border-[var(--user-accent)] bg-[var(--user-accent)]/10 px-3.5 py-3.5 sm:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-accent)]"><MessageSquareText size={15} aria-hidden="true" /> Store response</p>
+        <p className="text-xs text-[var(--user-text-muted)]">Store team{date ? ` · ${date}` : ""}</p>
+      </div>
+      <div className={`mt-2 max-w-2xl overflow-hidden text-sm leading-relaxed text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-3"}`}>
+        {paragraphs.map((paragraph, index) => <p key={index} className={index ? "mt-2" : ""}>{paragraph}</p>)}
+      </div>
+      {message.length > 180 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? "Show less" : "Show more"}</button>}
     </div>
   );
 }
@@ -326,6 +362,7 @@ export default function ProductRating({ productId, productName = "", review = nu
   const [removedVideo, setRemovedVideo] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null);
+  const [commentExpanded, setCommentExpanded] = useState(false);
 
   const rated = !!review;
   const savedCount = review ? (review.images || []).length + (review.videos || []).length : 0;
@@ -459,39 +496,41 @@ export default function ProductRating({ productId, productName = "", review = nu
 
   /* ---------- DETAIL variant — product page "Your rating" card ---------- */
   if (variant === "detail") {
+    const hasReviewBody = !!(review.title || review.comment || savedCount || review.storeResponse?.message);
     return (
       <>
-        <section className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 shadow-sm">
+        <section className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400/20 to-amber-400/5 border border-amber-400/25 flex items-center justify-center shrink-0">
-                <Star size={20} className="fill-amber-400 text-amber-400" />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10">
+                <Star size={17} className="fill-amber-500 text-amber-500" />
               </span>
               <div className="min-w-0">
-                <p className="text-[0.625rem] font-black uppercase tracking-[0.14em] text-[var(--user-text-secondary)]">Your rating</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <StarRow value={review.rating} size={17} />
-                  <span className="text-xs font-semibold text-[var(--user-text)]">{RATING_LABELS[review.rating]}</span>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--user-text-muted)]">Your rating</p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <StarRow value={review.rating} size={15} />
+                  <span className="text-sm font-semibold text-[var(--user-text)]">{RATING_LABELS[review.rating]}</span>
                 </div>
               </div>
             </div>
             <button type="button" onClick={openModal}
-              className="h-9 px-4 rounded-xl border border-[var(--user-border)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)] transition">
+              className="h-9 rounded-lg border border-[var(--user-border)] px-3.5 text-xs font-semibold text-[var(--user-text-secondary)] transition hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]">
               Edit rating
             </button>
           </div>
-          {(review.title || review.comment) ? (
-            <div className="mt-3 pt-3 border-t border-[var(--user-border)] space-y-1">
-              {review.title ? <p className="text-sm font-semibold text-[var(--user-text)]">{review.title}</p> : null}
-              {review.comment ? <p className="text-sm text-[var(--user-text-muted)] leading-relaxed">{review.comment}</p> : null}
+          {hasReviewBody ? (
+            <div className="mt-4 space-y-4 border-t border-[var(--user-border)] pt-4">
+              {(review.title || review.comment) && <div>
+                {review.title ? <p className="text-base font-semibold text-[var(--user-text)]">{review.title}</p> : null}
+                {review.comment ? <div>
+                  <p className={`mt-1.5 whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${commentExpanded ? "" : "line-clamp-4"}`}>{review.comment}</p>
+                  {review.comment.length > 220 && <button type="button" onClick={() => setCommentExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{commentExpanded ? "Read less" : "Read more"}</button>}
+                </div> : null}
+              </div>}
+              {savedCount > 0 && <SavedMedia images={review.images} videos={review.videos} onPreview={setPreview} />}
+              {review.storeResponse?.message && <StoreResponse response={review.storeResponse} />}
             </div>
           ) : null}
-          {savedCount > 0 ? (
-            <div className="mt-3 pt-3 border-t border-[var(--user-border)]">
-              <SavedMedia images={review.images} videos={review.videos} onPreview={setPreview} />
-            </div>
-          ) : null}
-          {review.storeResponse?.message ? <div className="mt-3 rounded-xl border border-[var(--user-accent)]/20 bg-[var(--user-accent)]/5 p-3"><p className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-accent)]"><MessageSquareText size={14} /> Store response</p><p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-[var(--user-text-secondary)]">{review.storeResponse.message}</p><p className="mt-2 text-[0.625rem] text-[var(--user-text-muted)]">{review.storeResponse.responded_by_name || "Store Support"}{review.storeResponse.responded_at ? ` · ${new Date(review.storeResponse.responded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}</p></div> : null}
         </section>
         {modal}
         {lightbox}

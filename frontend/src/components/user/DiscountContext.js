@@ -148,13 +148,19 @@ export function useDiscounts() {
           let dealDisplayValue = dealValue;
 
           if (dealType === "percentage") {
-            dealDiscountedPrice = Math.round(originalPrice * (1 - dealValue / 100));
-            dealHasDiscount = true;
-            dealSavings = originalPrice - dealDiscountedPrice;
+            const calculatedPrice = Math.round(originalPrice * (1 - dealValue / 100));
+            if (calculatedPrice > 0 && calculatedPrice < originalPrice) {
+              dealDiscountedPrice = calculatedPrice;
+              dealHasDiscount = true;
+              dealSavings = originalPrice - dealDiscountedPrice;
+            }
           } else if (dealType === "fixed_amount") {
-            dealDiscountedPrice = Math.max(0, originalPrice - dealValue);
-            dealHasDiscount = dealDiscountedPrice < originalPrice;
-            dealSavings = originalPrice - dealDiscountedPrice;
+            const calculatedPrice = originalPrice - dealValue;
+            if (calculatedPrice > 0 && calculatedPrice < originalPrice) {
+              dealDiscountedPrice = calculatedPrice;
+              dealHasDiscount = true;
+              dealSavings = originalPrice - dealDiscountedPrice;
+            }
           } else {
             dealDiscountedPrice = originalPrice;
             dealHasDiscount = false;
@@ -210,13 +216,19 @@ export function useDiscounts() {
             let dealDisplayValue = dealValue;
 
             if (dealType === "percentage") {
-              dealDiscountedPrice = Math.round(originalPrice * (1 - dealValue / 100));
-              dealHasDiscount = true;
-              dealSavings = originalPrice - dealDiscountedPrice;
+              const calculatedPrice = Math.round(originalPrice * (1 - dealValue / 100));
+              if (calculatedPrice > 0 && calculatedPrice < originalPrice) {
+                dealDiscountedPrice = calculatedPrice;
+                dealHasDiscount = true;
+                dealSavings = originalPrice - dealDiscountedPrice;
+              }
             } else if (dealType === "fixed_amount") {
-              dealDiscountedPrice = Math.max(0, originalPrice - dealValue);
-              dealHasDiscount = dealDiscountedPrice < originalPrice;
-              dealSavings = originalPrice - dealDiscountedPrice;
+              const calculatedPrice = originalPrice - dealValue;
+              if (calculatedPrice > 0 && calculatedPrice < originalPrice) {
+                dealDiscountedPrice = calculatedPrice;
+                dealHasDiscount = true;
+                dealSavings = originalPrice - dealDiscountedPrice;
+              }
             } else {
               dealDiscountedPrice = originalPrice;
               dealHasDiscount = false;
