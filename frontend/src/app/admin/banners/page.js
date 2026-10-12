@@ -528,9 +528,11 @@ export default function BannersPage() {
       markSelfAction(id ? "update" : "create");
       return id ? adminBannerApi.update(id, data) : adminBannerApi.create(data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (responseData, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
       toast.success(variables.id ? "Banner updated successfully" : "Banner added successfully");
+      // ✅ FIXED: After save, refresh the banners list and close modal
+      // The query invalidation will trigger a refetch automatically
       resetForm();
       setShowModal(false);
     },
@@ -670,6 +672,19 @@ export default function BannersPage() {
     if (!value) return undefined;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  };
+
+  // ✅ NEW: Convert ISO string to YYYY-MM-DD format (timezone-safe, local date)
+  // Handles both ISO strings (2026-10-12T00:00:00.000Z) and date objects
+  const dateToInputFormat = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return "";
+    // Use local date, not UTC to avoid timezone shift
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const dealSaveMutation = useMutation({
@@ -1474,11 +1489,11 @@ export default function BannersPage() {
                 {/* 5. Schedule */}
                 <FormSection number="5" title="Schedule" description="Set when banner should be active">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Start Date & Time" helpText="When banner becomes active">
-                      <Input type="datetime-local" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
+                    <FormField label="Start Date" helpText="When banner becomes active">
+                      <Input type="date" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
                     </FormField>
-                    <FormField label="End Date & Time" helpText="When banner expires">
-                      <Input type="datetime-local" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
+                    <FormField label="End Date" helpText="When banner expires">
+                      <Input type="date" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
                     </FormField>
                   </div>
                 </FormSection>
