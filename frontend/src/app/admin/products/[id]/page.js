@@ -611,7 +611,6 @@ function DetailStat({ label, value, sub, subColor, dotColor, color }) {
 
 function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
   const [previewImage, setPreviewImage] = useState(null);
-  const [copiedSku, setCopiedSku] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const panelRef = useRef(null);
 
@@ -694,19 +693,6 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   const hasLongDescription = description.length > 140;
   const primaryImage = images[0];
 
-  // SKU copy — clipboard se ek click mein
-  const copySku = async () => {
-    if (!sku) return;
-    try {
-      await navigator.clipboard.writeText(sku);
-      setCopiedSku(true);
-      setTimeout(() => setCopiedSku(false), 1800);
-      toast.success("SKU copied to clipboard");
-    } catch {
-      toast.error("Could not copy SKU");
-    }
-  };
-
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end" role="dialog" aria-modal="true" aria-labelledby="variant-drawer-title">
       <div className="absolute inset-0 animate-in fade-in duration-300 bg-black/60 backdrop-blur-[3px]" onClick={onClose} />
@@ -738,7 +724,7 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
 
         {/* BODY */}
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
-          {/* HERO — identity: image · title · status · SKU (copy) · description */}
+          {/* HERO — identity: image · title · status · SKU · description */}
           <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 flex items-start gap-3.5">
               {primaryImage ? (
                 <button type="button" onClick={() => setPreviewImage(0)} aria-label="Open image preview" className="group relative w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
@@ -762,16 +748,11 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
                   <StatusBadge active={isActive} />
                 </div>
 
-                {/* SKU + one-click copy */}
+                {/* SKU */}
                 <div className="mt-2 flex items-center gap-1.5">
                   <span className="inline-flex min-w-0 items-center rounded-md px-2 py-1 text-[10.5px] font-mono" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
                     <span className="truncate">{sku ? `SKU: ${sku}` : "No SKU"}</span>
                   </span>
-                  {sku && (
-                    <button type="button" onClick={copySku} title="Copy SKU" aria-label="Copy variant SKU" className="inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-md transition hover:brightness-110" style={{ backgroundColor: copiedSku ? "var(--success-soft)" : "var(--accent-soft)", color: copiedSku ? "var(--success)" : "var(--accent)", border: `1px solid color-mix(in srgb, ${copiedSku ? "var(--success)" : "var(--accent)"} 28%, transparent)` }}>
-                      {copiedSku ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  )}
                 </div>
 
                 {description ? (
