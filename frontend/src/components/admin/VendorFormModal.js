@@ -98,7 +98,6 @@ export default function VendorFormModal({ open, form, setForm, editing = false, 
           <section className="rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "#e5edf7" }}>
             {sectionTitle(MapPin, "Location", "Address and delivery location details.")}
             <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
-              {textField("Address", "address", "sm:col-span-2")}
               <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: "#475569" }}>Country</label>
               <select value={form.country} onChange={(event) => setForm((current) => ({ ...current, country: event.target.value, state: "", city: "" }))} className={selectClass} style={inputStyle}>
@@ -121,6 +120,7 @@ export default function VendorFormModal({ open, form, setForm, editing = false, 
               </select>
             </div>
             {textField("Zip Code", "zip_code")}
+            {textField("Address", "address", "sm:col-span-2")}
             </div>
           </section>
           <section className="rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "#e5edf7" }}>
