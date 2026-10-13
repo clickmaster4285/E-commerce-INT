@@ -142,7 +142,32 @@ app.use(
   }),
 );
 
-const io = initSocket(server);
+// ==========================================
+// STARTUP CONSOLE — sirf startup ke critical lines (DB / SMTP / port / server / socket).
+// ✅ Ye logger.js se alag hai: logger sab kuch silence karta hai (log.info/
+//    log.error no-op hain), jisse server start hone par console bilkul khamosh
+//    rehta tha. Yahan direct console use hota hai taaki "server started"
+//    confirmation user ko DIKHE.
+// ⚠️ Koi file nahi banti — pure console output. Baaki logging jaisi thi waisi
+//    hi silent chhodi gayi hai.
+// ==========================================
+const startupLog = {
+  error: (msg) => console.error(`❌ ${msg}`),
+};
+
+// ==========================================
+// SOCKET.IO — init + status (startup console ke liye)
+// ==========================================
+let socketStatus = "not connected";
+let io = null;
+try {
+  io = initSocket(server);
+  socketStatus = "connected";
+} catch (socketErr) {
+  // ✅ Socket fail ho jaye to server mat maro — baaki API chalti rahe
+  socketStatus = `NOT connected (${socketErr.message})`;
+}
+
 app.use((req, res, next) => { req.io = io; next(); });
 
 // ✅ GLOBAL RATE LIMIT — poori /api par (health check skip, static /uploads waise hi bahar)
@@ -293,38 +318,32 @@ const startServer = async () => {
     if (typeof bannerScheduler === 'function') bannerScheduler();
     else if (bannerScheduler?.start) bannerScheduler.start();
 
-    // 📧 SMTP status — OTP email jayegi ya sirf console par aayegi, start par hi pata chal jaye
-    // (checks same hain, sirf print 1 compact warn/line me)
-    let smtpStatus = "SMTP off (console fallback)";
+    // 📧 SMTP check (chalta rehta hai, par print nahi — extra info nahi chahiye)
     try {
       const { isSmtpConfigured, verifySmtpConnection, getSmtpConfig } = require("./utils/sendEmail");
-      if (!isSmtpConfigured()) {
-        log.warn("⚠️ SMTP not configured — OTP emails console par print hongi (backend/.env me SMTP_* set karein).");
-      } else {
-        const cfg = getSmtpConfig();
+      if (isSmtpConfigured()) {
         await verifySmtpConnection();
-        smtpStatus = `SMTP ok (${cfg.host}:${cfg.port})`;
-        log.info(`✅ SMTP OK — OTP emails ${cfg.host}:${cfg.port} (${cfg.user}) se jayengi`);
       }
     } catch (smtpError) {
       log.error("❌ SMTP check failed:", smtpError.message);
-      log.error("💡 Gmail: 16-char App Password use karein (spaces hata kar), 2-Step Verification ON rakhein.");
     }
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
-      log.error(`❌ Port ${PORT} is already in use (EADDRINUSE). Please close the other process or change PORT in .env.`);
-      log.error(`💡 Fix: kill $(lsof -t -i:${PORT}) or change PORT=${PORT+1}`);
+      // ✅ Pehle ye block poora silent tha — process bina kuch bataye exit ho jata tha
+      startupLog.error(`Port ${PORT} already in use (EADDRINUSE) — doosra backend chal raha hai.`);
+      console.error(`💡 Fix: taskkill /PID <pid> /F   |   ya .env me PORT badal do`);
       process.exit(1);
     }
 
     server.listen(PORT, HOST, () => {
-      const displayHost = HOST === "0.0.0.0" ? "localhost" : HOST;
-      // Start line hamesha dikhe (LOG_LEVEL se independent) — ye noise nahi, confirmation hai
-      log.info(`✅ ${STARTUP_MESSAGE} | API http://${displayHost}:${PORT}${API_PREFIX} | DB ok | ${smtpStatus}`);
+      // ✅ Sirf 2 lines — server start + socket status. Extra info nahi.
+      console.log(`✅ ${STARTUP_MESSAGE}`);
+      console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
   } catch (error) {
-    log.error("❌ Server start failed:", error.message);
+    // ✅ Pehle ye bhi silent tha — ab reason dikhegi
+    startupLog.error(`Server start failed: ${error.message}`);
     process.exit(1);
   }
 };

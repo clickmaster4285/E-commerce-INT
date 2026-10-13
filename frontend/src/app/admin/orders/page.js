@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
@@ -20,6 +20,7 @@ const XIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="n
 const BanIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>);
 const TruckIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1h4a1 1 0 001-1v-3m-9 4a2 2 0 104 0m-4 0a2 2 0 114 0m6-2V9m-2 2h4l2 3v3h-2m-2-5a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>);
 const BoxIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
+const PackageIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>);
 const AlertIcon = ({ className = "w-5 h-5" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>);
 const ClockIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const CheckCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
@@ -29,6 +30,27 @@ const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 
 /* ==================== HELPERS ==================== */
 const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+// ✅ Product history me "KAB order hua" exact dekhna ho to time bhi chahiye
+const formatDateTime = (d) => d
+  ? new Date(d).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
+  : "—";
+
+// ✅ Line item product se match karta hai? (String compare — ObjectId vs string safe)
+const isProductMatch = (item, productId) =>
+  Boolean(productId) && item?.product_id != null && String(item.product_id) === String(productId);
+
+// ✅ Order items ko aise order karo ki filtered product pehle dikhe
+const orderItemsForDisplay = (order, productId) => {
+  const items = order?.items || [];
+  if (!productId) return items;
+  const matched = items.filter((it) => isProductMatch(it, productId));
+  const rest = items.filter((it) => !isProductMatch(it, productId));
+  return [...matched, ...rest];
+};
+
+// ✅ Summary panel ka status breakdown — schema ke saath consistent
+const SUMMARY_STATUS_KEYS = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
@@ -179,9 +201,34 @@ function FilterSelect({ value, onChange, options, width = 160 }) {
 }
 
 /* ==================== MAIN COMPONENT ==================== */
+// ✅ useSearchParams ko Suspense boundary chahiye (production build warna fail hota hai)
 export default function OrdersPage() {
+  return (
+    <React.Suspense fallback={<OrdersFallback />}>
+      <OrdersView />
+    </React.Suspense>
+  );
+}
+
+function OrdersFallback() {
+  return (
+    <div className="w-full min-h-screen flex items-center justify-center p-10">
+      <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
+        <Spinner className="w-4 h-4" /> Loading orders...
+      </div>
+    </div>
+  );
+}
+
+function OrdersView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  // ✅ Product filter URL me hota hai — refresh / back button / shareable sab kaam kare
+  const productId = searchParams.get("productId") || "";
+  const productName = searchParams.get("productName") || "";
+  const productFilterActive = Boolean(productId);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -202,10 +249,25 @@ export default function OrdersPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["admin-orders", page, pageSize, statusFilter, search],
-    queryFn: () => orderApi.getAll({ page, limit: pageSize, status: statusFilter, search }),
+    queryKey: ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId],
+    // ✅ Saare filters backend pe jaate hain — pagination aur counts sahi rehte hain
+    queryFn: () => orderApi.getAll({
+      page, limit: pageSize, status: statusFilter, search,
+      payment: paymentFilter, shipping: shippingFilter, dateRange,
+      productId: productId || undefined,
+    }),
     retry: 1,
   });
+
+  // ✅ Product URL se badla (dashboard click / back-forward) to page 1 pe wapas —
+//    warna page 3 pe stale ya khaali results dikh sakte hain.
+//    Render-phase adjust (project convention — same pattern wishlist page me hai),
+//    effect me setState se cascading render hota hai.
+const [lastProductId, setLastProductId] = useState(productId);
+if (lastProductId !== productId) {
+  setLastProductId(productId);
+  setPage(1);
+}
 
   const debounceRef = useRef(null);
   React.useEffect(() => () => clearTimeout(debounceRef.current), []);
@@ -215,9 +277,10 @@ export default function OrdersPage() {
     debounceRef.current = setTimeout(() => { setSearch(value.trim()); setPage(1); }, 300);
   };
 
+  // ✅ productId bhi count queries me jata hai — stat cards filtered product ke orders dikhate hain
   const buildCountQuery = (key, status) => ({
-    queryKey: ["admin-orders-count", key],
-    queryFn: () => orderApi.getAll({ page: 1, limit: 1, status }),
+    queryKey: ["admin-orders-count", key, productId],
+    queryFn: () => orderApi.getAll({ page: 1, limit: 1, status, productId: productId || undefined }),
     staleTime: 60 * 1000, retry: false,
   });
   const { data: allCount } = useQuery(buildCountQuery("all", "all"));
@@ -225,6 +288,25 @@ export default function OrdersPage() {
   const { data: shippedCount } = useQuery(buildCountQuery("shipped", "shipped"));
   const { data: deliveredCount } = useQuery(buildCountQuery("delivered", "delivered"));
   const { data: cancelledCount } = useQuery(buildCountQuery("cancelled", "cancelled"));
+
+  // ✅ Product history summary — units/revenue/date range + status breakdown.
+  //    NOTE: status filter yahan intentionally pass nahi kiya, warna status
+  //    breakdown meaningless ho jata. Baaki filters (search/payment/shipping/time) lagte hain.
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+    queryKey: ["admin-product-summary", productId, paymentFilter, shippingFilter, dateRange, search],
+    queryFn: () => orderApi.getProductSummary({
+      productId,
+      status: "all",
+      payment: paymentFilter,
+      shipping: shippingFilter,
+      dateRange,
+      search,
+    }),
+    enabled: productFilterActive,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  const summary = summaryData?.data;
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status, notes }) => orderApi.updateStatus(id, { status, ...(notes ? { notes } : {}) }),
@@ -250,24 +332,9 @@ export default function OrdersPage() {
   const total = pagination.total || 0;
   const totalPages = pagination.totalPages || 1;
 
+  // ✅ Payment / shipping / date range / product filters ab BACKEND pe lagte hain
+  //    (is liye pagination + counts sahi hain). Yahan sirf sorting hai — wo backend nahi karta.
   const filteredOrders = useMemo(() => {
-    let arr = orders;
-    if (paymentFilter !== "all") arr = arr.filter((o) => (o.payment?.status || "pending") === paymentFilter);
-    if (shippingFilter !== "all") arr = arr.filter((o) => (o.shipping_method || "standard") === shippingFilter);
-    if (dateRange !== "all") {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      arr = arr.filter((o) => {
-        const d = new Date(o.created_at);
-        switch (dateRange) {
-          case "today": return d >= startOfToday;
-          case "yesterday": { const y = new Date(startOfToday); y.setDate(y.getDate() - 1); return d >= y && d < startOfToday; }
-          case "7d": { const c = new Date(startOfToday); c.setDate(c.getDate() - 7); return d >= c; }
-          case "30d": { const c = new Date(startOfToday); c.setDate(c.getDate() - 30); return d >= c; }
-          default: return true;
-        }
-      });
-    }
     const { key, direction } = sortConfig;
     const val = (o) => {
       switch (key) {
@@ -279,13 +346,13 @@ export default function OrdersPage() {
         case "created_at": default: return new Date(o.created_at || 0).getTime();
       }
     };
-    return [...arr].sort((a, b) => {
+    return [...orders].sort((a, b) => {
       const va = val(a), vb = val(b);
       if (va < vb) return direction === "asc" ? -1 : 1;
       if (va > vb) return direction === "asc" ? 1 : -1;
       return 0;
     });
-  }, [orders, paymentFilter, shippingFilter, dateRange, sortConfig]);
+  }, [orders, sortConfig]);
 
   const startIndex = ((pagination.page || 1) - 1) * pageSize;
 
@@ -344,17 +411,36 @@ export default function OrdersPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
+  // ✅ Product chip ✕ -> URL se params hatate hain (shareable link + back button theek rehta hai)
+  const clearProductFilter = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("productId");
+    params.delete("productName");
+    setPage(1);
+    const qs = params.toString();
+    router.replace(`/admin/orders${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
+
   const activeFilters = [];
-  if (search) activeFilters.push({ label: `Search: ${search}`, clear: () => { setSearchInput(""); setSearch(""); setPage(1); } });
-  if (statusFilter !== "all") activeFilters.push({ label: `Status: ${statusFilter}`, clear: () => { setStatusFilter("all"); setPage(1); } });
-  if (paymentFilter !== "all") activeFilters.push({ label: `Payment: ${PAYMENT_STATUS_CONFIG[paymentFilter]?.label || paymentFilter}`, clear: () => setPaymentFilter("all") });
-  if (shippingFilter !== "all") activeFilters.push({ label: `Shipping: ${shippingFilter}`, clear: () => setShippingFilter("all") });
-  if (dateRange !== "all") activeFilters.push({ label: `Date: ${({ today: "Today", yesterday: "Yesterday", "7d": "Last 7 days", "30d": "Last 30 days" })[dateRange]}`, clear: () => setDateRange("all") });
+  // ✅ Product chip sabse pehle (wo primary filter hai)
+  if (productFilterActive) {
+    activeFilters.push({
+      key: "product",
+      label: `Product: ${productName || "Selected product"}`,
+      clear: clearProductFilter,
+    });
+  }
+  if (search) activeFilters.push({ key: "search", label: `Search: ${search}`, clear: () => { setSearchInput(""); setSearch(""); setPage(1); } });
+  if (statusFilter !== "all") activeFilters.push({ key: "status", label: `Status: ${statusFilter}`, clear: () => { setStatusFilter("all"); setPage(1); } });
+  if (paymentFilter !== "all") activeFilters.push({ key: "payment", label: `Payment: ${PAYMENT_STATUS_CONFIG[paymentFilter]?.label || paymentFilter}`, clear: () => { setPaymentFilter("all"); setPage(1); } });
+  if (shippingFilter !== "all") activeFilters.push({ key: "shipping", label: `Shipping: ${shippingFilter}`, clear: () => { setShippingFilter("all"); setPage(1); } });
+  if (dateRange !== "all") activeFilters.push({ key: "date", label: `Date: ${({ today: "Today", yesterday: "Yesterday", "7d": "Last 7 days", "30d": "Last 30 days" })[dateRange]}`, clear: () => { setDateRange("all"); setPage(1); } });
   const clearAllFilters = () => {
     setSearchInput(""); setSearch("");
     setStatusFilter("all"); setPaymentFilter("all");
     setShippingFilter("all"); setDateRange("all");
     setPage(1);
+    if (productFilterActive) clearProductFilter();
   };
 
   const statCards = [
@@ -400,6 +486,16 @@ export default function OrdersPage() {
           ))}
         </div>
 
+        {/* ✅ Product history summary — sirf tab jab product filter active ho */}
+        {productFilterActive && (
+          <ProductSummaryPanel
+            summary={summary}
+            loading={summaryLoading}
+            productName={productName}
+            cardStyle={cardStyle}
+          />
+        )}
+
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           
@@ -442,7 +538,7 @@ export default function OrdersPage() {
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {activeFilters.map((f) => (
-              <span key={f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
+              <span key={f.key || f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
                 style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}>
                 {f.label}
                 <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
@@ -499,11 +595,23 @@ export default function OrdersPage() {
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
-            <BoxIcon className="w-8 h-8 mb-3 opacity-50" />
+          <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-2" style={cardStyle}>
+            <BoxIcon className="w-8 h-8 mb-1 opacity-50" />
+            {/* ✅ Product filter active hai + koi order nahi -> specific message */}
             <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>
-              {search || statusFilter !== "all" || activeFilters.length > 0 ? "No orders match your filters" : "No orders yet"}
+              {productFilterActive
+                ? "No orders found for this product."
+                : activeFilters.length > 0
+                  ? "No orders match your filters"
+                  : "No orders yet"}
             </p>
+            {productFilterActive && (
+              <button onClick={clearProductFilter}
+                className="mt-2 px-4 h-9 rounded-lg text-[13px] font-semibold transition hover:opacity-90"
+                style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+                Show all orders
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -583,11 +691,19 @@ export default function OrdersPage() {
                           </td>
                           <td className="px-3 py-2.5 align-middle hidden md:table-cell box-border">
                             <div className="space-y-0.5">
-                              {(order.items || []).slice(0, 2).map((item, idx) => (
-                                <div key={`${order._id}-row-item-${idx}`} className="flex items-center gap-1.5 min-w-0">
+                              {/* ✅ Filtered product ki line pehle + highlight (qty already ×N me dikhta hai) */}
+                              {orderItemsForDisplay(order, productId).slice(0, 2).map((item, idx) => {
+                                const isMatch = isProductMatch(item, productId);
+                                return (
+                                <div key={`${order._id}-row-item-${idx}`}
+                                  className={`flex items-center gap-1.5 min-w-0 rounded px-1 py-0.5 -mx-1 ${isMatch ? "ring-1" : ""}`}
+                                  style={isMatch ? {
+                                    backgroundColor: "var(--accent-soft)",
+                                    boxShadow: "inset 2px 0 0 var(--accent)",
+                                  } : undefined}>
                                   <OrderItemImage item={item} size={22} />
-                                  <span className="truncate text-[12px] min-w-0" title={item.name}>{item.name}</span>
-                                  <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{item.name}</span>
+                                  <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: isMatch ? "var(--accent)" : "var(--text-secondary)" }}>
                                     ×{item.qty}
                                   </span>
                                   {itemDealTag(item) && (
@@ -600,10 +716,11 @@ export default function OrdersPage() {
                                     <span className="shrink-0"><PromoTag tone="info">Combo</PromoTag></span>
                                   )}
                                 </div>
-                              ))}
-                              {(order.items || []).length > 2 && (
+                                );
+                              })}
+                              {orderItemsForDisplay(order, productId).length > 2 && (
                                 <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
-                                  +{(order.items || []).length - 2} more item{(order.items || []).length - 2 === 1 ? "" : "s"}
+                                  +{orderItemsForDisplay(order, productId).length - 2} more item{orderItemsForDisplay(order, productId).length - 2 === 1 ? "" : "s"}
                                 </p>
                               )}
                               <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
@@ -635,8 +752,10 @@ export default function OrdersPage() {
                           </td>
                           <td className="px-3 py-2.5 align-middle text-center box-border"><StatusBadge status={order.status} /></td>
                           <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap hidden lg:table-cell box-border"
-                            style={{ color: "var(--text-muted)" }}>
-                            {formatDate(order.created_at)}
+                            style={{ color: "var(--text-muted)" }}
+                            title={formatDateTime(order.created_at)}>
+                            {/* ✅ Product history me exact time chahiye — date + time dikhao */}
+                            {productFilterActive ? formatDateTime(order.created_at) : formatDate(order.created_at)}
                           </td>
                           <td className="px-3 py-2.5 align-middle whitespace-nowrap text-right relative box-border" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end items-center">
@@ -698,9 +817,15 @@ export default function OrdersPage() {
                                 {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-                                {(order.items || []).map((item, idx) => (
+                                {/* ✅ Matched product pehle + highlight */}
+                                {orderItemsForDisplay(order, productId).map((item, idx) => {
+                                  const isMatch = isProductMatch(item, productId);
+                                  return (
                                   <div key={`${order._id}-item-${idx}`} className="flex items-start gap-2.5 p-2 rounded-md max-w-full box-border"
-                                    style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                                    style={{
+                                      backgroundColor: isMatch ? "var(--accent-soft)" : "var(--bg-card)",
+                                      border: `1px solid ${isMatch ? "var(--accent)" : "var(--border-color)"}`,
+                                    }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
                                       <p className="text-xs font-medium truncate" title={item.name}>{item.name}</p>
@@ -718,7 +843,8 @@ export default function OrdersPage() {
                                       )}
                                     </div>
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </td>
                           </tr>
@@ -876,6 +1002,92 @@ export default function OrdersPage() {
 }
 
 /* ==================== SUB-COMPONENTS ==================== */
+
+const SUMMARY_STATUS_TONES = {
+  pending:    "var(--warning-text)",
+  confirmed:  "var(--info-text)",
+  processing: "var(--purple-text)",
+  shipped:    "var(--indigo-text)",
+  delivered:  "var(--success-text)",
+  cancelled:  "var(--danger-text)",
+};
+
+/* ✅ Product history summary panel — table ke upar, sirf product filter active hone par.
+   Units + revenue me CANCELLED orders include nahi hote (frontend note bhi dikhata hai). */
+function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
+  if (loading && !summary) {
+    return (
+      <div className="rounded-lg p-4" style={cardStyle} aria-busy="true">
+        <div className="h-3.5 w-40 rounded animate-pulse motion-reduce:animate-none"
+          style={{ backgroundColor: "var(--bg-tertiary)" }} />
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={`sum-skeleton-${i}`} className="h-12 rounded animate-pulse motion-reduce:animate-none"
+              style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!summary) return null;
+
+  const stats = [
+    { label: "Total Orders", value: summary.totalOrders ?? 0 },
+    { label: "Units Sold", value: summary.unitsSold ?? 0 },
+    { label: "Revenue", value: `Rs. ${(summary.revenue ?? 0).toLocaleString()}` },
+    { label: "First Order", value: formatDate(summary.firstOrderDate) },
+    { label: "Latest Order", value: formatDate(summary.lastOrderDate) },
+  ];
+
+  return (
+    <div className="rounded-lg p-4 space-y-3" style={cardStyle}>
+      <div className="flex flex-wrap items-center gap-2">
+        <PackageIcon className="w-4 h-4" />
+        <p className="text-[13px] font-bold">
+          Product history{productName ? `: ${productName}` : ""}
+        </p>
+        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          across all statuses
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {stats.map((s) => (
+          <div key={s.label} className="rounded-lg p-3"
+            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
+            <p className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{s.label}</p>
+            <p className="text-[15px] font-bold mt-0.5 truncate" title={String(s.value)}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Status breakdown */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          By status:
+        </span>
+        {SUMMARY_STATUS_KEYS.map((key) => (
+          <span key={`by-status-${key}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
+            style={{ backgroundColor: "var(--bg-tertiary)", color: SUMMARY_STATUS_TONES[key] || "var(--text-muted)" }}>
+            {key}
+            <span className="tabular-nums">{summary.byStatus?.[key] ?? 0}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* ✅ Cancelled exclusion ka clear note (requirement 7) */}
+      {summary.cancelledOrders > 0 && (
+        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          {summary.cancelledOrders} cancelled order{summary.cancelledOrders === 1 ? "" : "s"} (
+          {summary.cancelledUnits} unit{summary.cancelledUnits === 1 ? "" : "s"}, Rs.{" "}
+          {(summary.cancelledRevenue ?? 0).toLocaleString()}) list me hain, lekin units sold aur revenue
+          me count nahi kiye gaye.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function MenuItem({ icon, label, onClick, danger }) {
   return (
