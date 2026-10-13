@@ -22,23 +22,35 @@ const fileFilter = (req, file, cb) => {
   else cb(new Error("Only image files are allowed"), false);
 };
 
+// ✅ Banner images badi hoti hain — 5MB parakash me high-res PNG reject ho jata tha.
+// Env se override kar sakte hain (BANNER_UPLOAD_MAX_MB), default 15MB.
+const MAX_UPLOAD_MB = parseInt(process.env.BANNER_UPLOAD_MAX_MB, 10) || 15;
+
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
 });
 
-// ✅ Professional banner shapes — upload ke baad har image ko fixed
-// banner width/height par resize karke WebP mein compress kar diya jata hai
-const BANNER_SHAPES = {
-  desktopImage: { width: 1920, height: 600 },
-  tabletImage: { width: 1200, height: 600 },
-  mobileImage: { width: 768, height: 400 },
+// ==========================================
+// ✅ ORIGINAL IMAGE SIZE PRESERVE KARO
+// Pehle har image ko fixed shape par resize + CROP kar deta tha
+// (`fit: "cover"`, 1920x600). Is se:
+//   - badi image kat (crop) jati thi — content loss
+//   - choti image upscale ho jati thi — blur
+//   - admin apni high-res banner daal hi nahi paata tha
+// Ab: KABHI crop nahi, KABHI upscale nahi. Resize sirf tab jab width
+// MAX_WIDTH se zyada ho (sirf bandwidth bachane ke liye), aur ratio bhi maintain.
+// ==========================================
+const MAX_WIDTH = {
+  desktopImage: 3000,
+  tabletImage: 1800,
+  mobileImage: 1200,
 };
 
 const processBannerImage = async (file) => {
-  const shape = BANNER_SHAPES[file.fieldname];
-  if (!shape) return;
+  const maxWidth = MAX_WIDTH[file.fieldname];
+  if (!maxWidth) return;
 
   const processedName = `${path.basename(file.filename, path.extname(file.filename))}.webp`;
   const processedPath = path.join(uploadDir, processedName);
@@ -47,10 +59,9 @@ const processBannerImage = async (file) => {
   const buffer = await sharp(file.path)
     .rotate() // EXIF orientation respect karo
     .resize({
-      width: shape.width,
-      height: shape.height,
-      fit: "cover", // exact banner shape (center/attention crop, koi letterbox nahi)
-      position: sharp.strategy.attention, // important part crop mein aaye
+      width: maxWidth,
+      fit: "inside", // ✅ poora image rehta hai — koi crop nahi
+      withoutEnlargement: true, // ✅ choti image upscale mat karo (blur hote hue)
     })
     .webp({ quality: 85 })
     .toBuffer();
@@ -75,7 +86,28 @@ const uploadBanners = (req, res, next) => {
     { name: "tabletImage", maxCount: 1 },
     { name: "mobileImage", maxCount: 1 },
   ])(req, res, async (err) => {
-    if (err) return next(err);
+    // ✅ Pehle `next(err)` pe jaata tha. Is project me global error handler nahi hai,
+    //    to Express ka default handler HTML/500 bhejta tha — frontend ko JSON nahi
+    //    milta tha aur toast me sirf "Request failed with status code 500" dikhta tha.
+    //    Ab proper message bhejte hain.
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({
+          success: false,
+          message: `Image is too large. Maximum allowed size is ${MAX_UPLOAD_MB}MB.`,
+        });
+      }
+      if (err.code === "LIMIT_UNEXPECTED_FILE") {
+        return res.status(400).json({
+          success: false,
+          message: "Unexpected file field — only desktop, tablet and mobile images are allowed.",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message || "Image upload failed",
+      });
+    }
 
     try {
       for (const files of Object.values(req.files || {})) {

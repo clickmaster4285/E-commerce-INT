@@ -2,6 +2,10 @@ import adminHttp from "../axiosInstance";
 export const orderApi = {
   getAll: (params) => 
     adminHttp.get("/orders/admin/all", { params }).then((res) => res.data),
+   
+  // ✅ Product history summary (units/revenue/date range + status breakdown)
+  getProductSummary: (params) =>
+    adminHttp.get("/orders/admin/product-summary", { params }).then((res) => res.data),
   
   // ✅ NEW: Single order fetch for admin
   getById: (id) => 

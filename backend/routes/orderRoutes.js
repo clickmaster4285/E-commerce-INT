@@ -7,6 +7,7 @@ const {
   getMyOrders, 
   getOrderById, 
   getAllOrders,          // ✅ Import
+  getProductSummary,     // ✅ Import (product history summary)
   updateOrderStatus,    // ✅ Import
   editOrder,            // ✅ Import
   deleteOrder,          // ✅ Import
@@ -27,6 +28,8 @@ router.delete("/:id", authMiddleware, deleteOrder);
 
 // ✅ Admin Routes (Requires 'order' permission)
 router.get("/admin/all", authMiddleware, checkPermission("order"), getAllOrders);
+// ⚠️ Ye /admin/:id se PEHLE hona zaroori hai, warna "product-summary" id samajh aayega
+router.get("/admin/product-summary", authMiddleware, checkPermission("order"), getProductSummary);
 router.get("/admin/:id", authMiddleware, checkPermission("order"), getOrderByIdAdmin); // ✅ NEW
 
 router.patch("/admin/:id/status", authMiddleware, checkPermission("order"), updateOrderStatus);

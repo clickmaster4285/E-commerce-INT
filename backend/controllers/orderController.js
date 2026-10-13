@@ -614,25 +614,96 @@ const getOrderById = async (req, res) => {
 //    special characters query ko bigaad dete hain (ya crash/slow kar dete hain).
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// ==========================================
+// ✅ SHARED ADMIN ORDER FILTER
+//    List + summary dono isi builder se filters lete hain — is liye
+//    product filter ke saath status/payment/shipping/time/search
+//    hamesha ek jaise lagte hain.
+// ==========================================
+// ✅ Strict check — sirf 24-char hex ObjectId. Random/garbage ids gracefully reject hoti hain
+//    (Types.ObjectId.isValid 12-char strings ko bhi "valid" maan leta hai).
+const isValidProductId = (value) =>
+  Boolean(value) && mongoose.isObjectIdOrHexString(String(value));
+
+const buildAdminOrderFilter = ({
+  status = "all",
+  search = "",
+  payment = "all",
+  shipping = "all",
+  dateRange = "all",
+  productId = "",
+} = {}) => {
+  const query = {};
+
+  if (status && status !== "all") {
+    query.status = status;
+  }
+
+  // ✅ Payment / shipping ab bhi query me hain (pehle sirf frontend pe filter hote the)
+  if (payment && payment !== "all") {
+    query["payment.status"] = payment;
+  }
+
+  if (shipping && shipping !== "all") {
+    query.shipping_method = shipping;
+  }
+
+  // ✅ Product filter — order match hoga agar KISI BHI line item ka product_id match kare.
+  //    Invalid id par crash nahi hoga: query me kuch nahi jodenge (empty result).
+  if (isValidProductId(productId)) {
+    query["items.product_id"] = new mongoose.Types.ObjectId(String(productId));
+  }
+
+  if (dateRange && dateRange !== "all") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    if (dateRange === "today") {
+      query.created_at = { $gte: startOfToday };
+    } else if (dateRange === "yesterday") {
+      const y = new Date(startOfToday);
+      y.setDate(y.getDate() - 1);
+      query.created_at = { $gte: y, $lt: startOfToday };
+    } else if (dateRange === "7d") {
+      const c = new Date(startOfToday);
+      c.setDate(c.getDate() - 7);
+      query.created_at = { $gte: c };
+    } else if (dateRange === "30d") {
+      const c = new Date(startOfToday);
+      c.setDate(c.getDate() - 30);
+      query.created_at = { $gte: c };
+    }
+  }
+
+  if (search && String(search).trim()) {
+    // ✅ FIX: escaped regex — "." ya "[" jaise characters search ko break nahi karenge
+    const rx = new RegExp(escapeRegex(String(search).trim()), "i");
+    query.$or = [
+      { order_number: rx },
+      { "address_snapshot.full_name": rx },
+      { "address_snapshot.phone": rx },
+    ];
+  }
+
+  return query;
+};
+
 // GET /api/orders/admin/all — Get All Orders (Admin Only)
 // ==========================================
 const getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 15, status = "all", search = "" } = req.query;
-    const query = {};
+    const { page = 1, limit = 15 } = req.query;
+    const query = buildAdminOrderFilter(req.query);
 
-    if (status !== "all") {
-      query.status = status;
-    }
-
-    if (search.trim()) {
-      // ✅ FIX: escaped regex — "." ya "[" jaise characters search ko break nahi karenge
-      const rx = new RegExp(escapeRegex(String(search).trim()), "i");
-      query.$or = [
-        { order_number: rx },
-        { "address_snapshot.full_name": rx },
-        { "address_snapshot.phone": rx },
-      ];
+    // ✅ Invalid productId -> koi crash nahi, empty result + explicit flag
+    //    (frontend "No orders found for this product." empty state dikhata hai)
+    if (req.query.productId && !isValidProductId(req.query.productId)) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        invalidProductId: true,
+        pagination: { total: 0, page: 1, limit: Number(limit), totalPages: 0 },
+      });
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -659,6 +730,138 @@ const getAllOrders = async (req, res) => {
     });
   } catch (error) {
     log.error("❌ [getAllOrders] Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==========================================
+// GET /api/orders/admin/product-summary?productId=...
+//    Selected product ka poora history — total orders, units, revenue,
+//    first/latest order date aur status-wise breakdown.
+//    ✅ Cancelled orders LIST me rehti hain, lekin units + revenue se
+//       exclude hoti hain (cancelledUnits / cancelledRevenue alag se bhejte hain
+//       taake UI par clear note dikh sake).
+// ==========================================
+const SUMMARY_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+
+const getProductSummary = async (req, res) => {
+  try {
+    const { productId } = req.query;
+
+    const empty = (extra = {}) => ({
+      productId: productId || "",
+      totalOrders: 0,
+      unitsSold: 0,
+      revenue: 0,
+      cancelledOrders: 0,
+      cancelledUnits: 0,
+      cancelledRevenue: 0,
+      firstOrderDate: null,
+      lastOrderDate: null,
+      byStatus: SUMMARY_STATUSES.reduce((acc, s) => ({ ...acc, [s]: 0 }), {}),
+      ...extra,
+    });
+
+    // ✅ Invalid / missing productId -> crash nahi, empty summary
+    if (!isValidProductId(productId)) {
+      return res.status(200).json({
+        success: true,
+        data: empty({ invalidProductId: Boolean(productId) }),
+      });
+    }
+
+    const match = buildAdminOrderFilter(req.query);
+    const oid = new mongoose.Types.ObjectId(String(productId));
+
+    const [totals] = await Order.aggregate([
+      { $match: match },
+      // Sirf is product ki line items nikalo
+      {
+        $project: {
+          created_at: 1,
+          status: 1,
+          matchedItems: {
+            $filter: {
+              input: "$items",
+              as: "it",
+              cond: { $eq: ["$$it.product_id", oid] },
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          created_at: 1,
+          status: 1,
+          matchedQty: { $sum: "$matchedItems.qty" },
+          matchedRevenue: {
+            $sum: {
+              $map: {
+                input: "$matchedItems",
+                as: "it",
+                in: { $multiply: ["$$it.price", "$$it.qty"] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          firstOrderDate: { $min: "$created_at" },
+          lastOrderDate: { $max: "$created_at" },
+          // ✅ Cancelled exclude
+          unitsSold: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 0, "$matchedQty"] },
+          },
+          revenue: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 0, "$matchedRevenue"] },
+          },
+          cancelledOrders: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
+          },
+          cancelledUnits: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, "$matchedQty", 0] },
+          },
+          cancelledRevenue: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, "$matchedRevenue", 0] },
+          },
+        },
+      },
+    ]);
+
+    const statusRows = await Order.aggregate([
+      { $match: match },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    const byStatus = SUMMARY_STATUSES.reduce((acc, s) => ({ ...acc, [s]: 0 }), {});
+    statusRows.forEach((r) => {
+      if (r._id && r._id in byStatus) byStatus[r._id] = r.count;
+    });
+
+    if (!totals) {
+      return res.status(200).json({ success: true, data: empty() });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        productId: String(productId),
+        totalOrders: totals.totalOrders || 0,
+        unitsSold: totals.unitsSold || 0,
+        revenue: Math.round(totals.revenue || 0),
+        cancelledOrders: totals.cancelledOrders || 0,
+        cancelledUnits: totals.cancelledUnits || 0,
+        cancelledRevenue: Math.round(totals.cancelledRevenue || 0),
+        firstOrderDate: totals.firstOrderDate || null,
+        lastOrderDate: totals.lastOrderDate || null,
+        byStatus,
+      },
+    });
+  } catch (error) {
+    log.error("❌ [getProductSummary] Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -927,6 +1130,7 @@ module.exports = {
   getMyOrders,
   getOrderById,
   getAllOrders,
+  getProductSummary,
   updateOrderStatus,
   editOrder,
   deleteOrder,
