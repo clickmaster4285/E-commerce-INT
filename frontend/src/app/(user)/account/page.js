@@ -27,6 +27,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { userHttp } from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import { useWishlist } from "@/components/user/WishlistContext";
 import dynamic from "next/dynamic";
 // ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same
@@ -617,14 +618,14 @@ export default function AccountPage() {
     const form = profileForm || {};
     if (!String(form.name || "").trim()) return toast.error("Name is required");
     if (!String(form.username || "").trim()) return toast.error("Username is required");
-    if (form.phone && !/^[0-9+\-\s]{7,20}$/.test(String(form.phone)))
-      return toast.error("Enter a valid phone number");
+    if (form.phone && !isValidPhone(String(form.phone)))
+      return toast.error(String(form.phone).length < PHONE_MIN ? `Phone number must be at least ${PHONE_MIN} digits` : `Phone number must be at most ${PHONE_MAX} digits`);
     setSavingProfile(true);
     try {
       await userHttp.put("/users/profile", {
         name: String(form.name).trim(),
         username: String(form.username).trim(),
-        phone: String(form.phone || "").trim(),
+        phone: normalizePhone(form.phone || ""),
         dob: form.dob || "",
       });
       await refreshUser();
@@ -851,8 +852,11 @@ export default function AccountPage() {
                         <div>
                           <label className={labelCls}>Phone Number</label>
                           <input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={PHONE_MAX}
                             value={editingProfile ? profileForm?.phone ?? "" : user.phone || ""}
-                            onChange={(e) => setField("phone", e.target.value)}
+                            onChange={(e) => setField("phone", normalizePhone(e.target.value))}
                             readOnly={!editingProfile}
                             placeholder="Not added"
                             className={fieldCls(editingProfile)}

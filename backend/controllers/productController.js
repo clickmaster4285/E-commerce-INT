@@ -3,11 +3,14 @@ const log = require("../utils/logger");
 
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
+const User = require("../models/User");
+const Employee = require("../models/Employee");
 const Tag = require("../models/Tag");
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
 const Deal = require("../models/Deal");
 const Discount = require("../models/Discount");
+const PurchaseOrder = require("../models/PurchaseOrder");
 // ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
 const loadBrandModel = () => {
   const paths = [
@@ -74,6 +77,8 @@ const toNumber = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
+
+const toBoolean = (value) => value === true || String(value).toLowerCase() === "true";
 
 // ======================================================
 // SKU NORMALIZER
@@ -1288,14 +1293,75 @@ const getProductById = async (req, res) => {
 
     // ⭐ Populate audit users so the Activity tab can show WHO created /
     // updated each variant by name (instead of a raw ObjectId).
-    const variants = await Variant.find({
+    const variantDocs = await Variant.find({
       product_id: product._id,
       is_deleted: { $ne: true },
     })
       .sort({ created_at: 1 })
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
       .lean();
+
+    // Variant audit ids can refer to either an admin User or an Employee.
+    // The schema's legacy ref points to User, so populate alone renders staff
+    // creators as null; resolve both collections before returning the detail.
+    const actorIds = [...new Set(variantDocs.flatMap((variant) =>
+      [variant.createdby, variant.updatedby].filter(Boolean).map((actor) => String(actor))
+    ))];
+    const [auditUsers, auditEmployees] = actorIds.length
+      ? await Promise.all([
+          User.find({ _id: { $in: actorIds } }).select("name email").lean(),
+          Employee.find({ _id: { $in: actorIds } }).select("name email").lean(),
+        ])
+      : [[], []];
+    const auditActors = new Map();
+    auditUsers.forEach((actor) => auditActors.set(String(actor._id), actor));
+    auditEmployees.forEach((actor) => auditActors.set(String(actor._id), actor));
+    const resolveAuditActor = (actorId) => actorId ? auditActors.get(String(actorId)) || null : null;
+    const variants = variantDocs.map((variant) => ({
+      ...variant,
+      createdby: resolveAuditActor(variant.createdby),
+      updatedby: resolveAuditActor(variant.updatedby),
+    }));
+
+    const purchaseOrders = await PurchaseOrder.find({
+      "items.product_id": product._id,
+      "receivings.0": { $exists: true },
+      is_deleted: { $ne: true },
+    })
+      .select("po_number items.product_id items.variant_id items.name items.sku items.variantTitle items.cost_price items.sell_price items.expiry_after_delivery items.expiry_after_delivery_unit receivings.received_at receivings.invoice_no receivings.received_by_name receivings.items.variant_id receivings.items.product_id receivings.items.qty")
+      .lean();
+    const purchaseOrderHistory = purchaseOrders.flatMap((po) => {
+      const poItemsByVariant = new Map(
+        (po.items || [])
+          .filter((item) => String(item.product_id) === String(product._id))
+          .map((item) => [String(item.variant_id), item]),
+      );
+      return (po.receivings || []).flatMap((receiving) => {
+        const receivedItems = (receiving.items || [])
+          .filter((received) => poItemsByVariant.has(String(received.variant_id)))
+          .map((received) => {
+            const item = poItemsByVariant.get(String(received.variant_id));
+            return {
+              variant_id: received.variant_id,
+              name: item.variantTitle || item.name || item.sku || "Variant",
+              sku: item.sku || "",
+              qty: Number(received.qty) || 0,
+              cost_price: Number(item.cost_price) || 0,
+              sell_price: Number(item.sell_price) || 0,
+              expiry_after_delivery: Math.max(0, Number(item.expiry_after_delivery) || 0),
+              expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days",
+            };
+          })
+          .filter((item) => item.qty > 0);
+        if (!receivedItems.length) return [];
+        return [{
+          po_number: po.po_number,
+          received_at: receiving.received_at,
+          received_by_name: receiving.received_by_name || "",
+          invoice_no: receiving.invoice_no || "",
+          items: receivedItems,
+        }];
+      });
+    });
 
     // ⭐ LEGACY TAG HEALING: variant tags used to be saved as plain strings
     // without a Tag document, so the Tags tab showed "—" for Created By.
@@ -1363,6 +1429,7 @@ const getProductById = async (req, res) => {
     return res.status(200).json({
       ...product,
       variants,
+      purchaseOrderHistory,
       ratingSummary,
     });
   } catch (error) {
@@ -1392,6 +1459,16 @@ const createProduct = async (req, res) => {
 
     if (!req.body.brand_id) {
       return res.status(400).json({ message: "Brand is required" });
+    }
+
+    const isPerishable = toBoolean(req.body.isPerishable);
+    const expiryDuration = toNumber(req.body.expiryDuration, 0);
+    const expiryUnit = String(req.body.expiryUnit || "days");
+    if (isPerishable && (!Number.isInteger(expiryDuration) || expiryDuration <= 0)) {
+      return res.status(400).json({ message: "Expiry duration must be a positive whole number" });
+    }
+    if (isPerishable && !["days", "months", "years"].includes(expiryUnit)) {
+      return res.status(400).json({ message: "Expiry unit must be days, months, or years" });
     }
 
     const variants = parseJSON(req.body.variants, []);
@@ -1430,6 +1507,9 @@ const createProduct = async (req, res) => {
       specifications,
       description: String(req.body.description || "").trim(),
       tax: toNumber(req.body.tax, 0),
+      isPerishable,
+      expiryDuration: isPerishable ? expiryDuration : 0,
+      expiryUnit: isPerishable ? expiryUnit : "days",
       status: req.body.status === "inactive" ? "inactive" : "active",
       // ✅ Featured — create form se bhi mark ho sakta hai (default false)
       is_featured: req.body.is_featured === true,
@@ -1505,7 +1585,7 @@ const createProduct = async (req, res) => {
         tags: variantTags,
         images: imagesByVariant[index] || [],
         createdby: req.user?._id || null,
-        updatedby: req.user?._id || null,
+        updatedby: null,
       });
 
       createdVariants.push(variant);
@@ -1646,6 +1726,31 @@ const updateProduct = async (req, res) => {
       product.tax = toNumber(req.body.tax, 0);
     }
 
+    if (["isPerishable", "expiryDuration", "expiryUnit"].some((field) => req.body[field] !== undefined)) {
+      const isPerishable = req.body.isPerishable === undefined
+        ? Boolean(product.isPerishable)
+        : toBoolean(req.body.isPerishable);
+      if (isPerishable) {
+        const expiryDuration = req.body.expiryDuration === undefined
+          ? Number(product.expiryDuration)
+          : Number(req.body.expiryDuration);
+        const expiryUnit = String(req.body.expiryUnit || product.expiryUnit || "days");
+        if (!Number.isInteger(expiryDuration) || expiryDuration <= 0) {
+          return res.status(400).json({ message: "Expiry duration must be a positive whole number" });
+        }
+        if (!["days", "months", "years"].includes(expiryUnit)) {
+          return res.status(400).json({ message: "Expiry unit must be days, months, or years" });
+        }
+        product.isPerishable = true;
+        product.expiryDuration = expiryDuration;
+        product.expiryUnit = expiryUnit;
+      } else {
+        product.isPerishable = false;
+        product.expiryDuration = 0;
+        product.expiryUnit = "days";
+      }
+    }
+
     if (req.body.status !== undefined) {
       product.status = req.body.status === "inactive" ? "inactive" : "active";
     }
@@ -1738,6 +1843,13 @@ const updateProduct = async (req, res) => {
 
           if (item.selling_price !== undefined) {
             variant.selling_price = toNumber(item.selling_price, 0);
+          }
+
+          if (item.expiry_after_delivery !== undefined) {
+            variant.expiry_after_delivery = Math.max(0, toNumber(item.expiry_after_delivery, 0));
+          }
+          if (item.expiry_after_delivery_unit !== undefined) {
+            variant.expiry_after_delivery_unit = item.expiry_after_delivery_unit;
           }
 
           if (item.quantity !== undefined) {
@@ -1846,6 +1958,8 @@ const updateProduct = async (req, res) => {
             description: item.description || "",
             cost_price: toNumber(item.cost_price, 0),
             selling_price: toNumber(item.selling_price, 0),
+            expiry_after_delivery: Math.max(0, toNumber(item.expiry_after_delivery, 0)),
+            expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days",
             // ✅ Variant stock sirf whole units (decimal point truncate)
             quantity: Math.trunc(toNumber(item.quantity, 0)),
             min_qnt: toNumber(item.min_qnt, 0),
@@ -1855,7 +1969,7 @@ const updateProduct = async (req, res) => {
             status: item.status === "inactive" ? "inactive" : "active",
             images: imagesByVariant[index] || [],
             createdby: req.user?._id || null,
-            updatedby: req.user?._id || null,
+            updatedby: null,
           });
           addedVariantCount += 1;
         }

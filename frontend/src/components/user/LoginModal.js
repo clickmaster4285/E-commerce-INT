@@ -10,6 +10,7 @@ import {
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
 import OtpVerifyCard from "./OtpVerifyCard";
 import ResetPasswordCard from "./ResetPasswordCard";
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 
 export default function LoginModal({ isOpen, onClose }) {
   const queryClient = useQueryClient();
@@ -52,8 +53,13 @@ export default function LoginModal({ isOpen, onClose }) {
       else if (username.trim().length < 3) newErrors.username = "Username must be at least 3 characters";
       else if (!/^[a-zA-Z0-9_]+$/.test(username)) newErrors.username = "Username can only contain letters, numbers, and underscores";
 
-      if (!phone.trim()) newErrors.phone = "Phone number is required";
-      else if (phone.replace(/\D/g, "").length < 4) newErrors.phone = "Phone number must be at least 4 digits";
+      if (!isValidPhone(phone)) {
+        newErrors.phone = !phone
+          ? "Phone number is required"
+          : phone.length < PHONE_MIN
+            ? `Phone number must be at least ${PHONE_MIN} digits`
+            : `Phone number must be at most ${PHONE_MAX} digits`;
+      }
     }
 
     if (!email.trim()) newErrors.email = "Email is required";
@@ -513,9 +519,10 @@ export default function LoginModal({ isOpen, onClose }) {
                       <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
                       <input
                         type="tel"
+                        inputMode="numeric"
                         value={phone}
-                        onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 15)); setErrors((prev) => ({ ...prev, phone: "" })); }}
-                        maxLength={15}
+                        onChange={(e) => { setPhone(normalizePhone(e.target.value)); setErrors((prev) => ({ ...prev, phone: "" })); }}
+                        maxLength={PHONE_MAX}
                         placeholder="Phone number"
                         className={getInputCls("phone")}
                       />

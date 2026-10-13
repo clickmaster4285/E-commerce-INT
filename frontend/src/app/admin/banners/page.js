@@ -528,9 +528,11 @@ export default function BannersPage() {
       markSelfAction(id ? "update" : "create");
       return id ? adminBannerApi.update(id, data) : adminBannerApi.create(data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (responseData, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
       toast.success(variables.id ? "Banner updated successfully" : "Banner added successfully");
+      // ✅ FIXED: After save, refresh the banners list and close modal
+      // The query invalidation will trigger a refetch automatically
       resetForm();
       setShowModal(false);
     },
@@ -672,6 +674,19 @@ export default function BannersPage() {
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   };
 
+  // ✅ NEW: Convert ISO string to YYYY-MM-DD format (timezone-safe, local date)
+  // Handles both ISO strings (2026-10-12T00:00:00.000Z) and date objects
+  const dateToInputFormat = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return "";
+    // Use local date, not UTC to avoid timezone shift
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const dealSaveMutation = useMutation({
     mutationFn: ({ id, data }) => (id ? dealApi.update(id, data) : dealApi.create(data)),
     onSuccess: (result, variables) => {
@@ -803,15 +818,25 @@ export default function BannersPage() {
       return;
     }
 
+    // ✅ Dates ko proper ISO string mein convert karo.
+    // NOTE: form state ko MUTATE mat karo (`form.startDate = ...`). Pehle yahi hota
+    // tha — error aane par modal me jo value dikh rahi hai wo corrupt ISO string ho
+    // jati thi, aur date input use reject karke field khaali kar deta tha.
+    const isoStart = dateToISO(form.startDate);
+    const isoEnd = dateToISO(form.endDate);
+
+    // Range validation — deals/discounts me ye check lagaya hua hai, banners me
+    // missing tha. Galat range save hone se banner storefront pe kabhi dikhta hi nahi.
+    if (isoStart && isoEnd && new Date(isoEnd) < new Date(isoStart)) {
+      toast.error("End date must be on or after the start date");
+      return;
+    }
+
     const fd = new FormData();
-    // ✅ Dates ko proper ISO string mein convert karo
-    if (form.startDate) {
-      form.startDate = dateToISO(form.startDate);
-    }
-    if (form.endDate) {
-      form.endDate = dateToISO(form.endDate);
-    }
     Object.entries(form).forEach(([key, value]) => {
+      // startDate/endDate loop ke baad explicitly append hote hain (ISO ke saath)
+      if (key === "startDate" || key === "endDate") return;
+
       // Skip fields that should never be sent from the frontend
       // FIX: status ko loop mein skip karo — wo neeche auto-status block mein exactly
       // ek baar append hota hai. Pehle dono jagah append hone se multipart mein
@@ -858,18 +883,19 @@ export default function BannersPage() {
       } else if (typeof value === "object" && value !== null) {
         fd.append(key, JSON.stringify(value));
       } else if (value !== null && value !== undefined) {
-        // Dates ko ISO string mein bhejo
-        if (key === 'startDate' || key === 'endDate') {
-          if (value) fd.append(key, typeof value === 'string' && value.includes('T') ? new Date(value).toISOString() : value);
-        } else {
-          fd.append(key, value);
-        }
+        fd.append(key, value);
       }
     });
+
+    // Dates ab loop se bahar append hoti hain — hamesha exact ISO value jayegi,
+    // chahe form state me blank ho ya date-input ne value normalize ki ho.
+    if (isoStart) fd.append("startDate", isoStart);
+    if (isoEnd) fd.append("endDate", isoEnd);
+
     // ✅ Auto status: dates ke hisaab se status compute karo
     const nowDate = new Date();
-    const startD = form.startDate ? new Date(form.startDate) : null;
-    const endD = form.endDate ? new Date(form.endDate) : null;
+    const startD = isoStart ? new Date(isoStart) : null;
+    const endD = isoEnd ? new Date(isoEnd) : null;
     let autoStatus = "active";
     if (endD && endD < nowDate) autoStatus = "expired";
     else if (startD && startD > nowDate) autoStatus = "scheduled";
@@ -880,20 +906,12 @@ export default function BannersPage() {
    const handleEdit = (banner) => {
     setEditingBanner(banner);
     setPositionDuplicate("");
-    // ✅ UTC time ko local time mein convert karo (datetime-local input ke liye)
-    const formatDateInput = (d) => {
-      if (!d) return "";
-      const date = new Date(d);
-      if (Number.isNaN(date.getTime())) return "";
-      // Local time ko ISO string format mein convert karo (YYYY-MM-DDTHH:MM)
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    };
-    // Populated object ya plain id — dono ko string id mein convert karo
+    // ✅ FIX: Schedule fields <Input type="date"> hain, jo sirf "YYYY-MM-DD" accept
+    // karte hain. Pehle yahan "YYYY-MM-DDTHH:MM" (datetime-local format) bana rahe
+    // the — woh date input ke liye INVALID value hai, browser use reject karke field
+    // KHALI render kar deta tha. Isliye Edit karte hi start/end date "gayab" ho jate
+    // the (chahe DB me maujood hon), aur save pe blank value FormData me add nahi hoti.
+    // dateToInputFormat() exactly "YYYY-MM-DD" deta hai — wahi format chahiye tha.
     const toId = (v) => {
       if (!v) return "";
       if (typeof v === "object" && v._id) return String(v._id);
@@ -901,8 +919,8 @@ export default function BannersPage() {
     };
     setForm({
       ...banner,
-      startDate: formatDateInput(banner.startDate),
-      endDate: formatDateInput(banner.endDate),
+      startDate: dateToInputFormat(banner.startDate),
+      endDate: dateToInputFormat(banner.endDate),
       primaryButton: {
         text: banner.primaryButton?.text || "",
         linkType: banner.primaryButton?.linkType || "custom_url",
@@ -1474,11 +1492,11 @@ export default function BannersPage() {
                 {/* 5. Schedule */}
                 <FormSection number="5" title="Schedule" description="Set when banner should be active">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Start Date & Time" helpText="When banner becomes active">
-                      <Input type="datetime-local" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
+                    <FormField label="Start Date" helpText="When banner becomes active">
+                      <Input type="date" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
                     </FormField>
-                    <FormField label="End Date & Time" helpText="When banner expires">
-                      <Input type="datetime-local" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
+                    <FormField label="End Date" helpText="When banner expires">
+                      <Input type="date" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
                     </FormField>
                   </div>
                 </FormSection>

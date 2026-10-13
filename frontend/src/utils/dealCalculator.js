@@ -25,14 +25,14 @@ export function sanitizeDealBadge(text) {
 
 export function isDealActive(item) {
   if (!item || !item.dealId) return false;
-  if (item.dealType === "buy_x_get_y") {
-    const buyQty = Number(item.dealBuyQuantity) || 0;
-    if (buyQty <= 0) return false;
-    return Number(item.qty) >= buyQty;
+  if (item.dealType === "buy_x_get_y" && !(Number(item.dealBuyQuantity) > 0)) {
+    return false;
   }
-  // ✅ For all other deal types: check minQuantity if stored on cart line
-  const minQty = Number(item.dealMinQuantity) || 1;
-  return Number(item.qty) >= minQty;
+  return Number(item.qty) >= getEffectiveMinQuantity({
+    type: item.dealType,
+    minQuantity: item.dealMinQuantity,
+    buyQuantity: item.dealBuyQuantity,
+  });
 }
 
 /**
@@ -69,6 +69,71 @@ export function getEffectiveMinQuantity(deal) {
     return Math.max(minQty, buyQty);
   }
   return minQty;
+}
+
+export function getDealRequirementIssues(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items.flatMap((item) => {
+    if (!item?.dealId || item.isBundleGift) return [];
+
+    const quantity = Math.max(0, Number(item.qty) || 0);
+    const requiredQuantity = getEffectiveMinQuantity({
+      type: item.dealType,
+      minQuantity: item.dealMinQuantity,
+      buyQuantity: item.dealBuyQuantity,
+    });
+    if (quantity >= requiredQuantity) return [];
+
+    return [{
+      item,
+      quantity,
+      requiredQuantity,
+      remainingQuantity: requiredQuantity - quantity,
+    }];
+  });
+}
+
+export function formatDealRequirementIssue(issue) {
+  if (!issue) return "";
+  const name = issue.item?.name || "This item";
+  const required = issue.requiredQuantity;
+  const current = issue.quantity;
+  const remaining = issue.remainingQuantity;
+  return `"${name}" requires at least ${required} items for this deal. You have selected only ${current}. Please add ${remaining} more item${remaining === 1 ? '' : 's'}.`;
+}
+
+/**
+ * Validates deal requirements for cart items
+ * Returns first validation error or null if all valid
+ * @param {Array} items - Cart items to validate (should be selected items only)
+ * @returns {{ valid: boolean, message?: string, issue?: object }}
+ */
+export function validateDealRequirements(items) {
+  const issues = getDealRequirementIssues(items);
+  if (issues.length === 0) {
+    return { valid: true };
+  }
+  
+  const firstIssue = issues[0];
+  return {
+    valid: false,
+    message: formatDealRequirementIssue(firstIssue),
+    issue: firstIssue
+  };
+}
+
+export function getDealUnitPrice(price, dealType, discountValue) {
+  const regularPrice = Number(price) || 0;
+  const value = Number(discountValue) || 0;
+  if (dealType === "percentage" && value > 0) {
+    const discountedPrice = Math.round(regularPrice * (1 - value / 100));
+    return discountedPrice > 0 ? discountedPrice : regularPrice;
+  }
+  if (dealType === "fixed_amount" && value > 0 && value < regularPrice) {
+    return regularPrice - value;
+  }
+  return regularPrice;
 }
 
 /**

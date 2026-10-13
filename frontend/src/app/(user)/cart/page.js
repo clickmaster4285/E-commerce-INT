@@ -8,13 +8,25 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, ShoppingBag, Package, Tag, Check, Plus, Minus,
   Trash2, Sparkles, Zap, Truck, PackageOpen, ChevronDown, ShieldCheck, Lock,
-  Gift, CreditCard, Percent, TrendingUp, Box, BadgePercent
+  Gift, CreditCard, Percent, TrendingUp, Box, BadgePercent, CircleAlert
 } from "lucide-react";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import DealInfoDropdown from "@/components/user/DealInfoDropdown";
 import { shippingApi } from "@/apis/user/shippingApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule, sanitizeDealBadge } from "@/utils/dealCalculator";
+import {
+  calculateFreeItems,
+  calculatePayableItems,
+  calculateBuyXGetYSavings,
+  formatDealRequirementIssue,
+  getDealRequirementIssues,
+  isDealActive,
+  hasFreeShippingDeal,
+  isFreeShippingApplicable,
+  getDefaultShippingMethod,
+  matchShippingRule,
+  sanitizeDealBadge,
+} from "@/utils/dealCalculator";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -26,6 +38,23 @@ const getImgUrl = (img) => {
   if (raw.startsWith("http")) return raw;
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
+
+function DealRequirementNotice({ issues }) {
+  if (!issues.length) return null;
+  return (
+    <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+      <p className="flex items-center gap-2 font-bold">
+        <CircleAlert size={16} />
+        Complete the deal requirement before checkout
+      </p>
+      <ul className="mt-1.5 space-y-1 pl-6 text-xs">
+        {issues.map((issue) => (
+          <li key={issue.item.key}>{formatDealRequirementIssue(issue)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function getDealBadgeConfig(deal) {
   if (!deal) return null;
@@ -265,7 +294,20 @@ export default function CartPage() {
   const selectedLineCount = selectedItems.length;
   const selectedQtyCount = selectedItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
   const allSelected = hasItems && selectedLineCount === cart.length;
-  const canCheckout = selectedLineCount > 0;
+  const dealRequirementIssues = getDealRequirementIssues(selectedItems);
+  const canCheckout = selectedLineCount > 0 && dealRequirementIssues.length === 0;
+  const goToCheckout = () => {
+    // ✅ Validate deal requirements BEFORE navigation
+    if (dealRequirementIssues.length) {
+      const firstIssue = dealRequirementIssues[0];
+      toast.error(formatDealRequirementIssue(firstIssue));
+      // ❌ BLOCK navigation - user stays on cart page
+      return;
+    }
+    
+    // ✅ All validations passed - proceed to checkout
+    if (selectedLineCount > 0) router.push("/checkout");
+  };
 
   const handleRemove = (row) => {
     removeFromCart(row.key);
@@ -454,7 +496,7 @@ export default function CartPage() {
   return (
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
-    <div className="hidden lg:block">
+    <div className="cart-premium hidden lg:block">
     <main className="max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-10 pb-32 md:pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
@@ -498,6 +540,7 @@ export default function CartPage() {
           </span>
         </div>
       )}
+      {hasItems && <div className="mb-5"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
 
       {!hasItems ? (
         <div className="rounded-3xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 sm:p-16 text-center relative overflow-hidden">
@@ -563,6 +606,10 @@ export default function CartPage() {
               const Icon = badgeConfig?.icon || Sparkles;
               const isCollapsed = collapsedDeals.has(dealGroup.dealId);
               
+              // ✅ Check deal requirement for this group
+              const selectedDealItems = dealGroup.items.filter(item => isLineSelected(item.key));
+              const dealIssue = selectedDealItems.length > 0 ? getDealRequirementIssues(selectedDealItems)[0] : null;
+              
               return (
                 <div key={dealGroup.dealId || di} className="rounded-2xl border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-pink-500/5 overflow-hidden">
                   <div className={`flex items-center gap-3 px-4 py-3.5 ${!isCollapsed ? "border-b-2 border-purple-500/20" : ""}`}>
@@ -598,6 +645,15 @@ export default function CartPage() {
                       {dealGroup.items.map((row) => (
                         <ItemRow key={row.key} row={row} isDeal dealBadge={dealGroup.dealBadge} isSelected={isLineSelected(row.key)} onToggleSelect={() => toggleLineSelected(row.key)} />
                       ))}
+                      {/* ✅ Deal requirement warning */}
+                      {dealIssue && (
+                        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 flex items-start gap-2">
+                          <CircleAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-200 font-semibold">
+                            Add {dealIssue.remainingQuantity} more item{dealIssue.remainingQuantity === 1 ? '' : 's'} to unlock this deal ({dealIssue.quantity}/{dealIssue.requiredQuantity} selected)
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -680,11 +736,11 @@ export default function CartPage() {
 
               <button
                 type="button"
-                onClick={() => canCheckout && router.push("/checkout")}
-                disabled={!canCheckout}
+                onClick={goToCheckout}
+                disabled={selectedLineCount === 0}
                 className="mt-5 w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] py-4 text-sm font-black uppercase tracking-widest text-[var(--user-accent-text)] hover:opacity-90 hover:shadow-xl hover:shadow-[var(--user-accent)]/20 active:scale-[0.98] transition-all disabled:pointer-events-none disabled:opacity-50"
               >
-                {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : ("Select items to checkout")}
+                {canCheckout ? (<>Proceed to Checkout <ArrowRight size={16} /></>) : dealRequirementIssues.length ? "Complete deal requirements" : "Select items to checkout"}
               </button>
 
               <div className="mt-5 pt-5 border-t-2 border-[var(--user-border)] space-y-2">
@@ -712,10 +768,11 @@ export default function CartPage() {
               <p className="text-lg font-black text-[var(--user-accent)]">{fmt(grandTotal)}</p>
             </div>
             <button
-              onClick={() => router.push("/checkout")}
-              className="h-12 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition"
+              onClick={goToCheckout}
+              disabled={selectedLineCount === 0}
+              className="h-12 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition disabled:pointer-events-none disabled:opacity-50"
             >
-              Checkout <ArrowRight size={14} />
+              {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -724,7 +781,7 @@ export default function CartPage() {
     </div>
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
-    <div className="lg:hidden">
+    <div className="cart-premium lg:hidden">
       {/* Sticky top app bar */}
       <div
         className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
@@ -749,6 +806,7 @@ export default function CartPage() {
 
       {/* Content */}
       <div className="bg-[var(--user-bg)] px-3 pt-3 pb-28 min-h-[60vh]">
+        {hasItems && <div className="mb-3"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
         {!hasItems ? (
           <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center">
             <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
@@ -833,11 +891,11 @@ export default function CartPage() {
             </div>
             <button
               type="button"
-              onClick={() => canCheckout && router.push("/checkout")}
-              disabled={!canCheckout}
+              onClick={goToCheckout}
+              disabled={selectedLineCount === 0}
               className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 transition shadow-lg shadow-[var(--user-accent)]/20 disabled:pointer-events-none disabled:opacity-50"
             >
-              Checkout <ArrowRight size={14} />
+              {dealRequirementIssues.length ? "Meet deal quantity" : "Checkout"} <ArrowRight size={14} />
             </button>
           </div>
         </div>

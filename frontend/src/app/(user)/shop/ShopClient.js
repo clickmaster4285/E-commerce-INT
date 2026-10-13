@@ -479,7 +479,7 @@ function ShopContent() {
           <HomeSidebar
             {...sidebarProps}
             scrollable
-            className="sticky top-[7.25rem] hidden w-[16.375rem] shrink-0 rounded-l-none border-l-0 lg:block xl:w-[18rem] 2xl:w-[20rem]"
+            className="sticky top-[7.25rem] hidden w-56 shrink-0 rounded-l-none border-l-0 lg:block xl:w-60 2xl:w-64"
           />
 
           {/* MAIN COLUMN */}

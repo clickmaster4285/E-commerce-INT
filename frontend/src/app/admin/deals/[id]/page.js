@@ -398,6 +398,12 @@ export default function DealDetailPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
+    if (formData.has_min_quantity) {
+      const minQuantity = Number(formData.min_quantity);
+      if (!Number.isInteger(minQuantity) || minQuantity < 1) {
+        return toast.error("Minimum quantity must be a whole number greater than 0");
+      }
+    }
 
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {

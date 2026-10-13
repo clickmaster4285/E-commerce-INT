@@ -5,7 +5,7 @@ const log = require("../utils/logger");
 // ==========================================
 // 🚦 DYNAMIC RATE LIMITING (.env based)
 // ==========================================
-// Saari limits sirf RATE_LIMIT_* env vars se aati hain (koi hardcoded fallback nahi).
+// Saari limits sirf RATE_LIMIT_* env vars se aati hain.
 
 const num = (value) => {
   const n = Number(value);
@@ -18,53 +18,68 @@ const WINDOW_MS = Math.max(1, WINDOW_MINUTES) * 60 * 1000;
 const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER);
 const ADMIN_MULTIPLIER = num(process.env.RATE_LIMIT_ADMIN_MULTIPLIER);
 
-const WHITELIST_IPS = String(process.env.RATE_LIMIT_WHITELIST_IPS)
+// ✅ FIX: undefined par "undefined" string na bane
+const WHITELIST_IPS = String(process.env.RATE_LIMIT_WHITELIST_IPS || "")
   .split(",")
   .map((ip) => ip.trim())
   .filter(Boolean);
 
-// ✅ Store select: REDIS_URL ho to redis, warna memory (default)
-let sharedStore;
-const getStore = () => {
-  if (sharedStore !== undefined) return sharedStore;
-  sharedStore = null;
-  const redisUrl = String(process.env.REDIS_URL).trim();
-  if (redisUrl) {
-    try {
-      const { RedisStore } = require("rate-limit-redis");
-      const { Redis } = require("ioredis");
-      const client = new Redis(redisUrl, {
-        maxRetriesPerRequest: 2,
-        enableReadyCheck: true,
-      });
-      // Redis errors repeat ho sakte hain — terminal spam na ho, sirf pehli baar
-      let redisErrorLogged = false;
-      client.on("error", (err) => {
-        if (redisErrorLogged) return;
-        redisErrorLogged = true;
-        log.error("❌ [rateLimit] Redis error:", err.message);
-      });
-      sharedStore = new RedisStore({
-        // ✅ ioredis client ke liye sendCommand adapter
-        sendCommand: (...args) => client.call(...args),
-      });
-      log.info("✅ [rateLimit] Redis store enabled");
-    } catch (error) {
-      log.error(
-        "⚠️ [rateLimit] REDIS_URL set hai lekin redis store load nahi hua — memory store use hoga:",
-        error.message,
-      );
-      sharedStore = null;
-    }
+// ==========================================
+// 🧠 STORE: Redis sirf tab jab REDIS_URL valid ho (redis:// ya rediss://)
+// warna memory store (undefined) use hota hai
+// ==========================================
+let redisClient;
+const getRedisClient = () => {
+  if (redisClient !== undefined) return redisClient;
+  redisClient = null;
+
+  // ✅ FIX: String(undefined) = "undefined" wali galti khatam
+  const redisUrl = String(process.env.REDIS_URL || "").trim();
+  if (!/^rediss?:\/\//i.test(redisUrl)) return redisClient;
+
+  try {
+    const { Redis } = require("ioredis");
+    const client = new Redis(redisUrl, {
+      maxRetriesPerRequest: 2,
+      enableReadyCheck: true,
+    });
+    // Redis errors repeat ho sakte hain — terminal spam na ho, sirf pehli baar
+    let redisErrorLogged = false;
+    client.on("error", (err) => {
+      if (redisErrorLogged) return;
+      redisErrorLogged = true;
+      log.error("❌ [rateLimit] Redis error:", err.message);
+    });
+    redisClient = client;
+    log.info("✅ [rateLimit] Redis enabled");
+  } catch (error) {
+    log.error("⚠️ [rateLimit] Redis load nahi hua, memory store use hoga:", error.message);
+    redisClient = null;
   }
-  return sharedStore;
+  return redisClient;
+};
+
+// ✅ FIX: har limiter ka apna alag store (unique prefix) — ERR_ERL_STORE_REUSE khatam
+const makeStore = (name) => {
+  const client = getRedisClient();
+  if (!client) return undefined; // undefined = built-in memory store
+  try {
+    const { RedisStore } = require("rate-limit-redis");
+    return new RedisStore({
+      sendCommand: (...args) => client.call(...args),
+      prefix: `rl:${name}:`,
+    });
+  } catch (error) {
+    log.error("⚠️ [rateLimit] RedisStore load nahi hua, memory store use hoga:", error.message);
+    return undefined;
+  }
 };
 
 const isWhitelisted = (req) => {
   if (!WHITELIST_IPS.length) return false;
   const ip = String(req.ip || "").trim();
   if (WHITELIST_IPS.includes(ip)) return true;
-  // ✅ X-Forwarded-For ka leftmost IP bhi check karo (proxy ke peeche direct IP ke liye)
+  // ✅ X-Forwarded-For ka IP bhi check karo (proxy ke peeche direct IP ke liye)
   const forwarded = String(req.headers["x-forwarded-for"] || "")
     .split(",")
     .map((s) => s.trim())
@@ -86,7 +101,6 @@ const ipPart = (req) => {
 // ==========================================
 // 👤 ROLE PEHCHAN (global limiter auth se pehle chalta hai)
 // Token ko sirf decode/verify karte hain — fail ho to guest, kabhi 401 nahi.
-// role=admin wale JWT claim ko admin, baaki valid token ko user maante hain.
 // ==========================================
 const roleOf = (req) => {
   try {
@@ -180,13 +194,13 @@ const createRateLimiter = ({ name, max, windowMs = WINDOW_MS, keyBy = "ip", role
       if (roleBased && multiplierFor(roleOf(req)) <= 0) return true;
       return false;
     },
-    store: getStore() || undefined, // undefined = built-in memory store
+    store: makeStore(name), // ✅ har limiter ka alag store, ya memory (undefined)
     handler: tooManyHandler,
   });
 };
 
 // ==========================================
-// 📋 PREBUILT LIMITERS (.env defaults — spec ke mutabiq)
+// 📋 PREBUILT LIMITERS (.env defaults)
 // ==========================================
 const limiters = {
   global: createRateLimiter({

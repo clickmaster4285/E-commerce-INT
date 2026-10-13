@@ -1,16 +1,20 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const PendingRegistration = require("../models/PendingRegistration");
 const Wishlist = require("../models/Wishlist");
 const CheckoutDraft = require("../models/CheckoutDraft");
+const Product = require("../models/Product");
+const Order = require("../models/Order");
 const Employee = require("../models/Employee");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
+const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -66,7 +70,8 @@ const createUser = async (req, res) => {
     const { name, username, phone, email: rawEmail, password } = req.body;
     const email = normalizeEmail(rawEmail);
     const cleanUsername = String(username || "").trim();
-    const cleanPhone = String(phone || "").trim();
+    const rawPhone = typeof phone === "string" ? phone : "";
+    const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
 
     // ✅ Basic validation — User NAHI banega, sirf 400 milega
@@ -81,8 +86,13 @@ const createUser = async (req, res) => {
       else if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername))
         errors.username = "Username can only contain letters, numbers, and underscores";
     }
-    if (cleanPhone && cleanPhone.replace(/\D/g, "").length < 4)
-      errors.phone = "Phone number must be at least 4 digits";
+    if (rawPhone && !isValidPhone(rawPhone)) {
+      errors.phone = !/^\d+$/.test(rawPhone)
+        ? "Phone number must contain digits only"
+        : rawPhone.length < 10
+          ? "Phone number must be at least 10 digits"
+          : "Phone number must be at most 16 digits";
+    }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
 
@@ -706,6 +716,17 @@ const updateProfileInfo = async (req, res) => {
       name, email, phone, website, address,
       store_name, tagline, currency, country, city, state, zip_code, store_status
     } = req.body;
+    if (phone !== undefined && String(phone).trim()) {
+      const phoneValue = String(phone);
+      if (!isValidPhone(phoneValue)) {
+        const message = !/^\d+$/.test(phoneValue)
+          ? "Phone number must contain digits only"
+          : phoneValue.length < 10
+            ? "Phone number must be at least 10 digits"
+            : "Phone number must be at most 16 digits";
+        return res.status(400).json({ success: false, message });
+      }
+    }
     // ✅ Store fields sirf tab jab 'store' permission ho (admin bypass).
     // Socket path par req.user.permissions stale ho sakte hain — fresh load karo.
     let requesterRole = req.user?.role || "";
@@ -725,7 +746,7 @@ const updateProfileInfo = async (req, res) => {
     if (name !== undefined) userUpdateFields.name = name;
     if (email !== undefined)
       userUpdateFields.email = email.toLowerCase().trim();
-    if (phone !== undefined) userUpdateFields.phone = phone;
+    if (phone !== undefined) userUpdateFields.phone = phone ? normalizePhone(phone) : phone;
     if (website !== undefined) userUpdateFields.website = website;
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
@@ -752,7 +773,7 @@ const updateProfileInfo = async (req, res) => {
     if (store_status !== undefined)
       storeUpdateFields.store_status = store_status;
     if (email !== undefined) storeUpdateFields.email = email;
-    if (phone !== undefined) storeUpdateFields.phone = phone;
+    if (phone !== undefined) storeUpdateFields.phone = phone ? normalizePhone(phone) : phone;
     if (address !== undefined) storeUpdateFields.address = address;
     if (website !== undefined) storeUpdateFields.website = website;
     if (Object.keys(storeUpdateFields).length > 0 && !canEditStore) {
@@ -1002,12 +1023,21 @@ const googleCustomerLogin = async (req, res) => {
 const updatePhone = async (req, res) => {
   try {
     const { phone } = req.body;
-    if (!phone || !/^[0-9+\-\s]{7,20}$/.test(String(phone)))
-      return res.status(400).json({ message: "Valid phone number required" });
+    if (typeof phone !== "string" || !phone.trim())
+      return res.status(400).json({ message: "Phone number is required" });
+    const phoneValue = phone;
+    if (!/^\d+$/.test(phoneValue))
+      return res.status(400).json({ message: "Phone number must contain digits only" });
+    if (phoneValue.length < 10)
+      return res.status(400).json({ message: "Phone number must be at least 10 digits" });
+    if (phoneValue.length > 16)
+      return res.status(400).json({ message: "Phone number must be at most 16 digits" });
+    if (!isValidPhone(phoneValue))
+      return res.status(400).json({ message: "Please enter a valid phone number" });
     const Model = req.userType === "employee" ? Employee : User;
     const user = await Model.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    user.phone = String(phone).trim();
+    user.phone = normalizePhone(phoneValue);
     await user.save();
     res
       .status(200)
@@ -1107,19 +1137,52 @@ const toggleWishlist = async (req, res) => {
 
 
 // ==========================================
-// ✅ CREATE CHECKOUT DRAFT (new)
+// CHECKOUT DRAFTS
 // ==========================================
+const CHECKOUT_DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const checkoutDraftProductId = (item) => {
+  const raw = item?.productId || item?.product_id || item?.id || item?._id ||
+    String(item?.key || "").split("__")[0];
+  const value = raw && typeof raw === "object" ? raw._id || raw.id : raw;
+  return mongoose.isValidObjectId(value) ? String(value) : null;
+};
+
+const checkoutDraftProductIds = (draft) => {
+  const ids = new Set();
+  for (const item of Array.isArray(draft?.items) ? draft.items : []) {
+    const id = checkoutDraftProductId(item);
+    if (id) ids.add(id);
+  }
+  for (const key of Array.isArray(draft?.selectedKeys) ? draft.selectedKeys : []) {
+    const id = checkoutDraftProductId({ key });
+    if (id) ids.add(id);
+  }
+  return [...ids];
+};
+
+const finiteDraftAmount = (value, fallback = 0) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : fallback;
+};
+
+const hasAvailableDraftProducts = async (draft) => {
+  const ids = checkoutDraftProductIds(draft);
+  if (!ids.length) return false;
+  const available = await Product.find({
+    _id: { $in: ids },
+    is_deleted: { $ne: true },
+  }).select("_id").lean();
+  return available.length === ids.length;
+};
+
 const createCheckoutDraft = async (req, res) => {
   try {
     const {
-      step,
-      selectedKeys,
-      selectedAddressId,
-      shippingMethod,
-      paymentMethod,
-      items,
+      step, selectedKeys, selectedAddressId, shippingMethod, paymentMethod, items,
+      subtotal, shipping, tax, discount, estimatedTotal,
     } = req.body;
-
+    const now = new Date();
     const newDraft = {
       step: step ?? 1,
       selectedKeys: Array.isArray(selectedKeys) ? selectedKeys : [],
@@ -1127,63 +1190,155 @@ const createCheckoutDraft = async (req, res) => {
       shippingMethod: shippingMethod || "standard",
       paymentMethod: paymentMethod || "cod",
       saved: false,
+      status: "active",
       items: Array.isArray(items) ? items : [],
-      updatedAt: new Date(),
+      subtotal: finiteDraftAmount(subtotal),
+      shipping: finiteDraftAmount(shipping),
+      tax: finiteDraftAmount(tax),
+      discount: finiteDraftAmount(discount),
+      estimatedTotal: finiteDraftAmount(estimatedTotal),
+      order_id: null,
+      updatedAt: now,
     };
 
-    let checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc) {
-      checkoutDoc = await CheckoutDraft.create({ user_id: req.user._id, drafts: [newDraft] });
-    } else {
-      checkoutDoc.drafts.push(newDraft);
-      await checkoutDoc.save();
-    }
+    // Upsert the user's single draft container, then replace the most recently
+    // active draft instead of appending another subdocument on each checkout.
+    const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
+      { user_id: req.user._id },
+      { $setOnInsert: { user_id: req.user._id } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+    const cutoff = new Date(now.getTime() - CHECKOUT_DRAFT_MAX_AGE_MS);
+    const completedDrafts = checkoutDoc.drafts.filter((draft) => draft.status === "completed");
+    const activeDraft = checkoutDoc.drafts
+      .filter((draft) => draft.status !== "completed")
+      .filter((draft) => new Date(draft.updatedAt || 0) >= cutoff)
+      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))[0];
 
-    const createdDraft = checkoutDoc.drafts[checkoutDoc.drafts.length - 1];
-    res.status(201).json({ success: true, draft: createdDraft });
+    if (activeDraft) {
+      Object.assign(activeDraft, newDraft, { _id: activeDraft._id });
+    }
+    checkoutDoc.drafts = [
+      ...completedDrafts.map((draft) => draft.toObject()),
+      activeDraft ? activeDraft.toObject() : newDraft,
+    ];
+    await checkoutDoc.save();
+
+    const savedDraft = checkoutDoc.drafts.find((draft) => draft.status === "active") || checkoutDoc.drafts.at(-1);
+    res.status(activeDraft ? 200 : 201).json({ success: true, draft: savedDraft });
   } catch (error) {
     log.error("createCheckoutDraft error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message || "Checkout draft could not be saved" });
   }
 };
 
-// ==========================================
-// ✅ GET ALL CHECKOUT DRAFTS
-// ==========================================
 const getCheckoutDrafts = async (req, res) => {
   try {
     const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Checkout drafts not found" });
-    const drafts = checkoutDoc.drafts || [];
-    res.json({ success: true, drafts });
+    if (!checkoutDoc) return res.json({ success: true, drafts: [] });
+
+    const cutoff = new Date(Date.now() - CHECKOUT_DRAFT_MAX_AGE_MS);
+    const completedDrafts = [];
+    const activeCandidates = [];
+    let changed = false;
+
+    for (const draft of checkoutDoc.drafts || []) {
+      if (draft.status === "completed") {
+        completedDrafts.push(draft);
+        continue;
+      }
+      const updatedAt = new Date(draft.updatedAt || checkoutDoc.updated_at || 0);
+      if (updatedAt < cutoff) {
+        changed = true;
+        continue;
+      }
+      if (draft.status !== "active") {
+        draft.status = "active"; // legacy drafts had no lifecycle field
+        changed = true;
+      }
+      activeCandidates.push(draft);
+    }
+
+    const linkedOrders = activeCandidates.length
+      ? await Order.find({
+          user_id: req.user._id,
+          checkout_draft_id: { $in: activeCandidates.map((draft) => draft._id) },
+        }).select("_id checkout_draft_id").lean()
+      : [];
+    const orderByDraftId = new Map(linkedOrders.map((order) => [String(order.checkout_draft_id), order]));
+    const uncompleted = [];
+    for (const draft of activeCandidates) {
+      const order = orderByDraftId.get(String(draft._id));
+      if (order) {
+        draft.status = "completed";
+        draft.order_id = order._id;
+        completedDrafts.push(draft);
+        changed = true;
+      } else {
+        uncompleted.push(draft);
+      }
+    }
+
+    const productIds = [...new Set(uncompleted.flatMap(checkoutDraftProductIds))];
+    const existingProducts = productIds.length
+      ? await Product.find({ _id: { $in: productIds }, is_deleted: { $ne: true } }).select("_id").lean()
+      : [];
+    const availableProductIds = new Set(existingProducts.map((product) => String(product._id)));
+    const availableDrafts = [];
+    for (const draft of uncompleted) {
+      if (hasAvailableDraftProductsFromSet(draft, availableProductIds)) {
+        availableDrafts.push(draft);
+      } else {
+        changed = true;
+      }
+    }
+
+    availableDrafts.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+    if (availableDrafts.length > 1) changed = true;
+    const activeDrafts = availableDrafts.slice(0, 1);
+    checkoutDoc.drafts = [
+      ...completedDrafts,
+      ...activeDrafts,
+    ];
+    if (changed) await checkoutDoc.save();
+
+    res.json({ success: true, drafts: activeDrafts });
   } catch (error) {
     log.error("getCheckoutDrafts error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ==========================================
-// ✅ GET SINGLE CHECKOUT DRAFT BY ID
-// ==========================================
+const hasAvailableDraftProductsFromSet = (draft, availableProductIds) => {
+  const ids = checkoutDraftProductIds(draft);
+  return ids.length > 0 && ids.every((id) => availableProductIds.has(id));
+};
+
 const getCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
     const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Checkout drafts not found" });
+    const draft = checkoutDoc?.drafts.find((entry) => String(entry._id) === id);
+    if (!draft || draft.status === "completed") {
+      return res.status(404).json({ success: false, message: "Draft not found" });
+    }
 
-    const draft = checkoutDoc.drafts.find(
-      (d) => d._id.toString() === id,
-    );
-    if (!draft)
-      return res
-        .status(404)
-        .json({ success: false, message: "Draft not found" });
+    const cutoff = new Date(Date.now() - CHECKOUT_DRAFT_MAX_AGE_MS);
+    if (new Date(draft.updatedAt || checkoutDoc.updated_at || 0) < cutoff) {
+      checkoutDoc.drafts = checkoutDoc.drafts.filter((entry) => String(entry._id) !== id);
+      await checkoutDoc.save();
+      return res.status(404).json({ success: false, message: "This checkout draft has expired" });
+    }
+
+    const linkedOrder = await Order.findOne({ user_id: req.user._id, checkout_draft_id: draft._id }).select("_id").lean();
+    if (linkedOrder || !(await hasAvailableDraftProducts(draft))) {
+      checkoutDoc.drafts = checkoutDoc.drafts.filter((entry) => String(entry._id) !== id);
+      await checkoutDoc.save();
+      return res.status(404).json({
+        success: false,
+        message: linkedOrder ? "This draft has already been ordered" : "A product in this draft is no longer available",
+      });
+    }
 
     res.json({ success: true, draft });
   } catch (error) {
@@ -1192,50 +1347,32 @@ const getCheckoutDraft = async (req, res) => {
   }
 };
 
-// ==========================================
-// ✅ UPDATE SINGLE CHECKOUT DRAFT BY ID
-// ==========================================
 const updateCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      step,
-      selectedKeys,
-      selectedAddressId,
-      shippingMethod,
-      paymentMethod,
-      saved,
-      items,
+      step, selectedKeys, selectedAddressId, shippingMethod, paymentMethod, saved, items,
+      subtotal, shipping, tax, discount, estimatedTotal,
     } = req.body;
-
     const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Checkout drafts not found" });
+    const draft = checkoutDoc?.drafts.find((entry) => String(entry._id) === id);
+    if (!draft || draft.status === "completed") {
+      return res.status(404).json({ success: false, message: "Active checkout draft not found" });
+    }
 
-    const draftIndex = checkoutDoc.drafts.findIndex(
-      (d) => d._id.toString() === id,
-    );
-    if (draftIndex === -1)
-      return res
-        .status(404)
-        .json({ success: false, message: "Draft not found" });
-
-    checkoutDoc.drafts[draftIndex].step = step ?? checkoutDoc.drafts[draftIndex].step;
-    checkoutDoc.drafts[draftIndex].selectedKeys = Array.isArray(selectedKeys)
-      ? selectedKeys
-      : checkoutDoc.drafts[draftIndex].selectedKeys;
-    checkoutDoc.drafts[draftIndex].selectedAddressId = selectedAddressId !== undefined ? selectedAddressId : checkoutDoc.drafts[draftIndex].selectedAddressId;
-    checkoutDoc.drafts[draftIndex].shippingMethod = shippingMethod || checkoutDoc.drafts[draftIndex].shippingMethod;
-    checkoutDoc.drafts[draftIndex].paymentMethod = paymentMethod || checkoutDoc.drafts[draftIndex].paymentMethod;
-    checkoutDoc.drafts[draftIndex].saved = saved !== undefined ? saved : checkoutDoc.drafts[draftIndex].saved;
-    checkoutDoc.drafts[draftIndex].items = Array.isArray(items) ? items : checkoutDoc.drafts[draftIndex].items;
-    checkoutDoc.drafts[draftIndex].updatedAt = new Date();
-
+    draft.step = step ?? draft.step;
+    draft.selectedKeys = Array.isArray(selectedKeys) ? selectedKeys : draft.selectedKeys;
+    draft.selectedAddressId = selectedAddressId !== undefined ? selectedAddressId : draft.selectedAddressId;
+    draft.shippingMethod = shippingMethod || draft.shippingMethod;
+    draft.paymentMethod = paymentMethod || draft.paymentMethod;
+    draft.saved = saved !== undefined ? saved : draft.saved;
+    draft.items = Array.isArray(items) ? items : draft.items;
+    for (const [field, value] of Object.entries({ subtotal, shipping, tax, discount, estimatedTotal })) {
+      if (value !== undefined && Number.isFinite(Number(value))) draft[field] = Number(value);
+    }
+    draft.updatedAt = new Date();
     await checkoutDoc.save();
 
-    const draft = checkoutDoc.drafts[draftIndex];
     res.json({ success: true, draft });
   } catch (error) {
     log.error("updateCheckoutDraft error:", error);
@@ -1243,23 +1380,14 @@ const updateCheckoutDraft = async (req, res) => {
   }
 };
 
-// ==========================================
-// ✅ DELETE SINGLE CHECKOUT DRAFT BY ID
-// ==========================================
 const deleteCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
     const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc)
-      return res
-        .status(404)
-        .json({ success: false, message: "Checkout drafts not found" });
+    if (!checkoutDoc) return res.status(404).json({ success: false, message: "Checkout drafts not found" });
 
-    checkoutDoc.drafts = checkoutDoc.drafts.filter(
-      (d) => d._id.toString() !== id,
-    );
+    checkoutDoc.drafts = checkoutDoc.drafts.filter((draft) => String(draft._id) !== id);
     await checkoutDoc.save();
-
     res.json({ success: true, message: "Draft deleted" });
   } catch (error) {
     log.error("deleteCheckoutDraft error:", error);

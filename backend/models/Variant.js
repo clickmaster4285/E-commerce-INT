@@ -61,6 +61,16 @@ const variantSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    expiry_after_delivery: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    expiry_after_delivery_unit: {
+      type: String,
+      enum: ["days", "months", "years"],
+      default: "days",
+    },
     quantity: {
       type: Number,
       default: 0,
@@ -72,6 +82,12 @@ const variantSchema = new mongoose.Schema(
       min: 0,
     },
     max_qnt: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // ✅ Topup quantity/amount field - reusable across variants
+    topup: {
       type: Number,
       default: 0,
       min: 0,

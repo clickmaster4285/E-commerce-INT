@@ -118,7 +118,7 @@ function SearchContent() {
 
         {/* LOADING */}
         {isLoading && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="space-y-2 lg:space-y-3">
                 <div className="aspect-square rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]" />
@@ -150,7 +150,7 @@ function SearchContent() {
         {/* RESULTS */}
         {!isLoading && !isError && q && total > 0 && (
           <div ref={gridTopRef} className="scroll-mt-24">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {products.map((product, i) => (
                 <ProductCard key={product._id} product={product} priority={i < 2} />
               ))}

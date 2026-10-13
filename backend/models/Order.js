@@ -9,6 +9,7 @@ const orderSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    checkout_draft_id: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
 
     items: [
       {

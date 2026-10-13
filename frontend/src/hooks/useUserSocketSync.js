@@ -28,14 +28,15 @@ export function useUserSocketSync() {
     // ==========================================
     // 1. PRODUCTS
     // ==========================================
-    const onProductCreated = () => invalidate(["products"], ["featuredProducts"], ["categories"]);
+    const onProductCreated = () =>
+      invalidate(["products"], ["featuredProducts"], ["categories"], ["categoryTiles"]);
     const onProductUpdated = (data) => {
-      invalidate(["products"], ["featuredProducts"], ["categories"]);
+      invalidate(["products"], ["featuredProducts"], ["categories"], ["categoryTiles"]);
       const id = data?._id || data?.product?._id || data?.id;
       if (id) invalidate(["product", id], ["productStock", id]);
     };
     const onProductDeleted = (data) => {
-      invalidate(["products"], ["featuredProducts"], ["categories"]);
+      invalidate(["products"], ["featuredProducts"], ["categories"], ["categoryTiles"]);
       const id = typeof data === "string" ? data : data?.id || data?._id;
       if (id) {
         queryClient.removeQueries({ queryKey: ["product", id] });
@@ -115,7 +116,7 @@ export function useUserSocketSync() {
     // 8. CATEGORIES (footer + listings)
     // ==========================================
     const onCategoryChanged = () =>
-      invalidate(["categories"], ["allCategories"], ["products"]);
+      invalidate(["categories"], ["allCategories"], ["products"], ["categoryTiles"]);
 
     socket.on("category:created", onCategoryChanged);
     socket.on("category:updated", onCategoryChanged);

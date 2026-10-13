@@ -921,7 +921,7 @@ export default function FeaturedProductsPage() {
       )}
 
       {/* PAGINATION — same simple pattern as Products page */}
-      {!isLoading && !isError && totalRecords > 0 && (
+      {!isLoading && !isError && totalRecords > PER_PAGE && (
         <div
           className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
           style={cardStyle}

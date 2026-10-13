@@ -7,16 +7,16 @@ import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
-  ShoppingCart, ChevronRight, ChevronLeft, ChevronDown,
+  ShoppingCart, ChevronRight, ChevronLeft, ChevronDown, Clock3,
   Minus, Plus, Package, X, Check, Zap, ZoomIn, Tag, Sparkles, Heart, Star,
-  Share2, Store, ShieldCheck,
+  Store, ShieldCheck, ZoomIn as ZoomHintIcon,
 } from "lucide-react";
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import { userHttp } from "@/apis/axiosInstance";
 import { reviewApi } from "@/apis/user/reviewApi";
-import ProductRating from "@/components/user/ProductReviews";
+import ProductRating, { ReviewMediaGallery, StoreResponse } from "@/components/user/ProductReviews";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
@@ -211,17 +211,174 @@ const Stars = memo(({ value = 0, size = 13 }) => (
 ));
 Stars.displayName = "Stars";
 
+function ReviewComment({ comment }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!comment) return null;
+  return (
+    <div>
+      <p className={`whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-4"}`}>{comment}</p>
+      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? "Read less" : "Read more"}</button>}
+    </div>
+  );
+}
+
 const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
   const stripRef = useRef(null);
+  const imageFrameRef = useRef(null);
+  const lensRef = useRef(null);
+  const zoomPanelRef = useRef(null);
+  const moveFrameRef = useRef(0);
+  const pendingPointRef = useRef(null);
+  const naturalSizeRef = useRef({ width: 1, height: 1 });
+  const hoveredRef = useRef(false);
+  const updateZoomPositionRef = useRef(null);
+  const zoomRequestRef = useRef(0);
+  const [zoomVisible, setZoomVisible] = useState(false);
+  const [zoomLoaded, setZoomLoaded] = useState(false);
+  const [hasHovered, setHasHovered] = useState(false);
   const activeIndex = Math.max(0, images.indexOf(mainImage));
-  const scrollStrip = (dir) => {
-    stripRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
-  };
+  const lensSize = 112;
+  const zoomFactor = 2.5;
+
+  const preloadZoomImage = useCallback(() => {
+    if (!mainImage || typeof window === "undefined") return;
+    const requestId = ++zoomRequestRef.current;
+    setZoomLoaded(false);
+    const preload = new window.Image();
+    preload.onload = () => {
+      if (requestId !== zoomRequestRef.current) return;
+      naturalSizeRef.current = {
+        width: preload.naturalWidth || 1,
+        height: preload.naturalHeight || 1,
+      };
+      setZoomLoaded(true);
+      if (hoveredRef.current && !moveFrameRef.current) {
+        moveFrameRef.current = window.requestAnimationFrame(() => {
+          updateZoomPositionRef.current?.();
+        });
+      }
+    };
+    preload.onerror = () => {
+      if (requestId === zoomRequestRef.current) setZoomLoaded(false);
+    };
+    preload.src = mainImage;
+  }, [mainImage]);
+
+  const updateZoomPosition = useCallback(() => {
+    moveFrameRef.current = 0;
+    const frame = imageFrameRef.current;
+    const lens = lensRef.current;
+    const panel = zoomPanelRef.current;
+    const point = pendingPointRef.current;
+    if (!frame || !lens || !panel || !point || !hoveredRef.current) return;
+
+    const frameWidth = frame.clientWidth;
+    const frameHeight = frame.clientHeight;
+    const mainImg = frame.querySelector("img");
+    const naturalWidth = mainImg?.naturalWidth || naturalSizeRef.current.width;
+    const naturalHeight = mainImg?.naturalHeight || naturalSizeRef.current.height;
+    const scale = Math.min(frameWidth / naturalWidth, frameHeight / naturalHeight);
+    const imageWidth = naturalWidth * scale;
+    const imageHeight = naturalHeight * scale;
+    const offsetX = (frameWidth - imageWidth) / 2;
+    const offsetY = (frameHeight - imageHeight) / 2;
+    const cursorX = Math.max(offsetX, Math.min(point.x, offsetX + imageWidth));
+    const cursorY = Math.max(offsetY, Math.min(point.y, offsetY + imageHeight));
+    const activeLensSize = Math.min(lensSize, imageWidth, imageHeight);
+    lens.style.width = `${activeLensSize}px`;
+    lens.style.height = `${activeLensSize}px`;
+    const lensLeft = Math.max(offsetX, Math.min(cursorX - activeLensSize / 2, offsetX + imageWidth - activeLensSize));
+    const lensTop = Math.max(offsetY, Math.min(cursorY - activeLensSize / 2, offsetY + imageHeight - activeLensSize));
+    const centerX = lensLeft + activeLensSize / 2 - offsetX;
+    const centerY = lensTop + activeLensSize / 2 - offsetY;
+
+    lens.style.transform = `translate3d(${lensLeft}px, ${lensTop}px, 0)`;
+    const panelWidth = panel.clientWidth;
+    const panelHeight = panel.clientHeight;
+    panel.style.backgroundSize = `${imageWidth * zoomFactor}px ${imageHeight * zoomFactor}px`;
+    const backgroundX = Math.min(
+      0,
+      Math.max(panelWidth - imageWidth * zoomFactor, panelWidth / 2 - centerX * zoomFactor),
+    );
+    const backgroundY = Math.min(
+      0,
+      Math.max(panelHeight - imageHeight * zoomFactor, panelHeight / 2 - centerY * zoomFactor),
+    );
+    panel.style.backgroundPosition = `${backgroundX}px ${backgroundY}px`;
+  }, []);
+
+  useEffect(() => {
+    updateZoomPositionRef.current = updateZoomPosition;
+  }, [updateZoomPosition]);
+
+  const handleMouseMove = useCallback((event) => {
+    const bounds = imageFrameRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    pendingPointRef.current = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    if (!moveFrameRef.current) {
+      moveFrameRef.current = window.requestAnimationFrame(updateZoomPosition);
+    }
+  }, [updateZoomPosition]);
+
+  const handleMouseEnter = useCallback(() => {
+    hoveredRef.current = true;
+    setZoomVisible(true);
+    setHasHovered(true);
+    preloadZoomImage();
+  }, [preloadZoomImage]);
+
+  useEffect(() => {
+    if (hoveredRef.current && mainImage) preloadZoomImage();
+  }, [mainImage, preloadZoomImage]);
+
+  const handleMouseLeave = useCallback(() => {
+    hoveredRef.current = false;
+    setZoomVisible(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (moveFrameRef.current) window.cancelAnimationFrame(moveFrameRef.current);
+    };
+  }, []);
+
+  // ✅ Arrow = agli/peeche wali picture. Main image badalti hai aur uska thumbnail
+  // strip me visible bhi ho jata hai — chahe strip overflow kare ya na kare.
+  const scrollThumbIntoView = useCallback((url) => {
+    const strip = stripRef.current;
+    if (!strip || !url) return;
+    const node = strip.querySelector(`[data-img-url="${CSS.escape(url)}"]`);
+    if (!node) return;
+    const stripBox = strip.getBoundingClientRect();
+    const nodeBox = node.getBoundingClientRect();
+    if (nodeBox.left < stripBox.left) {
+      strip.scrollBy({ left: nodeBox.left - stripBox.left - 8, behavior: "smooth" });
+    } else if (nodeBox.right > stripBox.right) {
+      strip.scrollBy({ left: nodeBox.right - stripBox.right + 8, behavior: "smooth" });
+    }
+  }, []);
+
+  const stepImage = useCallback(
+    (dir) => {
+      if (!images.length) return;
+      const target = images[Math.min(Math.max(activeIndex + dir, 0), images.length - 1)];
+      if (!target) return;
+      if (target !== mainImage) onImageSelect(target);
+      scrollThumbIntoView(target);
+    },
+    [images, activeIndex, mainImage, onImageSelect, scrollThumbIntoView],
+  );
+
   return (
-    <div className="min-w-0">
+    <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
+      <div className="product-gallery-main relative">
       <div
-        className="group relative aspect-square cursor-zoom-in overflow-hidden border border-[var(--user-border)] bg-white"
+        ref={imageFrameRef}
+        className="group relative aspect-square cursor-crosshair overflow-hidden border border-[var(--user-border)] bg-white"
         onClick={() => mainImage && onZoom(mainImage)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
       >
         {mainImage ? (
           <Image
@@ -243,13 +400,38 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         {stock > 0 && stock < 5 && (
           <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
         )}
+        <div
+          ref={lensRef}
+          aria-hidden="true"
+          className={`product-image-zoom-lens pointer-events-none absolute left-0 top-0 z-20 h-28 w-28 border border-[var(--user-accent)]/70 bg-[rgba(245,114,36,0.2)] transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ transform: "translate3d(-200px, -200px, 0)" }}
+        />
+        {!hasHovered && mainImage ? (
+          <span className="product-image-zoom-hint pointer-events-none absolute bottom-3 right-3 z-20 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-[11px] text-white">
+            <ZoomHintIcon size={13} aria-hidden="true" />
+            Hover to zoom
+          </span>
+        ) : null}
+      </div>
+      {mainImage ? (
+        <div
+          ref={zoomPanelRef}
+          aria-hidden="true"
+          className={`product-image-zoom-panel pointer-events-none absolute left-full top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
+        >
+          {!zoomLoaded ? (
+            <div className="absolute inset-0 animate-pulse bg-gray-100" />
+          ) : null}
+        </div>
+      ) : null}
       </div>
       {images.length > 1 && (
         <div className="relative mt-2 flex items-center gap-1">
           <button
             type="button"
-            onClick={() => scrollStrip(-1)}
-            aria-label="Previous images"
+            onClick={() => stepImage(-1)}
+            aria-label="Previous image"
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronLeft size={18} />
@@ -259,8 +441,10 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
               <button
                 key={i}
                 type="button"
+                data-img-url={url}
                 onClick={() => onImageSelect(url)}
                 aria-label={`View image ${i + 1}`}
+                aria-current={url === mainImage}
                 className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
               >
                 <img src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
@@ -269,8 +453,8 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           </div>
           <button
             type="button"
-            onClick={() => scrollStrip(1)}
-            aria-label="Next images"
+            onClick={() => stepImage(1)}
+            aria-label="Next image"
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronRight size={18} />
@@ -281,6 +465,53 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
   );
 });
 Gallery.displayName = "Gallery";
+
+// ✅ Product details images — pehle sirf pehli image (neeche se fade), "View More" par saari images
+const COLLAPSED_IMAGE_HEIGHT = 620;
+const DetailImages = memo(({ productName, images, onZoom }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!images?.length) return null;
+  const hasMore = images.length > 1;
+  const visible = expanded || !hasMore ? images : images.slice(0, 1);
+  const collapsed = hasMore && !expanded;
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div
+        className="relative overflow-hidden"
+        style={collapsed ? { maxHeight: COLLAPSED_IMAGE_HEIGHT } : undefined}
+      >
+        <div className="flex flex-col items-center gap-2">
+          {visible.map((url, i) => (
+            <img
+              key={url}
+              src={url}
+              alt={`${productName}, image ${i + 1}`}
+              loading="lazy"
+              onClick={() => onZoom(url)}
+              className="h-auto w-full cursor-zoom-in object-contain"
+            />
+          ))}
+        </div>
+        {collapsed && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
+        )}
+      </div>
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-expanded={expanded}
+            className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+          >
+            {expanded ? "View Less" : `View More (${images.length - 1})`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+DetailImages.displayName = "DetailImages";
 
 const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
   if (!show) return null;
@@ -307,6 +538,10 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
 StickyBar.displayName = "StickyBar";
 
 const Lightbox = memo(({ images, index, onClose, onStep }) => {
+  const [zoom, setZoom] = useState({ index, scale: 1 });
+  const zoomScale = zoom.index === index ? zoom.scale : 1;
+  const touchGestureRef = useRef(null);
+
   useEffect(() => {
     if (index === null) return undefined;
     const handleKeyDown = (event) => {
@@ -317,12 +552,54 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [index, onClose, onStep]);
+
   if (index === null || !images?.length) return null;
+
+  const handleTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      const [first, second] = event.touches;
+      touchGestureRef.current = {
+        type: "pinch",
+        distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+        scale: zoomScale,
+      };
+    } else if (event.touches.length === 1) {
+      touchGestureRef.current = { type: "swipe", x: event.touches[0].clientX };
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type !== "pinch" || event.touches.length !== 2) return;
+    event.preventDefault();
+    const [first, second] = event.touches;
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    setZoom({ index, scale: Math.max(1, Math.min(4, gesture.scale * (distance / gesture.distance))) });
+  };
+
+  const handleTouchEnd = (event) => {
+    const gesture = touchGestureRef.current;
+    if (gesture?.type === "swipe" && event.changedTouches.length && zoomScale === 1) {
+      const delta = event.changedTouches[0].clientX - gesture.x;
+      if (Math.abs(delta) > 55) onStep(delta > 0 ? -1 : 1);
+    }
+    touchGestureRef.current = null;
+  };
+
   return (
     <div role="dialog" aria-modal="true" aria-label="Product image viewer" className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
       <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close"><X size={20} /></button>
       <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Previous"><ChevronLeft size={20} /></button>
-      <img src={images[index]} alt="" className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+      <img
+        src={images[index]}
+        alt=""
+        className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg"
+        style={{ transform: `scale(${zoomScale})`, touchAction: "none" }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
       <button type="button" onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Next"><ChevronRight size={20} /></button>
       <span className="absolute bottom-4 text-white/60 text-xs font-medium">{index + 1} / {images.length}</span>
     </div>
@@ -463,38 +740,39 @@ function ProductDetailContent({ params }) {
   const activeHasDiscount = isDealMode ? (dealOriginalPrice > dealPrice) : regularHasDiscount;
   const discountPct = activeHasDiscount && activeOriginalPrice > 0 ? Math.round(((activeOriginalPrice - activePrice) / activeOriginalPrice) * 100) : 0;
 
+  const selectedDealInfo = useMemo(() => {
+    if (!isDealMode || !matchedDeal) return null;
+    return {
+      dealId: matchedDeal._id,
+      dealType: matchedDeal.type,
+      dealName: matchedDeal.name,
+      dealBadge: getDealBadgeText(matchedDeal) || null,
+      savings: dealDisc?.hasDiscount ? dealDisc.originalPrice - dealDisc.discountedPrice : 0,
+      originalPrice: Number(dealDisc?.originalPrice) || variantPrice,
+      dealDiscountValue: Number(matchedDeal.discountValue) || 0,
+      minQuantity: Number(matchedDeal.minQuantity) || 1,
+      ...(matchedDeal.type === "buy_x_get_y"
+        ? {
+            buyQuantity: Number(matchedDeal.buyQuantity) || 0,
+            getQuantity: Number(matchedDeal.getQuantity) || 0,
+          }
+        : {}),
+    };
+  }, [isDealMode, matchedDeal, dealDisc, variantPrice]);
+
   const countdown = useCountdown(isDealMode ? matchedDeal?.endDate : null);
 
   const handleAdd = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? {
-      dealId: matchedDeal?._id,
-      dealType: matchedDeal?.type,
-      dealName: matchedDeal?.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
-    } : null);
+    addToCart(product, currentVariant, quantity, selectedDealInfo);
     trigger();
-  }, [stock, product, currentVariant, quantity, addToCart, trigger, isDealMode, matchedDeal]);
+  }, [stock, product, currentVariant, quantity, addToCart, trigger, selectedDealInfo]);
 
   const handleBuy = useCallback(() => {
     if (stock < 1 || !product) return;
-    addToCart(product, currentVariant, quantity, isDealMode ? {
-      dealId: matchedDeal?._id,
-      dealType: matchedDeal?.type,
-      dealName: matchedDeal?.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
-    } : null);
+    addToCart(product, currentVariant, quantity, selectedDealInfo);
     setIsCartOpen(true);
-  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, isDealMode, matchedDeal]);
-
-  const handleShare = useCallback(() => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.share) {
-      navigator.share({ title: product?.name || "Product", url }).catch(() => {});
-    } else if (navigator.clipboard && url) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
-  }, [product]);
+  }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, selectedDealInfo]);
 
   const categoryId = extractId(product?.category_id);
   const categoryName = extractName(product?.category_id);
@@ -505,6 +783,14 @@ function ProductDetailContent({ params }) {
   const shortDescription = product?.short_description || "";
   const specEntries = attrEntries(currentVariant?.attributes);
   const variantAttrName = specEntries.length > 0 ? specEntries[0][0] : (variants.length > 1 ? "Option" : "");
+  const expiryDuration = Number(product?.expiryDuration);
+  const expiryUnit = String(product?.expiryUnit || "").toLowerCase();
+  const expiryUnitName = { days: "Day", months: "Month", years: "Year" }[expiryUnit] || "";
+  const expiryUnitLabel = expiryUnitName ? `${expiryUnitName}${expiryDuration === 1 ? "" : "s"}` : "";
+  const showExpiryInfo = product?.isPerishable === true
+    && Number.isFinite(expiryDuration)
+    && expiryDuration > 0
+    && !!expiryUnitLabel;
 
   const related = useRelatedProducts(product, categoryId);
   const productId = product?._id || product?.id;
@@ -525,6 +811,9 @@ function ProductDetailContent({ params }) {
   });
   const summary = publicReviewData?.summary || { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
   const publicReviews = publicReviewData?.reviews || [];
+  const reviewsToDisplay = myReview?._id
+    ? publicReviews.filter((review) => String(review._id) !== String(myReview._id))
+    : publicReviews;
   const ratingAvg = Number(summary.avg) || 0;
   const ratingCount = Number(summary.count) || 0;
 
@@ -573,7 +862,7 @@ function ProductDetailContent({ params }) {
 
                 <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{product.name}</h1>
 
-                {/* Rating + share/wishlist */}
+                {/* Rating + wishlist */}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Stars value={ratingAvg} />
@@ -585,9 +874,6 @@ function ProductDetailContent({ params }) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
-                    <button type="button" onClick={handleShare} aria-label="Share this product" className="hover:text-[var(--user-accent)] transition-colors">
-                      <Share2 size={17} />
-                    </button>
                     <button
                       type="button"
                       onClick={() => productId && toggleWishlist(productId)}
@@ -752,6 +1038,37 @@ function ProductDetailContent({ params }) {
                   </div>
                 )}
 
+                {showExpiryInfo && (
+                  <div
+                    className="mt-3 rounded-xl border p-3.5 sm:p-4"
+                    style={{
+                      backgroundColor: "color-mix(in srgb, var(--user-accent) 8%, var(--user-bg-card))",
+                      borderColor: "color-mix(in srgb, var(--user-accent) 24%, var(--user-border))",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                        style={{
+                          backgroundColor: "color-mix(in srgb, var(--user-accent) 14%, transparent)",
+                          color: "var(--user-accent)",
+                        }}
+                      >
+                        <Clock3 size={17} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-[var(--user-text)]">Perishable Product</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--user-text)]">
+                          Valid for {expiryDuration} {expiryUnitLabel} after delivery
+                        </p>
+                        <p className="mt-1 text-[11px] leading-4 text-[var(--user-text-muted)]">
+                          Please consume or use before the validity period ends.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Quantity — real stock */}
                 <div className="mt-4 flex items-center gap-4">
                   <span className="text-xs text-[var(--user-text-muted)]">Quantity</span>
@@ -774,9 +1091,9 @@ function ProductDetailContent({ params }) {
                       <Plus size={13} />
                     </button>
                   </div>
-                  <span className={`text-xs ${stock > 0 ? "text-[var(--user-text-muted)]" : "text-[var(--user-accent)] font-semibold"}`}>
-                    {stock > 0 ? `${stock} in stock` : "Out of stock"}
-                  </span>
+                  {stock < 1 ? (
+                    <span className="text-xs font-semibold text-[var(--user-accent)]">Out of stock</span>
+                  ) : null}
                 </div>
 
                 {/* CTA — Daraz cyan/orange */}
@@ -921,21 +1238,37 @@ function ProductDetailContent({ params }) {
                 <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
               </div>
             )}
-            {publicReviews.length > 0 ? (
-              <ul className="space-y-4">
-                {publicReviews.map((r) => (
-                  <li key={r._id} className="border-b border-[var(--user-border)] pb-4 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <Stars value={r.rating} />
-                      <span className="text-xs font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--user-text-muted)]">
-                      by {r.user_id?.name || "Verified buyer"}
-                      {r.created_at ? ` · ${new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
-                    </p>
-                    {r.comment && <p className="mt-1.5 text-sm leading-6 text-[var(--user-text-secondary)]">{r.comment}</p>}
-                  </li>
-                ))}
+            {reviewsToDisplay.length > 0 ? (
+              <ul className="divide-y divide-[var(--user-border)]">
+                {reviewsToDisplay.map((r) => {
+                  const reviewerName = r.user_id?.name || "Customer";
+                  const reviewDate = r.created_at
+                    ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    : "";
+                  return (
+                    <li key={r._id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3">
+                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text-secondary)] ring-1 ring-[var(--user-border)]">
+                          {reviewerName.trim().charAt(0).toUpperCase() || "C"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="text-sm font-semibold text-[var(--user-text)]">{reviewerName}</p>
+                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={12} strokeWidth={2.5} /> Verified buyer</span>}
+                            </div>
+                            {reviewDate && <time className="text-xs text-[var(--user-text-muted)]">{reviewDate}</time>}
+                          </div>
+                          <div className="mt-2"><Stars value={r.rating} size={15} /></div>
+                          <p className="mt-1.5 text-base font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</p>
+                          {r.comment && <div className="mt-1"><ReviewComment comment={r.comment} /></div>}
+                          {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
+                          {r.storeResponse?.message && <div className="mt-3"><StoreResponse response={r.storeResponse} /></div>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : !myReview ? (
               <div className="py-6 text-center">
@@ -945,6 +1278,18 @@ function ProductDetailContent({ params }) {
             ) : null}
           </div>
         </section>
+
+        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
+        {allImages.length > 0 && (
+          <section className="mt-3 bg-[var(--user-bg-card)]">
+            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+              Product images of {product.name}
+            </h2>
+            <div className="px-3 sm:px-4 py-4">
+              <DetailImages productName={product.name} images={allImages} onZoom={openLightbox} />
+            </div>
+          </section>
+        )}
 
         {/* ===== You may also like — real related ===== */}
         {related.length > 0 && (

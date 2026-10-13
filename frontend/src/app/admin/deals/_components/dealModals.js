@@ -715,9 +715,11 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                     <div className={`transition-all duration-200 ${!formData.has_min_quantity ? "opacity-40 grayscale pointer-events-none" : "opacity-100"}`}>
                       <TextInput
                         type="number"
+                        min="1"
+                        step="1"
                         value={formData.min_quantity}
                         onChange={(v) => setFormData({ ...formData, min_quantity: v })}
-                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"}
+                        placeholder={formData.has_min_quantity ? "e.g., 3" : "Disabled"}
                         disabled={!formData.has_min_quantity}
                         style={{
                           ...inputStyle,

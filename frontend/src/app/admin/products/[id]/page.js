@@ -19,6 +19,7 @@ import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { tagApi } from "@/apis/admin/tagApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
+import VariantForm from "@/components/admin/VariantForm";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -27,10 +28,12 @@ const getImageUrl = (url) => {
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) return url;
   return `${API_ORIGIN}${url}`;
 };
+const formatMoney = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
 
 const createEmptyVariant = (sku = "") => ({
   _id: null, sku, title: "", description: "",
   cost_price: "", selling_price: "", quantity: "0",
+  topup: "0",
   attributes: [{ name: "Color", value: "Black", isCustom: false }],
   images: [],
   tags: [],
@@ -402,6 +405,7 @@ const ACTIVITY_TYPES = {
   "product-updated": { group: "product", label: "Product Updated", icon: Pencil, bg: "var(--info-soft)", fg: "var(--info)", avatar: "blue" },
   "variant-created": { group: "variant", label: "Variant Created", icon: Layers3, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
   "variant-updated": { group: "variant", label: "Variant Updated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
+  "purchase-order-received": { group: "purchase-order", label: "Purchase Order Received", icon: Package, bg: "var(--info-soft)", fg: "var(--info)", avatar: "emerald" },
 };
 
 const activityMetaOf = (type) => ACTIVITY_TYPES[type] || ACTIVITY_TYPES["product-updated"];
@@ -607,7 +611,6 @@ function DetailStat({ label, value, sub, subColor, dotColor, color }) {
 
 function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
   const [previewImage, setPreviewImage] = useState(null);
-  const [copiedSku, setCopiedSku] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const panelRef = useRef(null);
 
@@ -658,14 +661,14 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   const attributes = Object.entries(variant.attributes || {})
     .map(([name, raw]) => ({ name, value: attrValueOf(raw) }))
     .filter((attribute) => attribute.value);
-  const createdBy = variant.createdby && typeof variant.createdby === "object" ? variant.createdby : null;
-  const updatedBy = variant.updatedby && typeof variant.updatedby === "object" ? variant.updatedby : null;
+  const createdBy = actorInfo(variant.createdby).known ? variant.createdby : null;
+  const updatedBy = actorInfo(variant.updatedby).known ? variant.updatedby : null;
   const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
   // "Updated By" card sirf tab dikhta hai jab variant waqai update hua ho —
   // warna creation timestamp hi update lagta hai (jaisa seed data mein hota hai).
   const auditEntries = [
     { label: "Created By", user: createdBy, date: variant.created_at, color: "emerald" },
-    ...(hasRealUpdate(variant.created_at, variant.updated_at)
+    ...(updatedBy && hasRealUpdate(variant.created_at, variant.updated_at)
       ? [{ label: "Updated By", user: updatedBy, date: variant.updated_at, color: "blue" }]
       : []),
   ];
@@ -680,24 +683,15 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   // ---- Summary tiles ke numbers ----
   const costPrice = Number(variant.cost_price || 0);
   const sellingPrice = Number(variant.selling_price || 0);
+  const expiryAfterDelivery = Math.max(0, Number(variant.expiry_after_delivery) || 0);
+  const expiryAfterDeliveryUnit = ["days", "months", "years"].includes(variant.expiry_after_delivery_unit)
+    ? variant.expiry_after_delivery_unit
+    : "days";
 
   const sku = variant.sku || "";
   const description = variant.description || "";
   const hasLongDescription = description.length > 140;
   const primaryImage = images[0];
-
-  // SKU copy — clipboard se ek click mein
-  const copySku = async () => {
-    if (!sku) return;
-    try {
-      await navigator.clipboard.writeText(sku);
-      setCopiedSku(true);
-      setTimeout(() => setCopiedSku(false), 1800);
-      toast.success("SKU copied to clipboard");
-    } catch {
-      toast.error("Could not copy SKU");
-    }
-  };
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end" role="dialog" aria-modal="true" aria-labelledby="variant-drawer-title">
@@ -730,7 +724,7 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
 
         {/* BODY */}
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5">
-          {/* HERO — identity: image · title · status · SKU (copy) · description */}
+          {/* HERO — identity: image · title · status · SKU · description */}
           <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 flex items-start gap-3.5">
               {primaryImage ? (
                 <button type="button" onClick={() => setPreviewImage(0)} aria-label="Open image preview" className="group relative w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
@@ -754,16 +748,11 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
                   <StatusBadge active={isActive} />
                 </div>
 
-                {/* SKU + one-click copy */}
+                {/* SKU */}
                 <div className="mt-2 flex items-center gap-1.5">
                   <span className="inline-flex min-w-0 items-center rounded-md px-2 py-1 text-[10.5px] font-mono" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
                     <span className="truncate">{sku ? `SKU: ${sku}` : "No SKU"}</span>
                   </span>
-                  {sku && (
-                    <button type="button" onClick={copySku} title="Copy SKU" aria-label="Copy variant SKU" className="inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-md transition hover:brightness-110" style={{ backgroundColor: copiedSku ? "var(--success-soft)" : "var(--accent-soft)", color: copiedSku ? "var(--success)" : "var(--accent)", border: `1px solid color-mix(in srgb, ${copiedSku ? "var(--success)" : "var(--accent)"} 28%, transparent)` }}>
-                      {copiedSku ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    </button>
-                  )}
                 </div>
 
                 {description ? (
@@ -810,6 +799,14 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
                 ))}
               </div>
             )}
+          </DrawerSection>
+
+          <DrawerSection title="Expiry After Delivery" delay={150}>
+            <DetailStat
+              label="Usable duration after delivery"
+              value={expiryAfterDelivery > 0 ? `${expiryAfterDelivery} ${expiryAfterDeliveryUnit}` : "Not set"}
+              sub={expiryAfterDelivery > 0 ? "Variant expiry setting" : "No expiry duration configured"}
+            />
           </DrawerSection>
 
           {/* INVENTORY — sirf quantity (min/max qty UI mein nahi) */}
@@ -1568,6 +1565,7 @@ export default function ProductDetailPage() {
         _id: v._id || undefined, sku: finalSku, title: v.title.trim(), description: v.description,
         cost_price: Number(v.cost_price || 0), selling_price: Number(v.selling_price || 0),
         quantity: Number(v.quantity || 0),
+        topup: Number(v.topup || 0),
         attributes, existing_images: existingImages, tags: v.tags || [],
       };
     });
@@ -1736,6 +1734,7 @@ export default function ProductDetailPage() {
   // did not happen:
   //   • Product  → created_at / updated_at  (+ createdby / updatedby)
   //   • Variant  → created_at / updated_at  (+ createdby / updatedby)
+  //   • PO       → persisted receiving entries returned by product detail API
   // The backend only bumps those stamps when isModified() is true, so untouched
   // records produce no event. Tag documents are intentionally not treated as
   // product activity — a tag's own timestamps belong to the shared tag library.
@@ -1799,6 +1798,45 @@ export default function ProductDetailPage() {
       }
     });
 
+    /* ---------------- Purchase orders ---------------- */
+    (product.purchaseOrderHistory || []).forEach((receiving, receivingIndex) => {
+      const receivedItems = receiving.items || [];
+      const details = receivedItems.map((item) => {
+        const expiryDuration = Math.max(0, Number(item.expiry_after_delivery) || 0);
+        const expiryUnit = ["days", "months", "years"].includes(item.expiry_after_delivery_unit)
+          ? item.expiry_after_delivery_unit
+          : "days";
+        return `${item.name || item.sku || "Variant"}: ${item.qty} received, cost ${formatMoney(item.cost_price)}, sell ${formatMoney(item.sell_price)}, expiry after delivery ${expiryDuration > 0 ? `${expiryDuration} ${expiryUnit}` : "not set"}`;
+      });
+      const firstItem = receivedItems[0];
+      const subject = [
+        { label: "PO", value: receiving.po_number || "—", mono: true },
+        ...(receivedItems.length === 1
+          ? [
+              { label: "Variant", value: firstItem.name || firstItem.sku || "Variant" },
+              { label: "Qty Received", value: String(firstItem.qty) },
+              { label: "Cost Price", value: formatMoney(firstItem.cost_price) },
+              { label: "Sell Price", value: formatMoney(firstItem.sell_price) },
+              {
+                label: "Expiry After Delivery",
+                value: Number(firstItem.expiry_after_delivery) > 0
+                  ? `${firstItem.expiry_after_delivery} ${firstItem.expiry_after_delivery_unit || "days"}`
+                  : "Not set",
+              },
+            ]
+          : [{ label: "Received Variants", value: String(receivedItems.length) }]),
+        ...(receiving.invoice_no ? [{ label: "Invoice", value: receiving.invoice_no, mono: true }] : []),
+      ];
+      push({
+        key: `purchase-order-received-${receiving.po_number || "po"}-${receivingIndex}`,
+        type: "purchase-order-received",
+        actor: receiving.received_by_name || null,
+        description: `PO ${receiving.po_number || ""} received: ${details.join("; ")}`,
+        date: receiving.received_at,
+        subject,
+      });
+    });
+
     /* ---------------- Live socket overlay (deduped against DB entries) ---------------- */
     // The refetched document and the socket broadcast describe the same save with
     // the same millisecond, so an exact stamp match drops only true duplicates.
@@ -1844,6 +1882,7 @@ export default function ProductDetailPage() {
   const productEventCount = activityTimeline.filter((e) => e.group === "product").length;
   const variantCreateCount = activityTimeline.filter((e) => e.type === "variant-created").length;
   const variantUpdateCount = activityTimeline.filter((e) => e.type === "variant-updated").length;
+  const purchaseOrderReceiveCount = activityTimeline.filter((e) => e.type === "purchase-order-received").length;
   // Entries the backend never attributed to a user. Surfaced so the empty actor
   // rows are explained instead of looking like a rendering fault.
   const unattributedCount = activityTimeline.filter((e) => !actorInfo(e.actor).known).length;
@@ -1861,12 +1900,14 @@ export default function ProductDetailPage() {
     { id: "product-events", label: "Product Changes", icon: Package, soft: "var(--success-soft)", color: "var(--success)", value: productEventCount, hint: "Created & later edited" },
     { id: "variants-added", label: "Variants Added", icon: Layers3, soft: "var(--purple-soft)", color: "var(--purple)", value: variantCreateCount, hint: "Recorded variant creations" },
     { id: "variant-updates", label: "Variants Edited", icon: Pencil, soft: "var(--warning-soft)", color: "var(--warning)", value: variantUpdateCount, hint: "Recorded variant edits" },
+    { id: "po-receivings", label: "PO Receivings", icon: Package, soft: "var(--info-soft)", color: "var(--info)", value: purchaseOrderReceiveCount, hint: "Received purchase orders" },
   ];
 
   const activityFilters = [
     { id: "all", label: "All Activity", count: activityTimeline.length },
     { id: "product", label: "Product", count: productEventCount },
     { id: "variant", label: "Variants", count: variantCreateCount + variantUpdateCount },
+    { id: "purchase-order", label: "Purchase Orders", count: purchaseOrderReceiveCount },
   ];
 
   // Helper to open gallery
@@ -2473,6 +2514,52 @@ export default function ProductDetailPage() {
                       </div>
                     </div>
 
+                    {/* Perishable Information */}
+                    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Perishable Info</h3>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${product.isPerishable ? 'bg-amber-500/10' : 'bg-gray-500/10'}`}>
+                            <Clock className={`w-5 h-5 ${product.isPerishable ? 'text-amber-500' : 'text-gray-400'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                product.isPerishable 
+                                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                                  : 'bg-gray-500/10 text-gray-600 border border-gray-500/20'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${product.isPerishable ? 'bg-amber-500' : 'bg-gray-400'}`} />
+                                {product.isPerishable ? 'Perishable' : 'Non-Perishable'}
+                              </span>
+                            </div>
+                            
+                            {product.isPerishable ? (
+                              <div className="space-y-2">
+                                <div>
+                                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Expiry After Delivery</p>
+                                  <p className="text-[14px] font-semibold text-[var(--text-primary)]">
+                                    {product.expiryDuration || 0} {product.expiryUnit || 'days'}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg p-2.5 bg-amber-500/5 border border-amber-500/10">
+                                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                                    <span className="font-semibold">Note:</span> This product expires {product.expiryDuration || 0} {product.expiryUnit || 'days'} after delivery to the customer.
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
+                                This product does not have an expiry date after delivery.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Created By */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                       <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
@@ -2688,7 +2775,7 @@ export default function ProductDetailPage() {
               }>
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                     {activitySummary.map((stat) => {
                       const StatIcon = stat.icon;
                       return (
@@ -2755,7 +2842,7 @@ export default function ProductDetailPage() {
                       </h4>
                       <p className="text-[11px] mt-1 max-w-sm" style={{ color: "var(--text-muted)" }}>
                         {activityTimeline.length === 0
-                          ? "This product has only its original creation entry. Every edit you save from now on is listed here."
+                          ? "No product, variant, or received purchase-order activity has been recorded yet."
                           : "No recorded changes match the selected filter. Try “All Activity” to see everything."}
                       </p>
                     </div>
@@ -3068,8 +3155,9 @@ export default function ProductDetailPage() {
 
                               <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Pricing & Stock</p>
-                                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                                   {[{ l: "Cost Price *", f: "cost_price", p: "1000" }, { l: "Selling Price *", f: "selling_price", p: "1500" },
+                                  { l: "Topup", f: "topup", p: "0" },
                                   { l: "Quantity (whole units)", f: "quantity", p: "50" }
                                   ].map(({ l, f, p }) => (
                                     <div key={f}>

@@ -64,8 +64,8 @@ function BrandRow({ brand, items }) {
   return (
     <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4">
       {/* Brand header */}
-      <div className="mb-3 flex items-center gap-2.5">
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+      <div className="mb-3 flex items-center gap-3">
+        <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
           {logo ? (
             <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
           ) : (
@@ -75,16 +75,16 @@ function BrandRow({ brand, items }) {
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[0.8125rem] font-black capitalize text-[var(--user-text)]">
+          <p title={brand.name} className="truncate text-sm font-medium capitalize text-[var(--user-text)]">
             {brand.name}
           </p>
-          <p className="text-[0.625rem] font-semibold text-[var(--user-text-subtle)]">
+          <p className="text-xs font-normal text-[var(--user-text-muted)]">
             {brand.count} {brand.count === 1 ? "item" : "items"}
           </p>
         </div>
         <Link
           href={`/filtering-product?brand=${brandId}`}
-          className="group inline-flex shrink-0 items-center gap-1 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent)] transition-opacity hover:opacity-80"
+          className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-[var(--user-text-secondary)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
         >
           View all
           <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />

@@ -208,6 +208,10 @@ const dealSchema = new mongoose.Schema(
       type: Number,
       default: 1, // Changed default to 1 for better UX
       min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "Minimum quantity must be a whole number",
+      },
     },
 
    

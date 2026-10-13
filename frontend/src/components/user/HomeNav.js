@@ -43,7 +43,7 @@ const MORE_DROPDOWN_LIMIT = 5;
 const ALL_CATEGORY_LIMIT = 24;
 
 const itemClass = (active) =>
-  `shrink-0 inline-flex items-center h-11 lg:h-12 px-3 lg:px-3.5 text-[0.78125rem] font-semibold whitespace-nowrap border-b-2 transition-colors duration-200 ${
+  `shrink-0 inline-flex items-center h-10 lg:h-11 px-3 py-2 text-sm font-normal whitespace-nowrap border-b-2 transition-colors duration-200 ${
     active
       ? "text-[var(--user-text)] border-[var(--user-accent)]"
       : "text-[var(--user-text-muted)] border-transparent hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)]"
@@ -53,19 +53,11 @@ const itemClass = (active) =>
 function DropdownPanel({ style, panelRef, title, meta, footer, children, onMouseEnter, onMouseLeave }) {
   const panelElementRef = useRef(null);
   const leaveTimerRef = useRef(null);
-  
-  const isMouseOverPanel = (e) => {
-    const panel = panelElementRef.current;
-    if (!panel) return false;
-    // Use elementFromPoint for accurate check including scrollbar
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    return panel.contains(el);
-  };
 
   const handleMouseLeave = (e) => {
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
     leaveTimerRef.current = setTimeout(() => {
-      if (!isMouseOverPanel(e)) {
+      if (!panelElementRef.current?.matches(":hover")) {
         onMouseLeave(e);
       }
     }, 100);
@@ -128,8 +120,15 @@ export default function HomeNav() {
   const activeTab = searchParams?.get("tab");
   const [panel, setPanel] = useState(null);
   const [panelStyle, setPanelStyle] = useState(null);
+  const navScrollRef = useRef(null);
   const moreRef = useRef(null);
   const panelRef = useRef(null);
+  const moreCloseTimerRef = useRef(null);
+  const morePinnedRef = useRef(false);
+
+  useEffect(() => {
+    if (navScrollRef.current) navScrollRef.current.scrollLeft = 0;
+  }, [pathname, activeTab]);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
@@ -173,16 +172,42 @@ export default function HomeNav() {
     const rect = anchor.getBoundingClientRect();
     const width = Math.min(key === "more" ? 288 : 220, window.innerWidth - 24);
     const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
-    setPanelStyle({ left, top: rect.bottom + 6, width });
+    setPanelStyle({ left, top: rect.bottom, width });
   }, []);
 
-  const togglePanel = (key) => {
-    const next = panel === key ? null : key;
-    if (next) positionPanel(next);
-    setPanel(next);
+  const closePanel = useCallback(() => {
+    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+    morePinnedRef.current = false;
+    setPanel(null);
+  }, []);
+
+  const openMorePanel = () => {
+    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+    positionPanel("more");
+    setPanel("more");
   };
 
-  const closePanel = () => setPanel(null);
+  const scheduleMoreClose = () => {
+    if (morePinnedRef.current) return;
+    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+    moreCloseTimerRef.current = setTimeout(() => {
+      if (
+        !moreRef.current?.matches(":hover") &&
+        !panelRef.current?.matches(":hover")
+      ) {
+        closePanel();
+      }
+    }, 150);
+  };
+
+  const toggleMorePanel = () => {
+    if (panel === "more" && morePinnedRef.current) {
+      closePanel();
+      return;
+    }
+    morePinnedRef.current = true;
+    openMorePanel();
+  };
 
   /* Best Offers / New Arrivals: ?tab= URL me set + Featured section tak
      smooth scroll + wahi tab select (event se, taake same-page click par
@@ -229,15 +254,15 @@ export default function HomeNav() {
   useEffect(() => {
     if (!panel) return undefined;
     const reposition = () => positionPanel(panel);
-    const closeOnScroll = () => setPanel(null);
+    const closeOnScroll = closePanel;
     const onDown = (event) => {
       if (panelRef.current?.contains(event.target)) return;
       const anchor = panel === "more" ? moreRef.current : document.querySelector(`[data-panel-id="${panel}"]`);
       if (anchor?.contains(event.target)) return;
-      setPanel(null);
+      closePanel();
     };
     const onKey = (event) => {
-      if (event.key === "Escape") setPanel(null);
+      if (event.key === "Escape") closePanel();
     };
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", closeOnScroll, true);
@@ -249,12 +274,15 @@ export default function HomeNav() {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [panel, positionPanel]);
+  }, [panel, positionPanel, closePanel]);
 
   return (
     <nav aria-label="Primary" className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
-      <div className="w-full max-w-none px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
-        <div className="flex h-11 items-center justify-center gap-0.5 overflow-x-auto scrollbar-hide lg:h-12 lg:gap-1.5">
+      <div className="w-full min-w-0 max-w-full px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
+        <div
+          ref={navScrollRef}
+          className="flex h-10 w-full min-w-0 items-center justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-0.5 lg:h-11 lg:gap-1"
+        >
           {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
           {NAV_LINKS.map((link) => (
             <Link
@@ -280,24 +308,23 @@ export default function HomeNav() {
 
           {/* MORE — only dropdown */}
           <div className="relative shrink-0" ref={moreRef}>
-            <div
+            <button
+              type="button"
+              aria-haspopup="menu"
               aria-expanded={panel === "more"}
-              className={`${itemClass(panel === "more")} gap-1.5`}
-              onMouseEnter={() => togglePanel("more")}
-              onMouseLeave={() => {
-                setTimeout(() => {
-                  if (panel === "more" && !panelRef.current?.matches(":hover")) {
-                    closePanel();
-                  }
-                }, 100);
+              onClick={toggleMorePanel}
+              onMouseEnter={() => {
+                if (!morePinnedRef.current) openMorePanel();
               }}
+              onMouseLeave={scheduleMoreClose}
+              className={`${itemClass(panel === "more")} gap-1.5`}
             >
               More
               <ChevronDown
                 size={14}
                 className={`transition-transform duration-200 ${panel === "more" ? "rotate-180" : ""}`}
               />
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -307,14 +334,10 @@ export default function HomeNav() {
         <DropdownPanel
           panelRef={panelRef}
           style={panelStyle}
-          onMouseEnter={() => {}}
-          onMouseLeave={() => {
-            setTimeout(() => {
-              if (panel === "more" && !moreRef.current?.matches(":hover")) {
-                closePanel();
-              }
-            }, 100);
+          onMouseEnter={() => {
+            if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
           }}
+          onMouseLeave={scheduleMoreClose}
         >
           {hiddenParents.length > 0 ? (
             <>

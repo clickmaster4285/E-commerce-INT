@@ -160,11 +160,14 @@ const getStockOverview = async (req, res) => {
       out: searchOutOfStock,
     };
 
-    const populateProduct = [
-      { path: "product_id", select: "name is_deleted category_id brand_id" },
-      { path: "product_id.category_id", select: "name" },
-      { path: "product_id.brand_id", select: "name logo" },
-    ];
+    const populateProduct = [{
+      path: "product_id",
+      select: "name is_deleted category_id brand_id",
+      populate: [
+        { path: "category_id", select: "name" },
+        { path: "brand_id", select: "name logo" },
+      ],
+    }];
     const variantSelect = "sku title quantity min_qnt max_qnt product_id images";
 
     // ---- LEGACY MODE (no limit) ----

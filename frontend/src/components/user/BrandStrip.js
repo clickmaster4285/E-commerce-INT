@@ -5,11 +5,12 @@
    (brand logo API se, count real products se, kuch hardcoded nahi)
    ========================================================== */
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
+import useScrollFade from "@/hooks/useScrollFade";
 import {
   idOf,
   imageUrl,
@@ -19,6 +20,7 @@ import {
 const LIMIT = 14;
 
 export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = false }) {
+  const stripRef = useRef(null);
   // ✅ Counts server facets se — full catalog nahi
   const list = useMemo(() => {
     const counts = brandCounts || {};
@@ -27,6 +29,8 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
       .filter((brand) => brand.count > 0)
       .slice(0, LIMIT);
   }, [brands, brandCounts]);
+
+  const { fadeClassName } = useScrollFade(stripRef, list.map((brand) => brand._id).join("|"));
 
   if (isLoading && !list.length) return null;
   if (!list.length) return null;
@@ -40,15 +44,18 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
         linkLabel="All brands"
       />
 
-      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+      <div
+        ref={stripRef}
+        className={`scroll-fade-track flex gap-2.5 overflow-x-auto scrollbar-hide ${fadeClassName}`}
+      >
         {list.map((brand) => {
           const logo = imageUrl(brand.logo);
           return (
             <Link
               key={brand._id}
               href={`/filtering-product?brand=${brand._id}`}
-              title={`${brand.name} — ${brand.count} products`}
-              className="group flex w-[7.75rem] shrink-0 flex-col items-center gap-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)]"
+              title={brand.name}
+              className="group flex w-[8.75rem] shrink-0 flex-col items-center gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
             >
               <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
                 {logo ? (
@@ -59,10 +66,10 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
                   </span>
                 )}
               </span>
-              <span className="w-full truncate text-center text-[0.6875rem] font-semibold capitalize text-[var(--user-text-secondary)]">
+              <span className="w-full truncate text-center text-sm font-medium capitalize text-[var(--user-text)]">
                 {brand.name}
               </span>
-              <span className="text-[0.625rem] font-bold text-[var(--user-text-subtle)]">{brand.count} items</span>
+              <span className="text-xs font-normal text-[var(--user-text-muted)]">{brand.count} items</span>
             </Link>
           );
         })}

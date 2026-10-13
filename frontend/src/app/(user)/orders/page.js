@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState, Fragment, useRef, useMemo } from "react";
+import { Suspense, useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { userHttp } from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import {
@@ -78,12 +80,12 @@ const buildQtyBreakdown = (item) => {
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 const STATUS_CONFIG = {
-  pending:    { label: "Pending",    icon: Clock,        color: "text-amber-500",    bg: "bg-amber-500/10",    border: "border-amber-500/30",    textColor: "text-amber-500",    dotColor: "bg-amber-500" },
-  confirmed:  { label: "Confirmed",  icon: CheckCircle2, color: "text-blue-500",     bg: "bg-blue-500/10",     border: "border-blue-500/30",    textColor: "text-blue-500",     dotColor: "bg-blue-500" },
-  processing: { label: "Processing", icon: Package,      color: "text-cyan-500",     bg: "bg-cyan-500/10",     border: "border-cyan-500/30",    textColor: "text-cyan-500",     dotColor: "bg-cyan-500" },
-  shipped:    { label: "Shipped",    icon: Truck,        color: "text-indigo-500",   bg: "bg-indigo-500/10",   border: "border-indigo-500/30",  textColor: "text-indigo-500",   dotColor: "bg-indigo-500" },
-  delivered:  { label: "Delivered",  icon: CheckCircle2, color: "text-emerald-500",  bg: "bg-emerald-500/10",  border: "border-emerald-500/30", textColor: "text-emerald-500",  dotColor: "bg-emerald-500" },
-  cancelled:  { label: "Cancelled",  icon: XCircle,      color: "text-red-500",      bg: "bg-red-500/10",      border: "border-red-500/30",     textColor: "text-red-500",      dotColor: "bg-red-500" },
+  pending:    { label: "Pending",    icon: Clock,        color: "text-[var(--user-warning)]", bg: "bg-[var(--user-warning)]/10", border: "border-transparent", textColor: "text-[var(--user-warning)]", dotColor: "bg-[var(--user-warning)]" },
+  confirmed:  { label: "Confirmed",  icon: CheckCircle2, color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  processing: { label: "Processing", icon: Package,      color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  shipped:    { label: "Shipped",    icon: Truck,        color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  delivered:  { label: "Delivered",  icon: CheckCircle2, color: "text-[var(--user-success)]", bg: "bg-[var(--user-success)]/10", border: "border-transparent", textColor: "text-[var(--user-success)]", dotColor: "bg-[var(--user-success)]" },
+  cancelled:  { label: "Cancelled",  icon: XCircle,      color: "text-[var(--user-danger)]", bg: "bg-[var(--user-danger)]/10", border: "border-transparent", textColor: "text-[var(--user-danger)]", dotColor: "bg-[var(--user-danger)]" },
 };
 
 const PAYMENT_LABEL = {
@@ -122,12 +124,12 @@ const FilterDropdown = ({ icon: Icon, options, value, onChange, buttonClass, wid
               <button
                 key={o.value}
                 onClick={() => { onChange(o.value); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-xs font-semibold transition ${active ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"}`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-xs font-medium transition ${active ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"}`}
               >
                 {OIcon && <OIcon size={14} className={active ? "" : (o.color || "")} />}
                 <span className="flex-1 truncate">{o.label}</span>
                 {o.count !== undefined && (
-                  <span className={`text-[0.625rem] font-black px-1.5 py-0.5 rounded-full ${active ? "bg-[var(--user-accent-text)]/20" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"}`}>{o.count}</span>
+                  <span className={`text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full ${active ? "bg-[var(--user-accent-text)]/20" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"}`}>{o.count}</span>
                 )}
                 {active && <Check size={14} />}
               </button>
@@ -145,9 +147,9 @@ const OrderProgress = ({ status }) => {
   if (status === "cancelled") {
     return (
       <div className="flex items-center gap-3 py-3">
-        <div className="flex-1 h-px bg-red-500/30" />
-        <XCircle size={14} className="text-red-500" />
-        <span className="text-xs font-semibold text-red-500">Cancelled</span>
+        <div className="flex-1 h-px bg-[var(--user-danger)]/30" />
+        <XCircle size={14} className="text-[var(--user-danger)]" />
+        <span className="text-xs font-semibold text-[var(--user-danger)]">Cancelled</span>
       </div>
     );
   }
@@ -162,15 +164,15 @@ const OrderProgress = ({ status }) => {
             <div key={step} className="flex flex-col items-center flex-1 relative">
               <div className={`relative z-10 w-3.5 h-3.5 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                 isPast ? `${cfg.dotColor} border-transparent text-white`
-                : isCurrent ? `${cfg.dotColor} border-transparent text-white ring-4 ring-[var(--user-accent)]/20 scale-110`
+                : isCurrent ? `${cfg.dotColor} border-transparent text-white ring-4 ring-[var(--user-bg-hover)] scale-110`
                 : "bg-[var(--user-bg-card)] border-[var(--user-border)]"
               }`}>
                 {(isPast || isCurrent) && <CheckCircle2 size={10} strokeWidth={3} />}
               </div>
               {index < STATUS_FLOW.length - 1 && (
-                <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
+                <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-text-secondary)]" : "bg-[var(--user-border)]"}`} />
               )}
-              <span className={`mt-2 text-[0.5625rem] font-semibold uppercase tracking-wider whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
+              <span className={`mt-2 text-[0.5625rem] font-medium whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
                 {cfg.label}
               </span>
             </div>
@@ -212,7 +214,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
   return (
     <div className="relative group">
       {showLeftArrow && (
-        <button onClick={() => scroll("left")} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] transition-all">
+        <button onClick={() => scroll("left")} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition-all">
           <ChevronLeft size={16} />
         </button>
       )}
@@ -231,7 +233,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
           const itemReview = rateable && pid ? (reviewsMap && reviewsMap.get(pid)) || null : null;
           return (
                        <div key={index} className="flex-shrink-0 w-44 sm:w-72">
-              <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-accent)]/40 transition-all">
+              <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-border-hover)] transition-all">
                 <div className="flex gap-2 sm:gap-3 mb-1.5 sm:mb-2">
                   <div className="shrink-0">
                     {getImgUrl(item.image) ? (
@@ -242,11 +244,11 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-end items-end text-right">
                     {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
-                    <p className="text-sm sm:text-base font-black text-[var(--user-accent)] truncate">Rs. {totalPrice.toLocaleString()}</p>
+                    <p className="text-sm sm:text-base font-semibold text-[var(--user-text)] truncate">Rs. {totalPrice.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
-                  <p className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
+                  <p className="text-sm font-medium text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
                   {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
                 </div>
                 {/* QTY + free/deal bonus — attached together, inside the card */}
@@ -260,11 +262,11 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                         aria-controls={panelId}
                         aria-label={qtyLabel}
                         title={qtyLabel}
-                        className="inline-flex items-center gap-1 shrink-0 rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-0.5 hover:border-[var(--user-accent)]/60 active:scale-95 transition"
+                        className="inline-flex items-center gap-1 shrink-0 rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-0.5 hover:border-[var(--user-border-hover)] active:scale-95 transition"
                       >
-                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-text)]">Qty: {q.paidQty}</span>
+                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text)]">Qty: {q.paidQty}</span>
                         {q.freeQty > 0 && (
-                          <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-[var(--user-success)]/30 bg-[var(--user-success)]/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-black text-[var(--user-success)]">
+                          <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-[var(--user-success)]/30 bg-[var(--user-success)]/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-success)]">
                             +{q.freeQty} FREE
                           </span>
                         )}
@@ -281,20 +283,20 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                     <div id={panelId} className="mt-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-1.5 space-y-1">
                       <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
                         <span className="font-semibold text-[var(--user-text-muted)]">Paid units</span>
-                        <span className="font-bold text-[var(--user-text)]">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
+                        <span className="font-medium text-[var(--user-text)]">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
                       </div>
                       {q.freeQty > 0 && (
                         <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
                           <span className="font-semibold text-[var(--user-success)]">Free units</span>
-                          <span className="font-black text-[var(--user-success)]">+{q.freeQty}</span>
+                          <span className="font-medium text-[var(--user-success)]">+{q.freeQty}</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem] pt-1 border-t border-dashed border-[var(--user-border)]">
-                        <span className="font-bold text-[var(--user-text)]">Total you receive</span>
-                        <span className="font-black text-[var(--user-text)]">{q.totalQty} unit{q.totalQty > 1 ? "s" : ""}</span>
+                        <span className="font-medium text-[var(--user-text)]">Total you receive</span>
+                        <span className="font-semibold text-[var(--user-text)]">{q.totalQty} unit{q.totalQty > 1 ? "s" : ""}</span>
                       </div>
                       {q.dealTitle && (
-                        <p className="flex items-start gap-1 pt-1 border-t border-dashed border-[var(--user-border)] text-[0.5rem] sm:text-[0.5625rem] font-bold text-[var(--user-accent)]">
+                        <p className="flex items-start gap-1 pt-1 border-t border-dashed border-[var(--user-border)] text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text-secondary)]">
                           <Zap size={9} className="mt-0.5 shrink-0" /> <span className="min-w-0">{q.dealTitle}</span>
                         </p>
                       )}
@@ -316,7 +318,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
         })}
       </div>
       {showRightArrow && (
-        <button onClick={() => scroll("right")} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-xl flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] transition-all">
+        <button onClick={() => scroll("right")} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition-all">
           <ChevronRight size={16} />
         </button>
       )}
@@ -329,15 +331,15 @@ const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => (
   <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
     <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-5" onClick={e => e.stopPropagation()}>
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0"><AlertTriangle size={18} className="text-red-500" /></div>
+        <div className="w-10 h-10 rounded-full bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0"><AlertTriangle size={18} className="text-[var(--user-danger)]" /></div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-[var(--user-text)] leading-snug">Delete "{orderNumber}"?</h3>
+          <h3 className="text-sm font-semibold text-[var(--user-text)] leading-snug">Delete &quot;{orderNumber}&quot;?</h3>
           <p className="text-xs text-[var(--user-text-muted)] mt-1">This action cannot be undone.</p>
         </div>
       </div>
       <div className="flex gap-3 mt-5">
         <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] hover:opacity-80 transition">Cancel</button>
-        <button onClick={onConfirm} disabled={deleting} className="flex-1 h-10 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
+        <button onClick={onConfirm} disabled={deleting} className="flex-1 h-10 rounded-xl bg-[var(--user-danger)] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
           {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete
         </button>
       </div>
@@ -346,15 +348,9 @@ const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => (
 );
 
 const DraftProgress = ({ step }) => (
-  <div className="flex items-center gap-2">
-    {[1, 2, 3].map((s, i) => (
-      <Fragment key={s}>
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${s <= step ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />
-        {i < 2 && <div className={`h-0.5 w-8 rounded-full ${s < step ? "bg-[var(--user-accent)]" : "bg-[var(--user-border)]"}`} />}
-      </Fragment>
-    ))}
-    <span className="text-[0.625rem] font-bold text-[var(--user-accent)] uppercase tracking-wider">Step {step}/3</span>
-  </div>
+  <p className="text-xs text-[var(--user-text-muted)]">
+    Step {step} of 3 · {step >= 3 ? "Payment" : step === 2 ? "Delivery" : "Cart"}
+  </p>
 );
 
 /* ============ PAGINATION CONTROLS COMPONENT ============ */
@@ -374,7 +370,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
           onClick={() => goToPage(page - 1)}
           disabled={page === 1}
           aria-label="Previous page"
-          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={15} />
         </button>
@@ -389,10 +385,10 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
               key={item}
               onClick={() => goToPage(item)}
               aria-current={page === item ? "page" : undefined}
-              className={`h-9 min-w-[2.25rem] px-2 lg:h-10 lg:min-w-[2.5rem] rounded-lg lg:rounded-xl text-[0.6875rem] lg:text-xs font-bold transition ${
+              className={`h-9 min-w-[2.25rem] px-2 lg:h-10 lg:min-w-[2.5rem] rounded-lg lg:rounded-xl text-[0.6875rem] lg:text-xs font-medium transition ${
                 page === item
                   ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border border-[var(--user-accent)]"
-                  : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/60"
+                  : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-border-hover)]"
               }`}
             >
               {item}
@@ -404,7 +400,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
           onClick={() => goToPage(page + 1)}
           disabled={page === totalPages}
           aria-label="Next page"
-          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-accent)]/60 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight size={15} />
         </button>
@@ -514,6 +510,7 @@ function OrdersContent({ compact = false }) {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showAllDrafts, setShowAllDrafts] = useState(false);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -625,8 +622,8 @@ function OrdersContent({ compact = false }) {
   if (isLoading) {
     return (
     <>
-      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
-      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 className="animate-spin text-[var(--user-accent)]" size={28} /></div>
+      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
     </>
     );
   }
@@ -667,53 +664,92 @@ function OrdersContent({ compact = false }) {
     { value: "365", label: "This Year" },
   ];
 
-  const dropdownBtn = "w-full flex items-center gap-2 px-3.5 h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:border-[var(--user-accent)]/50 transition";
+  const dropdownBtn = "w-full flex items-center gap-2 px-3 h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] transition";
 
   const DraftCard = ({ draft }) => {
     const items = draft.items || [];
     const count = items.length || draft.selectedKeys?.length || 0;
     const firstItem = items[0];
     const discountedItems = items.map((i) => {
-      const disc = calculateProductDiscount({ _id: i.productId || i.id, category_id: i.categoryId || null, brand_id: i.brandId || null, discount: i.productDiscountPct || 0 }, i.price, false);
-      return { ...i, displayPrice: disc.discountedPrice, originalPrice: disc.originalPrice, hasDiscount: disc.hasDiscount, savings: disc.savings };
+      const basePrice = Number(i.originalPrice ?? i.regularPrice ?? i.price) || 0;
+      const disc = calculateProductDiscount({ _id: i.productId || i.id, category_id: i.categoryId || null, brand_id: i.brandId || null, discount: i.productDiscountPct || 0 }, basePrice, false);
+      const originalPrice = i.originalPrice != null ? Number(i.originalPrice) : Number(disc.originalPrice ?? basePrice);
+      const displayPrice = i.displayPrice != null ? Number(i.displayPrice) : Number(disc.discountedPrice ?? i.price ?? basePrice);
+      return { ...i, displayPrice, originalPrice };
     });
-    const total = discountedItems.reduce((s, i) => s + (Number(i.displayPrice) || 0) * (Number(i.qty) || 1), 0);
-    const totalSavings = discountedItems.reduce((s, i) => s + (Number(i.savings) || 0) * (Number(i.qty) || 1) + Number(i.deal_savings || 0), 0);
+    const totalSavings = discountedItems.reduce((sum, i) => {
+      const qty = Number(i.qty) || 1;
+      return sum + Math.max(0, (Number(i.originalPrice) || 0) - (Number(i.displayPrice) || 0)) * qty;
+    }, 0);
+    const displayedSavings = Math.max(totalSavings, Number(draft.discount) || 0);
+    const fallbackSubtotal = discountedItems.reduce((sum, i) => {
+      const qty = Number(i.payableItems) || Number(i.qty) || 1;
+      return sum + (Number(i.originalPrice) || 0) * qty;
+    }, 0);
+    const fallbackDiscount = discountedItems.reduce((sum, i) => {
+      const qty = Number(i.qty) || 1;
+      return sum + Math.max(0, (Number(i.originalPrice) || 0) - (Number(i.displayPrice) || 0)) * qty;
+    }, 0);
+    const fallbackTax = Math.round(discountedItems.reduce((sum, i) => {
+      const qty = Number(i.payableItems) || Number(i.qty) || 1;
+      return sum + (Number(i.displayPrice) || 0) * qty * (Number(i.tax) || 0) / 100;
+    }, 0));
+    const draftSubtotal = draft.subtotal != null ? Number(draft.subtotal) : fallbackSubtotal;
+    const draftDiscount = draft.discount != null ? Number(draft.discount) : fallbackDiscount;
+    const draftShipping = Number(draft.shipping) || 0;
+    const draftTax = draft.tax != null ? Number(draft.tax) : fallbackTax;
+    const total = draft.estimatedTotal != null && Number.isFinite(Number(draft.estimatedTotal))
+      ? Number(draft.estimatedTotal)
+      : Math.round(draftSubtotal + draftShipping + draftTax - draftDiscount);
+    const unavailable =
+      !firstItem ||
+      !firstItem.name ||
+      count > items.length ||
+      items.some((item) =>
+        item.available === false ||
+        item.isAvailable === false ||
+        item.productUnavailable === true ||
+        !(item.productId || item.product_id || item.id || item._id)
+      );
+    const draftDate = draft.updatedAt
+      ? new Date(draft.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : "—";
 
     return (
-      <div className="w-full text-left rounded-2xl border-2 border-[var(--user-accent)] bg-[var(--user-bg-card)] p-4 shadow-sm hover:shadow-md transition-all">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center"><ShoppingBag size={18} className="text-[var(--user-accent)]" /></div>
-            <div>
-              <p className="font-black text-sm text-[var(--user-text)]">DRAFT ORDER</p>
-              <p className="text-[0.625rem] text-[var(--user-text-muted)] flex items-center gap-1 mt-0.5"><Calendar size={10} /> {draft.updatedAt ? new Date(draft.updatedAt).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—"}</p>
-            </div>
-          </div>
-          <DraftProgress step={draft.step} />
+      <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 transition-colors hover:border-[var(--user-border-hover)]">
+        <div className="mb-3 flex justify-end gap-2">
+          {unavailable && <span className="rounded-full bg-[var(--user-bg-hover)] px-2.5 py-1 text-xs text-[var(--user-text-muted)]">Item unavailable</span>}
+          <span className="text-xs text-[var(--user-text-muted)]">{draftDate}</span>
         </div>
-        {firstItem && (
-          <div className="flex gap-3 mb-4 p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)]">
-            {getImgUrl(firstItem.image) ? (
-              <img src={getImgUrl(firstItem.image)} alt={firstItem.name} className="w-16 h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {getImgUrl(firstItem?.image) ? (
+              <Image src={getImgUrl(firstItem.image)} alt={firstItem.name || "Draft product"} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
             ) : (
-              <div className="w-16 h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
             )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{firstItem.name}</p>
-              <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-1">Qty: {firstItem.qty} {count > 1 && `• +${count - 1} more items`}</p>
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-sm font-medium text-[var(--user-text)]">{firstItem?.name || "Saved checkout"}</p>
+              <p className="mt-0.5 text-xs text-[var(--user-text-muted)]">
+                Qty {Number(firstItem?.qty) || 1}{count > 1 ? ` · +${count - 1} more ${count - 1 === 1 ? "item" : "items"}` : ""}
+              </p>
+              <DraftProgress step={draft.step || 1} />
             </div>
           </div>
-        )}
-        <div className="flex items-center justify-between pt-3 border-t border-[var(--user-border)]">
-          <div>
-            <p className="text-xs text-[var(--user-text-muted)]">Estimated Total</p>
-            <p className="text-lg font-black text-[var(--user-accent)]">Rs. {total.toLocaleString()}</p>
-            {totalSavings > 0 && <p className="text-[0.625rem] text-[var(--user-success)] font-semibold mt-0.5 flex items-center gap-1"><Tag size={10} /> You save Rs. {totalSavings.toLocaleString()}</p>}
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => resumeDraft(draft._id)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold hover:opacity-90 transition"><Play size={12} /> Resume</button>
-            <button onClick={() => deleteDraft(draft._id, items)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--user-danger)]/30 text-[var(--user-danger)] text-xs font-bold hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={12} /> Delete</button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3 sm:border-0 sm:pt-0">
+            <div className="min-w-0">
+              <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Total</p>
+              {total > 0 ? (
+                <p className="text-base font-semibold text-[var(--user-text)]">Rs. {total.toLocaleString()}</p>
+              ) : (
+                <p className="text-sm text-[var(--user-text-muted)]">Calculated at checkout</p>
+              )}
+              {displayedSavings > 0 && <p className="mt-0.5 text-xs text-[var(--user-success)]">You save Rs. {displayedSavings.toLocaleString()}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => resumeDraft(draft._id)} disabled={unavailable} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Play size={13} /> Resume</button>
+              <button type="button" onClick={() => deleteDraft(draft._id, items)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[var(--user-text-muted)] transition hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)]"><Trash2 size={14} /> Delete</button>
+            </div>
           </div>
         </div>
       </div>
@@ -722,17 +758,17 @@ function OrdersContent({ compact = false }) {
 
   return (
     <>
-    {/* ============= DESKTOP — UNCHANGED ============= */}
+    {/* ============= DESKTOP ============= */}
     <div className="hidden lg:block">
     <main className={compact ? "" : "max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10"}>
       {/* HEADER — account tab (compact) me account ka apna header hota hai */}
       {!compact && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-[var(--user-text)]">My Orders</h1>
-          <p className="text-sm text-[var(--user-text-muted)] mt-1">{isDraftFilter ? allOrders.length : (totalOrders || 0)} total orders · {activeCount} active</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--user-text)]">My Orders</h1>
+          <p className="mt-1 text-sm text-[var(--user-text-muted)]">{isDraftFilter ? allOrders.length : (totalOrders || 0)} orders</p>
         </div>
-        <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--user-accent)] hover:opacity-80 transition">
+        <Link href="/" className="inline-flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-3 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
           <ShoppingBag size={16} /> Continue Shopping
         </Link>
       </div>
@@ -740,16 +776,17 @@ function OrdersContent({ compact = false }) {
 
       {/* TOOLBAR (Search + Dropdowns) */}
       {(totalOrders > 0 || hasDrafts) && (
-        <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4 mb-6 shadow-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto] gap-3">
+        <>
+        <div className="mb-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(140px,auto))]">
             {/* SEARCH */}
-            <div className="relative sm:col-span-2 lg:col-span-1">
+            <div className="relative col-span-2 lg:col-span-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] pointer-events-none" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by order # or product..."
-                className="w-full h-11 pl-10 pr-9 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/20 transition"
+                className="w-full h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-10 pr-9 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-border-hover)] transition"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition"><X size={14} /></button>
@@ -766,45 +803,48 @@ function OrdersContent({ compact = false }) {
             <FilterDropdown icon={Calendar} options={timeOptions} value={timeRange} onChange={setTimeRange} buttonClass={dropdownBtn} width="w-44" />
           </div>
 
-          {/* RESULT COUNT + CLEAR */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--user-border)]">
-            <p className="text-[0.6875rem] font-semibold text-[var(--user-text-muted)]">
-              Showing <span className="font-black text-[var(--user-text)]">{isDraftFilter ? drafts.length : (pagination.total || orders.length)}</span> of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders
-            </p>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="flex items-center gap-1 text-[0.6875rem] font-bold text-[var(--user-accent)] hover:opacity-80 transition">
-                <X size={12} /> Clear all filters
-              </button>
-            )}
-          </div>
         </div>
+        <div className="mb-6 flex items-center justify-between gap-3 px-1 text-xs text-[var(--user-text-muted)]">
+          <p>Showing {isDraftFilter ? drafts.length : (pagination.total || orders.length)} of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders</p>
+          {hasActiveFilters && <button onClick={clearFilters} className="inline-flex items-center gap-1 font-medium hover:text-[var(--user-text)]"><X size={12} /> Clear filters</button>}
+        </div>
+        </>
       )}
 
       {/* DRAFTS */}
       {hasDrafts && (filter === "all" || filter === "draft") && (
-        <div className="space-y-4 mb-6">
-          <h2 className="text-sm font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-3">Saved Drafts</h2>
-          {drafts.map((draft) => <DraftCard key={draft._id} draft={draft} />)}
+        <div className="mb-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-[var(--user-text)]">Saved drafts</h2>
+            <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
+          </div>
+          {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
+          {drafts.length > 2 && (
+            <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
+              {showAllDrafts ? "Show fewer drafts" : `Show all drafts (${drafts.length})`}
+            </button>
+          )}
         </div>
       )}
 
       {/* EMPTY */}
-      {filter !== "draft" && orders.length === 0 && !(filter === "all" && hasDrafts) && (
+      {(filter !== "draft" || !hasDrafts) && orders.length === 0 && !(filter === "all" && hasDrafts) && (
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 text-center">
           <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4"><ShoppingBag size={28} className="text-[var(--user-text-subtle)]" /></div>
-          <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">{(totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}</h2>
-          <p className="text-sm text-[var(--user-text-muted)] mb-5">{(totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your search or filters."}</p>
+          <h2 className="text-base font-semibold text-[var(--user-text)] mb-2">{filter === "draft" ? "No saved drafts" : (totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}</h2>
+          <p className="text-sm text-[var(--user-text-muted)] mb-5">{filter === "draft" ? "Saved checkout drafts will appear here." : (totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your search or filters."}</p>
           {hasActiveFilters ? (
-            <button onClick={clearFilters} className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">Clear Filters</button>
+            <button onClick={clearFilters} className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Clear Filters</button>
           ) : (
-            <Link href="/" className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition">Shop Now</Link>
+            <Link href="/" className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Start shopping</Link>
           )}
         </div>
       )}
 
       {/* ORDERS LIST */}
       {filter !== "draft" && orders.length > 0 && (
-        <div className={`space-y-4 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+        <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+          <h2 className="text-sm font-semibold text-[var(--user-text)]">Orders</h2>
           {orders.map((order) => {
             const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const StatusIcon = cfg.icon;
@@ -820,36 +860,36 @@ function OrdersContent({ compact = false }) {
             }, 0);
 
             return (
-              <div key={order._id} className="group rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden hover:shadow-xl hover:border-[var(--user-accent)]/30 transition-all duration-300">
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 border-b border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 px-5 py-3">
-                  <div className="sm:col-span-3">
-                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Order Number</p>
-                    <p className="text-sm font-black text-[var(--user-accent)] font-mono">{order.order_number}</p>
+              <div key={order._id} className="group rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 transition-colors hover:border-[var(--user-border-hover)] sm:p-5">
+                <div className="grid grid-cols-2 gap-3 border-b border-[var(--user-border)] pb-3 sm:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Order number</p>
+                    <p className="text-sm font-medium text-[var(--user-text)] font-mono">{order.order_number}</p>
                   </div>
-                  <div className="sm:col-span-3">
-                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Placed On</p>
-                    <p className="text-sm font-semibold text-[var(--user-text)] flex items-center gap-1.5"><Calendar size={12} className="text-[var(--user-text-subtle)]" /> {date}</p>
+                  <div>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Placed on</p>
+                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><Calendar size={12} className="text-[var(--user-text-subtle)]" /> {date}</p>
                   </div>
-                  <div className="sm:col-span-3">
-                    <p className="text-[0.5625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider mb-0.5">Payment</p>
-                    <p className="text-sm font-semibold text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {pay.label}</p>
+                  <div>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Payment</p>
+                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {pay.label}</p>
                   </div>
-                  <div className="sm:col-span-3 flex sm:justify-end">
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.border}`}>
+                  <div className="flex sm:justify-end">
+                    <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 ${cfg.bg}`}>
                       <StatusIcon size={12} className={cfg.color} />
-                      <span className={`text-[0.625rem] font-bold uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
+                      <span className={`text-xs font-medium ${cfg.textColor}`}>{cfg.label}</span>
                     </div>
                   </div>
                 </div>
 
-                               <div className="p-4">
+                <div className="py-4">
                   {order.status === "cancelled" && (
                     <div className="mb-3 flex items-start gap-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-3">
                       <XCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="text-xs font-black text-[var(--user-danger)] uppercase tracking-wider">Order Cancelled</p>
+                        <p className="text-xs font-semibold text-[var(--user-danger)]">Order Cancelled</p>
                         <p className="text-xs text-[var(--user-text)] mt-1 leading-relaxed">
-                          <span className="font-bold text-[var(--user-danger)]">Reason:</span> {order.cancel_reason || "No reason provided."}
+                          <span className="font-medium text-[var(--user-danger)]">Reason:</span> {order.cancel_reason || "No reason provided."}
                         </p>
                       </div>
                     </div>
@@ -862,25 +902,25 @@ function OrdersContent({ compact = false }) {
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] bg-[var(--user-bg-hover)]/30 px-5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3">
                   <div>
                     <p className="text-[0.625rem] text-[var(--user-text-muted)] font-medium mb-0.5">Order Total</p>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-xl font-black text-[var(--user-text)]">Rs. {order.total.toLocaleString()}</p>
+                      <p className="text-base font-semibold text-[var(--user-text)]">Rs. {order.total.toLocaleString()}</p>
                       {orderTotalSavings > 0 && (
-                        <span className="text-[0.625rem] font-bold text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> Saved Rs. {orderTotalSavings.toLocaleString()}</span>
+                        <span className="text-[0.625rem] font-medium text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> Saved Rs. {orderTotalSavings.toLocaleString()}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {order.status === "shipped" && (
-                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] transition"><Navigation size={13} /> Track</button>
+                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] hover:border-[var(--user-border-hover)] transition"><Navigation size={13} /> Track</button>
                     )}
                     {order.status === "pending" && (
-                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-bold hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> Cancel Order</button>
+                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-medium hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> Cancel Order</button>
                     )}
-                    <Link href={`/orders/${order._id}`} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-bold hover:opacity-90 hover:shadow-lg hover:shadow-[var(--user-accent)]/20 transition-all active:scale-95">
-                      View Details <ArrowRight size={15} />
+                    <Link href={`/orders/${order._id}`} className="flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                      View details <ArrowRight size={15} />
                     </Link>
                   </div>
                 </div>
@@ -922,105 +962,84 @@ function OrdersContent({ compact = false }) {
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[0.9375rem] font-black text-[var(--user-text)] leading-none truncate">My Orders</p>
+            <p className="text-2xl font-semibold tracking-tight text-[var(--user-text)] leading-none truncate">My Orders</p>
             <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {totalOrders === 1 ? "order" : "orders"}</p>
           </div>
+          <Link href="/" className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 text-xs font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+            <ShoppingBag size={14} />
+            <span className="hidden sm:inline">Continue Shopping</span>
+            <span className="sm:hidden">Shop</span>
+          </Link>
         </div>
       </div>
       )}
 
-      <div className={compact ? "space-y-2.5" : "px-3 pt-3 pb-24 space-y-2.5"}>
-        {/* Status filter chips (horizontal scrollable) */}
+      <div className={compact ? "space-y-6" : "px-3 pt-3 pb-24 space-y-6"}>
         {(totalOrders > 0 || hasDrafts) && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3" style={{ scrollbarWidth: "none" }}>
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
-                filter === "all"
-                  ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
-                  : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
-              }`}
-            >
-              All ({isDraftFilter ? allOrders.length : (totalOrders || 0)})
-            </button>
-            {hasDrafts && (
-              <button
-                type="button"
-                onClick={() => setFilter("draft")}
-                className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
-                  filter === "draft"
-                    ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
-                    : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
-                }`}
-              >
-                Drafts ({drafts.length})
-              </button>
-            )}
-            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
-              const count = counts[key] || 0;
-              if (count === 0) return null;
-              const active = filter === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setFilter(key)}
-                  className={`shrink-0 h-8 px-3 rounded-full border-2 text-[0.6875rem] font-black uppercase tracking-wider transition ${
-                    active
-                      ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
-                      : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
-                  }`}
-                >
-                  {cfg.label} ({count})
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3">
+              <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                <div className="relative min-w-[190px] flex-1">
+                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)]" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search orders"
+                    className="h-10 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-9 pr-3 text-sm text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-border-hover)]"
+                  />
+                </div>
+                <div className="w-36 shrink-0">
+                  <FilterDropdown icon={Package} options={statusOptions} value={filter} onChange={setFilter} buttonClass={dropdownBtn} width="w-56" />
+                </div>
+                <div className="w-40 shrink-0">
+                  <FilterDropdown icon={ArrowUpDown} options={sortOptions} value={sortBy} onChange={setSortBy} buttonClass={dropdownBtn} width="w-52" />
+                </div>
+                <div className="w-36 shrink-0">
+                  <FilterDropdown icon={Calendar} options={timeOptions} value={timeRange} onChange={setTimeRange} buttonClass={dropdownBtn} width="w-52" />
+                </div>
+              </div>
+            </div>
+            <div className="-mt-5 flex items-center justify-between px-1 text-xs text-[var(--user-text-muted)]">
+              <p>Showing {isDraftFilter ? drafts.length : (pagination.total || orders.length)} of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders</p>
+              {hasActiveFilters && <button onClick={clearFilters} className="font-medium hover:text-[var(--user-text)]">Clear filters</button>}
+            </div>
+          </>
         )}
 
         {/* Drafts */}
         {hasDrafts && (filter === "all" || filter === "draft") && (
-          <div className="space-y-2">
-            {drafts.map((draft) => (
-              <div key={draft._id} className="rounded-xl bg-[var(--user-bg-card)] border-2 border-[var(--user-accent)] p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-                  <ShoppingBag size={18} className="text-[var(--user-accent)]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[0.75rem] font-black text-[var(--user-text)]">DRAFT</p>
-                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">Step {draft.step}/3 · {draft.items?.length || 0} items</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => resumeDraft(draft._id)}
-                  className="h-8 px-3 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.6875rem] font-black"
-                >
-                  Resume
-                </button>
-              </div>
-            ))}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-[var(--user-text)]">Saved drafts</h2>
+              <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
+            </div>
+            {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
+            {drafts.length > 2 && (
+              <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
+                {showAllDrafts ? "Show fewer drafts" : `Show all drafts (${drafts.length})`}
+              </button>
+            )}
           </div>
         )}
 
         {/* Empty */}
-        {filter !== "draft" && orders.length === 0 && !(filter === "all" && hasDrafts) && (
+        {(filter !== "draft" || !hasDrafts) && orders.length === 0 && !(filter === "all" && hasDrafts) && (
           <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-8 text-center">
-            <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-accent)]/10 flex items-center justify-center mb-4">
-              <Package size={36} className="text-[var(--user-accent)]" />
+            <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
+                <Package size={36} className="text-[var(--user-text-muted)]" />
             </div>
-            <h2 className="text-base font-black text-[var(--user-text)] mb-1.5">
-              {(totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}
+            <h2 className="text-base font-semibold text-[var(--user-text)] mb-1.5">
+              {filter === "draft" ? "No saved drafts" : (totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}
             </h2>
             <p className="text-xs text-[var(--user-text-muted)] mb-5">
-              {(totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
+              {filter === "draft" ? "Saved checkout drafts will appear here." : (totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
             </p>
             {hasActiveFilters ? (
-              <button onClick={clearFilters} className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+              <button onClick={clearFilters} className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
                 Clear Filters
               </button>
             ) : (
-              <Link href="/" className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+              <Link href="/" className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
                 <ShoppingBag size={16} /> Start Shopping
               </Link>
             )}
@@ -1029,47 +1048,59 @@ function OrdersContent({ compact = false }) {
 
         {/* Orders list */}
         {filter !== "draft" && orders.length > 0 && (
-          <div className={`space-y-2 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-                                  {orders.map((order) => {
+          <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+            <h2 className="text-sm font-semibold text-[var(--user-text)]">Orders</h2>
+            {orders.map((order) => {
               const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
               const StatusIcon = cfg.icon;
-              const visibleItems = (order.items || []).slice(0, 2);
-              const extraCount = (order.items || []).length - visibleItems.length;
+              const pay = PAYMENT_LABEL[order.payment?.method] || PAYMENT_LABEL.cod;
+              const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
               return (
                 <Link
                   key={order._id}
                   href={`/orders/${order._id}`}
-                  className="block rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm overflow-hidden active:scale-[0.99] transition"
+                  className="block rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 transition-colors hover:border-[var(--user-border-hover)]"
                 >
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    <div>
+                      <p className="text-xs text-[var(--user-text-muted)]">Order number</p>
+                      <p className="text-sm font-medium text-[var(--user-text)]">{order.order_number}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-[var(--user-text-muted)]">Placed on</p>
+                      <p className="text-sm font-medium text-[var(--user-text)]">{date}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--user-text-muted)]">Payment</p>
+                      <p className="text-sm font-medium text-[var(--user-text)]">{pay.label}</p>
+                    </div>
+                    <div className="flex justify-end">
+                      <span className={`inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.textColor}`}>
+                        <StatusIcon size={12} /> {cfg.label}
+                      </span>
+                    </div>
+                  </div>
                   {/* Cancelled reason strip */}
                   {order.status === "cancelled" && order.cancel_reason && (
-                    <div className="px-2.5 py-1.5 bg-[var(--user-danger)]/10 border-b border-[var(--user-danger)]/20">
-                      <p className="text-[0.625rem] font-semibold text-[var(--user-danger)] line-clamp-1">
-                        <span className="font-black uppercase tracking-wider mr-1">Reason:</span>{order.cancel_reason}
+                    <div className="mt-3 rounded-lg bg-[var(--user-danger)]/10 p-2">
+                      <p className="text-xs text-[var(--user-danger)] line-clamp-2">
+                        Reason: {order.cancel_reason}
                       </p>
                     </div>
                   )}
 
-                                 {/* Product card */}
                   {order.items?.length > 0 && (
-                    <div className="p-2.5 pb-1.5">
+                    <div className="mt-3 border-t border-[var(--user-border)] pt-3">
                       <ProductScrollList items={order.items} idPrefix={order._id} rateable={order.status === "delivered"} reviewsMap={reviewsMap} />
                     </div>
                   )}
 
-                  {/* Single-line footer — total + status + view */}
-                  <div className="flex items-center justify-between gap-2 px-2.5 py-2 border-t border-[var(--user-border)] bg-[var(--user-bg)]">
-                    <p className="text-[0.8125rem] font-black text-[var(--user-accent)] leading-none">
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--user-border)] pt-3">
+                    <p className="text-base font-semibold text-[var(--user-text)] leading-none">
                       Rs. {order.total.toLocaleString()}
                     </p>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.border}`}>
-                        <StatusIcon size={9} className={cfg.color} />
-                        <span className={`text-[0.5rem] font-black uppercase tracking-wider ${cfg.textColor}`}>{cfg.label}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[0.625rem] font-black text-[var(--user-accent)] border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5">
-                        View Details <ChevronRight size={11} />
-                      </span>
+                    <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--user-border)] px-3 text-sm font-medium text-[var(--user-text)]">
+                      View details <ChevronRight size={14} />
                     </div>
                   </div>
                 </Link>

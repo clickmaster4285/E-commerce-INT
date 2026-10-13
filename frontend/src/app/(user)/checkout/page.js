@@ -12,10 +12,22 @@ const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
   loading: () => null,
 });
 import { orderApi } from "@/apis/user/orderApi";
-import { calculateFreeItems, calculatePayableItems, calculateBuyXGetYSavings, isDealActive, hasFreeShippingDeal, isFreeShippingApplicable, getDefaultShippingMethod, matchShippingRule } from "@/utils/dealCalculator";
+import {
+  calculateFreeItems,
+  calculatePayableItems,
+  calculateBuyXGetYSavings,
+  formatDealRequirementIssue,
+  getDealRequirementIssues,
+  isDealActive,
+  hasFreeShippingDeal,
+  isFreeShippingApplicable,
+  getDefaultShippingMethod,
+  matchShippingRule,
+} from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
+import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import {
   ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
@@ -23,7 +35,48 @@ import {
   TrendingUp, Gift, BadgePercent,
 } from "lucide-react";
 
+function PrimaryButton({
+  children,
+  icon: Icon,
+  iconEnd: IconEnd,
+  loading = false,
+  loadingText,
+  disabled = false,
+  className = "",
+  type = "button",
+  ...buttonProps
+}) {
+  const isDisabled = disabled || loading;
+  const widthClass = className.split(/\s+/).includes("w-auto") ? "" : "w-full";
+
+  return (
+    <button
+      {...buttonProps}
+      type={type}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
+      className={`primary-btn inline-flex ${widthClass} items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`.trim()}
+    >
+      {loading ? (
+        <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
+      ) : Icon ? (
+        <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+      ) : null}
+      <span>{loading && loadingText ? loadingText : children}</span>
+      {!loading && IconEnd ? (
+        <IconEnd aria-hidden="true" className="h-4 w-4 shrink-0" />
+      ) : null}
+    </button>
+  );
+}
+
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+const getPhoneValidationError = (value) => {
+  if (!value) return "Phone number is required";
+  if (value.length < PHONE_MIN) return `Phone number must be at least ${PHONE_MIN} digits`;
+  if (!isValidPhone(value)) return `Phone number must be at most ${PHONE_MAX} digits`;
+  return "";
+};
 const getImgUrl = (img) => {
   const raw = typeof img === "string" ? img : img?.img_url;
   if (!raw) return null;
@@ -57,7 +110,7 @@ const BANK_DETAILS = {
 };
 
 // 🏦 Bank Transfer Panel — mobile + desktop dono ke liye (compact = mobile)
-const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
+const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormErrors, compact = false }) => {
   const [copied, setCopied] = useState("");
   const copy = async (text, key) => {
     try {
@@ -70,11 +123,26 @@ const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
     }
   };
   const inp = compact
-    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition"
-    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)] transition";
+    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition"
+    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition";
   const lbl = compact
     ? "block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider"
     : "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+  const errCls = compact ? "text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium" : "text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium";
+
+  const handleSenderNameChange = (e) => {
+    setBankForm({ ...bankForm, senderName: e.target.value });
+    if (bankFormErrors.senderName) {
+      setBankFormErrors({ ...bankFormErrors, senderName: "" });
+    }
+  };
+
+  const handleTransactionRefChange = (e) => {
+    setBankForm({ ...bankForm, transactionRef: e.target.value });
+    if (bankFormErrors.transactionRef) {
+      setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+    }
+  };
 
   return (
     <div className={`rounded-xl border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] overflow-hidden ${compact ? "" : "mt-4"}`}>
@@ -119,16 +187,142 @@ const BankTransferPanel = ({ bankForm, setBankForm, compact = false }) => {
         <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
           <div>
             <label className={lbl}>Sender Name (as per bank)</label>
-            <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inp} />
+            <input 
+              value={bankForm.senderName} 
+              onChange={handleSenderNameChange}
+              placeholder="e.g. Ahsan Younas" 
+              className={`${inp} ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+            />
+            {bankFormErrors.senderName && <p className={errCls}>{bankFormErrors.senderName}</p>}
           </div>
           <div>
-            <label className={lbl}>Transaction ID / Reference (optional)</label>
-            <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inp} />
+            <label className={lbl}>Transaction ID / Reference</label>
+            <input 
+              value={bankForm.transactionRef} 
+              onChange={handleTransactionRefChange}
+              placeholder="Add after transferring" 
+              className={`${inp} ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+            />
+            {bankFormErrors.transactionRef && <p className={errCls}>{bankFormErrors.transactionRef}</p>}
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+// ✅ Card validation helper function
+const validateCardDetails = (cardData) => {
+  const trimmedName = String(cardData.name || "").trim();
+  const cleanNumber = String(cardData.number || "").replace(/\s/g, "");
+  const cleanExpiry = String(cardData.expiry || "").trim();
+
+  // 1. Card Number validation
+  if (!cleanNumber) {
+    return { valid: false, field: "number", message: "Please enter your card number." };
+  }
+  if (!/^\d+$/.test(cleanNumber)) {
+    return { valid: false, field: "number", message: "Card number can contain digits only." };
+  }
+
+  const brand = getCardBrand(cleanNumber);
+  const supportedLengths = {
+    VISA: [13, 16, 19],
+    Mastercard: [16],
+    AMEX: [15],
+  };
+  const brandName = {
+    VISA: "Visa",
+    Mastercard: "Mastercard",
+    AMEX: "American Express",
+  }[brand];
+
+  if (!brandName) {
+    return {
+      valid: false,
+      field: "number",
+      message: "Please enter a Visa, Mastercard, or American Express card number.",
+    };
+  }
+  if (!supportedLengths[brand].includes(cleanNumber.length)) {
+    const lengths = supportedLengths[brand].join(", ");
+    return {
+      valid: false,
+      field: "number",
+      message: `Please enter a valid ${brandName} card number (${lengths} digits).`,
+    };
+  }
+
+  // Luhn algorithm check
+  let sum = 0;
+  let isEven = false;
+  for (let i = cleanNumber.length - 1; i >= 0; i--) {
+    let digit = parseInt(cleanNumber[i], 10);
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    isEven = !isEven;
+  }
+  if (sum % 10 !== 0) {
+    return { valid: false, field: "number", message: `Please enter a valid ${brandName} card number.` };
+  }
+
+  // 2. Card Holder Name validation
+  if (!trimmedName) {
+    return { valid: false, field: "name", message: "Please enter the card holder name." };
+  }
+  if (trimmedName.length < 3) {
+    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+  }
+  if (!/^[a-zA-Z\s.\-']+$/.test(trimmedName)) {
+    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+  }
+
+  // 3. Expiry validation
+  if (!cleanExpiry) {
+    return { valid: false, field: "expiry", message: "Please enter the card expiry date." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(cleanExpiry)) {
+    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+  }
+  const [datePart, timePart] = cleanExpiry.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const expiryDate = new Date(year, month - 1, day, hour, minute);
+  if (
+    expiryDate.getFullYear() !== year ||
+    expiryDate.getMonth() !== month - 1 ||
+    expiryDate.getDate() !== day ||
+    expiryDate.getHours() !== hour ||
+    expiryDate.getMinutes() !== minute
+  ) {
+    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+  }
+  const now = new Date();
+  now.setSeconds(0, 0);
+  if (expiryDate < now) {
+    return { valid: false, field: "expiry", message: "Your card has expired. Please use a valid card." };
+  }
+
+  return { valid: true };
+};
+
+const formatPreviewExpiry = (expiry) => {
+  const match = String(expiry || "").match(/^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}$/);
+  return match ? `${match[2]}/${match[3]}/${match[1]}` : "MM/DD/YYYY";
+};
+
+const getCardBrand = (number) => {
+  const digits = String(number || "").replace(/\D/g, "");
+  if (digits.startsWith("4")) return "VISA";
+  const firstFourDigits = Number(digits.slice(0, 4));
+  if (/^5[1-5]/.test(digits) || (firstFourDigits >= 2221 && firstFourDigits <= 2720)) {
+    return "Mastercard";
+  }
+  if (/^3[47]/.test(digits)) return "AMEX";
+  return "CARD";
 };
 
 // 💳 Card Preview — intentionally dark (credit-card look), white text OK
@@ -142,7 +336,7 @@ const CardPreview = ({ number, name, expiry }) => (
       <div className="flex items-center justify-between">
         <div className="w-12 h-9 rounded-lg bg-gradient-to-br from-amber-300 to-amber-500 shadow-lg" />
         <span className="text-white/90 text-sm font-black italic tracking-wider">
-          {number.replace(/\s/g, "").endsWith("4") ? "VISA" : "MasterCard"}
+          {getCardBrand(number)}
         </span>
       </div>
       <div className="space-y-1">
@@ -152,11 +346,11 @@ const CardPreview = ({ number, name, expiry }) => (
       <div className="flex items-end justify-between">
         <div>
           <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Card Holder</p>
-          <p className="text-white text-sm font-bold uppercase tracking-wider">{name || "YOUR NAME"}</p>
+          <p className="text-white text-sm font-bold uppercase tracking-wider">{name.trim() || "YOUR NAME"}</p>
         </div>
         <div>
           <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Expires</p>
-          <p className="text-white text-sm font-bold">{expiry || "MM/YY"}</p>
+          <p className="text-white text-sm font-bold">{formatPreviewExpiry(expiry)}</p>
         </div>
       </div>
     </div>
@@ -186,12 +380,22 @@ function CheckoutContent() {
   const [shippingMethod, setShippingMethod] = useState(() => getDefaultShippingMethod(null));
   const [userSelectedShipping, setUserSelectedShipping] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
-   const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "", cvv: "" });
+  const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "" });
+  const [cardFormErrors, setCardFormErrors] = useState({ number: "", name: "", expiry: "" });
   const [bankForm, setBankForm] = useState({ senderName: "", transactionRef: "" });
+  const [bankFormErrors, setBankFormErrors] = useState({ senderName: "", transactionRef: "" });
   const [placing, setPlacing] = useState(false);
   const [orderReviewOpen, setOrderReviewOpen] = useState(false);
   const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [phoneSubmitted, setPhoneSubmitted] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
+  const savingPhoneRef = useRef(false);
+  const draftCreateInFlight = useRef(false);
+  const placingRef = useRef(false);
+  const phoneValidationError = getPhoneValidationError(phone);
+  const phoneError = phoneTouched || phoneSubmitted ? phoneValidationError : "";
+  const phoneIsValid = !phoneValidationError;
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -252,24 +456,71 @@ function CheckoutContent() {
     }
   }, [addresses, selectedAddressId, draftReady]);
 
-  useEffect(() => {
-    if (!user || !draftRestored.current || !currentDraftId) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
-        step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
-        shippingMethod, paymentMethod, saved: false, items: draftItems,
-      }).catch(() => {});
-    }, 800);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId]);
+  const showCardValidationError = (validation) => {
+    setCardFormErrors({
+      number: validation.field === "number" ? validation.message : "",
+      name: validation.field === "name" ? validation.message : "",
+      expiry: validation.field === "expiry" ? validation.message : "",
+    });
+    if (validation.field === "number") toast.error(validation.message);
+    setOrderReviewOpen(false);
+    if (step === 3) setStep(2);
+
+    setTimeout(() => {
+      const fields = document.querySelectorAll(`input[name="card-${validation.field}"]`);
+      const input = Array.from(fields).find((field) => field.getClientRects().length > 0);
+      if (input) {
+        input.scrollIntoView({ behavior: "smooth", block: "center" });
+        input.focus();
+      }
+    }, 100);
+  };
 
   const goToStep = async (n) => {
+    // ✅ Validate card fields when moving from step 2 to step 3
+    if (n === 3 && paymentMethod === "card") {
+      const validation = validateCardDetails(cardForm);
+      if (!validation.valid) {
+        showCardValidationError(validation);
+        return;
+      }
+      // Clear any previous errors
+      setCardFormErrors({ number: "", name: "", expiry: "" });
+    }
+
+    // ✅ Validate bank transfer fields when moving from step 2 to step 3
+    if (n === 3 && paymentMethod === "bank") {
+      const trimmedSenderName = bankForm.senderName.trim();
+      const trimmedTransactionRef = bankForm.transactionRef.trim();
+      const errors = { senderName: "", transactionRef: "" };
+      let hasError = false;
+
+      if (!trimmedSenderName) {
+        errors.senderName = "Please enter the sender name as shown on your bank account.";
+        hasError = true;
+      }
+      if (!trimmedTransactionRef) {
+        errors.transactionRef = "Please enter your bank transaction ID or reference.";
+        hasError = true;
+      }
+
+      if (hasError) {
+        setBankFormErrors(errors);
+        toast.error("Please fill in all required bank transfer fields.");
+        return;
+      }
+
+      // ✅ Update bankForm with trimmed values
+      setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
+    }
+
     if (currentDraftId) {
       try {
         await userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
           step: n, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, saved: false, items: draftItems,
+          shippingMethod, paymentMethod, saved: false, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
       } catch {}
     }
@@ -277,7 +528,12 @@ function CheckoutContent() {
   };
 
   const proceedToStep2 = async () => {
+    if (draftCreateInFlight.current) return;
     if (!selectedCartItems.length) return toast.error("Please select at least one item");
+    const dealIssue = getDealRequirementIssues(selectedCartItems)[0];
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+
+    draftCreateInFlight.current = true;
     const snap = selectedCartItems.map((i) => ({ ...i }));
     setDraftItems(snap);
     removeItems(snap.map((i) => i.key));
@@ -287,7 +543,9 @@ function CheckoutContent() {
       if (!draftId) {
         const createRes = await userHttp.post("/users/checkout-drafts", {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, items: snap,
+          shippingMethod, paymentMethod, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
         draftId = createRes.data?.draft?._id;
         setCurrentDraftId(draftId);
@@ -295,10 +553,21 @@ function CheckoutContent() {
       } else {
         await userHttp.put(`/users/checkout-drafts/${draftId}`, {
           step: 2, selectedKeys: [], selectedAddressId: selectedAddressId || null,
-          shippingMethod, paymentMethod, items: snap,
+          shippingMethod, paymentMethod, items: itemsWithDiscounts,
+          subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+          estimatedTotal: draftEstimatedTotal,
         });
       }
-    } catch (e) { console.error("proceedToStep2 error:", e); }
+    } catch (e) {
+      console.error("proceedToStep2 error:", e);
+      restoreItems(snap);
+      setDraftItems([]);
+      setSelectedKeys(snap.map((item) => item.key));
+      toast.error(e.response?.data?.message || "Could not save checkout draft");
+      return;
+    } finally {
+      draftCreateInFlight.current = false;
+    }
     setStep(2);
   };
 
@@ -313,7 +582,19 @@ function CheckoutContent() {
     setStep(1);
   };
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || user.phone); }, [user]);
+  useEffect(() => { if (user?.phone) setPhone((p) => p || normalizePhone(user.phone)); }, [user]);
+
+  const handlePhoneChange = (event) => {
+    setPhone(event.target.value.replace(/\D/g, "").slice(0, PHONE_MAX));
+  };
+  const handlePhonePaste = (event) => {
+    event.preventDefault();
+    setPhone(event.clipboardData.getData("text").replace(/\D/g, "").slice(0, PHONE_MAX));
+  };
+  const handlePhoneKeyDown = (event) => {
+    if (event.ctrlKey || event.metaKey || event.key.length !== 1) return;
+    if (!/\d/.test(event.key)) event.preventDefault();
+  };
 
   // ✅ If the user arrives at /checkout with 0 selected items (and cart has items),
   //    send them back to /cart so they can pick what to buy.
@@ -329,6 +610,15 @@ function CheckoutContent() {
   //    import into CartContext (handled in the draft-restore effect above).
   const selectedCartItems = useMemo(() => selectedItems, [selectedItems]);
   const activeItems = step === 1 ? selectedCartItems : draftItems;
+  useEffect(() => {
+    if (!draftReady || placing || step !== 1 || activeItems.length === 0) return;
+    const dealIssue = getDealRequirementIssues(activeItems)[0];
+    if (dealIssue) {
+      toast.error(formatDealRequirementIssue(dealIssue));
+      router.replace("/cart");
+    }
+  }, [activeItems, draftReady, placing, router, step]);
+
   // ✅ Shared helper — single source of truth for free-shipping qualification.
   const freeShippingByActiveItems = hasFreeShippingDeal(activeItems);
   // ✅ Identify the active free-shipping deal (first match) so we can derive
@@ -468,19 +758,49 @@ function CheckoutContent() {
 
   const tax = Math.round(itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0));
   const grandTotal = Math.round(subtotal + shipping + tax);
+  const draftDiscount = itemsWithDiscounts.reduce((sum, item) => {
+    const originalPrice = Number(item.originalPrice) || 0;
+    const salePrice = Number(item.displayPrice) || 0;
+    const qty = Number(item.qty) || 1;
+    return sum + Math.max(0, originalPrice - salePrice) * qty;
+  }, 0);
+  const draftSubtotal = subtotal + draftDiscount;
+  const draftEstimatedTotal = Math.round(draftSubtotal + shipping + tax - draftDiscount);
+
+  useEffect(() => {
+    if (!user || !draftRestored.current || !currentDraftId || placing) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      userHttp.put(`/users/checkout-drafts/${currentDraftId}`, {
+        step, selectedKeys: selectedKeys || [], selectedAddressId: selectedAddressId || null,
+        shippingMethod, paymentMethod, saved: false, items: itemsWithDiscounts,
+        subtotal: draftSubtotal, shipping, tax, discount: draftDiscount,
+        estimatedTotal: draftEstimatedTotal,
+      }).catch(() => {});
+    }, 800);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId, placing, draftSubtotal, shipping, tax, draftDiscount, draftEstimatedTotal]);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
   const needsPhone = !!user && !user.phone;
 
   const savePhone = async () => {
-    if (!/^[0-9+\-\s]{7,20}$/.test(phone)) return toast.error("Please enter a valid phone number");
+    setPhoneSubmitted(true);
+    const normalizedPhone = normalizePhone(phone);
+    const validationError = getPhoneValidationError(normalizedPhone);
+    if (validationError) {
+      setPhone(normalizedPhone);
+      return;
+    }
+    if (savingPhoneRef.current) return;
+    savingPhoneRef.current = true;
     setSavingPhone(true);
     try {
-      await userHttp.put("/users/phone", { phone });
+      await userHttp.put("/users/phone", { phone: normalizedPhone });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       toast.success("Phone number saved!");
     } catch (e) { toast.error(e.response?.data?.message || "Phone save failed"); }
-    finally { setSavingPhone(false); }
+    finally { savingPhoneRef.current = false; setSavingPhone(false); }
   };
 
   const openAddressModal = () => {
@@ -503,30 +823,55 @@ function CheckoutContent() {
   };
 
   const placeOrder = async () => {
+    if (placingRef.current) return;
     if (!activeItems.length) return toast.error("No items selected");
     if (!selectedAddressId) return toast.error("Please select a delivery address");
-      if (paymentMethod === "card") {
-      if (cardForm.number.replace(/\s/g, "").length !== 16) return toast.error("Card number must be 16 digits");
-      if (!cardForm.name.trim()) return toast.error("Card holder name is required");
-      if (!/^\d{2}\/\d{2}$/.test(cardForm.expiry)) return toast.error("Expiry must be in MM/YY format");
-      if (cardForm.cvv.length < 3) return toast.error("Please enter a valid CVV");
-    }
-    if (paymentMethod === "bank" && !bankForm.senderName.trim()) {
-      return toast.error("Sender name is required for bank transfer");
-    }
-    // ✅ MIN QUANTITY CHECK — reject order if any deal item qty is below minQuantity
-    for (const item of itemsWithDiscounts) {
-      if (item.dealId && item.dealMinQuantity) {
-        const minQty = Number(item.dealMinQuantity) || 1;
-        if (item.qty < minQty) {
-          return toast.error(`"${item.name}" requires minimum ${minQty} items for deal. Current: ${item.qty}`);
-        }
+    
+    // ✅ Validate card fields for card payment
+    if (paymentMethod === "card") {
+      const validation = validateCardDetails(cardForm);
+      if (!validation.valid) {
+        showCardValidationError(validation);
+        return;
       }
+      // Clear any previous errors
+      setCardFormErrors({ number: "", name: "", expiry: "" });
     }
+    
+    if (paymentMethod === "bank") {
+      const trimmedSenderName = bankForm.senderName.trim();
+      const trimmedTransactionRef = bankForm.transactionRef.trim();
+      if (!trimmedSenderName) {
+        return toast.error("Sender name is required for bank transfer");
+      }
+      if (!trimmedTransactionRef) {
+        return toast.error("Transaction ID / Reference is required for bank transfer");
+      }
+      // ✅ Update bankForm with trimmed values for order submission
+      setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
+    }
+    const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+    placingRef.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
     try {
-           await orderApi.place({ items: itemsWithDiscounts, address_id: selectedAddressId, payment_method: paymentMethod, shipping_method: shippingMethod, shipping, bank_sender_name: bankForm.senderName || null, bank_transaction_ref: bankForm.transactionRef || null });
-            queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      await orderApi.place({
+        items: itemsWithDiscounts,
+        address_id: selectedAddressId,
+        payment_method: paymentMethod,
+        shipping_method: shippingMethod,
+        shipping,
+        checkout_draft_id: currentDraftId || null,
+        bank_sender_name: paymentMethod === "bank" ? bankForm.senderName.trim() : null,
+        bank_transaction_ref: paymentMethod === "bank" ? bankForm.transactionRef.trim() : null,
+      });
+      queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      if (currentDraftId) {
+        queryClient.setQueryData(["checkoutDrafts"], (drafts = []) =>
+          drafts.filter((draft) => String(draft._id) !== String(currentDraftId)),
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
       // ✅ Remove ONLY the selected lines from the cart; the save() helper in
 //    CartContext auto-prunes the selection for the removed keys. Leave any
@@ -534,9 +879,13 @@ function CheckoutContent() {
       const orderedKeys = itemsWithDiscounts.map((i) => i.key);
       removeItems(orderedKeys);
       setDraftItems([]);
-      if (currentDraftId) { await userHttp.delete(`/users/checkout-drafts/${currentDraftId}`).catch(() => {}); setCurrentDraftId(null); }
+      setCurrentDraftId(null);
       router.push("/orders");
-    } catch (e) { toast.error(e.response?.data?.message || "Order place failed"); setPlacing(false); }
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Order place failed");
+      placingRef.current = false;
+      setPlacing(false);
+    }
   };
 
   if (userLoading || !draftReady || (!user && !needsPhone)) {
@@ -565,34 +914,39 @@ function CheckoutContent() {
 
   // ✅ THEME-SAFE classes — no hardcoded white/black on accent
   const inputCls = "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] hover:border-[var(--user-accent)]/40";
+  const phoneInputCls = `w-full h-11 rounded-lg border bg-[var(--user-bg-card)] px-3.5 text-sm text-[var(--user-text)] outline-none transition-colors ${
+    phoneError
+      ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+      : "border-[var(--user-border)] focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+  }`;
   const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
-  const accentBtn = "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90 active:scale-[0.98] transition";
+  // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
   const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
 
   const StepIndicator = () => (
-    <div className="flex items-center justify-center mb-8 sm:mb-10">
+    <div className="flex items-start justify-center mb-8 sm:mb-10">
       {["Items", "Delivery", "Payment"].map((label, i) => {
         const n = i + 1;
         const active = step === n;
         const done = step > n;
         return (
-          <div key={label} className="flex items-center">
-            <button onClick={() => done && goToStep(n)} className={`flex items-center gap-2.5 sm:gap-3 ${done ? "cursor-pointer" : "cursor-default"}`}>
-              <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-sm font-black border-2 transition-all duration-300 ${
-                done ? "bg-[var(--user-success)] border-[var(--user-success)] text-white shadow-lg"
-                : active ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)] shadow-lg shadow-[var(--user-accent)]/30"
-                : "border-[var(--user-border)] text-[var(--user-text-muted)] bg-[var(--user-bg-card)]"}`}>
-                {done ? <Check size={17} /> : n}
-              </div>
-              <div className="text-left hidden sm:block">
-                <p className={`text-[0.5625rem] font-bold uppercase tracking-widest ${active || done ? "text-[var(--user-accent)]" : "text-[var(--user-text-subtle)]"}`}>Step {n}</p>
-                <p className={`text-sm font-bold ${active || done ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>{label}</p>
-              </div>
+          <div key={label} className="flex items-start">
+            <button
+              type="button"
+              onClick={() => done && goToStep(n)}
+              disabled={!done}
+              aria-current={active ? "step" : undefined}
+              className={`checkout-step flex flex-col items-center gap-1.5 w-20 sm:w-24 ${done ? "cursor-pointer" : "cursor-default"}`}
+            >
+              <span className={`checkout-step-marker ${done ? "is-complete" : active ? "is-active" : "is-upcoming"}`}>
+                {done ? <Check size={15} /> : n}
+              </span>
+              <span className={`checkout-step-label ${active ? "is-active" : done ? "is-complete" : "is-upcoming"}`}>{label}</span>
             </button>
             {n < 3 && (
-              <div className={`w-6 sm:w-14 lg:w-20 h-0.5 mx-2 sm:mx-3 rounded-full ${done ? "bg-[var(--user-success)]" : "bg-[var(--user-border)]"}`} />
+              <div className={`checkout-step-connector h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "is-complete" : ""}`} />
             )}
           </div>
         );
@@ -602,80 +956,56 @@ function CheckoutContent() {
 
   const SummaryPanel = ({ footer }) => (
     <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-          <PackageCheck size={18} className="text-[var(--user-accent-text)]" />
-        </div>
-        <div>
-          <h2 className="text-base font-black text-[var(--user-text)]">Order Summary</h2>
-          <p className="text-xs text-[var(--user-text-muted)]">{itemsWithDiscounts.length} items</p>
-        </div>
-      </div>
+      <h2 className="text-lg font-black text-[var(--user-text)] mb-4">Order Summary</h2>
 
-      <div className="space-y-3 my-4 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-2 mb-5 custom-scrollbar">
+      <div className="space-y-3 mt-4 mb-0 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 custom-scrollbar">
         {itemsWithDiscounts.map((i) => (
-          <div key={i.key} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)]">
+          <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="text-xs font-bold text-[var(--user-text)] truncate">{i.name}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] leading-snug line-clamp-2">{i.name}</p>
+              {i.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
               {i.dealActive && i.dealId && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  <span className="inline-flex items-center gap-1 text-[0.5625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-0.5 rounded-full">
-                    <Gift size={9} />
-                    {i.dealType === 'buy_x_get_y' ? `B${i.dealBuyQuantity || 2}G${i.dealGetQuantity || 1}` : 'Deal'}
-                  </span>
-                  {i.freeItems > 0 && (
-                    <span className="text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-full">+{i.freeItems} FREE</span>
-                  )}
-                </div>
+                <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1">
+                  <Tag size={10} /> Deal
+                </span>
               )}
-              <p className="text-[0.625rem] text-[var(--user-text-muted)]">Qty: {i.qty} {i.freeItems > 0 && `(${i.payableItems} paid)`}</p>
+              <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Qty: {i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
             </div>
-            <div className="text-right space-y-1">
+            <div className="text-right shrink-0">
               {i.hasDiscount && i.originalPrice * i.qty > i.lineTotal && (
-                <p className="text-[0.5625rem] text-[var(--user-text-subtle)] line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
+                <p className="text-[0.625rem] text-[var(--user-text-subtle)] line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
               )}
-              <p className="text-sm font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
-              {((i.savings * i.qty) + i.dealSavings) > 0 && (
-                <p className="text-[0.5625rem] font-black text-[var(--user-success)] flex items-center gap-0.5 justify-end">
-                  <TrendingUp size={9} /> -Rs. {((i.savings * i.qty) + i.dealSavings).toLocaleString()}
-                </p>
-              )}
+              <p className="text-[0.8125rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="space-y-3 pt-4 border-t-2 border-[var(--user-border)]">
-        <div className="flex justify-between text-sm">
-          <span className="text-[var(--user-text-muted)] font-semibold">Subtotal</span>
+      <div className="space-y-2.5 pt-3 border-t border-[var(--user-border)] text-[0.8125rem]">
+        <div className="flex justify-between">
+          <span className="text-[var(--user-text)] font-medium">Subtotal</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
-          <div className="flex justify-between text-sm bg-[var(--user-success)]/10 -mx-5 px-5 py-2 rounded-xl border border-[var(--user-success)]/20">
-            <span className="text-[var(--user-success)] flex items-center gap-2 font-bold"><BadgePercent size={14} /> You Save</span>
-            <span className="text-[var(--user-success)] font-black">-Rs. {totalSavings.toLocaleString()}</span>
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text)] font-medium">You Save</span>
+            <span className="text-[var(--user-success)] font-bold">– Rs. {totalSavings.toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between text-sm">
-          <span className="text-[var(--user-text-muted)] flex items-center gap-2 font-semibold">
-            <Truck size={14} /> Shipping
-            {shipping === 0 && <span className="text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/20 px-2 py-0.5 rounded-full">FREE</span>}
-          </span>
-          <span className="text-[var(--user-text)] font-bold">{shipping === 0 ? "Rs. 0" : `Rs. ${shipping}`}</span>
+        <div className="flex justify-between">
+          <span className="text-[var(--user-text)] font-medium">Shipping</span>
+          <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{shipping === 0 ? "FREE" : `Rs. ${shipping}`}</span>
         </div>
         {tax > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className="text-[var(--user-text-muted)] font-semibold">Tax</span>
+          <div className="flex justify-between">
+            <span className="text-[var(--user-text)] font-medium">Tax</span>
             <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between pt-4 border-t-2 border-[var(--user-border)]">
-          <span className="font-black text-[var(--user-text)]">Total</span>
-          <div className="text-right">
-            <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
-            <p className="text-[0.625rem] text-[var(--user-text-muted)]">Including all taxes</p>
-          </div>
+        <div className="flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
+          <span className="text-base font-black text-[var(--user-text)]">Total</span>
+          <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
         </div>
       </div>
       <div className="mt-5">{footer}</div>
@@ -699,7 +1029,7 @@ function CheckoutContent() {
   return (
     <>
     {/* ============= DESKTOP — UNCHANGED ============= */}
-    <div className="hidden lg:block">
+    <div className="checkout-premium hidden lg:block">
     <main className="max-w-[80rem] mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 lg:py-12 pb-24 sm:pb-28 md:pb-10">
       <style>{`
         @keyframes modalUp { from { opacity: 0; transform: translateY(30px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -726,14 +1056,43 @@ function CheckoutContent() {
             <div className="w-14 h-14 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-5">
               <Phone size={24} className="text-[var(--user-accent-text)]" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-2">Phone Number Required</h2>
-            <p className="text-sm text-[var(--user-text-muted)] mb-6">We need your phone number for delivery updates and order confirmation.</p>
-            <label className={labelCls}>Phone Number</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className={inputCls} />
-            <button onClick={savePhone} disabled={savingPhone} className={`mt-6 w-full h-12 rounded-xl text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 ${accentBtn}`}>
-              {savingPhone ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-              Save & Continue
-            </button>
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
+              <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+            </div>
+            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+            <input
+              id="checkout-phone-desktop"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={PHONE_MAX}
+              pattern="[0-9]*"
+              required
+              aria-invalid={phoneError ? "true" : undefined}
+              aria-describedby={phoneError ? "checkout-phone-helper-desktop checkout-phone-error-desktop" : "checkout-phone-helper-desktop"}
+              value={phone}
+              onChange={handlePhoneChange}
+              onPaste={handlePhonePaste}
+              onKeyDown={handlePhoneKeyDown}
+              onBlur={() => setPhoneTouched(true)}
+              placeholder="Enter phone number"
+              className={phoneInputCls}
+            />
+            <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
+              {phoneError ? <p id="checkout-phone-error-desktop" className="text-xs text-red-600">{phoneError}</p> : <span />}
+              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+            </div>
+            <PrimaryButton
+              onClick={savePhone}
+              disabled={!phoneIsValid}
+              loading={savingPhone}
+              loadingText="Saving..."
+              iconEnd={ArrowRight}
+              className="mt-6 h-12"
+            >
+              Save &amp; Continue
+            </PrimaryButton>
           </div>
         </div>
       ) : (
@@ -756,35 +1115,32 @@ function CheckoutContent() {
                         <p className="text-xs text-[var(--user-text-muted)]">{selectedCartItems.length} of {cart.length} items selected</p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">Edit selection</button>
+                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">Edit Cart</button>
                   </div>
 
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
                   <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[26.25rem] sm:max-h-[32.5rem] lg:max-h-none lg:flex-1 lg:min-h-0 custom-scrollbar">
                     {itemsWithDiscounts.map((item) => {
+                      const isSelected = selectedItems.some((selectedItem) => selectedItem.key === item.key)
+                        || draftItems.some((draftItem) => draftItem.key === item.key);
                       return (
-                        <div key={item.key} className={`flex items-start gap-3 p-4 rounded-xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5`}>
-                          <ItemThumb item={item} size="w-16 h-16" />
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
-                            {item.variantTitle && <p className="text-[0.625rem] sm:text-xs text-[var(--user-text-muted)]">{item.variantTitle}</p>}
-                            {item.dealId && (
-                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                <span className="inline-flex items-center gap-1 text-[0.5625rem] sm:text-[0.625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
-                                  <Gift size={9} />
-                                  {item.dealType === 'buy_x_get_y' ? `Buy ${item.dealBuyQuantity} Get ${item.dealGetQuantity} Free` : (item.dealName || 'Active Deal')}
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 mt-2">
-                              <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {item.displayPrice.toLocaleString()}</p>
-                              {item.hasDiscount && item.originalPrice * item.qty > item.lineTotal && (
-                                <p className="text-[0.625rem] text-[var(--user-text-subtle)] line-through">Rs. {(item.originalPrice * item.qty).toLocaleString()}</p>
-                              )}
-                            </div>
+                        <div key={item.key} className={`checkout-cart-item flex items-start gap-4 p-4 rounded-xl border ${isSelected ? "is-selected" : ""}`}>
+                          <div className="checkout-item-thumb relative shrink-0">
+                            <ItemThumb item={item} size="w-16 h-16" />
+                            {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
                           </div>
-                          <div className="shrink-0 flex flex-col items-end gap-2">
-                            <div className="flex items-center rounded-lg border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
+                            {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{item.variantTitle}</p>}
+                            {item.dealId && (
+                              <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1.5">
+                                <Tag size={10} /> Deal
+                              </span>
+                            )}
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-2.5">
+                            <p className="text-sm font-black text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
+                            <div className="flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]">
                               <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
                                 <Minus size={12} />
                               </button>
@@ -793,7 +1149,6 @@ function CheckoutContent() {
                                 <Plus size={12} />
                               </button>
                             </div>
-                            <p className="text-sm font-black text-[var(--user-accent)]">Rs. {item.lineTotal.toLocaleString()}</p>
                           </div>
                         </div>
                       );
@@ -813,9 +1168,14 @@ function CheckoutContent() {
               {/* RIGHT: Summary with Proceed button */}
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${accentBtn}`}>
-                    Proceed to Delivery <ArrowRight size={16} />
-                  </button>
+                  <PrimaryButton
+                    onClick={proceedToStep2}
+                    disabled={!selectedCartItems.length}
+                    iconEnd={ArrowRight}
+                    className="h-12"
+                  >
+                    Proceed to Delivery
+                  </PrimaryButton>
                   <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
                     <span className="font-semibold">Secure checkout · SSL encrypted</span>
@@ -832,9 +1192,14 @@ function CheckoutContent() {
                   <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{selectedCartItems.length} selected</p>
                   <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                 </div>
-                <button onClick={proceedToStep2} disabled={!selectedCartItems.length} className={`h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 disabled:opacity-40 ${accentBtn}`}>
-                  Proceed <ArrowRight size={14} />
-                </button>
+                <PrimaryButton
+                  onClick={proceedToStep2}
+                  disabled={!selectedCartItems.length}
+                  iconEnd={ArrowRight}
+                    className="h-11 w-auto shrink-0 px-5"
+                >
+                  Proceed
+                </PrimaryButton>
               </div>
             </div>
           )}
@@ -855,16 +1220,28 @@ function CheckoutContent() {
                   </div>
                   {addresses.length > 0 ? (
                     <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                      {addresses.map((a) => (
-                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`text-left rounded-xl border-2 p-4 transition-all duration-200 cursor-pointer ${selectedAddressId === a._id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
-                            {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded">DEFAULT</span>}
+                      {addresses.map((a) => {
+                        const sel = selectedAddressId === a._id;
+                        return (
+                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`checkout-selection-card text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${sel ? "is-selected" : ""}`}>
+                          <div className="flex items-start gap-3">
+                            <span className={`checkout-address-indicator mt-0.5 shrink-0 ${sel ? "is-selected" : ""}`}>
+                              {sel && <span className="checkout-address-indicator-dot" />}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
+                                {a.is_default && <span className="text-[0.625rem] font-bold text-[var(--user-accent)] border border-[var(--user-accent)]/40 px-1.5 py-0.5 rounded">Default</span>}
+                              </div>
+                              <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
+                                {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
+                              </p>
+                              <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{a.phone}</p>
+                            </div>
+                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} aria-label="Edit address" className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
+                              <Pencil size={15} />
+                            </button>
                           </div>
-                          <p className="text-xs text-[var(--user-text-muted)] leading-relaxed line-clamp-2 mb-1">
-                            {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
-                          </p>
-                          <p className="text-xs text-[var(--user-text-secondary)] font-semibold flex items-center gap-1"><Phone size={10} /> {a.phone}</p>
                           <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
                             <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
                               <Pencil size={11} /> Edit
@@ -874,7 +1251,8 @@ function CheckoutContent() {
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8 mb-4">
@@ -904,7 +1282,7 @@ function CheckoutContent() {
                       <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> Free shipping on orders over Rs. {cfg.free_shipping_over.toLocaleString()}</p>
                     </div>
                   )}
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     {shippingMethods.map((m) => {
                       const active = shippingMethod === m.id;
                       const IconComp = m.icon;
@@ -920,12 +1298,12 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all duration-200 ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                          {m.badge && (
-                            <span className={`absolute top-2 right-2 text-[0.5rem] font-black px-2 py-0.5 rounded-full ${m.id === "express" ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "bg-[var(--user-border)] text-[var(--user-text-muted)]"}`}>{m.badge}</span>
-                          )}
-                          <IconComp size={20} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
-                          <div className="flex-1 w-full">
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${active ? "is-selected" : ""}`}>
+                          <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                            {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                          </span>
+                          <IconComp size={20} className={active ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
                             <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.time}</p>
                             {active && shippingReason && <p className="text-[0.625rem] text-[var(--user-success)] mt-1 font-semibold">{shippingReason}</p>}
@@ -936,7 +1314,7 @@ function CheckoutContent() {
                               </p>
                             )}
                           </div>
-                          <span className={`text-sm font-black ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}</span>
+                          <span className={`text-sm font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}</span>
                         </button>
                       );
                     })}
@@ -955,24 +1333,19 @@ function CheckoutContent() {
                   </div>
                   <div className="space-y-3">
                     {[
-                      { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay when your order arrives", badge: "Most Popular" },
-                      { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our account", badge: null },
-                      { id: "card", icon: CreditCard, title: "Debit / Credit Card", sub: "Visa, Mastercard accepted", badge: null },
+                      { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay in cash when your order arrives" },
+                      { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our bank account" },
+                      { id: "card", icon: CreditCard, title: "Card", sub: "Visa, Mastercard, American Express" },
                     ].map((m) => (
-                      <button key={m.id} onClick={() => setPaymentMethod(m.id)} className={`w-full flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all duration-200 ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}>
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === m.id ? "bg-[var(--user-accent)]" : "bg-[var(--user-bg-hover)]"}`}>
-                          <m.icon size={18} className={paymentMethod === m.id ? "text-[var(--user-accent-text)]" : "text-[var(--user-text-muted)]"} />
-                        </div>
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                        <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                          {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                        </span>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
-                            {m.badge && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 px-2 py-0.5 rounded-full">{m.badge}</span>}
-                          </div>
+                          <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
                           <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.sub}</p>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${paymentMethod === m.id ? "border-[var(--user-accent)] bg-[var(--user-accent)]" : "border-[var(--user-border)]"}`}>
-                          {paymentMethod === m.id && <Check size={12} className="text-[var(--user-accent-text)]" />}
-                        </div>
+                        <m.icon size={20} className={paymentMethod === m.id ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
                       </button>
                     ))}
                   </div>
@@ -987,11 +1360,29 @@ function CheckoutContent() {
                       <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
                         <div>
                           <label className={labelCls}>Sender Name (as per bank)</label>
-                          <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className={inputCls} />
+                          <input 
+                            value={bankForm.senderName} 
+                            onChange={(e) => {
+                              setBankForm({ ...bankForm, senderName: e.target.value });
+                              if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
+                            }}
+                            placeholder="e.g. Ahsan Younas" 
+                            className={`${inputCls} ${bankFormErrors.senderName ? "!border-red-500 focus:!border-red-500" : ""}`}
+                          />
+                          {bankFormErrors.senderName && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.senderName}</p>}
                         </div>
                         <div>
-                          <label className={labelCls}>Transaction ID / Reference (optional)</label>
-                          <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className={inputCls} />
+                          <label className={labelCls}>Transaction ID / Reference</label>
+                          <input 
+                            value={bankForm.transactionRef} 
+                            onChange={(e) => {
+                              setBankForm({ ...bankForm, transactionRef: e.target.value });
+                              if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+                            }}
+                            placeholder="Add after transferring" 
+                            className={`${inputCls} ${bankFormErrors.transactionRef ? "!border-red-500 focus:!border-red-500" : ""}`}
+                          />
+                          {bankFormErrors.transactionRef && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.transactionRef}</p>}
                         </div>
                         <p className="text-[0.625rem] text-[var(--user-text-muted)]">Add your transaction ID after transferring the total amount for faster verification.</p>
                       </div>
@@ -1002,14 +1393,17 @@ function CheckoutContent() {
                       <CardPreview number={cardForm.number} name={cardForm.name} expiry={cardForm.expiry} />
                       <div className="space-y-3 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4">
                         <div><label className={labelCls}>Card Number</label>
-                          <input value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 16); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); }} placeholder="1234 5678 9012 3456" className={inputCls} /></div>
+                          <input name="card-number" value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 19); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" }); }} placeholder="1234 5678 9012 3456" className={`${inputCls} ${cardFormErrors.number ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.number && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.number}</p>}
+                        </div>
                         <div><label className={labelCls}>Card Holder Name</label>
-                          <input value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} placeholder="John Doe" className={inputCls} /></div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div><label className={labelCls}>Expiry</label>
-                            <input value={cardForm.expiry} onChange={(e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); setCardForm({ ...cardForm, expiry: v }); }} placeholder="MM/YY" className={inputCls} /></div>
-                          <div><label className={labelCls}>CVV</label>
-                            <input type="password" value={cardForm.cvv} onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" className={inputCls} /></div>
+                          <input name="card-name" value={cardForm.name} onChange={(e) => { setCardForm({ ...cardForm, name: e.target.value }); if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" }); }} placeholder="John Doe" className={`${inputCls} ${cardFormErrors.name ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.name && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.name}</p>}
+                        </div>
+                        <div>
+                          <label className={labelCls}>Expiry Date</label>
+                          <input name="card-expiry" type="datetime-local" value={cardForm.expiry} onChange={(e) => { setCardForm({ ...cardForm, expiry: e.target.value }); if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" }); }} className={`${inputCls} ${cardFormErrors.expiry ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                          {cardFormErrors.expiry && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.expiry}</p>}
                         </div>
                       </div>
                     </div>
@@ -1019,9 +1413,13 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${accentBtn}`}>
-                    Review Order <ArrowRight size={16} />
-                  </button>
+                  <PrimaryButton
+                    onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")}
+                    iconEnd={ArrowRight}
+                    className="h-12"
+                  >
+                    Review Order
+                  </PrimaryButton>
                   <button onClick={backToStep1} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back to Cart
                   </button>
@@ -1034,8 +1432,8 @@ function CheckoutContent() {
           {step === 3 && (
             <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
               <div className="space-y-4 sm:space-y-5">
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
+                <div className={`${cardCls} p-6`}>
+                  <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
                       <ShieldCheck size={18} className="text-[var(--user-accent-text)]" />
                     </div>
@@ -1051,7 +1449,7 @@ function CheckoutContent() {
                         <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
                       </div>
                       {selectedAddress && (
-                        <div className="space-y-1">
+                        <div className="space-y-1.5">
                           <p className="text-sm font-bold text-[var(--user-text)]">{selectedAddress.full_name}</p>
                           <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
                             {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}<br />
@@ -1082,13 +1480,13 @@ function CheckoutContent() {
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4">
-                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider mb-3">Order Items ({itemsWithDiscounts.length})</p>
-                    <div className="divide-y-2 divide-[var(--user-border)] space-y-3">
+                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4 space-y-5">
+                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Order Items ({itemsWithDiscounts.length})</p>
+                    <div className="divide-y divide-[var(--user-border)]">
                       {itemsWithDiscounts.map((i) => (
-                        <div key={i.key} className="flex items-start gap-3 pt-3 first:pt-0">
+                        <div key={i.key} className="flex items-start gap-4 py-1.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-14 h-14" />
-                          <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{i.name}</p>
 {i.dealActive && i.dealId && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -1110,14 +1508,19 @@ function CheckoutContent() {
 
               <SummaryPanel footer={
                 <div className="space-y-3">
-                  <button onClick={placeOrder} disabled={placing} className={`w-full h-12 rounded-xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 ${accentBtn}`}>
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing Order..." : "Place Order"}
-                  </button>
+                  <PrimaryButton
+                    onClick={placeOrder}
+                    loading={placing}
+                    loadingText="Placing Order..."
+                    icon={Lock}
+                    className="h-12"
+                  >
+                    Place Order
+                  </PrimaryButton>
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> Back
                   </button>
-                  <div className="flex items-center justify-center gap-2 pt-3 border-t border-[var(--user-border)]">
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--user-border)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
                     <span className="text-xs text-[var(--user-text-muted)] font-semibold">Your payment is secure and encrypted</span>
                   </div>
@@ -1152,7 +1555,7 @@ function CheckoutContent() {
       // Early-out: loading / empty / needs-phone states render their compact mobile equivalents.
       if (userLoading || !draftReady || (!user && !needsPhone)) {
         return (
-          <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
+          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
             <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
           </div>
         );
@@ -1162,7 +1565,7 @@ function CheckoutContent() {
       // Empty cart on step 1 (mobile)
       if (step === 1 && cart.length === 0 && !placing) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1191,7 +1594,7 @@ function CheckoutContent() {
       // needsPhone state — use the same compact card style
       if (needsPhone) {
         return (
-          <div className="lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
             <div
               className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -1208,14 +1611,43 @@ function CheckoutContent() {
                 <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-4">
                   <Phone size={22} className="text-[var(--user-accent-text)]" />
                 </div>
-                <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Phone Number Required</h2>
-                <p className="text-xs text-[var(--user-text-muted)] mb-5">We need your phone number for delivery updates and order confirmation.</p>
-                <label className="block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider">Phone Number</label>
-                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className="w-full h-12 px-4 rounded-xl text-sm outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)]" />
-                <button onClick={savePhone} disabled={savingPhone} className="mt-5 w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50">
-                  {savingPhone ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-                  Save & Continue
-                </button>
+                <div className="space-y-1.5">
+                  <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
+                  <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+                </div>
+                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+                <input
+                  id="checkout-phone-mobile"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={PHONE_MAX}
+                  pattern="[0-9]*"
+                  required
+                  aria-invalid={phoneError ? "true" : undefined}
+                  aria-describedby={phoneError ? "checkout-phone-helper-mobile checkout-phone-error-mobile" : "checkout-phone-helper-mobile"}
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  onPaste={handlePhonePaste}
+                  onKeyDown={handlePhoneKeyDown}
+                  onBlur={() => setPhoneTouched(true)}
+                  placeholder="Enter phone number"
+                  className={phoneInputCls}
+                />
+                <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
+                  {phoneError ? <p id="checkout-phone-error-mobile" className="text-xs text-red-600">{phoneError}</p> : <span />}
+                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+                </div>
+                <PrimaryButton
+                  onClick={savePhone}
+                  disabled={!phoneIsValid}
+                  loading={savingPhone}
+                  loadingText="Saving..."
+                  iconEnd={ArrowRight}
+                  className="mt-5 h-12"
+                >
+                  Save &amp; Continue
+                </PrimaryButton>
               </div>
             </div>
           </div>
@@ -1238,7 +1670,7 @@ function CheckoutContent() {
       ];
 
       return (
-        <div className="lg:hidden bg-[var(--user-bg)]">
+        <div className="checkout-premium lg:hidden bg-[var(--user-bg)]">
           {/* Sticky top app bar */}
           <div
             className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
@@ -1252,7 +1684,7 @@ function CheckoutContent() {
             </div>
           </div>
 
-          <div className="px-3 pt-3 pb-28 space-y-2">
+          <div className="px-3 pt-3 pb-28 space-y-3">
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] overflow-hidden">
               <p className="px-3 pt-2.5 pb-1.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
@@ -1295,9 +1727,15 @@ function CheckoutContent() {
 
               {/* Compact item rows */}
               <div className="space-y-2 max-h-[16.25rem] overflow-y-auto pr-1 custom-scrollbar">
-                {itemsWithDiscounts.map((i) => (
-                  <div key={i.key} className="flex items-center gap-2.5">
-                    <ItemThumb item={i} size="w-12 h-12" />
+                {itemsWithDiscounts.map((i) => {
+                  const isSelected = selectedItems.some((selectedItem) => selectedItem.key === i.key)
+                    || draftItems.some((draftItem) => draftItem.key === i.key);
+                  return (
+                  <div key={i.key} className={`checkout-cart-item checkout-cart-item-mobile flex items-center gap-2.5 rounded-lg border p-1.5 ${isSelected ? "is-selected" : ""}`}>
+                    <div className="checkout-item-thumb relative shrink-0">
+                      <ItemThumb item={i} size="w-12 h-12" />
+                      {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -1307,7 +1745,8 @@ function CheckoutContent() {
                     </div>
                     <p className="text-[0.75rem] font-black text-[var(--user-text)] shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Free shipping threshold banner (matches desktop) */}
@@ -1324,7 +1763,7 @@ function CheckoutContent() {
                 <Truck size={13} /> Delivery Method
               </p>
               <div className="space-y-1.5">
-                {shippingMethodsMob.map((m) => {
+                  {shippingMethodsMob.map((m) => {
                   const active = shippingMethod === m.id;
                   const IconComp = m.icon;
                   // ✅ Custom method => uska apna fee; warna standard/express config fee
@@ -1334,16 +1773,18 @@ function CheckoutContent() {
                   return (
                     <label
                       key={m.id}
-                      className={`flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition ${active ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/40"}`}
+                      className={`checkout-selection-card flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition-colors duration-150 ${active ? "is-selected" : ""}`}
                     >
                       <input
                         type="radio"
                         name="shipping-method-mobile"
                         checked={active}
                         onChange={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }}
-                        className="w-4 h-4 shrink-0"
-                        style={{ accentColor: "var(--user-accent)" }}
+                        className="sr-only"
                       />
+                      <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.title}</p>
@@ -1376,12 +1817,13 @@ function CheckoutContent() {
                       type="button"
                       onClick={() => setPaymentMethod(m.id)}
                       aria-pressed={active}
-                      className={`w-full flex flex-col items-center justify-center px-2 py-2 rounded-xl border-2 transition active:scale-95 ${
-                        active
-                          ? "border-[var(--user-accent)] bg-[var(--user-accent)]/10 text-[var(--user-accent)]"
-                          : "border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/40"
+                      className={`checkout-selection-card w-full flex flex-col items-center justify-center px-2 py-2 rounded-xl border-2 transition-colors duration-150 ${
+                        active ? "is-selected" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
                       }`}
                     >
+                      <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
+                        {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
+                      </span>
                       <m.icon size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{m.label}</span>
                     </button>
@@ -1401,11 +1843,29 @@ function CheckoutContent() {
                   <div className="pt-2 border-t border-[var(--user-border)] space-y-2.5">
                     <div>
                       <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Sender Name</label>
-                      <input value={bankForm.senderName} onChange={(e) => setBankForm({ ...bankForm, senderName: e.target.value })} placeholder="e.g. Ahsan Younas" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                      <input 
+                        value={bankForm.senderName} 
+                        onChange={(e) => {
+                          setBankForm({ ...bankForm, senderName: e.target.value });
+                          if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
+                        }}
+                        placeholder="e.g. Ahsan Younas" 
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                      />
+                      {bankFormErrors.senderName && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.senderName}</p>}
                     </div>
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID (optional)</label>
-                      <input value={bankForm.transactionRef} onChange={(e) => setBankForm({ ...bankForm, transactionRef: e.target.value })} placeholder="Add after transferring" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID</label>
+                      <input 
+                        value={bankForm.transactionRef} 
+                        onChange={(e) => {
+                          setBankForm({ ...bankForm, transactionRef: e.target.value });
+                          if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
+                        }}
+                        placeholder="Add after transferring" 
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                      />
+                      {bankFormErrors.transactionRef && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.transactionRef}</p>}
                     </div>
                   </div>
                 </div>
@@ -1416,21 +1876,46 @@ function CheckoutContent() {
                 <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
                   <div>
                     <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Number</label>
-                    <input value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 16); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); }} placeholder="1234 5678 9012 3456" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    <input 
+                      name="card-number"
+                      value={cardForm.number} 
+                      onChange={(e) => { 
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 19); 
+                        setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); 
+                        if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" });
+                      }} 
+                      placeholder="1234 5678 9012 3456" 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.number ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                    />
+                    {cardFormErrors.number && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.number}</p>}
                   </div>
                   <div>
                     <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Holder Name</label>
-                    <input value={cardForm.name} onChange={(e) => setCardForm({ ...cardForm, name: e.target.value })} placeholder="John Doe" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
+                    <input 
+                      name="card-name"
+                      value={cardForm.name} 
+                      onChange={(e) => {
+                        setCardForm({ ...cardForm, name: e.target.value });
+                        if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" });
+                      }} 
+                      placeholder="John Doe" 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.name ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                    />
+                    {cardFormErrors.name && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.name}</p>}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry</label>
-                      <input value={cardForm.expiry} onChange={(e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); setCardForm({ ...cardForm, expiry: v }); }} placeholder="MM/YY" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
-                    </div>
-                    <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">CVV</label>
-                      <input type="password" value={cardForm.cvv} onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" className="w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] focus:border-[var(--user-accent)]" />
-                    </div>
+                  <div>
+                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry Date</label>
+                    <input
+                      name="card-expiry"
+                      type="datetime-local"
+                      value={cardForm.expiry}
+                      onChange={(e) => {
+                        setCardForm({ ...cardForm, expiry: e.target.value });
+                        if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" });
+                      }}
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.expiry ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                    />
+                    {cardFormErrors.expiry && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.expiry}</p>}
                   </div>
                 </div>
               )}
@@ -1487,15 +1972,15 @@ function CheckoutContent() {
                 </p>
                 <p className="text-base font-black text-[var(--user-accent)] leading-none mt-0.5">Rs. {grandTotal.toLocaleString()}</p>
               </div>
-              <button
-                type="button"
+              <PrimaryButton
                 onClick={() => setOrderReviewOpen(true)}
-                disabled={placing}
-                className="h-11 px-6 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-60 transition shadow-lg shadow-[var(--user-accent)]/20"
+                loading={placing}
+                loadingText="Placing..."
+                icon={Lock}
+                className="h-11 w-auto shrink-0 px-6"
               >
-                {placing ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {placing ? "Placing..." : "Place Order"}
-              </button>
+                Place Order
+              </PrimaryButton>
             </div>
           </div>
 
@@ -1542,7 +2027,7 @@ function CheckoutContent() {
                       return (
                         <div
                           key={a._id}
-                          className={`w-full text-left rounded-xl border-2 p-3 transition ${isSel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)]"}`}
+                          className={`checkout-selection-card w-full text-left rounded-xl border-2 p-3 transition-colors duration-150 ${isSel ? "is-selected" : ""}`}
                         >
                           <button
                             type="button"
@@ -1553,7 +2038,7 @@ function CheckoutContent() {
                               <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">{a.full_name}</p>
                               <span className="text-[0.6875rem] text-[var(--user-text-muted)] font-semibold">· {a.phone}</span>
                               {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">DEFAULT</span>}
-                              {isSel && <Check size={14} className="text-[var(--user-accent)] ml-auto shrink-0" />}
+                              {isSel && <Check size={14} className="checkout-selection-check ml-auto shrink-0" />}
                             </div>
                             <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 leading-snug">
                               {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
@@ -1620,15 +2105,15 @@ function CheckoutContent() {
 
                 {/* Confirm button — calls EXISTING submit handler */}
                 <div className="px-4 pt-2 pb-1">
-                  <button
-                    type="button"
+                  <PrimaryButton
                     onClick={placeOrder}
-                    disabled={placing}
-                    className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition shadow-lg shadow-[var(--user-accent)]/20"
+                    loading={placing}
+                    loadingText="Placing..."
+                    icon={Lock}
+                    className="h-12"
                   >
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing..." : "Confirm & Place Order"}
-                  </button>
+                    Confirm &amp; Place Order
+                  </PrimaryButton>
                 </div>
               </div>
             </div>
@@ -1642,9 +2127,10 @@ function CheckoutContent() {
                   <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">Order Review</h3>
                   <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
                 </div>
-                <div className="p-3 space-y-2">
+                <div className="p-4 space-y-3">
+                  <div className="divide-y divide-[var(--user-border)]">
                   {itemsWithDiscounts.map((i) => (
-                    <div key={i.key} className="flex items-center gap-2.5">
+                    <div key={i.key} className="flex items-center gap-4 py-1.5 first:pt-0 last:pb-0">
                       <ItemThumb item={i} size="w-12 h-12" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
@@ -1653,23 +2139,29 @@ function CheckoutContent() {
                       <p className="text-[0.75rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
                     </div>
                   ))}
-                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-2.5 text-[0.6875rem] space-y-1">
+                  </div>
+                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-3 text-[0.6875rem] space-y-1.5">
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : "No address selected"}</p>
                     {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
                     <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}</p>
                   </div>
-                  <div className="space-y-1.5 text-[0.75rem] pt-1">
+                  <div className="space-y-2.5 text-[0.75rem] pt-3">
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Items Total</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
                     {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">You Save</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-bold">{shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}</span></div>
-                    <div className="flex justify-between items-baseline pt-2 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>
-                <div className="px-4 pt-2 pb-1">
-                  <button type="button" onClick={placeOrder} disabled={placing} className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98] transition">
-                    {placing ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                    {placing ? "Placing..." : "Confirm & Place Order"}
-                  </button>
+                <div className="px-4 pt-3 pb-1">
+                  <PrimaryButton
+                    onClick={placeOrder}
+                    loading={placing}
+                    loadingText="Placing..."
+                    icon={Lock}
+                    className="h-12"
+                  >
+                    Confirm &amp; Place Order
+                  </PrimaryButton>
                 </div>
               </div>
             </div>

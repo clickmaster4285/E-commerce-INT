@@ -10,9 +10,7 @@ const purchasePaymentSchema = new mongoose.Schema(
       enum: ["bank", "cash", "cod", "credit", "advance_adjust"],
       required: true,
     },
-    reference: { type: String, trim: true, default: "" },
     paid_at: { type: Date, default: Date.now },
-    notes: { type: String, trim: true, default: "" },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
