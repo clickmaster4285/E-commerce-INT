@@ -37,7 +37,7 @@ export default function WishlistPage({ compact = false }) {
       {!compact && (
       <div className="flex items-center justify-between mb-5 sm:mb-8">
         <div>
-          <h1 className="flex items-center gap-2 text-xl lg:text-2xl font-black text-[var(--user-text)]">
+          <h1 className="flex items-center gap-2 text-xl lg:text-2xl font-semibold text-[var(--user-text)]">
             <Heart size={20} className="text-[var(--user-danger)] fill-[var(--user-danger)]" />
             My Wishlist
           </h1>

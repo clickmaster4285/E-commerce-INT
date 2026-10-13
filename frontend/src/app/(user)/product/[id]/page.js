@@ -342,9 +342,33 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
     };
   }, []);
 
-  const scrollStrip = (dir) => {
-    stripRef.current?.scrollBy({ left: dir * 220, behavior: "smooth" });
-  };
+  // ✅ Arrow = agli/peeche wali picture. Main image badalti hai aur uska thumbnail
+  // strip me visible bhi ho jata hai — chahe strip overflow kare ya na kare.
+  const scrollThumbIntoView = useCallback((url) => {
+    const strip = stripRef.current;
+    if (!strip || !url) return;
+    const node = strip.querySelector(`[data-img-url="${CSS.escape(url)}"]`);
+    if (!node) return;
+    const stripBox = strip.getBoundingClientRect();
+    const nodeBox = node.getBoundingClientRect();
+    if (nodeBox.left < stripBox.left) {
+      strip.scrollBy({ left: nodeBox.left - stripBox.left - 8, behavior: "smooth" });
+    } else if (nodeBox.right > stripBox.right) {
+      strip.scrollBy({ left: nodeBox.right - stripBox.right + 8, behavior: "smooth" });
+    }
+  }, []);
+
+  const stepImage = useCallback(
+    (dir) => {
+      if (!images.length) return;
+      const target = images[Math.min(Math.max(activeIndex + dir, 0), images.length - 1)];
+      if (!target) return;
+      if (target !== mainImage) onImageSelect(target);
+      scrollThumbIntoView(target);
+    },
+    [images, activeIndex, mainImage, onImageSelect, scrollThumbIntoView],
+  );
+
   return (
     <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
       <div className="product-gallery-main relative">
@@ -406,8 +430,8 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         <div className="relative mt-2 flex items-center gap-1">
           <button
             type="button"
-            onClick={() => scrollStrip(-1)}
-            aria-label="Previous images"
+            onClick={() => stepImage(-1)}
+            aria-label="Previous image"
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronLeft size={18} />
@@ -417,8 +441,10 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
               <button
                 key={i}
                 type="button"
+                data-img-url={url}
                 onClick={() => onImageSelect(url)}
                 aria-label={`View image ${i + 1}`}
+                aria-current={url === mainImage}
                 className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
               >
                 <img src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
@@ -427,8 +453,8 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           </div>
           <button
             type="button"
-            onClick={() => scrollStrip(1)}
-            aria-label="Next images"
+            onClick={() => stepImage(1)}
+            aria-label="Next image"
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronRight size={18} />
