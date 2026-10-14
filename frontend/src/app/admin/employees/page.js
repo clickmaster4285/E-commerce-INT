@@ -29,9 +29,9 @@ const AVATAR_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/web
 const resolveAvatarUrl = (value) => {
   if (!value || typeof value !== "string") return "";
   if (/^(https?:|data:|blob:)/i.test(value)) return value;
-  const serverUrl =
-    process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "");
+  // Sirf `NEXT_PUBLIC_SERVERURL` — `NEXT_PUBLIC_API_URL` kabhi define nahi hua,
+  // to woh `||` fallback hamesha `undefined` hi deta tha (dead code).
+  const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
   return `${serverUrl}/${value.replace(/^\//, "")}`;
 };
 

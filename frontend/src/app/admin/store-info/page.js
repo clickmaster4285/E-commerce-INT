@@ -50,10 +50,9 @@ import cc from "currency-codes";
 // ======================================================
 
 const getServerUrl = () => {
-  return (
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "")
-  );
+  // Sirf `NEXT_PUBLIC_SERVERURL` — `NEXT_PUBLIC_API_URL` kabhi define nahi hua,
+  // to `||` wali pehli line hamesha `undefined` hi deti thi (dead code).
+  return process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 };
 
 const API_BASE_URL = getServerUrl();
@@ -148,7 +147,9 @@ const getLogoUrl = (storeData) => {
       return imgUrl;
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
+    // Sirf `NEXT_PUBLIC_SERVERURL` — `NEXT_PUBLIC_API_URL` kabhi define nahi hua,
+    // to woh `||` fallback hamesha `undefined` hi deta tha (dead code).
+    const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 
     // 2. FIX: Agar "/home/...", "/Users/..." ya koi absolute system path hai
     if ((imgUrl.startsWith("/") && !imgUrl.startsWith("/uploads"))) {
@@ -175,7 +176,9 @@ const getLogoUrl = (storeData) => {
         return possibleUrl;
       }
       
-      const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ;
+      // Sirf `NEXT_PUBLIC_SERVERURL` — `NEXT_PUBLIC_API_URL` kabhi define nahi hua,
+    // to woh `||` fallback hamesha `undefined` hi deta tha (dead code).
+    const serverUrl = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
       
       // Apply the same absolute path FIX for fallback properties
       if ((possibleUrl.startsWith("/") && !possibleUrl.startsWith("/uploads")) && possibleUrl.includes("/uploads/store/")) {
