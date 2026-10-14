@@ -27,7 +27,18 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
-const getUserAccessDays = () => Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS) || 7;
+// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
+// jwt.sign invalid expiresIn ("NaNd") pe THROW kar deta hai → OTP verify ke
+// baad login fail. Is liye validated fallback.
+const getUserAccessDays = () => {
+  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
+  return Number.isFinite(days) && days > 0 ? days : 7;
+};
+
+const getRefreshTokenDays = () => {
+  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
+  return Number.isFinite(days) && days > 0 ? days : 30;
+};
 
 const setAuthCookies = (res, userId, role) => {
   const accessToken = jwt.sign(
@@ -38,7 +49,7 @@ const setAuthCookies = (res, userId, role) => {
   const refreshToken = jwt.sign(
     { userId, role, type: "user" },
     process.env.JWT_SECRET,
-    { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d` },
+    { expiresIn: `${getRefreshTokenDays()}d` },
   );
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
@@ -50,8 +61,7 @@ const setAuthCookies = (res, userId, role) => {
     httpOnly: true,
     secure: false,
     sameSite: "lax",
-    maxAge:
-      Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS) * 24 * 60 * 60 * 1000,
+    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
   });
 };
 
