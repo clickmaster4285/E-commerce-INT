@@ -17,9 +17,18 @@ const storage = multer.diskStorage({
   },
 });
 
+// ✅ Sirf wahi formats jo frontend notice me likhe hain (JPG/PNG/WEBP).
+// Pehle `image/*` koi bhi type le leti thi — GIF/SVG/BMP silently accept ho
+// jate the aur sharp ke baad admin ko pata hi nahi chalta tha ki GIF ka
+// animation toot gaya ya SVG rasterize ho gaya.
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith("image/")) cb(null, true);
-  else cb(new Error("Only image files are allowed"), false);
+  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) return cb(null, true);
+  cb(
+    new Error("Unsupported file type — only JPG, PNG and WEBP images are allowed"),
+    false
+  );
 };
 
 // ✅ Banner images badi hoti hain — 5MB parakash me high-res PNG reject ho jata tha.
@@ -48,6 +57,11 @@ const MAX_WIDTH = {
   mobileImage: 1200,
 };
 
+// ✅ Decompression-bomb guard — chhoti file (2MB PNG) RAM me GB bhar sakti hai
+// jab sharp use decode karta hai. Banner ke liye 50 megapixel kaafi se zyada
+// hai (3000px wide), aur isse ek crafted image server memory nahi kha sakti.
+const MAX_INPUT_PIXELS = 50_000_000;
+
 const processBannerImage = async (file) => {
   const maxWidth = MAX_WIDTH[file.fieldname];
   if (!maxWidth) return;
@@ -56,7 +70,7 @@ const processBannerImage = async (file) => {
   const processedPath = path.join(uploadDir, processedName);
 
   // Buffer ke through process karo taaki same-name (pehle se .webp) par overwrite safe rahe
-  const buffer = await sharp(file.path)
+  const buffer = await sharp(file.path, { limitInputPixels: MAX_INPUT_PIXELS })
     .rotate() // EXIF orientation respect karo
     .resize({
       width: maxWidth,
@@ -129,7 +143,10 @@ const uploadBanners = (req, res, next) => {
       }
       res.status(400).json({
         success: false,
-        message: error.message || "Banner image processing failed",
+        // sharp ka raw error cryptic hota hai — pixel-limit wala clearly batao
+        message: /pixel limit/i.test(error?.message || "")
+          ? "Image resolution is too high. Please resize the image below 50 megapixels and try again."
+          : error?.message || "Banner image processing failed",
       });
     }
   });
