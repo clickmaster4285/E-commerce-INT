@@ -15,11 +15,15 @@ import { brandApi } from "../../../apis/admin/brandApi";
 // ==========================================
 // API SETUP
 // ==========================================
-const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
-const API_URL = `${API_BASE}/api`;
+// Base URL env se (frontend/.env → NEXT_PUBLIC_SERVERURL).
+// Pehle yahan env se `/api` hatakar wapas `/api` lagaya jata tha
+// (`replace(/\/api$/)` → `${API_BASE}/api`) — pure redundant round-trip jo
+// `/api/api` jaisi galti ka bhi risk rakhta tha.
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_SERVERURL || "").trim().replace(/\/+$/, "") || null;
 
 const bannerAxios = axios.create({
-  baseURL: API_URL,
+  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
@@ -924,7 +928,10 @@ export default function BannersPage() {
         if (cleanPrimaryButton.linkType === 'product' && cleanPrimaryButton.productId) {
           cleanPrimaryButton.link = `/product/${cleanPrimaryButton.productId}`;
         } else if (cleanPrimaryButton.linkType === 'category' && cleanPrimaryButton.categoryId) {
-          cleanPrimaryButton.link = `/category/${cleanPrimaryButton.categoryId}`;
+          // ✅ `/category/<id>` ka koi route hi nahi hai → storefront par 404.
+          // Baqi har jagah (Header, HomeCategories, HomeNav, PopularCategories)
+          // isi pattern par jata hai, is liye wahi use karo.
+          cleanPrimaryButton.link = `/filtering-product?category=${cleanPrimaryButton.categoryId}`;
         } else if (cleanPrimaryButton.linkType === 'brand' && cleanPrimaryButton.brandId) {
           cleanPrimaryButton.link = `/brand/${cleanPrimaryButton.brandId}`;
         }
