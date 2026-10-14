@@ -1,7 +1,7 @@
 /* ==========================================
-   USER THEME — DARK MODE (Default)
+   DARK MODE — Overrides (html.user-dark)
 ========================================== */
-:root {
+:root.user-dark {
   /* Backgrounds */
   --user-bg:            #0b0f14;
   --user-bg-elevated:   #10151c;
@@ -68,9 +68,9 @@
 }
 
 /* ==========================================
-   LIGHT MODE — Overrides
+   USER THEME — LIGHT MODE (Default)
 ========================================== */
-.user-theme.light {
+:root {
   --user-bg:            #eff0f5;
   --user-bg-elevated:   #ffffff;
   --user-bg-card:       #ffffff;
@@ -109,9 +109,26 @@
   --primary-hover:      #c35b1d;
   --primary-contrast:   #ffffff;
 
+  /* Logo background (dono modes mein white) */
+  --user-logo-bg:       #ffffff;
+
+  /* Status (dono modes me same) */
+  --user-success:       #10b981;
+  --user-danger:        #ef4444;
+  --user-warning:       #f59e0b;
+  --user-info:          #3b82f6;
+
   --user-shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.06);
   --user-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.08);
   --user-shadow-lg:     0 10px 30px rgba(0, 0, 0, 0.10);
+
+  /* Radius (dono modes me same) */
+  --user-radius-sm:     8px;
+  --user-radius-md:     12px;
+  --user-radius-lg:     16px;
+  --user-radius-xl:     24px;
+
+  --user-transition:    0.2s ease;
 }
 
 /* ==========================================
@@ -140,7 +157,7 @@
   background-color: #0f141a;
 }
 
-.user-theme:not(.light) .home-category-section {
+:root.user-dark .home-category-section {
   padding: 0.75rem;
   background: linear-gradient(180deg, #0b0f14 0%, #0f141a 100%);
 }
@@ -248,7 +265,7 @@
 }
 
 @media (min-width: 640px) {
-  .user-theme:not(.light) .home-category-section {
+  :root.user-dark .home-category-section {
     padding: 1rem;
   }
 }
@@ -521,10 +538,10 @@ html:has(.user-theme) {
     margin-inline: auto;
   }
   html:has(.user-theme) {
-    background: var(--user-bg);
-  }
-  html:has(.user-theme.light) {
     background: #fafafa;
+  }
+  :root.user-dark:has(.user-theme) {
+    background: #0b0f14;
   }
 }
 
@@ -584,8 +601,8 @@ html:has(.user-theme) {
   background-color: var(--user-bg);
 }
 
-/* Preserve checkout's existing light palette while dark mode inherits the storefront theme. */
-.user-theme.light .checkout-premium {
+/* Preserve checkout's existing light palette (default theme) while dark mode inherits the storefront theme. */
+:root:not(.user-dark) .checkout-premium {
   --user-bg: #f7f7f8;
   --user-bg-elevated: #ffffff;
   --user-bg-card: #ffffff;

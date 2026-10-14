@@ -21,6 +21,23 @@ const PUBLIC_AUTH_PATHS = [
 const USER_PUBLIC_AUTH_PATHS = PUBLIC_AUTH_PATHS.filter((path) => path !== "/users/admin/login");
 const FRIENDLY_SESSION_EXPIRED = "Session expired. Please log in again.";
 
+/* ==========================================================
+   PROACTIVE REFRESH — "token bar bar expire" ka asli ilaj
+   ---------------------------------------------------------
+   Pehle sirf REACTIVE refresh tha: token expire → API 401 → phir refresh.
+   Isi window me admin panel ka profile query fail hota tha aur user logout
+   ho jata tha (har 10 minute).
+
+   Ab access token apne expiry se PEHLE hi refresh ho jata hai:
+     • interval timer (har N minute)
+     • tab wapas foreground me aaye (visibilitychange) — idle time me
+       token expire ho chuka hota hai, yahi sabse common trigger hai
+   Isse 401 practically nahi aata, aur logout bilkul nahi hota.
+   ========================================================== */
+
+// 0 = proactive refresh off
+const REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 min (admin token 60 min ka hai)
+
 const notifyUserSessionExpired = () => {
   try {
     window.dispatchEvent(new CustomEvent("user-session-expired"));
@@ -29,7 +46,7 @@ const notifyUserSessionExpired = () => {
   }
 };
 
-function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
+function createAuthHttp({ refreshUrl, publicAuthPaths, mode, refreshIntervalMs }) {
   const http = axios.create({ withCredentials: true });
   let refreshPromise = null;
 
@@ -40,6 +57,12 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
       });
     }
     return refreshPromise;
+  };
+
+  // Proactive call — fail ho to chup chap ignore (reactive 401 flow sambhal lega)
+  const refreshSilently = () => {
+    if (typeof window === "undefined") return;
+    startRefresh().catch(() => {});
   };
 
   const redirectToAdminLogin = () => {
@@ -119,6 +142,18 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
     },
   );
 
+  // ==========================================================
+  // Timer + visibility — sirf browser me (SSR pe kuch nahi)
+  // ==========================================================
+  if (typeof window !== "undefined" && refreshIntervalMs > 0) {
+    setInterval(refreshSilently, refreshIntervalMs);
+
+    document.addEventListener("visibilitychange", () => {
+      // Sirf tab wapas aane par — background me refresh bekaar hai
+      if (document.visibilityState === "visible") refreshSilently();
+    });
+  }
+
   return http;
 }
 
@@ -126,12 +161,16 @@ const axiosInstance = createAuthHttp({
   refreshUrl: "/users/admin/refresh-token",
   publicAuthPaths: PUBLIC_AUTH_PATHS,
   mode: "admin",
+  // Admin token 60 min → 50 min par refresh (10 min safety margin)
+  refreshIntervalMs: REFRESH_INTERVAL_MS,
 });
 
 export const userHttp = createAuthHttp({
   refreshUrl: "/users/refresh-token",
   publicAuthPaths: USER_PUBLIC_AUTH_PATHS,
   mode: "user",
+  // Customer token 7 din ka hai — har 6 ghante par refresh kaafi hai
+  refreshIntervalMs: 6 * 60 * 60 * 1000,
 });
 
 export default axiosInstance;

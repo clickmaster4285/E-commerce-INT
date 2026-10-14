@@ -186,7 +186,9 @@ const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={classNa
 const UploadIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
 const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>);
 const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>);
-const InfoIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
+const PhotoIcon = ({ className = "w-4 h-4", style }) => (<svg className={className} style={style} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6.5 6.5h.01M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>);
+
+const InfoIcon = ({ className = "w-4 h-4", style }) => (<svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
 const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 2v10" /></svg>);
@@ -272,6 +274,49 @@ const Textarea = ({ ...props }) => (
   />
 );
 
+/* ==========================================================
+   BANNER IMAGE — SIZE / FORMAT RULES
+   ------------------------------------------------------------
+   Ye limit backend se EXACTLY match karti hai:
+   backend/middleware/uploadMiddleware.js → MAX_UPLOAD_MB = 15
+
+   Client par validate karne se admin ko 20MB+ file bhejne ka wait
+   nahi karna padta (upload pura hone ke baad 413 aata tha). Ab file
+   select karte hi foran clear error milta hai aur upload hota hi nahi.
+   ========================================================== */
+const MAX_IMAGE_MB = 15;
+const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ALLOWED_IMAGE_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
+
+const formatBytes = (bytes) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+/* ✅ Blob URL memory leak fix — pehle har render par naya objectURL
+   ban raha tha (URL.revokeObjectURL kabhi call nahi hota tha), jo
+   long admin session me memory barhata raha. Ab ek File = ek URL,
+   aur File GC hone par WeakMap bhi saath hi chala jata hai. */
+const previewUrlCache = new WeakMap();
+const getFilePreviewUrl = (file) => {
+  if (typeof window === "undefined" || !(file instanceof File)) return null;
+  const cached = previewUrlCache.get(file);
+  if (cached) return cached;
+  const url = URL.createObjectURL(file);
+  previewUrlCache.set(file, url);
+  return url;
+};
+
+/* null = valid, string = user-facing error */
+const validateImageFile = (file) => {
+  if (!file) return null;
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return "Unsupported file type. Please upload a JPG, PNG or WEBP image.";
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return `Image is ${formatBytes(file.size)}. Maximum allowed size is ${MAX_IMAGE_MB} MB.`;
+  }
+  return null;
+};
+
 /* ==================== DRAG AND DROP IMAGE UPLOAD (FIXED) ==================== */
 const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions }) => {
   const inputRef = useRef(null);
@@ -280,7 +325,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
   // Helper to get valid preview URL
   const getPreviewUrl = () => {
     if (!file) return null;
-    if (file instanceof File) return URL.createObjectURL(file);
+    if (file instanceof File) return getFilePreviewUrl(file);
     if (typeof file === 'string') {
       // If it's already a URL string (from DB), use it directly or prepend base
       return file.startsWith('http') ? file : `${API_BASE}${file.startsWith('/') ? '' : '/'}${file}`;
@@ -290,11 +335,21 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
 
   const currentPreview = preview || getPreviewUrl();
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+  // ✅ Ek hi jagah validate — click aur drag/drop dono yahan se guzarte hain
+  const acceptFile = (candidate) => {
+    if (!candidate) return;
+    const error = validateImageFile(candidate);
+    if (error) {
+      toast.error(error, { description: `Maximum allowed size is ${MAX_IMAGE_MB} MB.` });
+      // Input value reset — warna same file dobara select karne par change na fire ho
+      if (inputRef.current) inputRef.current.value = "";
+      return;
     }
+    setFile(candidate);
+  };
+
+  const handleFileChange = (e) => {
+    acceptFile(e.target.files?.[0]);
   };
 
   // Drag & Drop Handlers
@@ -319,12 +374,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
 
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles && droppedFiles.length > 0) {
-      const droppedFile = droppedFiles[0];
-      if (droppedFile.type.startsWith('image/')) {
-        setFile(droppedFile);
-      } else {
-        toast.error("Please upload an image file");
-      }
+      acceptFile(droppedFiles[0]);
     }
   };
 
@@ -336,11 +386,21 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      
+      {/* Label + size rule ek hi line par (label left, rule right) */}
+      <div className="flex items-center justify-between gap-3">
+        <label className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium whitespace-nowrap"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <PhotoIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
+          Max {MAX_IMAGE_MB} MB · JPG, PNG or WEBP
+        </p>
+      </div>
+
       {/* Drop Zone / Preview Container */}
       <div
         onDragOver={handleDragOver}
@@ -387,7 +447,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
                   Click to upload or drag and drop
                 </p>
                 <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-                  SVG, PNG, JPG or GIF
+                  JPG, PNG or WEBP
                 </p>
                 {dimensions && (
                   <p className="text-[10px] mt-0.5 font-mono opacity-70" style={{ color: "var(--text-secondary)" }}>
@@ -402,7 +462,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={ALLOWED_IMAGE_ACCEPT}
           onChange={handleFileChange}
           className="hidden"
         />
@@ -975,7 +1035,7 @@ export default function BannersPage() {
 
   const getImagePreview = (file) => {
     if (!file) return null;
-    if (file instanceof File) return URL.createObjectURL(file);
+    if (file instanceof File) return getFilePreviewUrl(file);
     const cleanPath = file.startsWith('/') ? file : `/${file}`;
     return `${API_BASE}${cleanPath}`;
   };

@@ -23,7 +23,9 @@ import SectionHeading from "./SectionHeading";
 import { STOCK_STATES, formatPrice, idOf } from "@/utils/homeCatalog";
 import { useShopProducts, scrollToListTop } from "@/hooks/useShopProducts";
 
-const PER_PAGE = 20;
+// ✅ 24 per page — xl par grid 6 columns hai, 24 = 4 poore rows (20 par
+// teesra row adhoora rehta tha).
+const PER_PAGE = 24;
 
 const safePageParam = (raw) => {
   const n = Number(raw);
