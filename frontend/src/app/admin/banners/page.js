@@ -186,6 +186,8 @@ const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={classNa
 const UploadIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
 const EyeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>);
 const CopyIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>);
+const PhotoIcon = ({ className = "w-4 h-4", style }) => (<svg className={className} style={style} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6.5 6.5h.01M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>);
+
 const InfoIcon = ({ className = "w-4 h-4", style }) => (<svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>);
 const TagIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>);
 const DotsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>);
@@ -384,25 +386,18 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-
-      {/* ===== Size / format notice — upload se PEHLE clear rule ===== */}
-      <div
-        className="flex items-start gap-2 rounded-md px-3 py-2 border"
-        style={{
-          backgroundColor: "var(--accent-soft)",
-          borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
-        }}
-        role="note"
-      >
-        <InfoIcon className="w-3.5 h-3.5 mt-px shrink-0" style={{ color: "var(--accent)" }} />
-        <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          Maximum size{" "}
-          <strong style={{ color: "var(--text-primary)" }}>{MAX_IMAGE_MB} MB</strong> · JPG,
-          PNG or WEBP only
+      {/* Label + size rule ek hi line par (label left, rule right) */}
+      <div className="flex items-center justify-between gap-3">
+        <label className="block text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <p
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium whitespace-nowrap"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <PhotoIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
+          Max {MAX_IMAGE_MB} MB · JPG, PNG or WEBP
         </p>
       </div>
 
