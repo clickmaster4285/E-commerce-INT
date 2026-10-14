@@ -14,7 +14,7 @@ import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
 import { useUserSocketSync } from "@/hooks/useUserSocketSync";
-import { getThemeFromCookie, initThemeFromCookie } from "@/lib/theme";
+import { initThemeFromCookie } from "@/lib/theme";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
