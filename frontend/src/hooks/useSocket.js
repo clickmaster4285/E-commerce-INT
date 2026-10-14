@@ -27,7 +27,10 @@ const getSocketURL = () => {
       // env URL galat hai to neeche wala dynamic URL use hoga
     }
   }
-  return `http://${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT}`;
+  // Protocol page wala copy karo — hardcoded `http://` HTTPS deployment par
+  // mixed-content block kar deta tha. Hostname bhi env se, taake har LAN
+  // device/host par koi IP hardcode na ho.
+  return `${window.location.protocol}//${window.location.hostname}:${process.env.NEXT_PUBLIC_SERVER_PORT}`;
 };
 
 function cleanupOldSocket() {
