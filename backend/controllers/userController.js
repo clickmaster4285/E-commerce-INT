@@ -24,10 +24,25 @@ const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
 
-const getUserAccessDays = () => Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS) || 7;
-const getAdminAccessMinutes = () => Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
+// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
+// jwt.sign "NaNm" jaise invalid expiresIn pe THROW kar deta hai (login/refresh
+// dono 500/401 → user logout). Is liye har value validated fallback ke saath.
+const getUserAccessDays = () => {
+  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
+  return Number.isFinite(days) && days > 0 ? days : 7;
+};
 
-// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → 10 min
+const getAdminAccessMinutes = () => {
+  const minutes = Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
+};
+
+const getRefreshTokenDays = () => {
+  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
+  return Number.isFinite(days) && days > 0 ? days : 30;
+};
+
+// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → minutes
 const isLongLivedUserToken = (type, role) =>
   String(type || "user").toLowerCase() !== "employee" &&
   String(role || "").toLowerCase() === "user";
@@ -37,17 +52,23 @@ const getAccessExpiry = (type, role) =>
     ? `${getUserAccessDays()}d`
     : `${getAdminAccessMinutes()}m`;
 
+// ⚠️ Ye value JWT expiry se EXACTLY match karti hai. Pehle admin ke liye
+// hardcoded 1 ghanta tha jabki JWT sirf 10 min ka tha — mismatch se cookie
+// zinda rehta tha par token expire ho jata tha, aur har 401 pe refresh chain
+// race karke admin ko logout kar deta tha.
 const getAccessCookieMaxAge = (type, role) =>
   isLongLivedUserToken(type, role)
     ? getUserAccessDays() * 24 * 60 * 60 * 1000
-    : 60 * 60 * 1000;
+    : getAdminAccessMinutes() * 60 * 1000;
+
+const getRefreshCookieMaxAge = () => getRefreshTokenDays() * 24 * 60 * 60 * 1000;
 
 const generateTokens = (userId, role, type = 'user') => {
   const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
     expiresIn: getAccessExpiry(type, role),
   });
   const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d`,
+    expiresIn: `${getRefreshTokenDays()}d`,
   });
   return { accessToken, refreshToken };
 };
@@ -297,7 +318,7 @@ const loginUser = async (req, res) => {
     res.cookie(
       "refreshToken",
       refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000),
+      getCookieOptions(getRefreshCookieMaxAge()),
     );
     res.json({
       success: true,
@@ -371,11 +392,11 @@ const loginAdmin = async (req, res) => {
       employee._id,
     );
     const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, 'employee');
-    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('employee', employee.role)));
     res.cookie(
       "refreshToken",
       refreshToken,
-      getCookieOptions(30 * 24 * 60 * 60 * 1000),
+      getCookieOptions(getRefreshCookieMaxAge()),
     );
     res.json({
       success: true,
@@ -439,7 +460,7 @@ const refreshAdminAccessToken = async (req, res) => {
         .status(401)
         .json({ success: false, message: "User not found" });
     const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(60 * 60 * 1000));
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
     res.status(401).json({ success: false, message: "Invalid refresh token" });
@@ -883,32 +904,13 @@ const googleLogin = async (req, res) => {
         await user.save();
       }
     }
-    const accessToken = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: `${process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES}m` },
-    );
-    const refreshToken = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: `${process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS}d` },
-    );
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge:
-        Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES) * 60 * 1000,
-    });
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge:
-        Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS) *
-        24 *
-        60 *
-        60 *
-        1000,
-    });
+    // ⚠️ Pehle `type` payload me nahi tha → authMiddleware ise "user" maan kar
+    // User collection me dhoondta (Employee hai → "User not found" 401), aur
+    // admin refresh endpoint bhi is token ko reject kar deta tha. Ab type
+    // set hai + expiry/cookie dono ek hi helper se aate hain.
+    const { accessToken, refreshToken } = generateTokens(user._id, user.role, "employee");
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
+    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
     return res.json({
       success: true,
       message: "Google login successful",
@@ -1000,7 +1002,7 @@ const googleCustomerLogin = async (req, res) => {
 
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
     res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(30 * 24 * 60 * 60 * 1000));
+    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
     res.json({
       success: true,
       message: "Google login successful",
