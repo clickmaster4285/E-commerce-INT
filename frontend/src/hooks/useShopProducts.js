@@ -9,7 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/user/productApi";
 
-export const SHOP_PAGE_SIZE = 20;
+export const SHOP_PAGE_SIZE = 24;
 
 export function useShopProducts({
   page = 1,

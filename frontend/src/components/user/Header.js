@@ -249,7 +249,7 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
   const [isMobile, setIsMobile] = useState(false);
   const { count, setIsCartOpen } = useCart();
   const { count: wishlistCount } = useWishlist();
@@ -273,10 +273,9 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    const saved = Cookies.get("user-theme") || "dark";
+    const saved = Cookies.get("user-theme") === "dark" ? "dark" : "light";
     setTheme(saved);
-    const el = document.getElementById("user-theme");
-    if (el) el.classList.toggle("light", saved === "light");
+    document.documentElement.classList.toggle("user-dark", saved === "dark");
   }, []);
 
   useEffect(() => {
@@ -296,8 +295,7 @@ export default function Header() {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
-    const el = document.getElementById("user-theme");
-    if (el) el.classList.toggle("light", next === "light");
+    document.documentElement.classList.toggle("user-dark", next === "dark");
   };
 
   const { data: user = null } = useQuery({
