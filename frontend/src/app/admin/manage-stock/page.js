@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
-import { useStockSocketSync } from "@/hooks/useStockSocketSync";
+import { useStockSocketSync } from "../../../hooks/admin/useStockSocketSync";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (url) => {

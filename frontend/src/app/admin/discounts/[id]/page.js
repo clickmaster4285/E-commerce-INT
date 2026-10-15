@@ -15,7 +15,7 @@ import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { DiscountFormModal, SelectionModal } from "../_components/discountModals";
 import { validateNonNegative } from "../_components/discountUtils";
-import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
+import useDiscountSocketSync from "../../../../hooks/admin/useDiscountSocketSync";
 
 /* =========================================================
    HELPERS

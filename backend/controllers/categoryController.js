@@ -548,20 +548,35 @@ const updateCategory = async (req, res) => {
     }
 
     // Check if there are any actual changes before setting updatedby
+    // ✅ FIX: Robust change detection that properly handles boolean fields like is_active
     const fieldsToCompare = Object.keys(updateData);
     const hasActualChanges = fieldsToCompare.some((key) => {
       const newVal = updateData[key];
       const oldVal = existingCategory[key];
+      
       // Handle array comparison for attributes
       if (Array.isArray(newVal) && Array.isArray(oldVal)) {
         return JSON.stringify(newVal) !== JSON.stringify(oldVal);
       }
-      if (newVal !== undefined && newVal !== null && oldVal !== undefined && oldVal !== null) {
-        return String(newVal) !== String(oldVal);
+      
+      // ✅ FIX: Handle boolean fields explicitly - critical for is_active changes
+      if (typeof newVal === "boolean" && typeof oldVal === "boolean") {
+        return newVal !== oldVal;
       }
-      // If new value is explicitly provided and different from old
+      
+      // Handle null/undefined edge cases
+      if (newVal === undefined && oldVal === undefined) return false;
+      if (newVal === null && oldVal === null) return false;
+      if (newVal === undefined && oldVal === null) return false;
+      if (newVal === null && oldVal === undefined) return false;
+      
+      // If new value is explicitly provided in request body, compare properly
       if (key in req.body) {
-        return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+        // For non-primitive values, use JSON stringify
+        if (typeof newVal === "object" || typeof oldVal === "object") {
+          return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+        }
+        return String(newVal) !== String(oldVal);
       }
       return false;
     });

@@ -29,7 +29,7 @@ import {
   MailCheck,
   MapPinCheck,
 } from "lucide-react";
-import { useSocket } from "@/hooks/useSocket";
+import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { toast } from "sonner";
 
 /* ══════════════════════════════════════════════
@@ -136,7 +136,7 @@ const cardStyle = {
    ═══════════════════════════════════════════════ */
 
 export default function ProfilePage() {
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected } = useAdminSocket();
 
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);

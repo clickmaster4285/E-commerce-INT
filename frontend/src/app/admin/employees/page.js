@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
-import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
+import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
 
 const ITEMS_PER_PAGE = 20;
 const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];

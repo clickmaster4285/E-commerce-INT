@@ -36,7 +36,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useSocket } from "@/hooks/useSocket";
+import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useQuery } from "@tanstack/react-query";
 import adminHttp from "@/apis/axiosInstance"
 import PhoneInput from "react-phone-input-2";
@@ -477,7 +477,7 @@ function SearchSelect({
 
 export default function StoreInfoPage() {
   const dispatch = useDispatch();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected } = useAdminSocket();
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);

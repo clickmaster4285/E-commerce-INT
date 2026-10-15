@@ -7,9 +7,9 @@ import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
 import adminHttp from '@/apis/axiosInstance';
 import Cookies from 'js-cookie';
-import { useStoreSocketSync } from '../../hooks/useStoreSocketSync';
-import { useShippingSocketSync } from '../../hooks/useShippingSocketSync';
-import { useOrderSocketSync } from '../../hooks/useOrderSocketSync';
+import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
+import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
+import { useOrderSocketSync } from '../../hooks/admin/useOrderSocketSync';
 import { io } from 'socket.io-client';
 
 // ==========================================

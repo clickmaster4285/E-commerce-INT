@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSocket } from "./useSocket";
+import { useAdminSocket } from "./useAdminSocket";
 
 export function useStoreSocketSync() {
   const queryClient = useQueryClient();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected } = useAdminSocket();
 
   useEffect(() => {
     // Socket available nahi ya connected nahi hai

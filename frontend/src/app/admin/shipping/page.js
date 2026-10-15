@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { shippingApi } from "@/apis/admin/shippingApi";
-import { useShippingSocketSync } from "@/hooks/useShippingSocketSync.js";
+import { useShippingSocketSync } from "@/hooks/admin/useShippingSocketSync";
 
 /* ================= ICONS ================= */
 const TruckIcon = ({ className = "w-4 h-4" }) => (

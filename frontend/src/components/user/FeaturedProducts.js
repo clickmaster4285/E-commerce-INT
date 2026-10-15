@@ -17,7 +17,7 @@ import ProductCard from "./ProductCard";
 import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { idOf } from "@/utils/homeCatalog";
-import { useShopProducts, scrollToListTop } from "@/hooks/useShopProducts";
+import { useShopProducts, scrollToListTop } from "../../hooks/user/useShopProducts";
 import { FEATURED_TAB_EVENT } from "./HomeNav";
 
 const TABS = [

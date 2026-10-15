@@ -225,9 +225,12 @@ const collectIds = (value) => {
 
 // ✅ Category subtree expand (homeCatalog.categorySubtreeIds parity) —
 // parent select ho to uske saare children bhi match hote hain
+// ⚠️ Sirf ACTIVE categories ka tree expand karo — disabled category ke
+// products storefront me nahi dikhne chahiye (category public endpoint
+// aur category-tiles bhi is_active: true filter karte hain).
 const expandCategorySubtrees = async (rootIds) => {
   if (!rootIds.length) return [];
-  const cats = await Category.find({ is_deleted: false }).select("parent_category_id").lean();
+  const cats = await Category.find({ is_deleted: false, is_active: true }).select("parent_category_id").lean();
   const childrenOf = new Map();
   cats.forEach((c) => {
     const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
@@ -266,10 +269,12 @@ const buildProductFilter = async (query = {}) => {
   const filter = { is_deleted: { $ne: true } };
   if (brandIds.length === 1) filter.brand_id = brandIds[0];
   else if (brandIds.length > 1) filter.brand_id = { $in: brandIds };
-  if (categoryIds.length) {
-    const expanded = await expandCategorySubtrees(categoryIds);
-    filter.category_id = { $in: expanded.length ? expanded : categoryIds };
-  }
+  // ⚠️ Filter by category + ensure category is active (is_active: true)
+    // This prevents products in disabled categories from appearing in storefront
+    if (categoryIds.length) {
+      const expanded = await expandCategorySubtrees(categoryIds);
+      filter.category_id = { $in: expanded.length ? expanded : categoryIds };
+    }
   if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
   if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
   else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
@@ -277,10 +282,14 @@ const buildProductFilter = async (query = {}) => {
   if (search) {
     const rx = { $regex: escapeRegex(search), $options: "i" };
     const [brandDocs, catDocs, variantDocs] = await Promise.all([
+      // ⚠️ Sirf ACTIVE brands ko search me include karo — disabled brand
+      // ke products storefront search me nahi aane chahiye
       Brand
-        ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
+        ? Brand.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => [])
         : Promise.resolve([]),
-      Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
+      // ⚠️ Sirf ACTIVE categories ko search me include karo — disabled category
+      // ke products storefront search me nahi aane chahiye
+      Category.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => []),
       Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
     ]);
     filter.$or = [
@@ -1014,7 +1023,10 @@ const getProductFacets = async (req, res) => {
         { $group: { _id: "$brand_id", count: { $sum: 1 } } },
       ]),
       Product.find(globalBase).select("_id").lean(),
-      Category.find({ is_deleted: false }).select("_id parent_category_id").lean(),
+      // ⚠️ `is_active` bhi select karo (niche emit filter ke liye). Tree
+      // structure ke liye INACTIVE children bhi chahiye — warna active parent ka
+      // subtree count galat aa jayega. Filtering sirf emit karte waqt hoti hai.
+      Category.find({ is_deleted: false }).select("_id parent_category_id is_active").lean(),
     ]);
     const allIds = allIdsDocs.map((d) => d._id);
     const globalStats = await variantStatsMap(allIds);
@@ -1038,10 +1050,16 @@ const getProductFacets = async (req, res) => {
       });
       return sum;
     };
-    const categoryCounts = categories.map((c) => ({
-      _id: c._id,
-      count: subtreeCount(String(c._id)),
-    }));
+    // ⚠️ Sirf ACTIVE categories ka facet emit karo — admin ne category
+    // disable ki to wo shop filter sidebar me bhi nahi dikhni chahiye
+    // (`/categories/public` + `category-tiles` ke same rule). Products khud
+    // chhapte nahi — wo grid me normal rehte hain, sirf category option hat jaata hai.
+    const categoryCounts = categories
+      .filter((c) => c.is_active !== false)
+      .map((c) => ({
+        _id: c._id,
+        count: subtreeCount(String(c._id)),
+      }));
     const brandCounts = brandGroups.map((g) => ({ _id: g._id, count: g.count }));
 
     // ✅ Shared pieces (ek baar fetch) + indexed counting (single pass)
@@ -1155,7 +1173,9 @@ const getCategoryTiles = async (req, res) => {
   try {
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 12;
-    const categories = await Category.find({ is_deleted: false })
+    // ⚠️ `is_active` filter — deactivate ki gayi category tiles me nahi dikhni
+    // chahiye (wahi bug jo `/categories/public` me tha).
+    const categories = await Category.find({ is_deleted: false, is_active: true })
       .select("name description parent_category_id sort_order")
       .sort({ sort_order: 1, name: 1 })
       .lean();

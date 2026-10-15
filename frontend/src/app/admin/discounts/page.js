@@ -9,7 +9,7 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
+import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 

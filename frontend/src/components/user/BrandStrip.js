@@ -10,7 +10,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
-import useScrollFade from "@/hooks/useScrollFade";
+import useScrollFade from "../../hooks/user/useScrollFade";
 import {
   idOf,
   imageUrl,

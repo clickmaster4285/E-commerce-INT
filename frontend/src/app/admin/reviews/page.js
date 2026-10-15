@@ -20,7 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
-import { useReviewSocketSync } from "@/hooks/useReviewSocketSync";
+import { useReviewSocketSync } from "../../../hooks/admin/useReviewSocketSync";
 
 const PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");

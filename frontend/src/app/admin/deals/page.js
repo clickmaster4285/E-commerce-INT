@@ -10,7 +10,7 @@ import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { toNonNegative, validateNonNegative } from "../discounts/_components/discountUtils";
-import useDealSocketSync from "../../../hooks/useDealSocketSync"; 
+import useDealSocketSync from "../../../hooks/admin/useDealSocketSync"; 
 import { DealFormModal, SelectionModal } from "./_components/dealModals";
 
 /* ==================== CONSTANTS ==================== */

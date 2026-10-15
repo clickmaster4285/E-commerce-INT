@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import axios from "axios";
 import { toast } from "sonner";
-import useBannerSocketSync from "../../../hooks/useBannerSocket";
+import useBannerSocketSync from "../../../hooks/admin/useBannerSocket";
 import { dealApi } from "../../../apis/admin/dealApi";
 import { DealFormModal, SelectionModal } from "../deals/_components/dealModals";
 import { productApi } from "../../../apis/admin/productApi";

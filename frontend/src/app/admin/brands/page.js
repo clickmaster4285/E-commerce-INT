@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { adminBrandApi } from "@/apis/admin/brandApi";
 import { Country } from "country-state-city";
-import { useBrandSocketSync } from "@/hooks/useBrandSocketSync.js";
+import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 

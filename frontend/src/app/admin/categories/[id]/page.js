@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
-import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
+import { useAttributeSocketSync } from "../../../../hooks/admin/useAttributeSocketSync";
 import { toast } from "sonner";
 
 /* =========================================================
@@ -1607,6 +1607,11 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   const [newAttrDefaultValue, setNewAttrDefaultValue] = useState("yes");
   const [creatingAttribute, setCreatingAttribute] = useState(false);
   const [showParentDropdown, setShowParentDropdown] = useState(false);
+  // ✅ DIRTY-FLAG: Status control chhua gaya ya nahi. `is_active` sirf tab
+  // payload me jayega jab admin ne status khud change kiya ho — warna is
+  // modal ka koi bhi doosra save, modal kholne ke baad ho chuki DISABLE ko
+  // dobara ACTIVE bana deta tha.
+  const [statusTouched, setStatusTouched] = useState(false);
   const parentDropdownRef = useRef(null);
   const [parentDropdownPos, setParentDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   // ✅ NEW: Disabled parent option ka inline explanation (hover / focus / invalid attempt)
@@ -1635,6 +1640,9 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
         category_code: category.category_code || "", name: category.name || "", description: category.description || "",
         parent_category_id: getId(category.parent_category_id), status: category.is_active !== false ? "active" : "inactive", attributes: loadedAttrs,
       });
+      // Form dobara load hua → status abhi "clean" hai (user ne is render me
+      // kuch nahi chhua), is liye save par `is_active` nahi jayega.
+      setStatusTouched(false);
     }
   }, [category]);
 
@@ -1666,7 +1674,15 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
     });
     if (parentError) { toast.error(parentError); return; }
 
-    updateMutation.mutate({ ...formData, parent_category_id: formData.parent_category_id || null, is_active: formData.status === "active" });
+    // `status` sirf UI state hai — payload me nahi jana chahiye. `is_active`
+    // sirf tab bhejo jab admin ne Status control khud chhua ho (statusTouched),
+    // warna stale form value se category dobara enable ho jati thi.
+    const { status: _statusField, ...formFields } = formData;
+    updateMutation.mutate({
+      ...formFields,
+      parent_category_id: formData.parent_category_id || null,
+      ...(statusTouched ? { is_active: formData.status === "active" } : {}),
+    });
   };
 
   const removeAttributeFromForm = (attrId) => setFormData((p) => ({ ...p, attributes: p.attributes.filter((a) => String(getAttributeId(a)) !== String(attrId)) }));
@@ -1805,7 +1821,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
                   {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
                     const isActive = formData.status === opt.id;
-                    return (<button key={opt.id} type="button" onClick={() => setFormData({ ...formData, status: opt.id })} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />{opt.label}</button>);
+                    return (<button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />{opt.label}</button>);
                   })}
                 </div>
               </div>

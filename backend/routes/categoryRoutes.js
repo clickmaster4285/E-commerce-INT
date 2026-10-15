@@ -21,7 +21,13 @@ const { publicCache, invalidate } = require("../utils/publicCache");
 const router = express.Router();
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropCategoriesCache = (req, res, next) => { invalidate("categories"); next(); };
+// "products" bhi drop karna zaroori hai — category-tiles (`/api/products/category-tiles`)
+// namespace `products` me cache hota hai, aur wahan bhi category list/counts aate hain.
+// Bina iske tiles 60s tak purana dikhate rehte the.
+const dropCategoriesCache = (req, res, next) => {
+  invalidate(["categories", "products"]);
+  next();
+};
 
 // ==========================================
 // ✅ PUBLIC ROUTE — Bina login ke categories (User GUI ke liye)
@@ -30,7 +36,12 @@ const dropCategoriesCache = (req, res, next) => { invalidate("categories"); next
 // ==========================================
 router.get("/public", publicCache(60 * 1000), async (req, res) => {
   try {
-    const categories = await Category.find({ is_deleted: false })
+    // ⚠️ `is_active` filter ZAROORI hai — admin me category deactivate karne par
+    // wo storefront se gayab honi chahiye. Pehle sirf `is_deleted` filter tha,
+    // is liye INACTIVE categories bhi public list me aa jati thi (user ne
+    // deactivate karne ke baad bhi category nahi hat rahi thi).
+    // Convention: baaki public endpoints bhi `is_active: true` use karte hain.
+    const categories = await Category.find({ is_deleted: false, is_active: true })
       .select("name description parent_category_id category_type sort_order created_at")
       .sort({ sort_order: 1, name: 1 })
       .lean();

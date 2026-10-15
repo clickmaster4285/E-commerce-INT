@@ -46,8 +46,8 @@ import {
 } from "recharts";
 
 import { dashboardApi } from "../../../apis/admin/dashboardApi";
-import { useStoreSocketSync } from "../../../hooks/useStoreSocketSync";
-import { useSocket } from "../../../hooks/useSocket";
+import { useStoreSocketSync } from "../../../hooks/admin/useStoreSocketSync";
+import { useAdminSocket } from "../../../hooks/admin/useAdminSocket";
 
 /* ==================== HELPERS ==================== */
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -982,7 +982,7 @@ export default function Dashboard() {
   const [range, setRange] = useState("7d");
   const [rangeOpen, setRangeOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { socket } = useSocket();
+  const { socket } = useAdminSocket();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["dashboard-stats", range],

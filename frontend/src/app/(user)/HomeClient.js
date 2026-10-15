@@ -35,7 +35,7 @@ import HomeNav from "@/components/user/HomeNav";
 import HomeSidebar from "@/components/user/HomeSidebar";
 import BannerSlider from "@/components/user/BannerSlider";
 import ViewportSection from "@/components/user/ViewportSection";
-import { useHomeCatalog } from "@/hooks/useHomeCatalog";
+import { useHomeCatalog } from "../../hooks/user/useHomeCatalog";
 
 /* Below-fold sections — code-split (initial JS chhota → LCP/INP fast).
    ssr:true taake SEO same rahe, lekin alag chunk me load hon. */

@@ -3,7 +3,24 @@ const Product = require("../models/Product");
 const path = require("path");
 const fs = require("fs-extra");
 const { getIO } = require("../utils/socket");
+const log = require("../utils/logger");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+
+// ==========================================
+// SOCKET HELPER — same pattern as
+// categoryController / productController / dealController.
+// Pehle yahan raw `io.emit(...)` tha jo `req.io` (null ho sakta hai) par
+// unguarded tha. Ye wrapper try/catch + getIO() fallback deta hai, is liye
+// brand mutation kabhi socket failure ki wajah se crash nahi karta.
+// ==========================================
+const emitSocketEvent = (event, data) => {
+  try {
+    const io = getIO();
+    if (io) io.emit(event, data);
+  } catch (error) {
+    log.warn(`Socket emit failed for ${event}:`, error.message);
+  }
+};
 
 // ================================
 // GET NEXT BRAND CODE
@@ -118,10 +135,7 @@ const createBrand = async (req, res) => {
       },
     }, performerId).catch(() => {});
 
-    try {
-      io.emit("brandCreated", updatedBrand.toObject());
-    } catch (socketErr) {
-    }
+    emitSocketEvent("brandCreated", updatedBrand.toObject());
 
     res.status(201).json({
       success: true,
@@ -291,10 +305,7 @@ const updateBrand = async (req, res) => {
       details: { changes, brandId: brand._id },
     }, performerId).catch(() => {});
 
-    try {
-      io.emit("brandUpdated", brand.toObject());
-    } catch (socketErr) {
-    }
+    emitSocketEvent("brandUpdated", brand.toObject());
 
     res.status(200).json({
       success: true,
@@ -339,10 +350,7 @@ const deleteBrand = async (req, res) => {
       details: { brandId: brand._id, brandCode: brand.brand_code },
     }, performerId).catch(() => {});
 
-    try {
-      io.emit("brandDeleted", { _id: brand._id.toString() });
-    } catch (socketErr) {
-    }
+    emitSocketEvent("brandDeleted", { _id: brand._id.toString() });
 
     res.status(200).json({
       success: true,
@@ -361,7 +369,9 @@ const getBrandsPublic = async (req, res) => {
     // ✅ slim=1 (opt-in, storefront): _id/name/logo hi chahiye hota hai
     // (brand_code/country/is_active sirf admin padhta hai). Default same.
     const slim = req.query.slim === "1";
-    const brands = await Brand.find({ is_deleted: false })
+    // ⚠️ is_active filter zaroori — admin me brand deactivate karne par
+    // wo storefront se gayab hona chahiye
+    const brands = await Brand.find({ is_deleted: false, is_active: true })
       .select(slim ? "_id name logo.img_url" : "brand_code name logo country is_active")
       .sort({ created_at: -1 })
       .lean()

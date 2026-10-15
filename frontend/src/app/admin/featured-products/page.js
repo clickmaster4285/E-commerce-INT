@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
-import { useProductSocketSync } from "@/hooks/useProductSocketSync";
+import { useProductSocketSync } from "../../../hooks/admin/useProductSocketSync";
 
 const PER_PAGE = 20;
 const MODAL_PER_PAGE = 8;

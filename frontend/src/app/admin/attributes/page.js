@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
+import { useAttributeSocketSync } from "../../../hooks/admin/useAttributeSocketSync";
 
 // --- Icons ---
 const SearchIcon = ({ className = "w-4 h-4" }) => (

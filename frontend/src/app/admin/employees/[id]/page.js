@@ -46,7 +46,7 @@ import {
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
-import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
+import { useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
 
 // ==========================================
 // ✅ ALLOWED PERMISSIONS — sab by default true

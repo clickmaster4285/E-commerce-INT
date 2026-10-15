@@ -13,7 +13,7 @@ import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { DealFormModal, SelectionModal } from "../_components/dealModals";
-import useDealSocketSync from "@/hooks/useDealSocketSync";
+import useDealSocketSync from "../../../../hooks/admin/useDealSocketSync";
 
 /* =========================================================
    HELPERS

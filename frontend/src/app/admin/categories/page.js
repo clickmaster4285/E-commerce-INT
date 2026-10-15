@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
+import { useCategorySocketSync } from "../../../hooks/admin/useCategorySocketSync";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -322,6 +322,14 @@ const [viewMode, setViewMode] = useState(() => {
     attributes: [],
   });
 
+  // ✅ DIRTY-FLAG: admin ne is modal me "Status" control ko chhua ya nahi.
+  // Pehle har save poora payload (is_active samet) bhejta tha — to modal
+  // kholne ke baad agar kisi doosre tab/window se category DISABLE ho jati,
+  // ye stale modal ka Save usse dobara ENABLE kar deta tha (wahi bug jo
+  // storefront par "disabled category phir bhi dikhti thi" ki wajah tha).
+  // Ab `is_active` sirf tab jata hai jab user ne status khud change kiya ho.
+  const [statusTouched, setStatusTouched] = useState(false);
+
   const [autoCode, setAutoCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
 
@@ -484,6 +492,7 @@ const [viewMode, setViewMode] = useState(() => {
       attributes: [],
     });
     setAutoCode("");
+    setStatusTouched(false);
     setOpenAttributeKey(null);
     setShowCreateAttrModal(false);
     setNewAttrName("");
@@ -549,6 +558,10 @@ const [viewMode, setViewMode] = useState(() => {
     });
     setEditingCategory(category);
     setAutoCode(category.category_code || "");
+    // Har naye Edit modal me status "clean" — tab tak admin usse chua nahi,
+    // is liye save par `is_active` nahi jayega (stale value se dobara enable
+    // hone se protected).
+    setStatusTouched(false);
     setShowEditModal(true);
   };
 
@@ -566,14 +579,25 @@ const [viewMode, setViewMode] = useState(() => {
     });
     if (parentError) { toast.error(parentError); return; }
 
-    const payload = { 
-      ...formData, 
+    // ⚠️ `status` field hamesha payload me mat bhejo — wo sirf UI state hai.
+    // Edit par `is_active` kehte hi bhejo AUR wo tabhi jab admin ne Status
+    // control actually chhua ho (statusTouched). Warna ek purana/stale modal
+    // (jismein category tabhi Active thi) kisi baad ki DISABLE ko save karte
+    // waqt usse wapas Active bana deta tha.
+    const { status: _statusField, ...formFields } = formData;
+    const payload = {
+      ...formFields,
       parent_category_id: formData.parent_category_id || null,
-      is_active: formData.status === "active"
     };
+
     if (showEditModal && editingCategory) {
+      // Sirf status chhua gaya ho tabhi `is_active` bhejo — warna backend
+      // existing value ko as-is chhodega (field absent = no change).
+      if (statusTouched) payload.is_active = formData.status === "active";
       updateMutation.mutate({ id: editingCategory._id, data: payload });
     } else {
+      // Create par status hamesha relevant hai (new record).
+      payload.is_active = formData.status === "active";
       createMutation.mutate(payload);
     }
   };
@@ -1214,7 +1238,7 @@ const [viewMode, setViewMode] = useState(() => {
                   {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
                     const isActive = formData.status === opt.id;
                     return (
-                      <button key={opt.id} type="button" onClick={() => setFormData({ ...formData, status: opt.id })}
+                      <button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }}
                         className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
                         {opt.label}

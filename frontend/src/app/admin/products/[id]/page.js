@@ -3,8 +3,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useProductSocketSync } from "@/hooks/useProductSocketSync";
-import { useSocket } from "@/hooks/useSocket";
+import { useProductSocketSync } from "../../../../hooks/admin/useProductSocketSync";
+import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import {
   Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
@@ -1020,7 +1020,7 @@ export default function ProductDetailPage() {
   const queryClient = useQueryClient();
 
   useProductSocketSync();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected } = useAdminSocket();
 
   const id = params?.id;
   const [liveEvents, setLiveEvents] = useState([]);

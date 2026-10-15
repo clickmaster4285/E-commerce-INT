@@ -26,7 +26,7 @@ import AllDealsResults from "@/components/user/AllDealsResults";
 import AllCategoriesResults from "@/components/user/AllCategoriesResults";
 import SectionHeading from "@/components/user/SectionHeading";
 import { Store } from "lucide-react";
-import { useHomeCatalog } from "@/hooks/useHomeCatalog";
+import { useHomeCatalog } from "../../../hooks/user/useHomeCatalog";
 
 /* Mobile drawer: band ho to zero JS — sirf kholne par load. */
 const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {

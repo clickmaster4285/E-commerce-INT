@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useProductSocketSync, patchProductStatusInCaches } from "@/hooks/useProductSocketSync";
+import { useProductSocketSync, patchProductStatusInCaches } from "../../../hooks/admin/useProductSocketSync";
 import {
   AlertTriangle,
   ChevronDown,
