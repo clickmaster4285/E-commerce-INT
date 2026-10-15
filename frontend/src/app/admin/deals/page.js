@@ -12,6 +12,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import { toNonNegative, validateNonNegative } from "../discounts/_components/discountUtils";
 import useDealSocketSync from "../../../hooks/admin/useDealSocketSync"; 
 import { DealFormModal, SelectionModal } from "./_components/dealModals";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ==================== CONSTANTS ==================== */
 // ✅ Server-side pagination — ek request par yehi deals aati hain
@@ -118,7 +119,9 @@ const formatDealValue = (deal) => {
 
 // ✅ CURRENCY FORMATTER
 const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+  const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
 };
 
 const toDateInput = (value) => {
@@ -229,6 +232,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
+  const { t, locale, dir } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -370,11 +374,11 @@ export default function DealsPage() {
     onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
-      toast.success(variables.id ? "Deal updated successfully" : "Deal created successfully");
+      toast.success(variables.id ? t("admin.deals.toast.updated") : t("admin.deals.toast.created"));
       setShowModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.saveFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -383,9 +387,9 @@ export default function DealsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       setDeleteTarget(null);
-      toast.success("Deal deleted successfully");
+      toast.success(t("admin.deals.toast.deleted"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.deleteFailed")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -393,9 +397,9 @@ export default function DealsPage() {
     onMutate: (_, variables) => markSelfAction("update"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
-      toast.success(variables.newActive ? "Deal activated" : "Deal deactivated");
+      toast.success(variables.newActive ? t("admin.deals.toast.activated") : t("admin.deals.toast.deactivated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.statusFailed")),
   });
 
   // ✅ Search / status / target filtering ab backend par ho chuki hai — is liye yahan
@@ -497,7 +501,7 @@ export default function DealsPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
 
     // ✅ Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
     const nonNegativeError = validateNonNegative([
@@ -513,20 +517,20 @@ export default function DealsPage() {
     if (formData.has_min_quantity) {
       const minQuantity = Number(formData.min_quantity);
       if (!Number.isInteger(minQuantity) || minQuantity < 1) {
-        return toast.error("Minimum quantity must be a whole number greater than 0");
+        return toast.error(t("admin.deals.validation.minQty"));
       }
     }
 
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
-      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
-      if (formData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
+      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error(t("admin.deals.validation.value"));
+      if (formData.value_type === "percentage" && dealValue > 100) return toast.error(t("admin.deals.validation.percentage"));
     }
 
     if (formData.value_type === "buy_x_get_y") {
-      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
-      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
-      if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error("Discount on Get Item (%) cannot be greater than 100");
+      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error(t("admin.deals.validation.buyQty"));
+      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error(t("admin.deals.validation.getQty"));
+      if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error(t("admin.deals.validation.getDiscountPercent"));
     }
 
     // ✅ Bundle deal — single offer condition validation
@@ -536,32 +540,32 @@ export default function DealsPage() {
       if (rule.mode === "limit") {
         const buyQty = Number(rule.buy_quantity);
         if (!buyQty || buyQty <= 0) {
-          return toast.error("Bundle offer: enter the required quantity");
+          return toast.error(t("admin.deals.validation.bundleQuantity"));
         }
       }
 
       if (rule.reward_type === "free_product") {
         if (!rule.gift_product_id) {
-          return toast.error("Bundle offer: select the free gift product");
+          return toast.error(t("admin.deals.validation.bundleGift"));
         }
       } else {
         const val = Number(rule.value);
         if (!val || val <= 0) {
-          return toast.error("Bundle offer: enter a discount value greater than 0");
+          return toast.error(t("admin.deals.validation.bundleValue"));
         }
         if (rule.reward_type === "percentage" && val > 100) {
-          return toast.error("Bundle offer: percentage cannot be more than 100%");
+          return toast.error(t("admin.deals.validation.bundlePercent"));
         }
       }
     }
 
-    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
-    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
-    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
+    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error(t("admin.deals.validation.selectProduct"));
+    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error(t("admin.deals.validation.selectCategory"));
+    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error(t("admin.deals.validation.selectBrand"));
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.deals.validation.dateOrder"));
 
     const cleanProductIds = formData.selected_product_ids.map(id => String(id?._id || id));
     const cleanCategoryIds = formData.selected_category_ids.map(id => String(id?._id || id));
@@ -737,17 +741,17 @@ export default function DealsPage() {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight">Deal Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage professional deals for your store.</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight">{t("admin.deals.page.heading")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.subtitleCurrent")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.discounts.page.listView")}><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.discounts.page.gridView")}><GridIcon /></button>
             </div>
             <div className="relative shrink-0" ref={typeMenuRef}>
               <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                <PlusIcon /> New Deal <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                <PlusIcon /> {t("admin.deals.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {isTypeMenuOpen && (
                 <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
@@ -768,9 +772,9 @@ export default function DealsPage() {
 
         {/* STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <StatCard title="Total Deals" value={stats.total} cardStyle={cardStyle} />
-          <StatCard title="Active" value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
-          <StatCard title="Inactive" value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
+          <StatCard title={t("admin.deals.page.total")} value={stats.total} cardStyle={cardStyle} />
+          <StatCard title={t("admin.discounts.page.active")} value={stats.active} valueClass="text-emerald-500" cardStyle={cardStyle} />
+          <StatCard title={t("admin.discounts.page.inactive")} value={stats.inactive} valueClass="text-red-400" cardStyle={cardStyle} />
         </div>
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -781,7 +785,7 @@ export default function DealsPage() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input 
               type="text" 
-              placeholder="Search deal name or code..." 
+              placeholder={t("admin.deals.page.search")} 
               value={searchInput} 
               onChange={(e) => setSearchInput(e.target.value)} 
               className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
@@ -806,11 +810,11 @@ export default function DealsPage() {
                 <table className="w-full text-[13px]">
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Deal</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Offer</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
                     </tr>
                   </thead>
                   <DealRowsSkeleton rows={DEALS_PER_PAGE} />
@@ -824,7 +828,7 @@ export default function DealsPage() {
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <DealIcon className="w-8 h-8 mb-3 opacity-50" />
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {searchInput || statusFilter !== "all" || targetFilter !== "all_targets" ? "No deals match your filters" : "No deals created yet"}
+              {searchInput || statusFilter !== "all" || targetFilter !== "all_targets" ? t("admin.deals.page.noMatch") : t("admin.deals.page.noneYet")}
             </p>
           </div>
         ) : viewMode === "list" ? (
@@ -833,11 +837,11 @@ export default function DealsPage() {
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Deal</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Offer</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1100,6 +1104,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 
 /* ==================== BUNDLE IMAGE UPLOADER ==================== */
 function BundleImageUploader({ value, onChange }) {
+  const { t } = useTranslation();
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -1112,17 +1117,17 @@ function BundleImageUploader({ value, onChange }) {
 
   const uploadFile = async (file) => {
     if (!file) return;
-    if (!file.type?.startsWith("image/")) return toast.error("Please select a valid image file");
-    if (file.size > 5 * 1024 * 1024) return toast.error("Image size must be less than 5MB");
+    if (!file.type?.startsWith("image/")) return toast.error(t("admin.deals.validation.imageType"));
+    if (file.size > 5 * 1024 * 1024) return toast.error(t("admin.deals.validation.imageSize"));
 
     setUploading(true);
     try {
       const url = await dealApi.uploadImage(file);
       if (!url) throw new Error("Image upload failed");
       onChange(url);
-      toast.success("Bundle image uploaded");
+      toast.success(t("admin.deals.toast.imageUploaded"));
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to upload bundle image");
+      toast.error(err?.response?.data?.message || err?.message || t("admin.deals.toast.imageUploadFailed"));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

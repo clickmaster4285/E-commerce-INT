@@ -9,6 +9,7 @@ import {
   UploadCloud, ImagePlus
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
@@ -48,6 +49,7 @@ const normalizeArrayResponse = (response) => {
 // DEPARTMENT DROPDOWN COMPONENT (UPDATED)
 // ==========================================
 function DepartmentDropdown({ value, onChange, disabled }) {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -111,7 +113,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Type or select..."
+          placeholder={t("admin.employees.form.departmentPlaceholder")}
           disabled={disabled}
           className="w-full h-8 pl-3 pr-7 rounded-md text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
           style={inputStyle}
@@ -141,7 +143,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           {/* LOGIC: Show "No matching" ONLY if user typed something AND it's not an exact match */}
           {hasInput && !exactMatch && (
             <div className="px-3 py-2 text-xs font-medium flex items-center gap-2 opacity-60 cursor-default select-none border-b border-dashed" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
-              <Info className="w-3 h-3" /> No matching departments
+              <Info className="w-3 h-3" /> {t("admin.employees.form.noDepartments")}
             </div>
           )}
 
@@ -167,13 +169,13 @@ function DepartmentDropdown({ value, onChange, disabled }) {
               className="px-3 py-2 text-[12px] font-medium border-t mt-1 flex items-center gap-2"
               style={{ borderColor: "var(--border-color)", color: "var(--success-text)" }}
             >
-              <Plus className="w-3 h-3" /> Creating new: "{inputValue.trim()}"
+              <Plus className="w-3 h-3" /> {t("admin.employees.form.creatingNew", { name: inputValue.trim() })}
             </div>
           )}
           
           {/* Empty State if no filter matches and no custom input */}
           {!hasInput && PREDEFINED_DEPARTMENTS.length === 0 && (
-             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No departments available</div>
+             <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.employees.form.noDepartmentsAvailable")}</div>
           )}
         </div>
       )}
@@ -198,6 +200,7 @@ const MenuItem = ({ icon, label, onClick, danger }) => (
 // MAIN EMPLOYEE PAGE COMPONENT
 // ==========================================
 export default function EmployeesPage() {
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   useEmployeeSocketSync();
@@ -232,9 +235,9 @@ export default function EmployeesPage() {
   // ✅ Jis ko 'employees' permission hai wahi add/edit/delete kar sakta hai
   const canManageEmployees = isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
   const denyEmployeesAccess = () =>
-    toast.error("Access denied. You don't have 'employees' permission.", {
+    toast.error(t("admin.employees.toast.accessDenied"), {
       duration: 5000,
-      description: "Contact an administrator or another staff member to grant you access.",
+      description: t("admin.employees.toast.accessDeniedBody"),
     });
 
   // Phone validation state for tooltip
@@ -295,43 +298,43 @@ export default function EmployeesPage() {
     mutationFn: employeeSocketApi.create,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee created successfully");
+      toast.success(t("admin.employees.toast.created"));
       closeModal();
     },
-    onError: (err) => toast.error(err.message || "Creation failed"),
+    onError: () => toast.error(t("admin.employees.toast.createFailed")),
   });
 
   const updateMutation = useMutation({
     mutationFn: employeeSocketApi.update,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee updated successfully");
+      toast.success(t("admin.employees.toast.updated"));
       closeModal();
     },
-    onError: (err) => toast.error(err.message || "Update failed"),
+    onError: () => toast.error(t("admin.employees.toast.updateFailed")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: employeeSocketApi.delete,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee deleted");
+      toast.success(t("admin.employees.toast.deleted"));
       setShowDeleteModal(false);
       setEmployeeToDelete(null);
       setSelectedIds([]);
     },
-    onError: (err) => toast.error(err.message || "Delete failed"),
+    onError: () => toast.error(t("admin.employees.toast.deleteFailed")),
   });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success(`${selectedIds.length} employees deleted`);
+      toast.success(t("admin.employees.toast.bulkDeleted", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) }));
       setSelectedIds([]);
       setShowBulkDeleteModal(false);
     },
-    onError: (err) => toast.error(err.message || "Bulk delete failed"),
+    onError: () => toast.error(t("admin.employees.toast.bulkDeleteFailed")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -342,11 +345,11 @@ export default function EmployeesPage() {
         return oldData.map((emp) => emp._id === updatedEmployee._id ? updatedEmployee : emp);
       });
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Status updated successfully");
+      toast.success(t("admin.employees.toast.statusUpdated"));
     },
     onError: (err) => {
       console.error("❌ Toggle Status Error:", err);
-      toast.error(err.message || "Status update failed");
+      toast.error(t("admin.employees.toast.statusUpdateFailed"));
     },
   });
 
@@ -411,30 +414,30 @@ export default function EmployeesPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return toast.error("Name is required");
-    if (!formData.username.trim()) return toast.error("Username is required");
+    if (!formData.name.trim()) return toast.error(t("admin.employees.toast.nameRequired"));
+    if (!formData.username.trim()) return toast.error(t("admin.employees.toast.usernameRequired"));
     const username = formData.username.trim().toLowerCase();
-    if (username.length < 3) return toast.error("Username must be at least 3 characters");
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) return toast.error("Username can only contain letters, numbers, and underscores");
-    if (!formData.email.trim()) return toast.error("Email is required");
-    if (!formData.department.trim()) return toast.error("Department is required");
+    if (username.length < 3) return toast.error(t("admin.employees.toast.usernameMinLength"));
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return toast.error(t("admin.employees.toast.usernameFormat"));
+    if (!formData.email.trim()) return toast.error(t("admin.employees.toast.emailRequired"));
+    if (!formData.department.trim()) return toast.error(t("admin.employees.toast.departmentRequired"));
 
     const phoneDigits = formData.phone.replace(/\D/g, "");
-    if (phoneDigits && phoneDigits.length < 6) return toast.error("Phone number must be at least 6 digits");
-    if (phoneDigits.length > 15) return toast.error("Phone number must be at most 15 digits");
+    if (phoneDigits && phoneDigits.length < 6) return toast.error(t("admin.employees.toast.phoneMinLength"));
+    if (phoneDigits.length > 15) return toast.error(t("admin.employees.toast.phoneMaxLength"));
 
     if (!editingEmployee) {
-      if (!formData.password) return toast.error("Password is required");
-      if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+      if (!formData.password) return toast.error(t("admin.employees.toast.passwordRequired"));
+      if (formData.password.length < 6) return toast.error(t("admin.employees.toast.passwordMinLength"));
       if (formData.password !== formData.confirmPassword) {
-        return toast.error("Passwords do not match");
+        return toast.error(t("admin.employees.toast.passwordMismatch"));
       }
     } else if (formData.password || formData.confirmPassword) {
-      if (!formData.password) return toast.error("Password is required");
-      if (!formData.confirmPassword) return toast.error("Confirm Password is required");
-      if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
+      if (!formData.password) return toast.error(t("admin.employees.toast.passwordRequired"));
+      if (!formData.confirmPassword) return toast.error(t("admin.employees.toast.confirmPasswordRequired"));
+      if (formData.password.length < 6) return toast.error(t("admin.employees.toast.passwordMinLength"));
       if (formData.password !== formData.confirmPassword) {
-        return toast.error("Passwords do not match");
+        return toast.error(t("admin.employees.toast.passwordMismatch"));
       }
     }
 
@@ -557,12 +560,12 @@ export default function EmployeesPage() {
     const type = String(file.type || "").toLowerCase();
     if (!AVATAR_ALLOWED_TYPES.includes(type)) {
       setAvatarError("Only PNG, JPG or WEBP images are allowed");
-      toast.error("Only PNG, JPG or WEBP images are allowed");
+      toast.error(t("admin.employees.toast.imageType"));
       return;
     }
     if (file.size > AVATAR_MAX_BYTES) {
       setAvatarError("Image is too large — max 2 MB allowed");
-      toast.error("Image is too large — max 2 MB allowed");
+      toast.error(t("admin.employees.toast.imageTooLarge"));
       return;
     }
 
@@ -575,7 +578,7 @@ export default function EmployeesPage() {
     };
     reader.onerror = () => {
       setAvatarError("Could not read that image, please try another one");
-      toast.error("Could not read that image, please try another one");
+      toast.error(t("admin.employees.toast.imageReadError"));
     };
     reader.readAsDataURL(file);
   };
@@ -614,7 +617,7 @@ export default function EmployeesPage() {
     setAvatarPreview("");
     setAvatarRemoved(true);
     setAvatarError("");
-    toast.info("Profile picture will be removed on save");
+    toast.info(t("admin.employees.toast.pictureWillBeRemoved"));
   };
 
   /* ===== PROFESSIONAL ACTION BUTTONS WITH 3-DOT MENU ===== */
@@ -639,12 +642,12 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-end">
         <button
           onClick={toggleMenu}
-          aria-label={`Actions for ${employee.userId?.name || employee.name}`}
+          aria-label={t("admin.employees.form.actionsFor", { name: employee.userId?.name || employee.name })}
           aria-haspopup="menu"
           aria-expanded={open}
           className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.employees.page.actions")}
         >
           <MoreVertical className="w-4 h-4" />
         </button>
@@ -696,7 +699,7 @@ export default function EmployeesPage() {
             style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
           />
           <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Loading employees...
+            {t("admin.employees.page.loading")}
           </p>
         </div>
       </div>
@@ -708,7 +711,7 @@ export default function EmployeesPage() {
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
         <AlertTriangle className="h-10 w-10 text-red-500 opacity-60" />
         <p className="text-[14px] text-center" style={{ color: "var(--text-muted)" }}>
-          Failed to load employees.
+          {t("admin.employees.page.loadFailed")}
           <br />
           <span className="text-[12px]">{error?.message}</span>
         </p>
@@ -717,7 +720,7 @@ export default function EmployeesPage() {
           className="h-10 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold"
           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
         >
-          Retry
+          {t("admin.employees.page.retry")}
         </button>
       </div>
     );
@@ -729,9 +732,9 @@ export default function EmployeesPage() {
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight">Employee Management</h1>
+          <h1 className="text-[24px] font-bold tracking-tight">{t("admin.employees.page.title")}</h1>
           <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-            Manage your team members and their departments
+            {t("admin.employees.page.subtitle")}
           </p>
         </div>
         <button
@@ -739,7 +742,7 @@ export default function EmployeesPage() {
           className="h-9 px-4 min-w-[44px] min-h-[44px] rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90 shadow-sm"
           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
         >
-          <Plus className="w-4 h-4" /> Add Employee
+          <Plus className="w-4 h-4" /> {t("admin.employees.page.addEmployee")}
         </button>
       </div>
 
@@ -767,7 +770,7 @@ export default function EmployeesPage() {
           </span>
           <input 
             type="text" 
-            placeholder="Search by name or email..." 
+            placeholder={t("admin.employees.page.searchPlaceholder")}
             value={search} 
             onChange={(e) => setSearch(e.target.value)} 
             className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
@@ -785,9 +788,9 @@ export default function EmployeesPage() {
             className="appearance-none h-9 w-full sm:w-[160px] px-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
             style={inputStyle}
           >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="all">{t("admin.employees.page.allStatus")}</option>
+            <option value="active">{t("admin.employees.page.active")}</option>
+            <option value="inactive">{t("admin.employees.page.inactive")}</option>
           </select>
         </div>
       </div>
@@ -801,7 +804,7 @@ export default function EmployeesPage() {
           }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--success-text)" }}>
-            {selectedIds.length} selected
+            {t("admin.employees.page.selected", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })}
           </p>
           <div className="flex items-center gap-3">
             <button
@@ -809,7 +812,7 @@ export default function EmployeesPage() {
               className="text-xs font-medium transition hover:opacity-70"
               style={{ color: "var(--text-muted)" }}
             >
-              Clear
+              {t("admin.employees.page.clear")}
             </button>
             <button
               onClick={handleBulkDelete}
@@ -818,7 +821,7 @@ export default function EmployeesPage() {
               style={{ backgroundColor: "var(--danger)" }}
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Delete Selected
+              {t("admin.employees.page.deleteSelected")}
             </button>
           </div>
         </div>
@@ -839,19 +842,19 @@ export default function EmployeesPage() {
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("name")}>
-                  Employee {getSortIcon("name")}
+                  {t("admin.employees.page.employee")} {getSortIcon("name")}
                 </th>
                 <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("email")}>
-                  Email {getSortIcon("email")}
+                  {t("admin.employees.page.email")} {getSortIcon("email")}
                 </th>
                 <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("department")}>
-                  Department {getSortIcon("department")}
+                  {t("admin.employees.page.department")} {getSortIcon("department")}
                 </th>
                 <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider cursor-pointer hover:opacity-80" style={{ color: "var(--text-muted)" }} onClick={() => handleSort("status")}>
-                  Status {getSortIcon("status")}
+                  {t("admin.employees.page.status")} {getSortIcon("status")}
                 </th>
                 <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                  Actions
+                  {t("admin.employees.page.actions")}
                 </th>
               </tr>
             </thead>
@@ -860,7 +863,7 @@ export default function EmployeesPage() {
                 <tr>
                   <td colSpan={6} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
                     <Users className="mx-auto mb-3 h-8 w-8 opacity-30" />
-                    No employees found
+                    {t("admin.employees.page.noEmployees")}
                   </td>
                 </tr>
               ) : (
@@ -945,7 +948,7 @@ export default function EmployeesPage() {
                               : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }
                           }
                         >
-                          {empStatus === "active" ? "Active" : "Inactive"}
+                          {empStatus === "active" ? t("admin.employees.page.active") : t("admin.employees.page.inactive")}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 whitespace-nowrap w-1">
@@ -963,9 +966,11 @@ export default function EmployeesPage() {
       {pagination.total > ITEMS_PER_PAGE && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-
-            {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)} of {pagination.total || employees.length}{" "}
-            employees
+            {t("admin.employees.page.showingRange", {
+              from: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format((currentPage - 1) * ITEMS_PER_PAGE + 1),
+              to: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)),
+              total: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(pagination.total || employees.length),
+            })}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -977,7 +982,10 @@ export default function EmployeesPage() {
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="hidden sm:inline-flex px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
-              Page {currentPage} of {totalPages}
+              {t("admin.employees.page.pageOf", {
+                page: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(currentPage),
+                total: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(totalPages),
+              })}
             </span>
             <button
               disabled={currentPage === totalPages}
@@ -997,7 +1005,7 @@ export default function EmployeesPage() {
           <div className="w-full max-w-lg rounded-xl shadow-xl max-h-[90vh] flex flex-col overflow-hidden" style={cardStyle}>
             <div className="px-5 py-4 flex items-center justify-between rounded-t-xl shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <div>
-                <h3 className="text-base font-semibold">{editingEmployee ? "Edit Employee" : "Add New Employee"}</h3>
+                <h3 className="text-base font-semibold">{editingEmployee ? t("admin.employees.form.editTitle") : t("admin.employees.form.addTitle")}</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                   {editingEmployee ? "Update employee details" : "Create a new team member"}
                 </p>
@@ -1013,12 +1021,12 @@ export default function EmployeesPage() {
                 <div className="flex items-center justify-between gap-2 mb-2.5">
                   <div className="flex items-center gap-2">
                     <ImagePlus className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                    <span className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>Profile Picture</span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.profilePicture")}</span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded-full"
                       style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
                     >
-                      Optional
+                      {t("admin.employees.form.optional")}
                     </span>
                   </div>
                   {avatarPreview && (
@@ -1029,7 +1037,7 @@ export default function EmployeesPage() {
                       className="text-[11px] font-medium transition disabled:opacity-50 hover:opacity-80"
                       style={{ color: "var(--danger-text)" }}
                     >
-                      Remove
+                      {t("admin.employees.form.remove")}
                     </button>
                   )}
                 </div>
@@ -1051,7 +1059,7 @@ export default function EmployeesPage() {
                       {avatarPreview ? (
                         <img
                           src={avatarPreview}
-                          alt="Profile picture preview"
+                          alt={t("admin.employees.form.profilePicturePreview")}
                           className="h-full w-full object-cover"
                           onError={() => {
                             setAvatarPreview("");
@@ -1070,8 +1078,8 @@ export default function EmployeesPage() {
                         type="button"
                         onClick={handleAvatarRemove}
                         disabled={isSubmitting}
-                        title="Remove picture"
-                        aria-label="Remove profile picture"
+                        title={t("admin.employees.form.removePicture")}
+                        aria-label={t("admin.employees.form.removeProfilePicture")}
                         className="absolute -bottom-0.5 -right-0.5 h-6 w-6 rounded-full flex items-center justify-center shadow-md transition disabled:opacity-50 hover:opacity-90"
                         style={{ backgroundColor: "var(--danger)", color: "#fff", border: "2px solid var(--bg-tertiary)" }}
                       >
@@ -1085,7 +1093,7 @@ export default function EmployeesPage() {
                     <div
                       role="button"
                       tabIndex={0}
-                      aria-label="Upload profile picture"
+                      aria-label={t("admin.employees.form.uploadProfilePicture")}
                       onClick={() => { if (!isSubmitting) avatarInputRef.current?.click(); }}
                       onKeyDown={(e) => {
                         if ((e.key === "Enter" || e.key === " ") && !isSubmitting) {
@@ -1108,11 +1116,11 @@ export default function EmployeesPage() {
                         style={{ color: isAvatarDragOver ? "var(--accent)" : "var(--text-muted)" }}
                       />
                       <p className="text-[11.5px] leading-4" style={{ color: "var(--text-secondary)" }}>
-                        <span className="font-semibold" style={{ color: "var(--accent)" }}>Drag &amp; drop</span> a photo here, or{" "}
-                        <span className="font-semibold underline" style={{ color: "var(--text-primary)" }}>browse</span>
+                        <span className="font-semibold" style={{ color: "var(--accent)" }}>{t("admin.employees.form.dragDrop")}</span> {t("admin.employees.form.photoHereOr")}{" "}
+                        <span className="font-semibold underline" style={{ color: "var(--text-primary)" }}>{t("admin.employees.form.browse")}</span>
                       </p>
                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                        PNG, JPG or WEBP · up to 2 MB · square photo works best
+                        {t("admin.employees.form.dropzoneHint")}
                       </p>
                     </div>
                     {avatarError && (
@@ -1134,40 +1142,40 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Full Name *</label>
-                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="John Doe" />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.fullName")}</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={t("admin.employees.form.fullNamePlaceholder")} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Username *</label>
-                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john_doe" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email *</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="john@example.com" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Phone number</label>
-                  <input type="tel" inputMode="numeric" maxLength={15} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 15) })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder="03001234567" />
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.username")}</label>
+                  <input type="text" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={t("admin.employees.form.usernamePlaceholder")} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Password {editingEmployee ? "" : "*"}</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.email")}</label>
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={t("admin.employees.form.emailPlaceholder")} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.phone")}</label>
+                  <input type="tel" inputMode="numeric" maxLength={15} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 15) })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={t("admin.employees.form.phonePlaceholder")} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.password")}{editingEmployee ? "" : " *"}</label>
                   <div className="relative">
-                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Leave blank to keep current" : "Min 6 chars"} minLength={6} />
+                    <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? t("admin.employees.form.passwordPlaceholder") : t("admin.employees.form.confirmPasswordPlaceholder")} minLength={6} />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                       {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Confirm Password {editingEmployee ? "" : "*"}</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.form.confirmPassword")}{editingEmployee ? "" : " *"}</label>
                   <div className="relative">
-                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? "Confirm new password" : "Confirm"} minLength={6} />
+                    <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} required={!editingEmployee} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 pr-9 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle} placeholder={editingEmployee ? t("admin.employees.form.confirmNewPasswordPlaceholder") : t("admin.employees.form.confirmPlaceholder")} minLength={6} />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
                       {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -1177,22 +1185,22 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Status</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.page.status")}</label>
                   <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={isSubmitting} className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50" style={inputStyle}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
+                    <option value="active">{t("admin.employees.page.active")}</option>
+                    <option value="inactive">{t("admin.employees.page.inactive")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Department *</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{t("admin.employees.page.department")} *</label>
                   <DepartmentDropdown value={formData.department} onChange={(val) => setFormData({ ...formData, department: val })} disabled={isSubmitting} />
                 </div>
               </div>
 
               <div className="flex gap-2 pt-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="button" onClick={closeModal} disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.employees.page.cancel")}</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 h-10 min-w-[44px] min-h-[44px] rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : editingEmployee ? "Update Employee" : "Create Employee"}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : editingEmployee ? t("admin.employees.toast.updated") : t("admin.employees.page.addEmployee")}
                 </button>
               </div>
             </form>
@@ -1216,10 +1224,10 @@ export default function EmployeesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">
-                  Delete "{employeeToDelete.userId?.name || employeeToDelete.name}"?
+                  {t("admin.employees.modal.deleteOneTitle", { name: employeeToDelete.userId?.name || employeeToDelete.name })}
                 </h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  This action cannot be undone. All employee data will be permanently removed.
+                  {t("admin.employees.modal.deleteOneBody")}
                 </p>
               </div>
             </div>
@@ -1237,7 +1245,7 @@ export default function EmployeesPage() {
                   color: "var(--text-primary)",
                 }}
               >
-                Cancel
+                {t("admin.employees.page.cancel")}
               </button>
               <button
                 disabled={deleteMutation.isPending}
@@ -1248,7 +1256,7 @@ export default function EmployeesPage() {
                 {deleteMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Delete"
+                  t("admin.employees.page.delete")
                 )}
               </button>
             </div>
@@ -1269,10 +1277,10 @@ export default function EmployeesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">
-                  Delete {selectedIds.length} employees?
+                  {t("admin.employees.modal.deleteManyTitle", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })}
                 </h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  This action cannot be undone. All selected employees will be permanently removed.
+                  {t("admin.employees.modal.deleteManyBody")}
                 </p>
               </div>
             </div>
@@ -1287,7 +1295,7 @@ export default function EmployeesPage() {
                   color: "var(--text-primary)",
                 }}
               >
-                Cancel
+                {t("admin.employees.page.cancel")}
               </button>
               <button
                 disabled={bulkDeleteMutation.isPending}
@@ -1298,7 +1306,7 @@ export default function EmployeesPage() {
                 {bulkDeleteMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  `Delete ${selectedIds.length}`
+                  t("admin.employees.modal.confirmDeleteMany", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })
                 )}
               </button>
             </div>

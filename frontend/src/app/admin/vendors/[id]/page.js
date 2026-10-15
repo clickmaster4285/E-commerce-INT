@@ -3,6 +3,7 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { vendorApi } from "@/apis/admin/vendorApi";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
 import { toast } from "sonner";
@@ -20,7 +21,16 @@ const accent = { color: "#2563eb" };
 const accentBtn = { background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff" };
 const money = (n) => `Rs. ${(Math.max(0, Number(n) || 0)).toLocaleString()}`;
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
-const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", delivered: "Received", closed: "Closed", cancelled: "Cancelled" };
+
+function getStatusLabels(tDetail) {
+  return {
+    pending: tDetail("detail.statusLabels.pending"),
+    confirmed: tDetail("detail.statusLabels.confirmed"),
+    received: tDetail("detail.statusLabels.received"),
+    closed: tDetail("detail.statusLabels.closed"),
+    cancelled: tDetail("detail.statusLabels.cancelled"),
+  };
+}
 
 function Panel({ title, icon: Icon, trailing, children, className = "" }) {
   return <section className={`min-w-0 overflow-hidden rounded-2xl shadow-lg ${className}`} style={cardStyle}>
@@ -63,6 +73,14 @@ export default function VendorDetailPage({ params }) {
   const { id } = use(params);
   const router = useRouter();
   const qc = useQueryClient();
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.vendors." + k, p);
+  const tDetail = (k, p) => __t("admin.vendors.detail." + k, p);
+  const tToast = (k, p) => __t("admin.vendors.toast." + k, p);
+  const tShared = (k, p) => __t("admin.shared." + k, p);
+  
+  const STATUS_LABEL = getStatusLabels(tDetail);
+  
   const [tab, setTab] = useState("purchases");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyVendorForm);
@@ -73,18 +91,18 @@ export default function VendorDetailPage({ params }) {
 
   const saveMutation = useMutation({
     mutationFn: () => vendorApi.update(id, toVendorPayload(form)),
-    onSuccess: () => { toast.success("Vendor updated"); setShowModal(false); invalidate(); },
-    onError: (e) => toast.error(e?.response?.data?.message || "Save failed"),
+    onSuccess: () => { toast.success(tToast("updated")); setShowModal(false); invalidate(); },
+    onError: (e) => toast.error(e?.response?.data?.message || tToast("saveFailed")),
   });
   const toggleMutation = useMutation({
     mutationFn: () => vendorApi.update(id, { is_active: !detail?.is_active }),
-    onSuccess: () => { toast.success(detail?.is_active ? "Vendor deactivated" : "Vendor activated"); setMenuOpen(false); invalidate(); },
-    onError: (e) => toast.error(e?.response?.data?.message || "Failed"),
+    onSuccess: () => { toast.success(detail?.is_active ? tToast("deactivated") : tToast("activated")); setMenuOpen(false); invalidate(); },
+    onError: (e) => toast.error(e?.response?.data?.message || tToast("failed")),
   });
   const deleteMutation = useMutation({
     mutationFn: () => vendorApi.delete(id),
-    onSuccess: () => { toast.success("Vendor deleted"); router.push("/admin/vendors"); },
-    onError: (e) => toast.error(e?.response?.data?.message || "Delete failed"),
+    onSuccess: () => { toast.success(tToast("deleted")); router.push("/admin/vendors"); },
+    onError: (e) => toast.error(e?.response?.data?.message || tToast("deleteFailed")),
   });
 
   // Payments of recent POs for the activity timeline + payments tab (existing detail endpoint).
@@ -116,8 +134,8 @@ export default function VendorDetailPage({ params }) {
     return ev.sort((a, b) => new Date(b.t) - new Date(a.t));
   }, [detail, paymentsByPo]);
 
-  if (isLoading) return <p className="text-sm p-6 text-center" style={{ color: "var(--text-muted)" }}>Loading vendor...</p>;
-  if (!detail) return <p className="text-sm p-6">Vendor not found. <Link className="underline" href="/admin/vendors">Back to vendors</Link></p>;
+  if (isLoading) return <p className="text-sm p-6 text-center" style={{ color: "var(--text-muted)" }}>{tDetail("states.loading")}</p>;
+  if (!detail) return <p className="text-sm p-6">{tDetail("states.notFound")} <Link className="underline" href="/admin/vendors">{tDetail("backTo")}</Link></p>;
 
   const recentPOs = (detail.purchaseOrders || []).slice(0, 5);
 
@@ -126,29 +144,29 @@ export default function VendorDetailPage({ params }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-1.5 flex items-center gap-1.5 text-sm" style={muted}>
-            <Link href="/admin/vendors" className="inline-flex items-center gap-1 hover:text-blue-700"><ArrowLeft size={14} />Vendors</Link>
+            <Link href="/admin/vendors" className="inline-flex items-center gap-1 hover:text-blue-700"><ArrowLeft size={14} />{tShared("nav.item.vendors")}</Link>
             <ChevronRight size={13} />
             <span className="truncate" style={primary}>{detail.name}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white" style={{ borderColor: "#cfe0f8", color: "#2878f0" }}><Building2 size={18} /></div>
             <h1 className="text-xl font-bold" style={primary}>{detail.name}</h1>
-            <Pill tone={detail.is_active ? "green" : "red"}>{detail.is_active ? "Active" : "Inactive"}</Pill>
+            <Pill tone={detail.is_active ? "green" : "red"}>{detail.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 pl-11 text-xs" style={muted}>
-            <span className="font-mono">Vendor Code: {detail.vendor_code || "—"}</span>
+            <span className="font-mono">{tDetail("vendorCode")} {detail.vendor_code || "—"}</span>
             {detail.company_name && <span>{detail.company_name}</span>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => router.push(`/admin/purchase-orders/new?vendor=${detail._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold transition hover:opacity-90" style={accentBtn}><ShoppingCart size={14} /> Create PO</button>
-          <button onClick={() => { setForm(toVendorForm(detail)); setShowModal(true); }} className="h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition hover:opacity-90" style={{ ...cardStyle, color: "#2563eb" }}><Pencil size={14} /> Edit</button>
+          <button onClick={() => router.push(`/admin/purchase-orders/new?vendor=${detail._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold transition hover:opacity-90" style={accentBtn}><ShoppingCart size={14} /> {tDetail("createPO")}</button>
+          <button onClick={() => { setForm(toVendorForm(detail)); setShowModal(true); }} className="h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition hover:opacity-90" style={{ ...cardStyle, color: "#2563eb" }}><Pencil size={14} /> {tDetail("edit")}</button>
           <div className="relative">
-            <button onClick={() => setMenuOpen((o) => !o)} className="h-9 px-3 rounded-lg text-[13px] font-semibold transition hover:opacity-80" style={{ ...cardStyle, color: "#334155" }}>More ▾</button>
+            <button onClick={() => setMenuOpen((o) => !o)} className="h-9 px-3 rounded-lg text-[13px] font-semibold transition hover:opacity-80" style={{ ...cardStyle, color: "#334155" }}>{tDetail("more")} ▾</button>
             {menuOpen && (
               <div className="absolute right-0 top-10 z-30 w-44 overflow-hidden rounded-xl shadow-xl" style={cardStyle}>
-                <button onClick={() => toggleMutation.mutate()} disabled={toggleMutation.isPending} className="w-full px-3 py-2.5 text-left text-[13px] transition hover:bg-slate-50 disabled:opacity-50">{detail.is_active ? "Deactivate vendor" : "Activate vendor"}</button>
-                <button onClick={() => { setMenuOpen(false); if (confirm("Delete this vendor?")) deleteMutation.mutate(); }} disabled={deleteMutation.isPending} className="w-full px-3 py-2.5 text-left text-[13px] transition hover:bg-red-50" style={{ color: "#cf3348" }}>Delete vendor</button>
+                <button onClick={() => toggleMutation.mutate()} disabled={toggleMutation.isPending} className="w-full px-3 py-2.5 text-left text-[13px] transition hover:bg-slate-50 disabled:opacity-50">{detail.is_active ? tDetail("deactivateVendor") : tDetail("activateVendor")}</button>
+                <button onClick={() => { setMenuOpen(false); if (confirm(tDetail("deleteVendor"))) deleteMutation.mutate(); }} disabled={deleteMutation.isPending} className="w-full px-3 py-2.5 text-left text-[13px] transition hover:bg-red-50" style={{ color: "#cf3348" }}>{tDetail("deleteThisVendor")}</button>
               </div>
             )}
           </div>
@@ -157,32 +175,32 @@ export default function VendorDetailPage({ params }) {
 
       <div className="grid items-start gap-4 lg:grid-cols-12">
         <main className="min-w-0 space-y-4 lg:col-span-8">
-          <Panel title="Vendor Information" icon={Building2} trailing={<div className="flex items-center gap-1.5"><Stars value={detail.rating} /><span className="text-xs font-bold" style={primary}>{(Number(detail.rating) || 0).toFixed(1)} / 5</span></div>}>
+          <Panel title={tDetail("vendorInformation")} icon={Building2} trailing={<div className="flex items-center gap-1.5"><Stars value={detail.rating} /><span className="text-xs font-bold" style={primary}>{(Number(detail.rating) || 0).toFixed(1)} / 5</span></div>}>
             <div className="grid gap-4 p-4 md:grid-cols-2">
               <div className="space-y-0.5">
-                <Dl label="Vendor Name" value={detail.name} />
-                <Dl label="Company" value={detail.company_name} />
-                <Dl label="Contact Person" value={detail.contact_person} />
-                <Dl label="Vendor Code" value={detail.vendor_code} mono />
-                <Dl label="Tax ID" value={detail.tax_id} />
-                <Dl label="Lead Time" value={`${Number(detail.lead_time_days) || 0} days`} icon={CalendarDays} />
+                <Dl label={tDetail("labels.vendorName")} value={detail.name} />
+                <Dl label={tDetail("labels.company")} value={detail.company_name} />
+                <Dl label={tDetail("labels.contactPerson")} value={detail.contact_person} />
+                <Dl label={tDetail("labels.vendorCode")} value={detail.vendor_code} mono />
+                <Dl label={tDetail("labels.taxId")} value={detail.tax_id} />
+                <Dl label={tDetail("labels.leadTime")} value={`${Number(detail.lead_time_days) || 0} ${tShared("label.days")}`} icon={CalendarDays} />
               </div>
               <div className="space-y-0.5">
-                <Dl label="Email" value={detail.email} icon={Mail} />
-                <Dl label="Phone" value={detail.phone} icon={Phone} />
-                <Dl label="WhatsApp" value={detail.whatsapp} icon={MessageCircle} />
-                <Dl label="Address" value={detail.address} icon={MapPin} />
-                <Dl label="City / State" value={[detail.city, detail.state].filter(Boolean).join(", ")} />
-                <Dl label="Country / ZIP" value={[detail.country, detail.zip_code].filter(Boolean).join(" · ")} />
+                <Dl label={tDetail("labels.email")} value={detail.email} icon={Mail} />
+                <Dl label={tDetail("labels.phone")} value={detail.phone} icon={Phone} />
+                <Dl label={tDetail("labels.whatsapp")} value={detail.whatsapp} icon={MessageCircle} />
+                <Dl label={tDetail("labels.address")} value={detail.address} icon={MapPin} />
+                <Dl label={tDetail("labels.cityState")} value={[detail.city, detail.state].filter(Boolean).join(", ")} />
+                <Dl label={tDetail("labels.countryZIP")} value={[detail.country, detail.zip_code].filter(Boolean).join(" · ")} />
               </div>
             </div>
             {(detail.bank_details?.bank || detail.bank_details?.account_title || detail.bank_details?.account_no) && (
               <div className="border-t px-4 py-3" style={{ borderColor: "#eaf0f8" }}>
-                <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={muted}>Bank Details</p>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wide" style={muted}>{tDetail("bankDetails")}</p>
                 <div className="grid gap-x-4 sm:grid-cols-3">
-                  <Dl label="Bank" value={detail.bank_details?.bank} />
-                  <Dl label="Account Title" value={detail.bank_details?.account_title} />
-                  <Dl label="Account No" value={detail.bank_details?.account_no} mono />
+                  <Dl label={tDetail("labels.bank")} value={detail.bank_details?.bank} />
+                  <Dl label={tDetail("labels.accountTitle")} value={detail.bank_details?.account_title} />
+                  <Dl label={tDetail("labels.accountNo")} value={detail.bank_details?.account_no} mono />
                 </div>
               </div>
             )}
@@ -191,7 +209,7 @@ export default function VendorDetailPage({ params }) {
           {/* tabs */}
           <div className="overflow-hidden rounded-2xl shadow-lg" style={cardStyle}>
             <div className="flex px-2 overflow-x-auto" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              {[["purchases", "Purchase Orders"], ["payments", "Payments"], ["activity", "Activity"]].map(([k, label]) => (
+              {[["purchases", tDetail("tabs.purchaseOrders")], ["payments", tDetail("tabs.payments")], ["activity", tDetail("tabs.activity")]].map(([k, label]) => (
                 <button key={k} onClick={() => setTab(k)} className="px-4 py-2.5 text-[13px] font-semibold transition whitespace-nowrap" style={tab === k ? { color: "var(--accent)", borderBottom: "2px solid var(--accent)" } : { color: "var(--text-muted)" }}>{label}</button>
               ))}
             </div>
@@ -200,7 +218,7 @@ export default function VendorDetailPage({ params }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
                     <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                      <tr>{["PO Number", "Date", "Lines", "Total", "Paid", "Status"].map((h) => <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{h}</th>)}</tr>
+                      <tr>{[tDetail("poTable.poNumber"), tDetail("poTable.date"), tDetail("poTable.lines"), tDetail("poTable.total"), tDetail("poTable.paid"), tDetail("poTable.status")].map((h) => <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {(detail.purchaseOrders || []).map((p) => (
@@ -213,26 +231,26 @@ export default function VendorDetailPage({ params }) {
                           <td className="px-3 py-2"><Pill tone={statusTone(p.status)}>{STATUS_LABEL[p.status] || p.status}</Pill></td>
                         </tr>
                       ))}
-                      {!(detail.purchaseOrders || []).length && <tr><td colSpan={6} className="p-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>No purchase orders yet.</td></tr>}
+                      {!(detail.purchaseOrders || []).length && <tr><td colSpan={6} className="p-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>{tDetail("states.noPurchaseOrders")}</td></tr>}
                     </tbody>
                   </table>
                 </div>
               )}
               {tab === "payments" && (
-                paymentsError ? <div className="py-8 text-center"><p className="text-sm" style={{ color: "#cf3348" }}>Could not load payment history.</p><button onClick={() => refetchPayments()} className="mt-2 text-sm font-semibold hover:underline" style={accent}>Try again</button></div> :
-                paymentsLoading ? <p className="py-8 text-center text-sm" style={muted}>Loading payments...</p> :
+                paymentsError ? <div className="py-8 text-center"><p className="text-sm" style={{ color: "#cf3348" }}>{tDetail("states.loadPaymentsFailed")}</p><button onClick={() => refetchPayments()} className="mt-2 text-sm font-semibold hover:underline" style={accent}>{tDetail("states.tryAgain")}</button></div> :
+                paymentsLoading ? <p className="py-8 text-center text-sm" style={muted}>{tDetail("states.loadingPayments")}</p> :
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[520px] text-[13px]">
-                      <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["Purchase Order", "Paid At", "Amount"].map((label) => <th key={label} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide">{label}</th>)}</tr></thead>
+                      <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{[tDetail("paymentTable.purchaseOrder"), tDetail("paymentTable.paidAt"), tDetail("paymentTable.amount")].map((label) => <th key={label} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide">{label}</th>)}</tr></thead>
                       <tbody>
                         {(paymentsByPo || []).map((payment, index) => (
                           <tr key={payment._id || `${payment.po_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
-                            <td className="px-3 py-2.5"><Link href={`/admin/purchase-orders/${payment.po_id}`} className="font-mono font-semibold hover:underline" style={accent}>{payment.po_number || "View PO"}</Link></td>
+                            <td className="px-3 py-2.5"><Link href={`/admin/purchase-orders/${payment.po_id}`} className="font-mono font-semibold hover:underline" style={accent}>{payment.po_number || tDetail("viewPO")}</Link></td>
                             <td className="px-3 py-2.5" style={muted}>{fmtDate(payment.paid_at || payment.created_at)}</td>
                             <td className="px-3 py-2.5 font-bold" style={primary}>{money(payment.amount)}</td>
                           </tr>
                         ))}
-                        {!(paymentsByPo || []).length && <tr><td colSpan={3} className="p-8 text-center text-sm" style={muted}>No payments recorded yet.</td></tr>}
+                        {!(paymentsByPo || []).length && <tr><td colSpan={3} className="p-8 text-center text-sm" style={muted}>{tDetail("states.noPayments")}</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -247,7 +265,7 @@ export default function VendorDetailPage({ params }) {
                       </div>
                     </div>
                   ))}
-                  {!events.length && <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>No activity yet.</p>}
+                  {!events.length && <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>{tDetail("states.noActivity")}</p>}
                 </div>
               )}
             </div>
@@ -256,9 +274,9 @@ export default function VendorDetailPage({ params }) {
 
         {/* sidebar */}
         <aside className="space-y-4 lg:col-span-4">
-          <Panel title="Business Summary" icon={Wallet}>
+          <Panel title={tDetail("businessSummary")} icon={Wallet}>
             <div className="grid grid-cols-3 divide-x p-4 text-center" style={{ borderColor: "#eaf0f8" }}>
-              {[["Purchased", detail.total_purchased, "#2563eb"], ["Paid", detail.total_paid, "#079878"], ["Balance", detail.balance_payable, "#cf3348"]].map(([label, amount, color]) => (
+              {[[tDetail("summary.purchased"), detail.total_purchased, "#2563eb"], [tDetail("summary.paid"), detail.total_paid, "#079878"], [tDetail("summary.balance"), detail.balance_payable, "#cf3348"]].map(([label, amount, color]) => (
                 <div key={label} className="min-w-0 px-1">
                   <div className="text-[11px]" style={muted}>{label}</div>
                   <div className="mt-1 break-words text-[13px] font-extrabold" style={{ color }}>{money(amount)}</div>
@@ -266,7 +284,7 @@ export default function VendorDetailPage({ params }) {
               ))}
             </div>
           </Panel>
-          <Panel title="Recent Purchase Orders" icon={FileText} trailing={<button onClick={() => setTab("purchases")} className="text-xs font-semibold hover:underline" style={accent}>View all</button>}>
+          <Panel title={tDetail("recentPurchaseOrders")} icon={FileText} trailing={<button onClick={() => setTab("purchases")} className="text-xs font-semibold hover:underline" style={accent}>{tDetail("viewAll")}</button>}>
             <div className="space-y-2 p-3">
               {recentPOs.map((p) => (
                 <Link key={p._id} href={`/admin/purchase-orders/${p._id}`} className="flex items-center justify-between gap-2 rounded-xl border p-3 transition hover:border-blue-200 hover:bg-blue-50/40" style={{ borderColor: "#eaf0f8" }}>
@@ -275,7 +293,7 @@ export default function VendorDetailPage({ params }) {
                   <b className="whitespace-nowrap text-[12px]" style={primary}>{money(p.total)}</b>
                 </Link>
               ))}
-              {!recentPOs.length && <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>No orders yet.</p>}
+              {!recentPOs.length && <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>{tDetail("states.noOrders")}</p>}
             </div>
           </Panel>
         </aside>

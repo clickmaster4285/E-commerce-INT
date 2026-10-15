@@ -10,6 +10,7 @@ import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 
@@ -476,6 +477,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -575,7 +577,7 @@ export default function DiscountsPage() {
     onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.id ? "Discount updated successfully" : "Discount created successfully");
+      toast.success(variables.id ? t("admin.discounts.toast.updated") : t("admin.discounts.toast.created"));
       setShowModal(false);
       resetForm();
     },
@@ -596,9 +598,9 @@ export default function DiscountsPage() {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       setDeleteTarget(null);
       setSelectedIds([]);
-      toast.success("Discount deleted successfully");
+      toast.success(t("admin.discounts.toast.deleted"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.deleteFailed")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -610,9 +612,9 @@ export default function DiscountsPage() {
     onMutate: () => markSelfAction("update"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.newStatus === "active" ? "Discount activated" : "Discount deactivated");
+      toast.success(variables.newStatus === "active" ? t("admin.discounts.toast.activated") : t("admin.discounts.toast.deactivated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.statusFailed")),
   });
 
   const filteredDiscounts = useMemo(() => {
@@ -702,24 +704,24 @@ export default function DiscountsPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormErrors({});
-    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
       setFormErrors({ code: "Discount code is required." });
       return;
     }
-    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
-    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
+    if (Number(formData.value) < 0) return toast.error(t("admin.discounts.validation.valueNegative"));
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error(t("admin.discounts.validation.percentageMax"));
 
     // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
     const nonNegativeError = validateNonNegative([
-      ["Discount value", formData.value],
-      ["Minimum order amount", formData.min_order_amount],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Total usage limit", formData.usage_limit],
-      ["Per customer limit", formData.usage_per_customer],
-    ]);
+      [t("admin.discounts.form.discountValue"), formData.value],
+      [t("admin.discounts.form.minOrderAmount"), formData.min_order_amount],
+      [t("admin.discounts.form.minQuantity"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.usage_per_customer],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
@@ -728,21 +730,21 @@ export default function DiscountsPage() {
 
     if (activeFormType === "product") {
       target_type = "specific_products"; applyTo = "specific_products";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
       payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "category") {
       target_type = "specific_categories"; applyTo = "specific_categories";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
       payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "brand") {
       target_type = "brand"; applyTo = "brand";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
       payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
     }
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
       ? Number(formData.min_quantity) 
@@ -895,8 +897,8 @@ export default function DiscountsPage() {
           {/* Title & Actions Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
-              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
+              <h1 className="text-[24px] leading-7 font-bold tracking-tight">{t("admin.discounts.page.title")}</h1>
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.subtitle")}</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -907,7 +909,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("list")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="List view"
+                  title={t("admin.discounts.page.listView")}
                 >
                   <ListIcon />
                 </button>
@@ -916,7 +918,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("grid")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="Grid view"
+                  title={t("admin.discounts.page.gridView")}
                 >
                   <GridIcon />
                 </button>
@@ -931,7 +933,7 @@ export default function DiscountsPage() {
                   className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition" 
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                 >
-                  <PlusIcon /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                  <PlusIcon /> {t("admin.discounts.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isTypeMenuOpen && (
                   <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
@@ -952,9 +954,9 @@ export default function DiscountsPage() {
 
           {/* Stats Cards Row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
-            <StatCard title="Active" value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
-            <StatCard title="Inactive" value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.total")} value={stats.total} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.active")} value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.inactive")} value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
           </div>
 
           {/* Search Bar & Filters Row */}
@@ -963,7 +965,7 @@ export default function DiscountsPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
               <input 
                 type="text" 
-                placeholder="Search by discount name or code..." 
+                placeholder={t("admin.discounts.page.search")} 
                 value={search} 
                 onChange={(e) => setSearch(e.target.value)} 
                 className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]" 
@@ -984,8 +986,8 @@ export default function DiscountsPage() {
           <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
             <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
+              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.page.clear")}</button>
+              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}</button>
             </div>
           </div>
         )}
@@ -1001,11 +1003,11 @@ export default function DiscountsPage() {
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
                       <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                     </tr>
                   </thead>
                   <DiscountRowsSkeleton rows={itemsPerPage} />
@@ -1018,7 +1020,7 @@ export default function DiscountsPage() {
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <TagIcon className="w-8 h-8 mb-3 opacity-50" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No discounts found" : "No discounts created yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? t("admin.discounts.page.noMatch") : t("admin.discounts.page.noneYet")}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -1027,11 +1029,11 @@ export default function DiscountsPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={paginatedDiscounts.length > 0 && paginatedDiscounts.every((d) => selectedIds.includes(d._id || d.id))} onChange={(e) => setSelectedIds(e.target.checked ? paginatedDiscounts.map((d) => d._id || d.id) : [])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>

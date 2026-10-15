@@ -14,6 +14,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
+import { slugKey } from "@/utils/slugKey";
+import { useTranslation } from "../../i18n/LanguageProvider";
 
 import {
   FolderOpen,
@@ -450,6 +452,23 @@ export default function Sidebar({ onNavigate, userData }) {
   }, [handleConnect, handleProfileData, handleProfileUpdated, handlePermissionsUpdated]);
 
   // ============================================================
+  // I18N (admin only)
+  // ============================================================
+  // `name` / `title` stay the stable lookup key — paths, permissionKey and icons
+  // are untouched. If a key is ever missing we fall back to the English label.
+  const { t } = useTranslation();
+  const navLabel = useCallback(
+    (kind, label) => {
+      const key = `admin.nav.${kind}.${slugKey(label)}`;
+      const translated = t(key);
+      // The translator returns the key itself when missing — fall back to the
+      // raw English label so the sidebar never shows a dotted key.
+      return translated === key ? label : translated;
+    },
+    [t],
+  );
+
+  // ============================================================
   // VISIBLE MENU ITEMS
   // ============================================================
 
@@ -594,7 +613,7 @@ export default function Sidebar({ onNavigate, userData }) {
         <button
           type="button"
           onClick={() => setIsMobileOpen(true)}
-          aria-label="Open sidebar"
+          aria-label={t("admin.sidebar.open")}
           className="
             fixed top-4 left-4 z-[60]
             flex h-10 w-10 items-center justify-center
@@ -672,7 +691,7 @@ export default function Sidebar({ onNavigate, userData }) {
                   {displayName}
                 </span>
                 <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                  Admin Panel
+                  {t("admin.sidebar.adminPanel")}
                 </span>
               </span>
             )}
@@ -682,7 +701,7 @@ export default function Sidebar({ onNavigate, userData }) {
           <button
             type="button"
             onClick={handleCloseMobile}
-            aria-label="Close sidebar"
+            aria-label={t("admin.sidebar.close")}
             className="
               shrink-0 rounded-md p-1
               text-[var(--text-sidebar-muted)]
@@ -699,8 +718,8 @@ export default function Sidebar({ onNavigate, userData }) {
           <button
             type="button"
             onClick={toggleCollapse}
-            aria-label={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
-            title={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={iconOnly ? t("admin.sidebar.expand") : t("admin.sidebar.collapse")}
+            title={iconOnly ? t("admin.sidebar.expand") : t("admin.sidebar.collapse")}
             className="
               hidden h-7 w-7 shrink-0 items-center justify-center
               rounded-lg
@@ -719,7 +738,7 @@ export default function Sidebar({ onNavigate, userData }) {
             NAVIGATION
         ================================================== */}
         <nav
-          aria-label="Main navigation"
+          aria-label={t("admin.sidebar.navigation")}
           className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
         >
           {sidebarSections.map((section) => {
@@ -736,7 +755,7 @@ export default function Sidebar({ onNavigate, userData }) {
                 ) : (
                   <div className="px-2.5 pt-1.5 pb-1">
                     <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                      {section.title}
+                      {navLabel("section", section.title)}
                     </span>
                   </div>
                 )}
@@ -753,8 +772,8 @@ export default function Sidebar({ onNavigate, userData }) {
                         href={item.path}
                         onClick={handleCloseMobile}
                         aria-current={active ? "page" : undefined}
-                        title={iconOnly ? item.name : undefined}
-                        aria-label={iconOnly ? item.name : undefined}
+                        title={iconOnly ? navLabel("item", item.name) : undefined}
+                        aria-label={iconOnly ? navLabel("item", item.name) : undefined}
                         className={`
                           group relative flex h-9
                           items-center gap-2.5
@@ -784,7 +803,7 @@ export default function Sidebar({ onNavigate, userData }) {
                               : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
                           }`}
                         />
-                        {!iconOnly && <span className="truncate">{item.name}</span>}
+                        {!iconOnly && <span className="truncate">{navLabel("item", item.name)}</span>}
                       </Link>
                     );
                   })}
@@ -805,7 +824,7 @@ export default function Sidebar({ onNavigate, userData }) {
           ) : (
             <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
               Powered by{" "}
-              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> v1.0
+              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> {t("admin.sidebar.version")}
             </p>
           )}
         </div>

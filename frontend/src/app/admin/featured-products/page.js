@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 import { useProductSocketSync } from "../../../hooks/admin/useProductSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const PER_PAGE = 20;
 const MODAL_PER_PAGE = 8;
@@ -44,7 +45,9 @@ const getImageUrl = (path) => {
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+const localeTag = (locale) => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US";
+const fmt = (n, locale = "en") => new Intl.NumberFormat(localeTag(locale)).format(Number(n || 0));
+const fmtCurrency = (n, locale = "en") => new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "PKR" }).format(Number(n || 0));
 
 /* Same page-number logic jo Products page par hai */
 function buildPageList(currentPage, totalPages) {
@@ -63,6 +66,7 @@ function buildPageList(currentPage, totalPages) {
 
 /* Same status pill jo Products page par hai */
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const isActive = status === "active";
   return (
     <span
@@ -73,7 +77,7 @@ function StatusBadge({ status }) {
       }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isActive ? "var(--success)" : "var(--danger)" }} />
-      {isActive ? "Active" : "Inactive"}
+      {isActive ? t("admin.featuredProducts.page.active") : t("admin.featuredProducts.page.inactive")}
     </span>
   );
 }
@@ -100,8 +104,8 @@ function TableSkeleton({ rows = PER_PAGE }) {
           <td className="px-4 py-2.5">
             <div className="h-5 w-14 animate-pulse rounded-full" style={{ backgroundColor: "var(--bg-tertiary)" }} />
           </td>
-          <td className="px-4 py-2.5 text-right">
-            <div className="ml-auto h-6 w-6 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+          <td className="px-4 py-2.5 text-end">
+            <div className="ms-auto h-6 w-6 animate-pulse rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
           </td>
         </tr>
       ))}
@@ -134,6 +138,7 @@ function GridSkeleton({ cards = 8 }) {
    FEATURED ROW — list view table row (same cells as Products page)
    ========================================================== */
 function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
+  const { t, locale } = useTranslation();
   const variant = product?.variants?.[0];
   const img = variant?.images?.[0]?.img_url;
   const price = Number(variant?.selling_price) || Number(product?.price) || 0;
@@ -165,10 +170,10 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
             <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
           </div>
           <span
-            className="ml-1 inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5"
+            className="ms-1 inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-            title="Featured product"
-            aria-label="Featured"
+            title={t("admin.featuredProducts.ui.featuredLabel")}
+            aria-label={t("admin.featuredProducts.ui.featuredAria")}
           >
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
           </span>
@@ -178,23 +183,23 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
       <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{product?.brand_id?.name || "—"}</td>
       <td className="px-4 py-2.5">
         <div className="flex items-baseline gap-1.5">
-          <span className="font-semibold tabular-nums">Rs. {fmt(price)}</span>
+          <span className="font-semibold tabular-nums">{fmtCurrency(price, locale)}</span>
           {listPrice > price && (
             <span className="text-[11px] line-through tabular-nums" style={{ color: "var(--text-muted)" }}>
-              Rs. {fmt(listPrice)}
+              {fmtCurrency(listPrice, locale)}
             </span>
           )}
         </div>
       </td>
-      <td className="px-4 py-2.5 font-medium tabular-nums">{fmt(variant?.quantity)}</td>
+      <td className="px-4 py-2.5 font-medium tabular-nums">{fmt(variant?.quantity, locale)}</td>
       <td className="px-4 py-2.5"><StatusBadge status={product.status} /></td>
-      <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+      <td className="px-4 py-2.5 text-end" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
             onClick={onOpen}
-            title="View product"
-            aria-label={`View ${product.name}`}
+            title={t("admin.featuredProducts.page.viewProduct")}
+            aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: product.name })}
             className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
           >
@@ -204,8 +209,8 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
             type="button"
             disabled={isRemoving}
             onClick={onRemove}
-            title="Remove from featured"
-            aria-label={`Remove ${product.name} from featured`}
+            title={t("admin.featuredProducts.page.removeFromFeatured")}
+            aria-label={t("admin.featuredProducts.ui.removeAria", { name: product.name })}
             className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
           >
@@ -221,6 +226,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
    FEATURED GRID CARD — same card layout as Products grid view
    ========================================================== */
 function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
+  const { t, locale } = useTranslation();
   const variant = product?.variants?.[0];
   const img = variant?.images?.[0]?.img_url;
   const price = Number(variant?.selling_price) || Number(product?.price) || 0;
@@ -247,8 +253,8 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
           <span
             className="inline-flex items-center rounded-md px-1.5 py-1"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-            title="Featured product"
-            aria-label="Featured"
+            title={t("admin.featuredProducts.ui.featuredLabel")}
+            aria-label={t("admin.featuredProducts.ui.featuredAria")}
           >
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
           </span>
@@ -263,7 +269,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
           {[product?.category_id?.name, product?.brand_id?.name].filter(Boolean).join(" · ") || "—"}
         </p>
         <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
-          Rs. {fmt(price)} · Stock: {fmt(variant?.quantity)}
+          {fmtCurrency(price, locale)} · {t("admin.featuredProducts.ui.stock")}: {fmt(variant?.quantity, locale)}
         </p>
       </div>
 
@@ -275,8 +281,8 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
         <button
           type="button"
           onClick={onOpen}
-          title="View product"
-          aria-label={`View ${product.name}`}
+          title={t("admin.featuredProducts.page.viewProduct")}
+          aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: product.name })}
           className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80"
           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
         >
@@ -286,8 +292,8 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
           type="button"
           disabled={isRemoving}
           onClick={onRemove}
-          title="Remove from featured"
-          aria-label={`Remove ${product.name} from featured`}
+          title={t("admin.featuredProducts.page.removeFromFeatured")}
+          aria-label={t("admin.featuredProducts.ui.removeAria", { name: product.name })}
           className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
         >
@@ -328,6 +334,7 @@ function ModalSkeleton({ rows = MODAL_PER_PAGE }) {
    sakte (backend bhi same rule lagata hai).
    ========================================================== */
 function ManageFeaturedModal({ open, onClose, onSaved }) {
+  const { t, dir, locale } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -432,25 +439,24 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
       queryClient.invalidateQueries({ queryKey: ["featured-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["manage-featured"] });
-      const messages = (results || []).map((r) => r?.message).filter(Boolean);
-      toast.success(messages.length ? messages.join(" · ") : "Featured products updated");
+      toast.success(t("admin.featuredProducts.toast.updated"));
       onSaved?.();
       onClose?.();
     },
     onError: (e) => {
-      toast.error(e?.response?.data?.message || "Failed to update featured products");
+      toast.error(t("admin.featuredProducts.toast.updateFailed"));
     },
   });
 
   const actionLabel = saveMutation.isPending
-    ? "Saving..."
+    ? t("admin.featuredProducts.modal.saving")
     : toFeature.length && toUnfeature.length
-      ? "Update Featured"
+      ? t("admin.featuredProducts.modal.update")
       : toFeature.length
-        ? `Feature ${toFeature.length} Selected`
+        ? t("admin.featuredProducts.modal.featureSelected", { count: toFeature.length })
         : toUnfeature.length
-          ? `Remove ${toUnfeature.length} from Featured`
-          : "No Changes";
+        ? t("admin.featuredProducts.modal.removeSelected", { count: toUnfeature.length })
+        : t("admin.featuredProducts.modal.noChanges");
 
   if (!open) return null;
 
@@ -460,7 +466,9 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Manage featured products"
+      aria-label={t("admin.featuredProducts.modal.manageFeatured")}
+      dir={dir}
+      lang={locale}
     >
       <style>{`@keyframes modalScaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}} @keyframes modalSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div
@@ -475,16 +483,16 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
               <Star className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-[16px] font-bold leading-6">Manage Featured Products</h2>
+              <h2 className="text-[16px] font-bold leading-6">{t("admin.featuredProducts.modal.title")}</h2>
               <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                Select the products you want to show on the storefront
+                {t("admin.featuredProducts.modal.subtitle")}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("admin.featuredProducts.ui.close")}
             className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:opacity-70"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
           >
@@ -495,13 +503,13 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
         {/* TOOLBAR */}
         <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border-color)" }}>
           <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
             <input
               type="text"
-              placeholder="Search products..."
+              placeholder={t("admin.featuredProducts.modal.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 w-full rounded-lg pl-9 pr-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+              className="h-9 w-full rounded-lg ps-9 pe-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
               style={inputStyle}
             />
           </div>
@@ -514,10 +522,10 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
                 disabled={!selectableOnPage.length}
                 className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
               />
-              Select all on page
+              {t("admin.featuredProducts.modal.selectAll")}
             </label>
             <span aria-hidden="true">·</span>
-            <span><span className="font-bold" style={{ color: "var(--text-primary)" }}>{selectedCount}</span> selected</span>
+            <span>{t("admin.featuredProducts.modal.selected", { count: selectedCount })}</span>
           </div>
         </div>
 
@@ -528,20 +536,20 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
           ) : isError ? (
             <div className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
               <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
-              <p className="text-[13px]">Failed to load products. Please check your connection.</p>
+              <p className="text-[13px]">{t("admin.featuredProducts.ui.loadError")}</p>
               <button
                 type="button"
                 onClick={() => refetch()}
                 className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
                 style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
               >
-                Retry
+                {t("admin.featuredProducts.page.retry")}
               </button>
             </div>
           ) : products.length === 0 ? (
             <div className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
               <Package className="mx-auto mb-3 h-8 w-8 opacity-30" />
-              <p className="text-[13px]">{debounced ? "No products match your search" : "No products found"}</p>
+              <p className="text-[13px]">{debounced ? t("admin.featuredProducts.modal.noProductsMatch") : t("admin.featuredProducts.modal.noProducts")}</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -592,7 +600,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
 
                     {isInactive ? (
                       <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}>
-                        Inactive
+                        {t("admin.featuredProducts.page.inactive")}
                       </span>
                     ) : (
                       <StatusBadge status={p.status} />
@@ -611,27 +619,27 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
               type="button"
               onClick={() => setPage((v) => Math.max(1, v - 1))}
               disabled={page <= 1 || isFetching}
-              aria-label="Previous page"
+              aria-label={t("admin.featuredProducts.pagination.prev")}
               className="flex h-8 w-8 items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              Page <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{page}</span> of {totalPages}
-              {totalRecords > 0 ? ` · ${fmt(totalRecords)} products` : ""}
+              {t("admin.featuredProducts.modal.pageOf", { page, pages: totalPages })}
+              {totalRecords > 0 ? ` · ${t("admin.featuredProducts.pagination.products", { count: fmt(totalRecords, locale) })}` : ""}
             </span>
             <button
               type="button"
               onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
               disabled={page >= totalPages || isFetching}
-              aria-label="Next page"
+              aria-label={t("admin.featuredProducts.pagination.next")}
               className="flex h-8 w-8 items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
-            {isFetching && <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" style={{ color: "var(--text-muted)" }} />}
+            {isFetching && <Loader2 className="ms-1 h-3.5 w-3.5 animate-spin" style={{ color: "var(--text-muted)" }} />}
           </div>
 
           <div className="flex items-center justify-end gap-2">
@@ -642,7 +650,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
               className="h-9 rounded-lg px-3 text-[13px] font-medium transition disabled:opacity-40 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
-              Clear
+              {t("admin.featuredProducts.modal.clear")}
             </button>
             <button
               type="button"
@@ -651,7 +659,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
               className="h-9 rounded-lg px-3 text-[13px] font-medium transition disabled:opacity-40 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
-              Cancel
+              {t("admin.featuredProducts.modal.cancel")}
             </button>
             <button
               type="button"
@@ -672,6 +680,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
 
 
 export default function FeaturedProductsPage() {
+  const { t, dir, locale } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   // ✅ Baqi pages (Products waghera) ki tarah live socket sync —
@@ -729,11 +738,11 @@ export default function FeaturedProductsPage() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["featured-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success(res?.message || "Product removed from featured");
+      toast.success(t("admin.featuredProducts.toast.removed"));
     },
     onError: (e) => {
       queryClient.invalidateQueries({ queryKey: ["featured-products"] });
-      toast.error(e?.response?.data?.message || "Failed to update featured product");
+      toast.error(t("admin.featuredProducts.toast.removeFailed"));
     },
   });
 
@@ -747,9 +756,9 @@ export default function FeaturedProductsPage() {
       {/* HEADER — same as Products page */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-[24px] font-bold leading-7 tracking-tight">Featured Products</h1>
+          <h1 className="text-[24px] font-bold leading-7 tracking-tight">{t("admin.featuredProducts.page.title")}</h1>
           <p className="mt-1 text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Manage products, variants, stock and pricing
+            {t("admin.featuredProducts.page.subtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -759,7 +768,7 @@ export default function FeaturedProductsPage() {
               onClick={() => setViewMode("list")}
               className="flex h-9 w-9 items-center justify-center rounded-lg transition"
               style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}
-              aria-label="List view"
+              aria-label={t("admin.featuredProducts.ui.listView")}
             >
               <List className="h-4 w-4" />
             </button>
@@ -768,7 +777,7 @@ export default function FeaturedProductsPage() {
               onClick={() => setViewMode("grid")}
               className="flex h-9 w-9 items-center justify-center rounded-lg transition"
               style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}
-              aria-label="Grid view"
+              aria-label={t("admin.featuredProducts.ui.gridView")}
             >
               <Grid3x3 className="h-4 w-4" />
             </button>
@@ -779,7 +788,7 @@ export default function FeaturedProductsPage() {
             className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            <Package className="h-4 w-4" /> Manage Products
+            <Package className="h-4 w-4" /> {t("admin.featuredProducts.page.manageProducts")}
           </button>
         </div>
       </div>
@@ -787,14 +796,14 @@ export default function FeaturedProductsPage() {
       {/* STAT CARDS — same 4-card grid as Products page */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { l: "Total Featured", v: totalRecords },
-          { l: "Active", v: activeCount, c: "text-emerald-500" },
-          { l: "Out of Stock", v: outOfStockCount, c: outOfStockCount ? "text-red-400" : "text-emerald-500" },
-          { l: "Total Stock", v: totalStock, c: "text-blue-500" },
+          { l: t("admin.featuredProducts.page.totalFeatured"), v: totalRecords },
+          { l: t("admin.featuredProducts.page.active"), v: activeCount, c: "text-emerald-500" },
+          { l: t("admin.featuredProducts.ui.outOfStock"), v: outOfStockCount, c: outOfStockCount ? "text-red-400" : "text-emerald-500" },
+          { l: t("admin.featuredProducts.ui.totalStock"), v: totalStock, c: "text-blue-500" },
         ].map((s, i) => (
           <div key={i} className="rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
-            <p className={`mt-1 text-[20px] font-bold tabular-nums ${s.c || ""}`}>{s.v}</p>
+            <p className={`mt-1 text-[20px] font-bold tabular-nums ${s.c || ""}`}>{fmt(s.v, locale)}</p>
           </div>
         ))}
       </div>
@@ -802,13 +811,13 @@ export default function FeaturedProductsPage() {
       {/* TOOLBAR — search left (same as Products / Brands) */}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div className="relative w-full md:w-[400px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
           <input
             type="text"
-            placeholder="Search by product name or SKU..."
+            placeholder={t("admin.featuredProducts.page.searchPlaceholder")}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            className="h-9 w-full rounded-lg pl-9 pr-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+            className="h-9 w-full rounded-lg ps-9 pe-3 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
             style={inputStyle}
           />
         </div>
@@ -822,10 +831,10 @@ export default function FeaturedProductsPage() {
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                 <tr>
-                  {["Product", "Category", "Brand", "Price", "Stock", "Status", "Actions"].map((h) => (
+                  {[t("admin.featuredProducts.page.product"), t("admin.featuredProducts.ui.category"), t("admin.featuredProducts.ui.brand"), t("admin.featuredProducts.ui.price"), t("admin.featuredProducts.ui.stock"), t("admin.featuredProducts.ui.status"), t("admin.featuredProducts.ui.actions")].map((h) => (
                     <th
                       key={h}
-                      className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`}
+                      className={`px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider ${h === t("admin.featuredProducts.ui.actions") ? "text-end" : ""}`}
                       style={{ color: "var(--text-muted)" }}
                     >
                       {h}
@@ -842,14 +851,14 @@ export default function FeaturedProductsPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
                         <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
-                        <p className="text-[13px]">Failed to load featured products. Please check your connection.</p>
+                        <p className="text-[13px]">{t("admin.featuredProducts.page.loadFailed")}</p>
                         <button
                           type="button"
                           onClick={() => refetch()}
                           className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
                           style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                         >
-                          Retry
+                          {t("admin.featuredProducts.page.retry")}
                         </button>
                       </td>
                     </tr>
@@ -857,7 +866,7 @@ export default function FeaturedProductsPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
                         <Star className="mx-auto mb-3 h-8 w-8 opacity-30" />
-                        {search ? "No featured products match your search" : "No featured products yet"}
+                        {search ? t("admin.featuredProducts.page.noMatch") : t("admin.featuredProducts.page.empty")}
                       </td>
                     </tr>
                   ) : (
@@ -887,7 +896,7 @@ export default function FeaturedProductsPage() {
           <div className="rounded-lg px-4 py-14 text-center" style={cardStyle}>
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
             <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-              Failed to load featured products. Please check your connection.
+              {t("admin.featuredProducts.page.loadFailed")}
             </p>
             <button
               type="button"
@@ -895,14 +904,14 @@ export default function FeaturedProductsPage() {
               className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
             >
-              Retry
+              {t("admin.featuredProducts.page.retry")}
             </button>
           </div>
         ) : products.length === 0 ? (
           <div className="rounded-lg px-4 py-14 text-center" style={cardStyle}>
             <Star className="mx-auto mb-3 h-8 w-8 opacity-30" style={{ color: "var(--text-muted)" }} />
             <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-              {search ? "No featured products match your search" : "No featured products yet"}
+              {search ? t("admin.featuredProducts.page.noMatch") : t("admin.featuredProducts.page.empty")}
             </p>
           </div>
         ) : (
@@ -928,26 +937,26 @@ export default function FeaturedProductsPage() {
         >
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
             <span>
-              Showing <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(firstRow)}–{fmt(lastRow)}</span> of{" "}
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalRecords)}</span> products
+              {t("admin.featuredProducts.ui.showing")} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(firstRow, locale)}–{fmt(lastRow, locale)}</span> {t("admin.featuredProducts.ui.of")}{" "}
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalRecords, locale)}</span> {t("admin.featuredProducts.ui.products")}
             </span>
             <span aria-hidden="true">·</span>
             <span>
-              Page <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{currentPage}</span> of{" "}
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalPages)}</span>
+              {t("admin.featuredProducts.ui.page")} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{currentPage}</span> {t("admin.featuredProducts.ui.of")}{" "}
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalPages, locale)}</span>
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-1.5" role="navigation" aria-label="Pagination">
+          <div className="flex flex-wrap items-center justify-end gap-1.5" role="navigation" aria-label={t("admin.featuredProducts.ui.pagination")}>
             <button
               type="button"
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1 || isFetching}
-              aria-label="Previous page"
+              aria-label={t("admin.featuredProducts.pagination.prev")}
               className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
-              <ChevronLeft className="h-3.5 w-3.5" /> Prev
+              <ChevronLeft className="h-3.5 w-3.5" /> {t("admin.featuredProducts.ui.prev")}
             </button>
 
             {buildPageList(currentPage, totalPages).map((pg, i) =>
@@ -961,7 +970,7 @@ export default function FeaturedProductsPage() {
                   type="button"
                   onClick={() => goToPage(pg)}
                   aria-current={pg === currentPage ? "page" : undefined}
-                  aria-label={`Page ${pg}`}
+              aria-label={t("admin.featuredProducts.pagination.pageOf", { page: pg })}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums transition hover:opacity-80"
                   style={
                     pg === currentPage
@@ -978,11 +987,11 @@ export default function FeaturedProductsPage() {
               type="button"
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages || isFetching}
-              aria-label="Next page"
+              aria-label={t("admin.featuredProducts.pagination.next")}
               className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             >
-              Next <ChevronRight className="h-3.5 w-3.5" />
+              {t("admin.featuredProducts.pagination.nextShort")} <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

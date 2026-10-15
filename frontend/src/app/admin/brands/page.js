@@ -7,6 +7,7 @@ import { Country } from "country-state-city";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -96,20 +97,32 @@ const Avatar = ({ brand, size = "w-8 h-8" }) => {
   );
 };
 
-const StatusBadge = ({ active }) => (
+const StatusBadge = ({ active }) => {
+  const { t } = useTranslation();
+  return (
   <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide whitespace-nowrap" style={active ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-    {active ? "Active" : "Inactive"}
+    {active ? t("admin.brands.ui.active") : t("admin.brands.ui.inactive")}
   </span>
-);
+  );
+};
 
 /* ================================================================
    ✅ CUSTOM COUNTRY DROPDOWN COMPONENT — OPENS UPWARD
    ================================================================ */
 const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] }) => {
+  const { t, dir, locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
+  const localizedCountryName = (country) => {
+    try {
+      const localeTag = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en";
+      return new Intl.DisplayNames([localeTag], { type: "region" }).of(country.isoCode) || country.name;
+    } catch {
+      return country.name;
+    }
+  };
 
   const getFlagEmoji = (isoCode) => {
     if (!isoCode || isoCode.length !== 2) return "";
@@ -119,8 +132,8 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
   const filteredCountries = useMemo(() => {
     if (!searchTerm.trim()) return allCountries;
     const term = searchTerm.toLowerCase();
-    return allCountries.filter((c) => c.name.toLowerCase().includes(term) || c.isoCode.toLowerCase().includes(term));
-  }, [allCountries, searchTerm]);
+    return allCountries.filter((c) => c.name.toLowerCase().includes(term) || localizedCountryName(c).toLowerCase().includes(term) || c.isoCode.toLowerCase().includes(term));
+  }, [allCountries, searchTerm, locale]);
 
   const selectedCountry = useMemo(() => allCountries.find((c) => c.name === value) || null, [allCountries, value]);
 
@@ -159,12 +172,12 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
           {selectedCountry ? (
             <>
               <span className="text-base leading-none">{getFlagEmoji(selectedCountry.isoCode)}</span>
-              <span className="truncate text-[13px]">{selectedCountry.name}</span>
+              <span className="truncate text-[13px]">{localizedCountryName(selectedCountry)}</span>
             </>
           ) : (
             <span className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
               <GlobeIcon className="w-3.5 h-3.5" />
-              <span className="text-[13px]">Select Country</span>
+              <span className="text-[13px]">{t("admin.brands.ui.selectCountry")}</span>
             </span>
           )}
         </div>
@@ -179,13 +192,13 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}>
+        <div dir={dir} lang={locale} className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}>
           <div className="px-3 py-1.5 text-center" style={{ borderBottom: "1px solid var(--border-color)" }}>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{filteredCountries.length} of {allCountries.length} countries</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.countryCount", { filtered: filteredCountries.length, total: allCountries.length })}</p>
           </div>
           <div className="max-h-[200px] overflow-y-auto py-1" style={{ scrollbarWidth: "thin" }}>
             {filteredCountries.length === 0 ? (
-              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No country found</p></div>
+              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.noCountry")}</p></div>
             ) : (
               filteredCountries.map((country) => {
                 const isSelected = country.name === value;
@@ -193,7 +206,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
                   <button key={country.isoCode} type="button" onClick={() => handleSelect(country.name)} className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left transition" style={{ backgroundColor: isSelected ? "var(--success-soft)" : "transparent" }} onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }} onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-base leading-none">{getFlagEmoji(country.isoCode)}</span>
-                      <span className="truncate text-[13px]" style={{ color: isSelected ? "var(--success-text)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{country.name}</span>
+                      <span className="truncate text-[13px]" style={{ color: isSelected ? "var(--success-text)" : "var(--text-primary)", fontWeight: isSelected ? 600 : 400 }}>{localizedCountryName(country)}</span>
                     </div>
                     {isSelected && <CheckIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--success-text)" }} />}
                   </button>
@@ -203,8 +216,8 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
           </div>
           <div className="p-2" style={{ borderTop: "1px solid var(--border-color)" }}>
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-3.5 h-3.5" /></span>
-              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search country..." className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              <span className="absolute start-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon className="w-3.5 h-3.5" /></span>
+              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t("admin.brands.ui.searchCountry")} className="w-full h-10 md:h-8 ps-8 pe-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
             </div>
           </div>
         </div>
@@ -215,6 +228,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
 /* ================= Main Component ================= */
 export default function BrandsPage() {
+  const { t, dir, locale } = useTranslation();
   useBrandSocketSync();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -337,35 +351,35 @@ export default function BrandsPage() {
     if (isError && error) {
       const msg = error.message || "";
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("403")) {
-        toast.error("You don't have permission to view brands.", { duration: 6000, description: "Contact an administrator to grant you access." });
+        toast.error(t("admin.brands.ui.noPermission"), { duration: 6000, description: t("admin.brands.ui.contactAccess") });
       } else {
-        toast.error("Failed to load brands", { description: msg });
+        toast.error(t("admin.brands.ui.loadFailed"));
       }
     }
-  }, [isError, error]);
+  }, [isError, error, t]);
 
   const brandMutation = useMutation({
     mutationFn: ({ data, id }) => id ? adminBrandApi.update(id, data) : adminBrandApi.create(data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBrands"] });
-      toast.success(variables.id ? "Brand updated successfully" : "Brand added successfully");
+      toast.success(variables.id ? t("admin.brands.toast.updated") : t("admin.brands.ui.brandAdded"));
       resetForm();
       setShowModal(false);
     },
     onError: (error) => {
-      const msg = error.response?.data?.message || error.message || "Brand operation failed";
+      const msg = error.response?.data?.message || error.message || "";
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
-        toast.error(msg, { duration: 6000, description: "Contact an administrator to grant you brand access." });
+        toast.error(t("admin.brands.ui.noPermission"), { duration: 6000, description: t("admin.brands.ui.contactBrandAccess") });
       } else if (!editingBrand && (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("duplicate"))) {
         const usedGeneratedCode = formData.brand_code?.trim() === autoBrandCode?.trim();
-        toast.error(msg, {
+        toast.error(t("admin.brands.ui.operationFailed"), {
           description: usedGeneratedCode
-            ? "A new brand code has been generated — review it and click Save Brand again."
-            : "Please enter a different brand code and try again.",
+            ? t("admin.brands.ui.saveAgain")
+            : t("admin.brands.ui.differentCode"),
         });
         if (usedGeneratedCode) fetchNextBrandCode({ replaceCurrent: true });
       } else {
-        toast.error(msg);
+        toast.error(t("admin.brands.ui.operationFailed"));
       }
     },
   });
@@ -375,14 +389,14 @@ export default function BrandsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminBrands"] });
       setSelectedIds([]);
-      toast.success("Brand deleted successfully");
+      toast.success(t("admin.brands.toast.deleted"));
     },
     onError: (error) => {
-      const msg = error.response?.data?.message || error.message || "Brand delete failed";
+      const msg = error.response?.data?.message || error.message || "";
       if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
-        toast.error(msg, { duration: 6000, description: "Contact an administrator to grant you brand access." });
+        toast.error(t("admin.brands.ui.noPermission"), { duration: 6000, description: t("admin.brands.ui.contactBrandAccess") });
       } else {
-        toast.error(msg);
+        toast.error(t("admin.brands.ui.deleteFailed"));
       }
     },
   });
@@ -395,11 +409,10 @@ export default function BrandsPage() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBrands"] });
-      toast.success(variables.newActive ? "Brand enabled" : "Brand disabled");
+      toast.success(variables.newActive ? t("admin.brands.ui.enabled") : t("admin.brands.ui.disabled"));
     },
     onError: (error) => {
-      const msg = error.response?.data?.message || error.message || "Failed to update status";
-      toast.error(msg);
+      toast.error(t("admin.brands.ui.operationFailed"));
     },
   });
 
@@ -408,6 +421,15 @@ export default function BrandsPage() {
   const brands = Array.isArray(paginatedBrandsData?.items) ? paginatedBrandsData.items : [];
   const brandCounts = paginatedBrandsData?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 };
   const countries = Array.isArray(paginatedBrandsData?.countries) ? paginatedBrandsData.countries : [];
+  const countryLabel = (name) => {
+    const country = allCountries.find((item) => item.name === name);
+    if (!country) return name;
+    try {
+      return new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en"], { type: "region" }).of(country.isoCode) || name;
+    } catch {
+      return name;
+    }
+  };
   const pagination = paginatedBrandsData?.pagination || {
     total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false,
   };
@@ -446,7 +468,7 @@ export default function BrandsPage() {
     e.preventDefault();
     const trimmedName = formData.name?.trim() || "";
     if (!trimmedName) {
-      toast.error("Brand Name is required");
+      toast.error(t("admin.brands.validation.nameRequired"));
       return;
     }
     const fd = new FormData();
@@ -514,7 +536,7 @@ export default function BrandsPage() {
   // ✅ UPDATED LOGO HANDLERS FOR DRAG & DROP
   const handleLogoChange = (file) => {
     if (file) {
-      if (file.size > 10 * 1024 * 1024) return toast.error("Image size must be less than 10MB");
+      if (file.size > 10 * 1024 * 1024) return toast.error(t("admin.brands.ui.imageTooLarge"));
       setLogoFile(file);
       setRemoveLogo(false);
       setLogoPreview(URL.createObjectURL(file));
@@ -529,7 +551,7 @@ export default function BrandsPage() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (!file.type.startsWith('image/')) {
-        return toast.error("Please drop an image file (PNG, JPG, WEBP)");
+        return toast.error(t("admin.brands.ui.imageTypes"));
       }
       handleLogoChange(file);
     }
@@ -558,7 +580,7 @@ export default function BrandsPage() {
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const SortHeader = ({ label, sortKey }) => (
-    <th className="px-4 py-3 text-left">
+    <th className="px-4 py-3 text-start">
       <button type="button" onClick={() => handleSort(sortKey)} className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label} <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
       </button>
@@ -567,10 +589,10 @@ export default function BrandsPage() {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[140px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
         {children}
       </select>
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+              <span className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
     </div>
   );
 
@@ -620,10 +642,10 @@ export default function BrandsPage() {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
           className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
-          aria-label="More actions"
+          aria-label={t("admin.brands.ui.moreActions")}
           aria-haspopup="true"
           aria-expanded={open}
-          title="More actions"
+          title={t("admin.brands.ui.moreActions")}
         >
           <DotsVerticalIcon className="w-[18px] h-[18px]" />
         </button>
@@ -631,6 +653,8 @@ export default function BrandsPage() {
           <div
             ref={menuRef}
             className="fixed z-[9999] w-[170px] rounded-lg border shadow-lg py-1"
+            dir={dir}
+            lang={locale}
             style={{
               top: menuPos.top,
               left: menuPos.left,
@@ -647,7 +671,7 @@ export default function BrandsPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> {t("admin.brands.ui.viewDetails")}
             </button>
             <button
               type="button"
@@ -657,7 +681,7 @@ export default function BrandsPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> {t("admin.brands.ui.edit")}
             </button>
             <button
               type="button"
@@ -672,7 +696,7 @@ export default function BrandsPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? t("admin.brands.ui.deactivate") : t("admin.brands.ui.activate")}
             </button>
             <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <button
@@ -683,7 +707,7 @@ export default function BrandsPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
+              <TrashIcon className="w-4 h-4 shrink-0" /> {t("admin.brands.ui.delete")}
             </button>
           </div>,
           document.body
@@ -698,16 +722,16 @@ export default function BrandsPage() {
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Brand Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage your brands, their details, and status</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.brands.ui.managementTitle")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.brands.ui.listView")}><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.brands.ui.gridView")}><GridIcon /></button>
             </div>
             <button onClick={handleOpenAddModal} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <PlusIcon /> Add Brand
+              <PlusIcon /> {t("admin.brands.page.addBrand")}
             </button>
           </div>
         </div>
@@ -715,11 +739,11 @@ export default function BrandsPage() {
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
           {[
-            { label: "Total Brands", value: allBrands, color: "" },
-            { label: "Active", value: activeBrands, color: "text-emerald-500" },
-            { label: "Inactive", value: inactiveBrands, color: "text-amber-500" },
-            { label: "Countries", value: countries.length, color: "text-blue-500" },
-            { label: "With Logo", value: withLogo, color: "text-purple-500" },
+            { label: t("admin.brands.ui.totalBrands"), value: allBrands, color: "" },
+            { label: t("admin.brands.ui.active"), value: activeBrands, color: "text-emerald-500" },
+            { label: t("admin.brands.ui.inactive"), value: inactiveBrands, color: "text-amber-500" },
+            { label: t("admin.brands.ui.countries"), value: countries.length, color: "text-blue-500" },
+            { label: t("admin.brands.ui.withLogo"), value: withLogo, color: "text-purple-500" },
           ].map((s, i) => (
             <div key={i} className="rounded-lg p-3 sm:p-4" style={cardStyle}>
               <p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{s.label}</p>
@@ -733,13 +757,13 @@ export default function BrandsPage() {
           
           {/* Wider Search Bar (Left Side) */}
           <div className="relative w-full md:w-[400px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <span className="absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input 
               type="text" 
-              placeholder="Search brands..." 
+              placeholder={t("admin.brands.page.searchPlaceholder")}
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              className="w-full h-9 ps-9 pe-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
               style={inputStyle} 
             />
           </div>
@@ -747,14 +771,14 @@ export default function BrandsPage() {
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
             <SelectFilter value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="all">{t("admin.brands.ui.allStatus")}</option>
+              <option value="active">{t("admin.brands.ui.active")}</option>
+              <option value="inactive">{t("admin.brands.ui.inactive")}</option>
             </SelectFilter>
             
             <SelectFilter value={filterCountry} onChange={(e) => { setFilterCountry(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
-              <option value="all">All Countries</option>
-              {countries.map((c) => (<option key={c} value={c}>{c}</option>))}
+              <option value="all">{t("admin.brands.ui.allCountries")}</option>
+              {countries.map((c) => (<option key={c} value={c}>{countryLabel(c)}</option>))}
             </SelectFilter>
           </div>
         </div>
@@ -762,11 +786,11 @@ export default function BrandsPage() {
         {/* ===== Bulk selection bar ===== */}
         {selectedIds.length > 0 && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{t("admin.brands.ui.selected", { count: selectedIds.length })}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
+              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.brands.ui.clear")}</button>
               <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}>
-                <TrashIcon className="w-3.5 h-3.5" /> Delete Selected
+                <TrashIcon className="w-3.5 h-3.5" /> {t("admin.brands.ui.deleteSelected")}
               </button>
             </div>
           </div>
@@ -775,13 +799,13 @@ export default function BrandsPage() {
         {/* ===== Loading / Empty / Table / Grid ===== */}
         {loading ? (
           <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}>
-            <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading brands...</span>
+            <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.loading")}</span>
           </div>
         ) : paginatedBrands.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" || filterCountry !== "all" ? "No brands match your filters" : "No brands yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" || filterCountry !== "all" ? t("admin.brands.ui.noMatch") : t("admin.brands.ui.noBrands")}</p>
             {!search && filterStatus === "all" && filterCountry === "all" && (
-              <button onClick={handleOpenAddModal} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ Add your first brand</button>
+              <button onClick={handleOpenAddModal} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ {t("admin.brands.ui.addFirst")}</button>
             )}
           </div>
         ) : viewMode === "list" ? (
@@ -792,12 +816,12 @@ export default function BrandsPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <SortHeader label="Brand Code" sortKey="code" />
-                    <SortHeader label="Brand Name" sortKey="name" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Description</th>
-                    <SortHeader label="Country" sortKey="country" />
-                    <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
+                    <SortHeader label={t("admin.brands.ui.brandCode")} sortKey="code" />
+                    <SortHeader label={t("admin.brands.ui.brandName")} sortKey="name" />
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.description")}</th>
+                    <SortHeader label={t("admin.brands.ui.country")} sortKey="country" />
+                    <SortHeader label={t("admin.brands.ui.status")} sortKey="status" />
+                    <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("admin.brands.ui.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -816,7 +840,7 @@ export default function BrandsPage() {
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{brand.description || "—"}</p></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><StatusBadge active={brand.is_active} /></td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-right"><ActionButtons brand={brand} /></td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-end"><ActionButtons brand={brand} /></td>
                       </tr>
                     );
                   })}
@@ -909,11 +933,11 @@ export default function BrandsPage() {
         {totalBrands > 20 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              Showing {startIndex + 1}-{Math.min(endIndex, totalBrands)} of {totalBrands} brands
-              {isFetching && !loading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+              {t("admin.brands.ui.showingRange", { start: startIndex + 1, end: Math.min(endIndex, totalBrands), total: totalBrands })}
+              {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.brands.ui.updating")}</span> : null}
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.previousPage")}><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
@@ -923,14 +947,14 @@ export default function BrandsPage() {
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.nextPage")}><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
         {paginatedBrands.length > 0 && totalBrands <= 20 && (
           <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            Showing {paginatedBrands.length} of {totalBrands} brands
-            {isFetching && !loading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+            {t("admin.brands.ui.showingBrands", { count: paginatedBrands.length, total: totalBrands })}
+            {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.brands.ui.updating")}</span> : null}
           </p>
         )}
       </div>
@@ -940,7 +964,7 @@ export default function BrandsPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={cardStyle}>
             <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">{editingBrand ? "Edit Brand" : "Add New Brand"}</h3>
+              <h3 className="text-base font-semibold">{editingBrand ? t("admin.brands.ui.editTitle") : t("admin.brands.ui.addTitle")}</h3>
               <button onClick={() => { setShowModal(false); resetForm(); }} disabled={isSubmitting} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><CloseIcon /></button>
             </div>
             
@@ -949,7 +973,7 @@ export default function BrandsPage() {
               {/* ROW 1: Brand Code + Brand Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.brandCodeLabel")}</label>
                   <input 
                     type="text" 
                     value={formData.brand_code}
@@ -958,11 +982,11 @@ export default function BrandsPage() {
                     disabled={isSubmitting}
                     className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50 font-mono"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder={loadingCode ? "Generating..." : "BRD-001"}
+                    placeholder={loadingCode ? t("admin.brands.ui.codeGenerating") : "BRD-001"}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Name *</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.brandNameRequired")}</label>
                   <input 
                     type="text" 
                     value={formData.name} 
@@ -971,14 +995,14 @@ export default function BrandsPage() {
                     disabled={isSubmitting} 
                     className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" 
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder="e.g. Nike" 
+                    placeholder={t("admin.brands.ui.nameExample")}
                   />
                 </div>
               </div>
 
               {/* ROW 2: Description */}
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.description")}</label>
                 <textarea 
                   value={formData.description} 
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
@@ -986,13 +1010,13 @@ export default function BrandsPage() {
                   disabled={isSubmitting} 
                   className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none" 
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                  placeholder="Brand details..." 
+                  placeholder={t("admin.brands.ui.detailsPlaceholder")}
                 />
               </div>
 
               {/* ✅ ROW 3: DRAG AND DROP LOGO UPLOAD */}
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.brandLogo")}</label>
                 
                 {/* Hidden Input */}
                 <input 
@@ -1018,12 +1042,12 @@ export default function BrandsPage() {
                 >
                   {logoPreview ? (
                     <div className="relative w-full h-full flex items-center justify-center p-2">
-                       <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" />
+                       <img src={logoPreview} alt={t("admin.brands.ui.logoPreview")} className="max-h-full max-w-full object-contain rounded-md" />
                        {/* Remove Button Overlay */}
                        <button 
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleRemoveLogo(); }}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
+                        className="absolute top-2 end-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"
                        >
                          <CloseIcon className="w-3 h-3" />
                        </button>
@@ -1037,7 +1061,7 @@ export default function BrandsPage() {
                         <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                           {isDragging ? "Drop image here" : "Click or Drag image here"}
                         </p>
-                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.imageLimit")}</p>
                       </div>
                     </>
                   )}
@@ -1047,19 +1071,19 @@ export default function BrandsPage() {
               {/* ROW 4: Country + Active Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.country")}</label>
                   <CountryDropdown value={formData.country} onChange={(val) => setFormData({ ...formData, country: val })} disabled={isSubmitting} allCountries={allCountries} />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer h-9 mb-1">
                   <input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} disabled={isSubmitting} className="w-4 h-4 rounded disabled:opacity-50" style={{ accentColor: "var(--accent)" }} />
-                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Active</span>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.ui.active")}</span>
                 </label>
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={isSubmitting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} disabled={isSubmitting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.brands.ui.cancel")}</button>
                 <button type="submit" disabled={isSubmitting || loadingCode} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {isSubmitting ? <><Spinner className="w-3.5 h-3.5" /> Saving...</> : editingBrand ? "Update Brand" : "Save Brand"}
+                  {isSubmitting ? <><Spinner className="w-3.5 h-3.5" /> {t("admin.brands.ui.saving")}</> : editingBrand ? t("admin.brands.ui.update") : t("admin.brands.ui.save")}
                 </button>
               </div>
             </form>
@@ -1077,21 +1101,21 @@ export default function BrandsPage() {
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? `Delete "${deleteTarget.brands[0].name}"?` : `Delete ${deleteTarget.brands.length} brands?`}</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The brand(s) will be permanently removed.</p>
+                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: deleteTarget.brands[0].name }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.deleteWarning")}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4 p-2.5 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <Avatar brand={deleteTarget.brands[0]} size="w-8 h-8" />
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{deleteTarget.brands[0].name}</p>
-                <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.brands.length === 1 ? deleteTarget.brands[0].brand_code || "—" : `+ ${deleteTarget.brands.length - 1} more`}</p>
+                <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.brands.length === 1 ? deleteTarget.brands[0].brand_code || "—" : t("admin.brands.ui.moreCount", { count: deleteTarget.brands.length - 1 })}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.brands.ui.cancel")}</button>
               <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {isDeleting ? (<><Spinner className="w-3.5 h-3.5" /> Deleting...</>) : "Delete"}
+                {isDeleting ? (<><Spinner className="w-3.5 h-3.5" /> {t("admin.brands.ui.deleting")}</>) : t("admin.brands.ui.delete")}
               </button>
             </div>
           </div>

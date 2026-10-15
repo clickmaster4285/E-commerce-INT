@@ -36,6 +36,7 @@ import HomeSidebar from "@/components/user/HomeSidebar";
 import BannerSlider from "@/components/user/BannerSlider";
 import ViewportSection from "@/components/user/ViewportSection";
 import { useHomeCatalog } from "../../hooks/user/useHomeCatalog";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* Below-fold sections — code-split (initial JS chhota → LCP/INP fast).
    ssr:true taake SEO same rahe, lekin alag chunk me load hon. */
@@ -166,6 +167,7 @@ function HomeParamsSync() {
 }
 
 function HomeContent({ initialBanners = null }) {
+  const { dir } = useTranslation();
   const {
     categories,
     brands,
@@ -285,16 +287,17 @@ function HomeContent({ initialBanners = null }) {
       <HomeNav />
 
       <div className="w-full min-w-0 max-w-full pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-2 lg:pr-8 lg:pt-2 xl:pr-10 2xl:pr-12">
-        <div className="flex w-full min-w-0 max-w-full items-start gap-4">
+        <div dir="ltr" className="flex w-full min-w-0 max-w-full items-start gap-4">
           {/* LEFT SIDEBAR — same component, click → /filtering-product */}
           <HomeSidebar
             {...sidebarProps}
             scrollable
+            dir={dir}
             className="sticky top-[6.75rem] hidden w-[280px] shrink-0 rounded-l-none border-l-0 lg:block"
           />
 
           {/* MAIN COLUMN — sirf showcase (koi filter grid nahi → fast) */}
-          <div className="w-full min-w-0 max-w-full flex-1 space-y-8 lg:space-y-12">
+          <div dir={dir} className="w-full min-w-0 max-w-full flex-1 space-y-8 lg:space-y-12">
             {/* MOBILE FILTER TRIGGER → filtering page */}
             <div className="flex items-center justify-between gap-3 lg:hidden">
               <button

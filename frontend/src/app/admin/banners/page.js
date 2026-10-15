@@ -11,6 +11,7 @@ import { DealFormModal, SelectionModal } from "../deals/_components/dealModals";
 import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 // ==========================================
 // API SETUP
@@ -21,6 +22,14 @@ import { brandApi } from "../../../apis/admin/brandApi";
 // `/api/api` jaisi galti ka bhi risk rakhta tha.
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_SERVERURL || "").trim().replace(/\/+$/, "") || null;
+const API_ORIGIN = API_BASE_URL?.replace(/\/api\/?$/, "") || null;
+
+const getImageUrl = (file) => {
+  if (typeof file !== "string" || !file) return null;
+  if (/^https?:\/\//i.test(file)) return file;
+  if (!API_ORIGIN) return null;
+  return `${API_ORIGIN}/${file.replace(/^\/+/, "")}`;
+};
 
 const bannerAxios = axios.create({
   baseURL: API_BASE_URL,
@@ -323,18 +332,15 @@ const validateImageFile = (file) => {
 
 /* ==================== DRAG AND DROP IMAGE UPLOAD (FIXED) ==================== */
 const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions }) => {
+  const { t } = useTranslation();
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
   // Helper to get valid preview URL
   const getPreviewUrl = () => {
     if (!file) return null;
-    if (file instanceof File) return getFilePreviewUrl(file);
-    if (typeof file === 'string') {
-      // If it's already a URL string (from DB), use it directly or prepend base
-      return file.startsWith('http') ? file : `${API_BASE}${file.startsWith('/') ? '' : '/'}${file}`;
-    }
-    return null;
+    if (typeof File !== "undefined" && file instanceof File) return getFilePreviewUrl(file);
+    return getImageUrl(file);
   };
 
   const currentPreview = preview || getPreviewUrl();
@@ -344,7 +350,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
     if (!candidate) return;
     const error = validateImageFile(candidate);
     if (error) {
-      toast.error(error, { description: `Maximum allowed size is ${MAX_IMAGE_MB} MB.` });
+      toast.error(error, { description: t("admin.banners.validation.imageSize", { size: MAX_IMAGE_MB }) });
       // Input value reset — warna same file dobara select karne par change na fire ho
       if (inputRef.current) inputRef.current.value = "";
       return;
@@ -507,6 +513,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 // MAIN COMPONENT
 // ==========================================
 export default function BannersPage() {
+  const { t, locale, dir } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -594,13 +601,13 @@ export default function BannersPage() {
     },
     onSuccess: (responseData, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
-      toast.success(variables.id ? "Banner updated successfully" : "Banner added successfully");
+      toast.success(variables.id ? t("admin.banners.toast.updated") : t("admin.banners.toast.added"));
       // ✅ FIXED: After save, refresh the banners list and close modal
       // The query invalidation will trigger a refetch automatically
       resetForm();
       setShowModal(false);
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Operation failed"),
+    onError: (error) => toast.error(error.response?.data?.message || error.message || t("admin.banners.toast.operationFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -611,9 +618,9 @@ export default function BannersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
       setSelectedIds([]);
-      toast.success("Banner(s) deleted successfully");
+      toast.success(t("admin.banners.toast.deleted"));
     },
-     onError: (error) => toast.error(error.response?.data?.message || "Delete failed"),
+     onError: (error) => toast.error(error.response?.data?.message || t("admin.banners.toast.deleteFailedShort")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -625,9 +632,9 @@ export default function BannersPage() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
-      toast.success(variables.newStatus === "active" ? "Banner activated" : "Banner deactivated");
+      toast.success(variables.newStatus === "active" ? t("admin.banners.toast.activated") : t("admin.banners.toast.deactivated"));
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update status"),
+    onError: (error) => toast.error(error.response?.data?.message || error.message || t("admin.banners.toast.statusFailed")),
   });
 
   // --- Derived Data ---
@@ -864,21 +871,21 @@ export default function BannersPage() {
     // Prevent submit if position is invalid
     const pos = parseInt(form.position, 10);
     if (!Number.isFinite(pos) || pos < 1) {
-      toast.error("Position must be a positive whole number (1 or greater)");
+      toast.error(t("admin.banners.validation.positionPositive"));
       return;
     }
 
     // Entity link types ke liye selection required
     if (form.primaryButton.linkType === "product" && !String(form.primaryButton.productId || "").trim()) {
-      toast.error("Please select a product for the banner button");
+      toast.error(t("admin.banners.validation.productRequired"));
       return;
     }
     if (form.primaryButton.linkType === "category" && !String(form.primaryButton.categoryId || "").trim()) {
-      toast.error("Please select a category for the banner button");
+      toast.error(t("admin.banners.validation.categoryRequired"));
       return;
     }
     if (form.primaryButton.linkType === "brand" && !String(form.primaryButton.brandId || "").trim()) {
-      toast.error("Please select a brand for the banner button");
+      toast.error(t("admin.banners.validation.brandRequired"));
       return;
     }
 
@@ -892,7 +899,7 @@ export default function BannersPage() {
     // Range validation — deals/discounts me ye check lagaya hua hai, banners me
     // missing tha. Galat range save hone se banner storefront pe kabhi dikhta hi nahi.
     if (isoStart && isoEnd && new Date(isoEnd) < new Date(isoStart)) {
-      toast.error("End date must be on or after the start date");
+      toast.error(t("admin.banners.validation.endDate"));
       return;
     }
 
@@ -1042,9 +1049,8 @@ export default function BannersPage() {
 
   const getImagePreview = (file) => {
     if (!file) return null;
-    if (file instanceof File) return getFilePreviewUrl(file);
-    const cleanPath = file.startsWith('/') ? file : `/${file}`;
-    return `${API_BASE}${cleanPath}`;
+    if (typeof File !== "undefined" && file instanceof File) return getFilePreviewUrl(file);
+    return getImageUrl(file);
   };
 
   // --- Reusable Styles ---
@@ -1133,7 +1139,7 @@ export default function BannersPage() {
                   setActionMenu(null); 
                   adminBannerApi.duplicate(id).then(() => { 
                     queryClient.invalidateQueries({ queryKey: ["adminBanners"] }); 
-                    toast.success("Duplicated"); 
+                    toast.success(t("admin.banners.toast.duplicatedShort")); 
                   }); 
                 }}
               />
@@ -1170,12 +1176,12 @@ export default function BannersPage() {
   };
 
   return (
-    <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
+    <div className="w-full min-h-screen" dir={dir} lang={locale} style={{ color: "var(--text-primary)" }}>
       <div className="w-full space-y-5">
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Banner Management</h1>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.banners.page.heading")}</h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage homepage, promotional, and category banners</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1184,7 +1190,7 @@ export default function BannersPage() {
               <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
             </div>
             <button onClick={handleOpenAdd} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <PlusIcon /> Add Banner
+              <PlusIcon /> {t("admin.banners.page.addBanner")}
             </button>
           </div>
         </div>
@@ -1215,7 +1221,7 @@ export default function BannersPage() {
             </span>
             <input 
               type="text" 
-              placeholder="Search banners..." 
+              placeholder={t("admin.banners.page.searchPlaceholder")} 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
               className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]"
@@ -1248,7 +1254,7 @@ export default function BannersPage() {
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
               <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                <TrashIcon className="w-3.5 h-3.5" /> Delete Selected
+                <TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}
               </button>
             </div>
           </div>
@@ -1265,13 +1271,13 @@ export default function BannersPage() {
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
                       <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Preview</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.preview")}</th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Title</th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Type</th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Schedule</th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Pos</th>
-                      <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.schedule")}</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.positionShort")}</th>
+                      <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.banners.page.actions")}</th>
                     </tr>
                   </thead>
                   <BannerRowsSkeleton rows={itemsPerPage} />
@@ -1283,9 +1289,9 @@ export default function BannersPage() {
           )
         ) : paginatedBanners.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? "No banners match your filters" : "No banners yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? t("admin.banners.page.noMatch") : t("admin.banners.page.noBannerYet")}</p>
             {!search && filterStatus === "all" && (
-              <button onClick={handleOpenAdd} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ Add your first banner</button>
+              <button onClick={handleOpenAdd} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ {t("admin.banners.page.addFirst")}</button>
             )}
           </div>
         ) : viewMode === "list" ? (
@@ -1297,13 +1303,13 @@ export default function BannersPage() {
                     <th className="px-4 py-3 w-10">
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                     </th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Preview</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.preview")}</th>
                     <SortHeader label="Title" sortKey="title" />
                     <SortHeader label="Type" sortKey="bannerType" />
                     <SortHeader label="Status" sortKey="status" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Schedule</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.schedule")}</th>
                     <SortHeader label="Pos" sortKey="position" />
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.banners.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import {
   AlertCircle,
   ArrowDown,
@@ -68,16 +69,16 @@ const imageUrl = (raw) => {
   return `${API_ORIGIN}${s.startsWith("/") ? "" : "/"}${s}`;
 };
 
-const timeAgo = (date) => {
+const timeAgo = (date, t) => {
   if (!date) return "";
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t("recentActivity.justNow");
+  if (mins < 60) return t("recentActivity.minutesAgo", { mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("recentActivity.hoursAgo", { hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t("recentActivity.daysAgo", { days });
   return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
@@ -97,20 +98,20 @@ const ACTIVITY_META = {
   "Brand Management": { icon: "brand", classes: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400" },
 };
 
-const RANGE_OPTIONS = [
-  { key: "7d", label: "Last 7 Days" },
-  { key: "30d", label: "Last 30 Days" },
-  { key: "3m", label: "Last 3 Months" },
-  { key: "6m", label: "Last 6 Months" },
-  { key: "1y", label: "Last 1 Year" },
+const rangeOptions = (t) => [
+  { key: "7d", label: t("dateRange.7d") },
+  { key: "30d", label: t("dateRange.30d") },
+  { key: "3m", label: t("dateRange.3m") },
+  { key: "6m", label: t("dateRange.6m") },
+  { key: "1y", label: t("dateRange.1y") },
 ];
 
-const RANGE_TABS = [
-  { key: "7d", label: "7D" },
-  { key: "30d", label: "30D" },
-  { key: "3m", label: "3M" },
-  { key: "6m", label: "6M" },
-  { key: "1y", label: "1Y" },
+const rangeTabs = (t) => [
+  { key: "7d", label: t("dateRange.7dShort") },
+  { key: "30d", label: t("dateRange.30dShort") },
+  { key: "3m", label: t("dateRange.3mShort") },
+  { key: "6m", label: t("dateRange.6mShort") },
+  { key: "1y", label: t("dateRange.1yShort") },
 ];
 
 const CHART_COLORS = ["#3b82f6", "#a855f7", "#22c55e", "#f97316", "#ec4899", "#94a3b8"];
@@ -215,12 +216,14 @@ function Sparkline({ data, color, id }) {
 
 /* ==================== STAT CARDS ==================== */
 function StatCards({ data }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const orderCount = Number(data?.orders?.count) || 0;
   const revenueFactor = 1 + (Number(data?.revenue?.trend) || 0) / 100;
   const ordersFactor = 1 + (Number(data?.orders?.trend) || 0) / 100;
   const cards = [
     {
-      title: "Total Revenue",
+      title: t("stat.totalRevenue"),
       value: fmt(data?.revenue?.total),
       trend: data?.revenue?.trend ?? 0,
       icon: Wallet,
@@ -229,7 +232,7 @@ function StatCards({ data }) {
       spark: data?.sparklines?.revenue,
     },
     {
-      title: "Total Orders",
+      title: t("stat.totalOrders"),
       value: orderCount.toLocaleString(),
       trend: data?.orders?.trend ?? 0,
       icon: ShoppingCart,
@@ -238,7 +241,7 @@ function StatCards({ data }) {
       spark: data?.series?.map((point) => Number(point.orders) || 0),
     },
     {
-      title: "Total Products",
+      title: t("stat.totalProducts"),
       value: data?.counts?.products ?? 0,
       trend: data?.counts?.productsTrend ?? 0,
       icon: Package,
@@ -247,7 +250,7 @@ function StatCards({ data }) {
       spark: data?.sparklines?.products,
     },
     {
-      title: "Total Brands",
+      title: t("stat.totalBrands"),
       value: data?.counts?.brands ?? 0,
       trend: data?.counts?.brandsTrend ?? 0,
       icon: Bookmark,
@@ -256,7 +259,7 @@ function StatCards({ data }) {
       spark: data?.sparklines?.brands,
     },
     {
-      title: "Total Categories",
+      title: t("stat.totalCategories"),
       value: data?.counts?.categories ?? 0,
       trend: data?.counts?.categoriesTrend ?? 0,
       icon: FolderOpen,
@@ -265,7 +268,7 @@ function StatCards({ data }) {
       spark: data?.sparklines?.categories,
     },
     {
-      title: "Featured Products",
+      title: t("stat.featuredProducts"),
       value: data?.counts?.featuredProducts ?? 0,
       trend: data?.counts?.featuredProductsTrend ?? 0,
       icon: Star,
@@ -294,7 +297,7 @@ function StatCards({ data }) {
             />
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25"
+              className="pointer-events-none absolute -end-10 -top-12 h-32 w-32 rounded-full opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-25"
               style={{ background: c.color }}
             />
 
@@ -341,6 +344,8 @@ function StatCards({ data }) {
 
 /* ==================== REVENUE OVERVIEW ==================== */
 function ChartTooltip({ active, payload, label }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   if (!active || !payload?.length) return null;
 
   const revenue = payload.find((p) => p.dataKey === "revenue")?.value ?? 0;
@@ -355,14 +360,14 @@ function ChartTooltip({ active, payload, label }) {
 
       <p className="flex items-center gap-2 text-xs text-[var(--text-primary)]">
         <span className="h-2 w-2 rounded-sm bg-blue-500" />
-        Revenue
-        <b className="ml-auto tabular-nums">{fmt(revenue)}</b>
+        {t("revenueOverview.revenue")}
+        <b className="ms-auto tabular-nums">{fmt(revenue)}</b>
       </p>
 
       <p className="mt-1 flex items-center gap-2 text-xs text-[var(--text-primary)]">
         <span className="h-2 w-2 rounded-full bg-purple-500" />
-        Orders
-        <b className="ml-auto tabular-nums">{orders}</b>
+        {t("revenueOverview.orders")}
+        <b className="ms-auto tabular-nums">{orders}</b>
       </p>
 
           </div>
@@ -370,6 +375,8 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 function RevenueOverview({ data, range, onRangeChange }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const series = data?.series || [];
 
   const totals = series.reduce(
@@ -384,31 +391,33 @@ function RevenueOverview({ data, range, onRangeChange }) {
     series.length > 0 ? Math.round(totals.revenue / series.length) : 0;
 
   const summary = [
-    { label: "Revenue", value: fmt(totals.revenue), color: "#3b82f6" },
-    { label: "Orders", value: totals.orders.toLocaleString(), color: "#a855f7" },
+    { label: t("revenueOverview.revenue"), value: fmt(totals.revenue), color: "#3b82f6" },
+    { label: t("revenueOverview.orders"), value: totals.orders.toLocaleString(), color: "#a855f7" },
   ];
+
+  const tabs = rangeTabs(t);
 
   return (
     <div className="card animate-slide-up flex min-w-0 flex-col rounded-xl p-4 shadow-[var(--shadow-sm)]">
       <CardHead
         compact
         icon={Wallet}
-        title="Revenue Overview"
-        subtitle="Store performance across the selected period"
+        title={t("revenueOverview.title")}
+        subtitle={t("revenueOverview.subtitle")}
         action={
           <div className="no-scrollbar flex max-w-full shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] p-1">
-            {RANGE_TABS.map((t) => (
+            {tabs.map((tab) => (
               <button
-                key={t.key}
+                key={tab.key}
                 type="button"
-                onClick={() => onRangeChange(t.key)}
+                onClick={() => onRangeChange(tab.key)}
                 className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                  range === t.key
+                  range === tab.key
                     ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-[var(--shadow-sm)] ring-1 ring-[var(--border-card)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                {t.label}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -435,14 +444,14 @@ function RevenueOverview({ data, range, onRangeChange }) {
           </span>
         ))}
 
-        <span className="ml-auto hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 md:inline-flex">
+        <span className="ms-auto hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 md:inline-flex">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          {series.length} reporting points
+          {t("revenueOverview.reportingPoints", { count: series.length })}
         </span>
       </div>
 
       {series.length === 0 ? (
-        <SectionEmpty icon={Wallet}>No revenue data for this period</SectionEmpty>
+        <SectionEmpty icon={Wallet}>{t("revenueOverview.noData")}</SectionEmpty>
       ) : (
         <div className="mt-1 h-[175px] w-full min-w-0 sm:h-[195px] lg:h-[220px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={140}>
@@ -502,7 +511,7 @@ function RevenueOverview({ data, range, onRangeChange }) {
                 strokeDasharray="4 4"
                 strokeWidth={1}
                 label={{
-                  value: "Avg",
+                  value: t("revenueOverview.average"),
                   position: "insideTopRight",
                   fontSize: 9.5,
                   fill: "#94a3b8",
@@ -550,17 +559,19 @@ function RevenueOverview({ data, range, onRangeChange }) {
 
 /* ==================== SALES DISTRIBUTION ==================== */
 function SalesDistribution({ data }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const dist = (data?.distribution || []).filter((d) => d.value > 0);
   const total = dist.reduce((s, d) => s + d.value, 0);
   const isRevenue = (dist[0]?.basis || "revenue") === "revenue";
-  const formatValue = (v) => (isRevenue ? fmt(v) : `${v} product${v === 1 ? "" : "s"}`);
+  const formatValue = (v) => (isRevenue ? fmt(v) : t("salesDistribution.productsCount", { count: v }));
 
   return (
     <div className="card animate-slide-up flex flex-col rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
-      <CardHead icon={Tag} title="Sales Distribution" subtitle="By product category" />
+      <CardHead icon={Tag} title={t("salesDistribution.title")} subtitle={t("salesDistribution.subtitle")} />
 
       {dist.length === 0 ? (
-        <SectionEmpty icon={Tag}>No sales data yet</SectionEmpty>
+        <SectionEmpty icon={Tag}>{t("salesDistribution.noData")}</SectionEmpty>
       ) : (
         <div className="flex flex-1 flex-col items-center gap-5 sm:flex-row">
           <div className="relative h-[190px] w-[190px] shrink-0">
@@ -589,7 +600,7 @@ function SalesDistribution({ data }) {
                 {isRevenue ? fmtShort(total) : total}
               </span>
               <span className="text-[10.5px] text-[var(--text-muted)]">
-                {isRevenue ? "Total Sales" : "Products"}
+                {isRevenue ? t("salesDistribution.totalSales") : t("salesDistribution.products")}
               </span>
             </div>
           </div>
@@ -637,15 +648,17 @@ function SalesDistribution({ data }) {
 
 /* ==================== RECENT ACTIVITY ==================== */
 function RecentActivity({ data }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const items = data?.activities || [];
   const ICONS = { cart: ShoppingCart, package: Package, tag: Tag, brand: Bookmark };
 
   return (
     <div className="card animate-slide-up flex h-full flex-col rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
-      <CardHead icon={Zap} title="Recent Activity" subtitle="Latest events across your store" />
+      <CardHead icon={Zap} title={t("recentActivity.title")} subtitle={t("recentActivity.subtitle")} />
 
       {items.length === 0 ? (
-        <SectionEmpty icon={Zap}>No activity yet</SectionEmpty>
+        <SectionEmpty icon={Zap}>{t("recentActivity.noData")}</SectionEmpty>
       ) : (
         <ul className="custom-scrollbar max-h-[320px] flex-1 space-y-0.5 overflow-y-auto pr-1">
           {items.map((a, i) => {
@@ -660,7 +673,7 @@ function RecentActivity({ data }) {
                 {!isLast && (
                   <span
                     aria-hidden="true"
-                    className="absolute left-[15px] top-9 h-full w-px bg-[var(--border-card)]"
+                    className="absolute start-[15px] top-9 h-full w-px bg-[var(--border-card)]"
                   />
                 )}
 
@@ -682,7 +695,7 @@ function RecentActivity({ data }) {
                     </span>
 
                     <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
-                      {timeAgo(a.timestamp)}
+                      {timeAgo(a.timestamp, t)}
                     </span>
                   </span>
                 </span>
@@ -697,26 +710,28 @@ function RecentActivity({ data }) {
 
 /* ==================== RECENT ORDERS ==================== */
 function RecentOrders({ data }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const orders = data?.recentOrders || [];
 
   return (
     <div className="card animate-slide-up flex flex-col rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
       <CardHead
         icon={ShoppingCart}
-        title="Recent Orders"
-        subtitle="Latest customer orders"
+        title={t("recentOrders.title")}
+        subtitle={t("recentOrders.subtitle")}
         action={
           <Link
             href="/admin/orders"
             className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
-            View All <ChevronRight size={12} />
+            {t("recentOrders.viewAll")} <ChevronRight size={12} />
           </Link>
         }
       />
 
       {orders.length === 0 ? (
-        <SectionEmpty icon={ShoppingCart}>No orders yet</SectionEmpty>
+        <SectionEmpty icon={ShoppingCart}>{t("recentOrders.noData")}</SectionEmpty>
       ) : (
         <ul className="custom-scrollbar -mx-1 flex-1 divide-y divide-[var(--border-card)] overflow-y-auto px-1">
           {orders.map((o) => (
@@ -759,8 +774,8 @@ function RecentOrders({ data }) {
                     </span>
                   </span>
 
-                  <span className="mt-0.5 block text-right text-[10px] text-[var(--text-muted)]">
-                    {timeAgo(o.created_at)}
+                  <span className="mt-0.5 block text-end text-[10px] text-[var(--text-muted)]">
+                    {timeAgo(o.created_at, t)}
                   </span>
                 </span>
 
@@ -785,6 +800,8 @@ const RANK_STYLES = [
 ];
 
 function TopProducts({ data }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   const router = useRouter();
   const products = data?.topProducts || [];
 
@@ -802,30 +819,30 @@ function TopProducts({ data }) {
     <div className="card animate-slide-up rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
       <CardHead
         icon={Package}
-        title="Top Selling Products"
-        subtitle="Ranked by units sold"
+        title={t("topProducts.title")}
+        subtitle={t("topProducts.subtitle")}
         action={
           <Link
             href="/admin/products"
             className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
-            View All <ChevronRight size={12} />
+            {t("topProducts.viewAll")} <ChevronRight size={12} />
           </Link>
         }
       />
 
       {products.length === 0 ? (
-        <SectionEmpty icon={Package}>No sales data yet</SectionEmpty>
+        <SectionEmpty icon={Package}>{t("topProducts.noData")}</SectionEmpty>
       ) : (
         <div className="-mx-1 overflow-x-auto px-1">
-          <table className="w-full min-w-[420px] text-left text-[13px]">
+          <table className="w-full min-w-[420px] text-start text-[13px]">
             <thead>
               <tr className="border-b border-[var(--border-card)] bg-[var(--bg-secondary)] text-[10.5px] uppercase tracking-wide text-[var(--text-muted)]">
-                <th className="py-2 pr-2 font-semibold">#</th>
-                <th className="py-2 font-semibold">Product</th>
-                <th className="py-2 text-right font-semibold">Sold</th>
-                <th className="py-2 text-right font-semibold">Revenue</th>
-                <th className="py-2 text-right font-semibold">Trend</th>
+                <th className="py-2 pe-2 font-semibold">{t("topProducts.table.rank")}</th>
+                <th className="py-2 font-semibold">{t("topProducts.table.product")}</th>
+                <th className="py-2 text-end font-semibold">{t("topProducts.table.sold")}</th>
+                <th className="py-2 text-end font-semibold">{t("topProducts.table.revenue")}</th>
+                <th className="py-2 text-end font-semibold">{t("topProducts.table.trend")}</th>
               </tr>
             </thead>
 
@@ -837,8 +854,8 @@ function TopProducts({ data }) {
                   <tr
                     key={String(p.id) || i}
                     onClick={() => openProductOrders(p)}
-                    title={p.id ? `View all orders containing ${p.name}` : "Product id missing"}
-                    aria-label={p.id ? `View orders containing ${p.name}` : undefined}
+                    title={p.id ? t("topProducts.viewOrdersTitle", { name: p.name }) : t("topProducts.idMissing")}
+                    aria-label={p.id ? t("topProducts.viewOrdersAria", { name: p.name }) : undefined}
                     className={`group transition-colors hover:bg-[var(--bg-tertiary)]/70 ${
                       p.id ? "cursor-pointer" : "cursor-default"
                     }`}
@@ -903,20 +920,24 @@ function TopProducts({ data }) {
 }
 
 /* ==================== QUICK ACTIONS + PROMO ==================== */
-const QUICK_ACTIONS = [
-  { label: "Add Product", href: "/admin/products", icon: PackagePlus, classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  { label: "Add Category", href: "/admin/categories", icon: FolderPlus, classes: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-  { label: "Create Discount", href: "/admin/discounts", icon: BadgePercent, classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  { label: "Manage Stock", href: "/admin/manage-stock", icon: Boxes, classes: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
+const quickActions = (t) => [
+  { label: t("quickActions.addProduct"), href: "/admin/products", icon: PackagePlus, classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  { label: t("quickActions.addCategory"), href: "/admin/categories", icon: FolderPlus, classes: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+  { label: t("quickActions.createDiscount"), href: "/admin/discounts", icon: BadgePercent, classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  { label: t("quickActions.manageStock"), href: "/admin/manage-stock", icon: Boxes, classes: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
 ];
 
 function QuickActions() {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
+  const actions = quickActions(t);
+
   return (
     <div className="card animate-slide-up rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
-      <CardHead icon={Zap} title="Quick Actions" subtitle="Jump to frequent tasks" />
+      <CardHead icon={Zap} title={t("quickActions.title")} subtitle={t("quickActions.subtitle")} />
 
       <div className="grid grid-cols-2 gap-2.5">
-        {QUICK_ACTIONS.map((a) => (
+        {actions.map((a) => (
           <Link
             key={a.label}
             href={a.href}
@@ -944,14 +965,16 @@ function QuickActions() {
 }
 
 function GrowBanner() {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
   return (
     <div className="animate-slide-up relative overflow-hidden rounded-[var(--radius-lg)] bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 p-5 text-white shadow-[var(--shadow-md)]">
-      <div className="absolute -right-6 -top-8 h-28 w-28 rounded-full bg-white/10 blur-xl" />
-      <div className="absolute -bottom-10 -left-4 h-24 w-24 rounded-full bg-orange-400/20 blur-xl" />
+      <div className="absolute -end-6 -top-8 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+      <div className="absolute -bottom-10 -start-4 h-24 w-24 rounded-full bg-orange-400/20 blur-xl" />
 
       <svg
         viewBox="0 0 100 60"
-        className="absolute -bottom-1 right-2 h-20 w-24 text-white/10"
+        className="absolute -bottom-1 end-2 h-20 w-24 text-white/10"
         fill="none"
         stroke="currentColor"
         strokeWidth="4"
@@ -961,14 +984,14 @@ function GrowBanner() {
       </svg>
 
       <div className="relative">
-        <h3 className="text-[15px] font-bold">Grow Your Business</h3>
-        <p className="mt-1 text-xs text-white/70">Better tools. More sales. Bigger success.</p>
+        <h3 className="text-[15px] font-bold">{t("growBanner.title")}</h3>
+        <p className="mt-1 text-xs text-white/70">{t("growBanner.subtitle")}</p>
 
         <Link
           href="/admin/orders"
           className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-400"
         >
-          View Analytics <ChevronRight size={13} />
+          {t("growBanner.cta")} <ChevronRight size={13} />
         </Link>
       </div>
     </div>
@@ -977,6 +1000,9 @@ function GrowBanner() {
 
 /* ==================== PAGE ==================== */
 export default function Dashboard() {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.dashboard." + k, p);
+
   useStoreSocketSync();
 
   const [range, setRange] = useState("7d");
@@ -1006,14 +1032,15 @@ export default function Dashboard() {
     return () => window.removeEventListener("click", close);
   }, [rangeOpen]);
 
-  const activeLabel = RANGE_OPTIONS.find((r) => r.key === range)?.label || "Last 7 Days";
+  const options = rangeOptions(t);
+  const activeLabel = options.find((r) => r.key === range)?.label || t("dateRange.7d");
   const isLive = Boolean(socket?.connected);
 
   return (
     <div className="min-w-0">
       {/* Header */}
       <div className="relative mb-4 overflow-visible rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-3 shadow-[var(--shadow-sm)] sm:px-5 sm:py-3.5">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 overflow-hidden rounded-r-2xl bg-gradient-to-l from-blue-500/[0.06] to-transparent" />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-1/2 overflow-hidden rounded-e-2xl bg-gradient-to-l from-blue-500/[0.06] to-transparent" />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20">
@@ -1022,13 +1049,13 @@ export default function Dashboard() {
 
             <div className="min-w-0">
               <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
-                Store overview
+                {t("page.storeOverview")}
               </p>
               <h1 className="text-[17px] font-extrabold tracking-tight text-[var(--text-primary)] sm:text-[18px]">
-                Dashboard
+                {t("page.title")}
               </h1>
               <p className="mt-0.5 truncate text-[11.5px] text-[var(--text-muted)]">
-                Track sales, orders, and store activity in one place.
+                {t("page.subtitle")}
               </p>
             </div>
           </div>
@@ -1037,7 +1064,7 @@ export default function Dashboard() {
             {isLive && (
               <span className="hidden items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 sm:inline-flex">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                Live
+                {t("page.live")}
               </span>
             )}
 
@@ -1046,8 +1073,8 @@ export default function Dashboard() {
               onClick={() => refetch()}
               disabled={isRefetching}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--text-muted)] shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-60"
-              title="Refresh"
-              aria-label="Refresh dashboard"
+              title={t("page.refresh")}
+              aria-label={t("page.refresh")}
             >
               <RefreshCw size={15} className={isRefetching ? "animate-spin" : ""} />
             </button>
@@ -1070,7 +1097,7 @@ export default function Dashboard() {
               </button>
 
               {rangeOpen && (
-                <div className="animate-fade-in absolute right-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-lg)]">
+                <div className="animate-fade-in absolute end-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-lg)]">
                   {RANGE_OPTIONS.map((r) => (
                     <button
                       key={r.key}

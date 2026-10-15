@@ -272,6 +272,23 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* ==========================================
+   RTL LANGUAGE FONTS
+   ------------------------------------------
+   The `lang` attribute is set on <html> (and mirrored on the app wrapper by
+   LanguageProvider), so these selectors switch the whole site's typeface the
+   moment Arabic or Urdu is chosen — English keeps the default Inter stack.
+   ========================================== */
+html[lang="ar"] body,
+[lang="ar"] {
+  font-family: "Cairo", "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[lang="ur"] body,
+[lang="ur"] {
+  font-family: "Noto Nastaliq Urdu", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+}
+
 a {
   color: inherit;
   text-decoration: none;

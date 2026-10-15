@@ -25,6 +25,7 @@ import {
   User,
 } from "lucide-react";
 import bannerAPI from "@/apis/admin/bannerApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -313,6 +314,7 @@ const TABS = [
 ];
 
 export default function BannerDetailPage() {
+  const { t, locale, dir } = useTranslation();
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -345,9 +347,9 @@ export default function BannerDetailPage() {
     mutationFn: () => bannerAPI.duplicate(bannerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminBanners"] });
-      toast.success("Banner duplicated");
+      toast.success(t("admin.banners.toast.duplicated"));
     },
-    onError: () => toast.error("Failed to duplicate banner"),
+    onError: () => toast.error(t("admin.banners.toast.duplicateFailed")),
   });
 
   const handleTabClick = (tab) => {
@@ -389,14 +391,14 @@ export default function BannerDetailPage() {
 
   return (
     <>
-      <div className="w-full space-y-4 pb-10">
+      <div dir={dir} lang={locale} className="w-full space-y-4 pb-10">
         {/* ============ BREADCRUMB ============ */}
         <nav className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }} aria-label="Breadcrumb">
           <button onClick={() => router.push(backPath)} className="font-medium transition-colors hover:opacity-80" style={{ color: "var(--text-muted)" }}>
-            Banners
+            {t("admin.banners.page.title")}
           </button>
           <ChevronRight className="h-3.5 w-3.5" style={{ color: "var(--text-muted)", opacity: 0.6 }} />
-          <span className="font-semibold" style={{ color: "var(--text-primary)" }}>Banner Details</span>
+          <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.banners.detail.bannerDetails")}</span>
         </nav>
 
         {/* ============ HEADER ============ */}
@@ -404,7 +406,7 @@ export default function BannerDetailPage() {
           <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => router.push(backPath)}
-              aria-label="Back to banners"
+              aria-label={t("admin.banners.detail.backToBanners")}
               className="btn-icon shrink-0"
               style={{ width: 38, height: 38 }}
             >
@@ -412,7 +414,7 @@ export default function BannerDetailPage() {
             </button>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="truncate text-[17px] font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
-                {banner.title || "Banner Details"}
+                {banner.title || t("admin.banners.detail.bannerDetails")}
               </h1>
               <Chip tone="accent">{formatType(banner.bannerType)}</Chip>
             </div>
@@ -423,27 +425,27 @@ export default function BannerDetailPage() {
             <button
               onClick={() => router.push(`/admin/banners?edit=${bannerId}`)}
               className={`${headerActionCls} btn-secondary`}
-              title="Edit this banner"
+              title={t("admin.banners.detail.edit")}
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit
+              <Pencil className="h-3.5 w-3.5" /> {t("admin.banners.detail.edit")}
             </button>
             <button
               onClick={() => duplicateMutation.mutate()}
               disabled={duplicateMutation.isPending}
               className={`${headerActionCls} btn-secondary`}
-              title="Create a copy of this banner"
+              title={t("admin.banners.detail.duplicate")}
             >
               {duplicateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
-              Duplicate
+              {t("admin.banners.detail.duplicate")}
             </button>
             <button
               onClick={() => setShowDelete(true)}
               disabled={deleteMutation.isPending}
               className={headerActionCls}
               style={{ backgroundColor: "var(--danger)", color: "#ffffff" }}
-              title="Delete this banner"
+              title={t("admin.banners.detail.delete")}
             >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
+              <Trash2 className="h-3.5 w-3.5" /> {t("admin.banners.detail.delete")}
             </button>
           </div>
         </div>
@@ -463,13 +465,13 @@ export default function BannerDetailPage() {
             {/* Preview */}
             <SectionCard
               icon={Eye}
-              title="Banner Preview"
+              title={t("admin.banners.detail.preview")}
               action={(
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold"
                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                 >
-                  <Monitor className="h-3 w-3" /> Desktop View
+                  <Monitor className="h-3 w-3" /> {t("admin.banners.detail.desktopView")}
                 </span>
               )}
             >
@@ -480,20 +482,20 @@ export default function BannerDetailPage() {
                 >
                   <img
                     src={desktopImage}
-                    alt={banner.altText || banner.title || "Banner"}
+                    alt={banner.altText || banner.title || t("admin.banners.detail.banner")}
                     className="block h-auto max-h-[420px] w-full object-contain"
                   />
                 </div>
               ) : (
                 <div className="empty-state" style={{ border: "1px dashed var(--border-color)", borderRadius: "var(--radius-md)" }}>
                   <span className="empty-state-icon"><ImageIcon className="h-6 w-6" /></span>
-                  <p className="text-[13px] font-medium">No desktop image uploaded</p>
+                  <p className="text-[13px] font-medium">{t("admin.banners.detail.noDesktopImage")}</p>
                 </div>
               )}
             </SectionCard>
 
             {/* Basic Information */}
-            <SectionCard icon={Info} title="Basic Information">
+            <SectionCard icon={Info} title={t("admin.discounts.form.basicInfo")}>
               <InfoRow label="Title">{banner.title}</InfoRow>
               <InfoRow label="Internal Name">
                 <span className="font-mono text-[12px]">{banner.internalName || banner.slug}</span>

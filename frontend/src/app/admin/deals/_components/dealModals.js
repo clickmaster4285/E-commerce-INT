@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { attributeApi } from "../../../../apis/admin/attributeApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { toNonNegative, validateNonNegative } from "../../discounts/_components/discountUtils";
 
 /* ==================== ICONS ==================== */
@@ -53,7 +54,9 @@ const getName = (item, type) => {
 };
 
 const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+  const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
 };
 
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
@@ -97,7 +100,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.common.noOptions")}</div>
           ) : (
             options.map((opt) => (
               <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -114,6 +117,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
 };
 
 function Select({ value, onChange, options, inputStyle }) {
+  const { t } = useTranslation();
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-9 w-[170px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer" style={inputStyle}>
@@ -296,6 +300,7 @@ const humanizeKey = (key) => {
 };
 
 export function DealFormModal({ formType, formData, setFormData, editingDeal, saveMutation, setShowModal, resetForm, setSelector, getSelectedItems, handleSubmit, inputStyle, products, categories, brands }) {
+  const { t, locale, dir } = useTranslation();
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DEAL_TYPE_LABELS[formType] || "Deal";
@@ -354,7 +359,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
@@ -398,7 +403,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
             {/* ===== SECTION: BASIC INFORMATION ===== */}
             <section>
-              <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your deal a clear identity" />
+              <SectionHeader icon={InfoIcon} title={t("admin.deals.form.basicInfo")} subtitle={t("admin.deals.form.identity")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Deal Name" required fullWidth>
@@ -547,7 +552,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
             {/* ===== SECTION: DEAL OFFER ===== */}
             <section>
-              <SectionHeader icon={PercentIcon} title="Deal Offer" subtitle="Configure how the discount is calculated" />
+              <SectionHeader icon={PercentIcon} title={t("admin.deals.form.offer")} subtitle={t("admin.deals.form.configureDiscount")} />
               <div className="rounded-lg p-4 space-y-4" style={cardStyle}>
                 <FormField label="Discount Type" fullWidth>
                   <CustomModalSelect
@@ -742,7 +747,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
             {/* ===== SECTION: SCHEDULE & LIMITS ===== */}
             <section>
-              <SectionHeader icon={CalendarIcon} title="Schedule & Limits" subtitle="Control when and how often the deal can be used" />
+              <SectionHeader icon={CalendarIcon} title={t("admin.deals.form.scheduleLimits")} subtitle={t("admin.deals.form.scheduleHint")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Start Date">
@@ -763,7 +768,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
             {/* ===== SECTION: SETTINGS ===== */}
             <section>
-              <SectionHeader icon={SettingsIcon} title="Settings" subtitle="Status and visibility options" />
+              <SectionHeader icon={SettingsIcon} title={t("admin.deals.form.settings")} subtitle={t("admin.deals.form.statusVisibility")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Status">
@@ -785,8 +790,8 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
                         className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
                       />
-                      <span className="text-[13px] font-semibold">Featured Deal</span>
-                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Highlight in store</span>
+                      <span className="text-[13px] font-semibold">{t("admin.deals.form.featured")}</span>
+                      <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>{t("admin.deals.form.highlight")}</span>
                     </label>
                   </FormField>
                 </div>
@@ -817,7 +822,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
             {saveMutation.isPending ? (
-              <><Spinner className="w-4 h-4" /> Saving...</>
+              <><Spinner className="w-4 h-4" /> {t("admin.deals.form.saving")}</>
             ) : (
               editingDeal ? "Update Deal" : "Create Deal"
             )}
@@ -838,6 +843,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
 /* ==================== SELECTION MODAL (REDESIGNED) ==================== */
 export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+  const { t, locale, dir } = useTranslation();
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 
@@ -865,7 +871,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
   }, [items, draftIds, type]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={cardStyle}

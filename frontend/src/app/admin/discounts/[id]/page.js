@@ -16,6 +16,7 @@ import { brandApi } from "../../../../apis/admin/brandApi";
 import { DiscountFormModal, SelectionModal } from "../_components/discountModals";
 import { validateNonNegative } from "../_components/discountUtils";
 import useDiscountSocketSync from "../../../../hooks/admin/useDiscountSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* =========================================================
    HELPERS
@@ -25,11 +26,11 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
-function fd(date) {
+function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
-  });
+  }).format(new Date(date));
 }
 
 function tago(date) {
@@ -74,12 +75,12 @@ function getDiscountStatus(discount) {
   return "active";
 }
 
-function formatDateTime(date) {
+function formatDateTime(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     month: "short", day: "numeric", year: "numeric",
     hour: "2-digit", minute: "2-digit",
-  });
+  }).format(new Date(date));
 }
 
 const toDateInput = (value) => {
@@ -277,6 +278,7 @@ function Avatar({ user, size = "md", color = "emerald" }) {
    MAIN PAGE
 ========================================================= */
 export default function DiscountDetailPage() {
+  const { t, locale, dir } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -326,11 +328,11 @@ export default function DiscountDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("Discount deleted successfully");
+      toast.success(t("admin.discounts.toast.deleted"));
       router.push(backPath);
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount");
+      toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.deleteFailed"));
     },
   });
 
@@ -411,24 +413,24 @@ export default function DiscountDetailPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormErrors({});
-    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
-      setFormErrors({ code: "Discount code is required." });
+      setFormErrors({ code: t("admin.discounts.validation.codeRequired") });
       return;
     }
-    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
-    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
+    if (Number(formData.value) < 0) return toast.error(t("admin.discounts.validation.valueNegative"));
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error(t("admin.discounts.validation.percentageMax"));
 
     // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
     const nonNegativeError = validateNonNegative([
-      ["Discount value", formData.value],
-      ["Minimum order amount", formData.min_order_amount],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Total usage limit", formData.usage_limit],
-      ["Per customer limit", formData.usage_per_customer],
-    ]);
+      [t("admin.discounts.form.discountValue"), formData.value],
+      [t("admin.discounts.form.minOrderAmount"), formData.min_order_amount],
+      [t("admin.discounts.form.minQuantity"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.usage_per_customer],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
@@ -436,15 +438,15 @@ export default function DiscountDetailPage() {
     let payloadExtras = {};
     if (activeFormType === "product") {
       target_type = "specific_products"; applyTo = "specific_products";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
       payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "category") {
       target_type = "specific_categories"; applyTo = "specific_categories";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
       payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "brand") {
       target_type = "brand"; applyTo = "brand";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
       payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
     }
 
@@ -452,7 +454,7 @@ export default function DiscountDetailPage() {
     const fallbackEnd = new Date();
     fallbackEnd.setDate(fallbackEnd.getDate() + 30);
     const endDate = formData.end_at ? dateToISO(formData.end_at) : fallbackEnd.toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity ? Number(formData.min_quantity) : null;
 
@@ -485,12 +487,12 @@ export default function DiscountDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discount"] });
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("Discount updated successfully");
+      toast.success(t("admin.discounts.toast.updated"));
       setShowEdit(false);
       resetForm();
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to update discount");
+      toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.saveFailed"));
     },
   });
 
@@ -540,7 +542,7 @@ export default function DiscountDetailPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        {[{ icon: Percent, label: "Discount Type", value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: "Valid Period", value: `${fd(discount.startDate)} - ${fd(discount.endDate)}` }, { icon: TrendingUp, label: "Usage Limit", value: discount.usageLimit ? String(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: "Minimum Order Value", value: discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum" }].map(({ icon: Icon, label, value }) => (
+        {[{ icon: Percent, label: "Discount Type", value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: "Valid Period", value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` }, { icon: TrendingUp, label: "Usage Limit", value: discount.usageLimit ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: "Minimum Order Value", value: discount.minOrderValue ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : "No minimum" }].map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}><Icon className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /><div className="min-w-0"><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{value}</p></div></div>
         ))}
       </div>
@@ -696,7 +698,7 @@ export default function DiscountDetailPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        {fd(discount.created_at || discount.createdAt)}
+                        {fd(discount.created_at || discount.createdAt, locale)}
                       </p>
                       <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                         {tago(discount.created_at || discount.createdAt)}
@@ -733,7 +735,7 @@ export default function DiscountDetailPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                          {fd(discount.updated_at || discount.updatedAt)}
+                          {fd(discount.updated_at || discount.updatedAt, locale)}
                         </p>
                         <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                           {tago(discount.updated_at || discount.updatedAt)}

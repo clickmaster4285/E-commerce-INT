@@ -13,6 +13,7 @@ import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { DealFormModal, SelectionModal } from "../_components/dealModals";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import useDealSocketSync from "../../../../hooks/admin/useDealSocketSync";
 
 /* =========================================================
@@ -23,19 +24,19 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
-function fd(date) {
+function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
-  });
+  }).format(new Date(date));
 }
 
-function fdt(date) {
+function fdt(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
-  });
+  }).format(new Date(date));
 }
 
 function getDealStatus(deal) {
@@ -272,6 +273,7 @@ function Field({ label, children }) {
    MAIN PAGE
 ========================================================= */
 export default function DealDetailPage() {
+  const { t, locale, dir } = useTranslation();
   const { markSelfAction } = useDealSocketSync();
   const router = useRouter();
   const params = useParams();
@@ -317,11 +319,11 @@ export default function DealDetailPage() {
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
-      toast.success(variables.id ? "Deal updated successfully" : "Deal created successfully");
+      toast.success(variables.id ? t("admin.deals.toast.updated") : t("admin.deals.toast.created"));
       setShowModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.saveFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -329,10 +331,10 @@ export default function DealDetailPage() {
     onMutate: () => markSelfAction("delete"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
-      toast.success("Deal deleted successfully");
+      toast.success(t("admin.deals.toast.deleted"));
       router.push(backPath);
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.deleteFailed")),
   });
 
   const toggleMutation = useMutation({
@@ -345,9 +347,9 @@ export default function DealDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
       const wasOn = deal ? getDealStatus(deal) === "active" : true;
-      toast.success(wasOn ? "Deal deactivated" : "Deal activated");
+      toast.success(wasOn ? t("admin.deals.toast.deactivated") : t("admin.deals.toast.activated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.statusFailed")),
   });
 
   const resetForm = () => {
@@ -397,32 +399,32 @@ export default function DealDetailPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
     if (formData.has_min_quantity) {
       const minQuantity = Number(formData.min_quantity);
       if (!Number.isInteger(minQuantity) || minQuantity < 1) {
-        return toast.error("Minimum quantity must be a whole number greater than 0");
+        return toast.error(t("admin.deals.validation.minQty"));
       }
     }
 
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
-      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
-      if (formData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
+      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error(t("admin.deals.validation.value"));
+      if (formData.value_type === "percentage" && dealValue > 100) return toast.error(t("admin.deals.validation.percentage"));
     }
 
     if (formData.value_type === "buy_x_get_y") {
-      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
-      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error(t("admin.deals.validation.buyQty"));
+      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error(t("admin.deals.validation.getQty"));
     }
 
-    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
-    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
-    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
+    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error(t("admin.deals.validation.selectProduct"));
+    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error(t("admin.deals.validation.selectCategory"));
+    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error(t("admin.deals.validation.selectBrand"));
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.deals.validation.dateOrder"));
 
     const cleanProductIds = formData.selected_product_ids.map((id) => String(id?._id || id));
     const cleanCategoryIds = formData.selected_category_ids.map((id) => String(id?._id || id));
@@ -540,7 +542,7 @@ export default function DealDetailPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" /> Created at
-                <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt)}</b>
+                <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt, locale)}</b>
               </span>
               {hasUpdates && editor ? (
                 <span className="flex items-center gap-1.5">
@@ -551,7 +553,7 @@ export default function DealDetailPage() {
               {hasUpdates ? (
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" /> Updated at
-                  <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt)}</b>
+                  <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt, locale)}</b>
                 </span>
               ) : null}
             </div>
@@ -637,8 +639,8 @@ export default function DealDetailPage() {
                     </span>
                   ) : deal.applyTo === "all" ? "All Products" : "—"}
                 </Field>
-                <Field label="Start Date">{fdt(deal.startDate)}</Field>
-                <Field label="End Date">{fdt(deal.endDate)}</Field>
+                <Field label="Start Date">{fdt(deal.startDate, locale)}</Field>
+                <Field label="End Date">{fdt(deal.endDate, locale)}</Field>
               </div>
 
               {/* COLUMN 3 — usage & flags (form fields only) */}
@@ -855,8 +857,8 @@ export default function DealDetailPage() {
               <DataRow icon={Percent} label="Deal Type" value={deal.type?.replace(/_/g, " ") || "—"} />
               <DataRow icon={DollarSign} label="Discount Value" value={formatDealValue(deal)} highlight />
               <DataRow icon={Target} label="Apply To" value={formatTarget(deal.applyTo)} />
-              <DataRow icon={Calendar} label="Start Date" value={fdt(deal.startDate)} />
-              <DataRow icon={Calendar} label="End Date" value={fdt(deal.endDate)} />
+              <DataRow icon={Calendar} label="Start Date" value={fdt(deal.startDate, locale)} />
+              <DataRow icon={Calendar} label="End Date" value={fdt(deal.endDate, locale)} />
               <div className="flex items-center justify-between gap-3 py-1.5">
                 <span className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
                   <Activity className="w-3.5 h-3.5" /> Status
@@ -898,7 +900,7 @@ export default function DealDetailPage() {
             </thead>
             <tbody>
               <tr style={{ borderBottom: hasUpdates ? "1px solid var(--border-color)" : "none" }}>
-                <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt)}</td>
+                <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt, locale)}</td>
                 <td className="py-2.5 pr-4">
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>Created</span>
                 </td>
@@ -912,7 +914,7 @@ export default function DealDetailPage() {
               </tr>
               {hasUpdates && (
                 <tr>
-                  <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt)}</td>
+                  <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt, locale)}</td>
                   <td className="py-2.5 pr-4">
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>Updated</span>
                   </td>

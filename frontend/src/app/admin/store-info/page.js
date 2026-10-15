@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { toast } from "sonner";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 import {
   Save,
@@ -223,6 +224,7 @@ function SearchSelect({
   emptyText = "No results found",
   hint = "",
 }) {
+  const { t, dir, locale } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -349,6 +351,8 @@ function SearchSelect({
           ref={panelRef}
           role="listbox"
           aria-label={placeholder}
+          dir={dir}
+          lang={locale}
           className="flex flex-col overflow-hidden"
           style={{
             position: "fixed",
@@ -390,7 +394,7 @@ function SearchSelect({
                 <button
                   type="button"
                   onClick={() => { setSearch(""); setHighlight(0); }}
-                  aria-label="Clear search"
+                  aria-label={t("admin.storeInfo.searchSelect.clearSearch")}
                   className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full"
                   style={{ color: "var(--text-muted)" }}
                 >
@@ -400,7 +404,7 @@ function SearchSelect({
             </div>
             <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
               <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                {filtered.length} {filtered.length === 1 ? "result" : "results"}
+                {new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(filtered.length)} {filtered.length === 1 ? t("admin.storeInfo.searchSelect.result") : t("admin.storeInfo.searchSelect.results")}
               </span>
               {hint ? (
                 <span className="truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{hint}</span>
@@ -411,7 +415,7 @@ function SearchSelect({
           <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
             {visible.length === 0 ? (
               <p className="px-3 py-4 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>
-                {allowCustom ? "No match — apna naam type karke Enter / Add dabayein" : emptyText}
+                {allowCustom ? t("admin.storeInfo.searchSelect.noMatchCreate") : emptyText}
               </p>
             ) : (
               visible.map((o, i) => {
@@ -451,7 +455,7 @@ function SearchSelect({
                 backgroundColor: "var(--bg-card)",
               }}
             >
-              <Plus className="h-3.5 w-3.5" /> {customPrefix} &quot;{search.trim()}&quot;
+              <Plus className="h-3.5 w-3.5" /> {t("admin.storeInfo.searchSelect.use")} &quot;{search.trim()}&quot;
             </button>
           ) : null}
 
@@ -461,7 +465,7 @@ function SearchSelect({
               className="shrink-0 px-3 py-2 text-[11px]"
               style={{ borderTop: "1px solid var(--border-color)", color: "var(--text-muted)" }}
             >
-              Showing first {MAX_VISIBLE_OPTIONS} of {filtered.length} — type karke list chhoti karein
+              {t("admin.storeInfo.searchSelect.showingFirst", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(MAX_VISIBLE_OPTIONS), total: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(filtered.length) })}
             </p>
           ) : null}
         </div>,
@@ -476,6 +480,7 @@ function SearchSelect({
 // ======================================================
 
 export default function StoreInfoPage() {
+  const { t, locale } = useTranslation();
   const dispatch = useDispatch();
   const { socket, isConnected } = useAdminSocket();
 
@@ -501,9 +506,9 @@ export default function StoreInfoPage() {
   const isCurrentAdmin = String(currentUserProfile?.role || "").toLowerCase() === "admin";
   const canEditStore = isCurrentAdmin || !!currentUserProfile?.permissions?.store;
   const denyStoreAccess = () =>
-    toast.error("Access denied. You don't have 'store' permission.", {
+    toast.error(t("admin.storeInfo.toast.accessDenied"), {
       duration: 5000,
-      description: "Contact an administrator or another staff member to grant you store access.",
+      description: t("admin.storeInfo.toast.accessDeniedBody"),
     });
 
   // ====================================================
@@ -562,19 +567,19 @@ export default function StoreInfoPage() {
 
   // Placeholders/hint — dataset me data hai ya nahi, uska saaf signal
   const statePlaceholder = !formData.country
-    ? "Select country first"
+    ? t("admin.storeInfo.page.selectCountryFirst")
     : stateOptions.length
-    ? "Select state / province"
-    : "Type your state / province";
+    ? t("admin.storeInfo.page.selectState")
+    : t("admin.storeInfo.page.typeState");
   const cityPlaceholder = !formData.state
-    ? "Select state first"
+    ? t("admin.storeInfo.page.selectStateFirst")
     : cityOptions.length
-    ? "Select city"
-    : "Type your city name";
+    ? t("admin.storeInfo.page.selectCity")
+    : t("admin.storeInfo.page.typeCity");
   const cityFallbackHint = cityFallbackToCountry
-    ? `No cities in this state — showing all cities of ${
-        countryOptions.find((o) => o.value === formData.country)?.label || formData.country
-      }`
+    ? t("admin.storeInfo.page.noCitiesInState", {
+        state: stateOptions.find((o) => o.value === formData.state)?.label || formData.state,
+      })
     : "";
 
   const currencyOptions = useMemo(() => {
@@ -582,10 +587,11 @@ export default function StoreInfoPage() {
       .codes()
       .map((code) => {
         const currency = cc.code(code);
-        return { value: currency.code, label: `${currency.code} — ${currency.currency}` };
+        const displayNames = new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en"], { type: "currency" });
+        return { value: currency.code, label: `${currency.code} — ${displayNames.of(currency.code) || currency.currency}` };
       })
       .filter((i) => i.value);
-  }, []);
+  }, [locale]);
 
   // ====================================================
   // SOCKET — fetch + realtime update
@@ -703,12 +709,12 @@ export default function StoreInfoPage() {
     
     const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      toast.error("Please upload a PNG, JPG, SVG, or WEBP image");
+      toast.error(t("admin.storeInfo.toast.imageType"));
       return;
     }
     
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Logo must be under 2MB");
+      toast.error(t("admin.storeInfo.toast.logoTooLarge"));
       return;
     }
     
@@ -716,7 +722,7 @@ export default function StoreInfoPage() {
     const previewUrl = URL.createObjectURL(file);
     setLogoPreview(previewUrl);
     setLogoError(false);
-    toast.success("Logo selected successfully");
+    toast.success(t("admin.storeInfo.toast.logoSelected"));
   };
 
   const handleLogoDragEnter = (e) => {
@@ -754,9 +760,9 @@ export default function StoreInfoPage() {
         setLogoError(false);
         setFormData((p) => ({ ...p, logo: { img_url: "", public_id: "" } }));
         if (resp.data) dispatch(setStoreInfo(resp.data));
-        toast.success("Store logo removed");
+        toast.success(t("admin.storeInfo.toast.logoRemoved"));
       } else {
-        toast.error(resp?.message || "Failed to remove logo");
+        toast.error(t("admin.storeInfo.toast.logoRemoveFailed"));
       }
     });
   };
@@ -770,7 +776,7 @@ export default function StoreInfoPage() {
       const url = getLogoUrl(formData);
       setLogoPreview(url || "");
       setLogoError(false);
-      toast.info("Selected file cleared");
+      toast.info(t("admin.storeInfo.toast.fileCleared"));
       return;
     }
 
@@ -778,11 +784,11 @@ export default function StoreInfoPage() {
     // (native window.confirm hata diya: ugly browser dialog → in-app toast)
     const serverUrl = getLogoUrl(formData);
     if (!serverUrl && !logoPreview) return;
-    toast.warning("Remove store logo?", {
-      description: "This action can't be undone.",
+    toast.warning(t("admin.storeInfo.toast.removeLogoTitle"), {
+      description: t("admin.storeInfo.toast.removeLogoBody"),
       duration: 6000,
-      action: { label: "Remove", onClick: removeSavedLogo },
-      cancel: { label: "Cancel", onClick: () => {} },
+      action: { label: t("admin.storeInfo.toast.remove"), onClick: removeSavedLogo },
+      cancel: { label: t("admin.storeInfo.page.cancel"), onClick: () => {} },
     });
   };
 
@@ -819,7 +825,7 @@ export default function StoreInfoPage() {
 
     // ✅ Check socket connection first
     if (!socket || !isConnected) {
-      toast.error("Server connection lost. Please refresh and try again.");
+      toast.error(t("admin.storeInfo.toast.connectionLost"));
       return;
     }
 
@@ -857,9 +863,9 @@ export default function StoreInfoPage() {
 
           // ✅ CHECK FOR PERMISSION ERROR
           if (resp?.success === false && resp?.message?.toLowerCase().includes("permission")) {
-            toast.error(resp.message, {
+            toast.error(t("admin.storeInfo.toast.updateFailed"), {
               duration: 6000,
-              description: "Contact an administrator or another staff member to grant you store access.",
+              description: t("admin.storeInfo.toast.accessDeniedBody"),
             });
             setLoading(false);
             return;
@@ -884,9 +890,9 @@ export default function StoreInfoPage() {
 
             setLogoFile(null);
             setIsEditing(false);
-            toast.success("Store updated successfully");
+            toast.success(t("admin.storeInfo.toast.updated"));
           } else {
-            toast.error(resp?.message || "Store update failed");
+            toast.error(t("admin.storeInfo.toast.updateFailed"));
           }
           setLoading(false);
         }
@@ -895,7 +901,7 @@ export default function StoreInfoPage() {
       const timeoutId = setTimeout(() => {
         setLoading((prev) => {
           if (prev) {
-            toast.error("Server response timeout. Please try again.");
+            toast.error(t("admin.storeInfo.toast.timeout"));
             return false;
           }
           return prev;
@@ -905,7 +911,7 @@ export default function StoreInfoPage() {
       return () => clearTimeout(timeoutId);
     } catch (err) {
       console.error("❌ Submit error:", err);
-      toast.error(err.message || "Something went wrong while saving");
+      toast.error(t("admin.storeInfo.toast.saveError"));
       setLoading(false);
     }
   };
@@ -1014,10 +1020,10 @@ export default function StoreInfoPage() {
                 </button>
                 <div>
                   <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-                    Edit Store
+                    {t("admin.storeInfo.page.editStore")}
                   </h1>
                   <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-                    Update your store details and preferences
+                    {t("admin.storeInfo.page.subtitle")}
                   </p>
                 </div>
               </div>
@@ -1037,7 +1043,7 @@ export default function StoreInfoPage() {
                   className="h-9 px-4 rounded-lg text-[13px] font-medium transition hover:opacity-80"
                   style={{ ...cardStyle, color: "var(--text-primary)" }}
                 >
-                  Cancel
+                  {t("admin.storeInfo.page.cancel")}
                 </button>
                 <button
                   onClick={handleSubmit}
@@ -1061,22 +1067,22 @@ export default function StoreInfoPage() {
                       <Store size={16} style={{ color: "var(--success-text)" }} />
                     </div>
                     <div>
-                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Basic Information</h3>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Your store identity</p>
+                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.basicInfo")}</h3>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.basicInfoSubtitle")}</p>
                     </div>
                   </div>
                   <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Store Name</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.storeName")}</label>
                       <input type="text" name="store_name" value={formData.store_name} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                        style={inputStyle} placeholder="Enter store name" />
+                        style={inputStyle} placeholder={t("admin.storeInfo.page.storeNamePlaceholder")} />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tagline</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.tagline")}</label>
                       <input type="text" name="tagline" value={formData.tagline} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                        style={inputStyle} placeholder="Enter store tagline" />
+                        style={inputStyle} placeholder={t("admin.storeInfo.page.taglinePlaceholder")} />
                     </div>
                   </div>
                 </div>
@@ -1088,8 +1094,8 @@ export default function StoreInfoPage() {
                       <ImageIcon size={16} style={{ color: "var(--warning-text)" }} />
                     </div>
                     <div>
-                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Store Logo</h3>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Brand image</p>
+                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.storeLogo")}</h3>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.brandImage")}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-center px-4 py-5">
@@ -1108,7 +1114,7 @@ export default function StoreInfoPage() {
                         {logoPreview && !logoError ? (
                           <img 
                             src={logoPreview} 
-                            alt="Logo" 
+                            alt={t("admin.storeInfo.page.storeLogo")}
                             className="w-full h-full object-contain p-1.5"
                             onError={(e) => { 
                               e.target.style.display = "none"; 
@@ -1128,7 +1134,7 @@ export default function StoreInfoPage() {
                         ) : null}
                         <div className="flex-col items-center gap-1.5" style={{ color: "var(--text-muted)", display: logoPreview && !logoError ? "none" : "flex" }}>
                           <Store size={28} />
-                          <span className="text-[10px]">No Logo</span>
+                          <span className="text-[10px]">{t("admin.storeInfo.page.noLogo")}</span>
                         </div>
                       </div>
                       <span className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-full flex items-center justify-center transition"
@@ -1141,11 +1147,11 @@ export default function StoreInfoPage() {
                           {isLogoDragOver ? "Drop logo here" : "Drag & drop your logo here"}
                         </p>
                         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          or click to browse
+                          {t("admin.storeInfo.page.orClickToBrowse")}
                         </p>
                       </div>
                       <p className="mt-2 text-[11px] leading-4 text-center" style={{ color: "var(--text-muted)" }}>
-                        PNG, JPG, SVG or WEBP · Max 2MB · Square recommended
+                        {t("admin.storeInfo.page.logoFormats")}
                       </p>
                     </label>
                     {logoPreview && !logoError && (
@@ -1165,7 +1171,7 @@ export default function StoreInfoPage() {
                     )}
                     {logoFile && (
                       <p className="mt-2 text-[11px] text-emerald-500">
-                        ✓ New logo selected: {logoFile.name}
+                        ✓ {t("admin.storeInfo.page.newLogoSelected", { name: logoFile.name })}
                       </p>
                     )}
                     </div>
@@ -1180,19 +1186,19 @@ export default function StoreInfoPage() {
                     <Mail size={16} style={{ color: "var(--purple-text)" }} />
                   </div>
                   <div>
-                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Contact Information</h3>
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store & support contacts</p>
+                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.contactInfo")}</h3>
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.contactInfoSubtitle")}</p>
                   </div>
                 </div>
                 <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Email Address</label>
+                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.emailAddress")}</label>
                     <input type="email" name="email" value={formData.email} onChange={handleChange}
                       className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                      style={inputStyle} placeholder="store@example.com" />
+                      style={inputStyle} placeholder={t("admin.storeInfo.page.emailPlaceholder")} />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Phone Number</label>
+                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.phoneNumber")}</label>
                     <PhoneInput country={phoneCountryCode} value={formData.phone}
                       onChange={(v) => handlePhoneChange(v, "phone")} inputProps={{ name: "phone" }}
                       enableSearch preferredCountries={["pk", "in", "us", "gb", "ae"]}
@@ -1201,13 +1207,13 @@ export default function StoreInfoPage() {
                       searchStyle={phoneStyles.searchStyle} />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Support Email</label>
+                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.supportEmail")}</label>
                     <input type="email" name="support_email" value={formData.support_email} onChange={handleChange}
                       className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                      style={inputStyle} placeholder="support@example.com" />
+                      style={inputStyle} placeholder={t("admin.storeInfo.page.supportEmailPlaceholder")} />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Support Phone</label>
+                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.supportPhone")}</label>
                     <PhoneInput country={phoneCountryCode} value={formData.support_phone}
                       onChange={(v) => handlePhoneChange(v, "support_phone")} inputProps={{ name: "support_phone" }}
                       enableSearch preferredCountries={["pk", "in", "us", "gb", "ae"]}
@@ -1226,61 +1232,61 @@ export default function StoreInfoPage() {
                       <MapPin size={16} style={{ color: "var(--rose)" }} />
                     </div>
                     <div>
-                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Location</h3>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Physical address</p>
+                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.location")}</h3>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.physicalAddress")}</p>
                     </div>
                   </div>
                   <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.country")}</label>
                       <SearchSelect
                         value={formData.country}
                         options={countryOptions}
                         onChange={handleCountryChange}
-                        placeholder="Select country"
-                        searchPlaceholder="Search country..."
+                        placeholder={t("admin.storeInfo.page.selectCountry")}
+                        searchPlaceholder={t("admin.storeInfo.searchSelect.searchPlaceholder")}
                       />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>State / Province</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.stateProvince")}</label>
                       <SearchSelect
                         value={formData.state}
                         options={stateOptions}
                         onChange={handleStateChange}
                         placeholder={statePlaceholder}
-                        searchPlaceholder="Search state / province..."
+                        searchPlaceholder={t("admin.storeInfo.searchSelect.searchPlaceholder")}
                         disabled={!formData.country}
                         allowCustom={stateOptions.length === 0}
-                        customPrefix="Use state"
+                        customPrefix={t("admin.storeInfo.searchSelect.use")}
                         emptyText="Is country ka state data dataset me nahi hai — apna state type karein"
                       />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>City</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.city")}</label>
                       <SearchSelect
                         value={formData.city}
                         options={cityOptions}
                         onChange={handleCityChange}
                         placeholder={cityPlaceholder}
-                        searchPlaceholder="Search city..."
+                        searchPlaceholder={t("admin.storeInfo.searchSelect.searchPlaceholder")}
                         disabled={!formData.state}
                         allowCustom
-                        customPrefix="Use city"
+                        customPrefix={t("admin.storeInfo.searchSelect.use")}
                         emptyText="Is state ka city data nahi hai — apna city type karke Enter dabayein"
                         hint={cityFallbackHint}
                       />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Postal Code</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.postalCode")}</label>
                       <input type="text" name="zip_code" value={formData.zip_code} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                        style={inputStyle} placeholder="Postal code" />
+                        style={inputStyle} placeholder={t("admin.storeInfo.page.postalCodePlaceholder")} />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Store Address</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.storeAddress")}</label>
                       <input type="text" name="address" value={formData.address} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                        style={inputStyle} placeholder="Full store address" />
+                        style={inputStyle} placeholder={t("admin.storeInfo.page.fullStoreAddress")} />
                     </div>
                   </div>
                 </div>
@@ -1291,53 +1297,53 @@ export default function StoreInfoPage() {
                       <Briefcase size={16} style={{ color: "var(--orange)" }} />
                     </div>
                     <div>
-                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Business Details</h3>
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Operational settings</p>
+                      <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.businessDetails")}</h3>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.operationalSettings")}</p>
                     </div>
                   </div>
                   <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Business Type</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.businessType")}</label>
                       <input type="text" name="business_type" value={formData.business_type} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
-                        style={inputStyle} placeholder="Private Limited" />
+                        style={inputStyle} placeholder={t("admin.storeInfo.page.privateLimited")} />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Total Employees</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.totalEmployees")}</label>
                       <input type="text" name="total_employees" value={formData.total_employees} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="25–50" />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Year Established</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.yearEstablished")}</label>
                       <input type="text" name="year_established" value={formData.year_established} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="2020" />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Currency</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.currency")}</label>
                       <SearchSelect
                         value={formData.currency}
                         options={currencyOptions}
                         onChange={handleCurrencyChange}
-                        placeholder="Select currency"
-                        searchPlaceholder="Search currency (e.g. PKR, USD)..."
+                        placeholder={t("admin.storeInfo.page.selectCurrency")}
+                        searchPlaceholder={t("admin.storeInfo.searchSelect.searchPlaceholder")}
                       />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Tax Rate (%)</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.taxRatePercent")}</label>
                       <input type="number" name="tax_rate" value={formData.tax_rate} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                         style={inputStyle} placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Weight Unit</label>
+                      <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.storeInfo.page.weightUnit")}</label>
                       <select name="weight_unit" value={formData.weight_unit} onChange={handleChange}
                         className="h-10 md:h-9 px-3 rounded-lg text-[16px] md:text-[13px] w-full outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40 appearance-none"
                         style={inputStyle}>
-                        <option value="kg">Kilogram (kg)</option>
-                        <option value="g">Gram (g)</option>
-                        <option value="lbs">Pounds (lbs)</option>
+                        <option value="kg">{t("admin.storeInfo.page.kilogram")}</option>
+                        <option value="g">{t("admin.storeInfo.page.gram")}</option>
+                        <option value="lbs">{t("admin.storeInfo.page.pounds")}</option>
                       </select>
                     </div>
                   </div>
@@ -1351,8 +1357,8 @@ export default function StoreInfoPage() {
                     <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
                   </div>
                   <div>
-                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Social Profiles</h3>
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Connected platforms</p>
+                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.socialProfiles")}</h3>
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.connectedPlatforms")}</p>
                   </div>
                 </div>
                 <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -1383,8 +1389,8 @@ export default function StoreInfoPage() {
                     <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
                   </div>
                   <div>
-                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>SEO & Policies</h3>
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Search engine & legal info</p>
+                    <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.seoPolicies")}</h3>
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.searchLegalInfo")}</p>
                   </div>
                 </div>
                 <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1439,10 +1445,10 @@ export default function StoreInfoPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-              Store Information
+              {t("admin.storeInfo.page.titleFull")}
             </h1>
             <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              Manage and view your store information
+              {t("admin.storeInfo.page.subtitleFull")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1452,14 +1458,14 @@ export default function StoreInfoPage() {
                 className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
               />
               <span style={{ color: "var(--text-muted)" }}>
-                {isConnected ? "Connected" : "Disconnected"}
+                    {isConnected ? t("admin.storeInfo.page.connected") : t("admin.storeInfo.page.disconnected")}
               </span>
             </div>
             <button onClick={handleEdit}
               className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
               <Pencil size={14} />
-              Edit Store
+              {t("admin.storeInfo.page.editStore")}
             </button>
           </div>
         </div>
@@ -1473,7 +1479,7 @@ export default function StoreInfoPage() {
                 {logoPreview && !logoError ? (
                   <img 
                     src={logoPreview} 
-                    alt="Logo" 
+                    alt={t("admin.storeInfo.page.storeLogo")}
                     className="w-full h-full object-contain p-1.5"
                     onError={(e) => { 
                       e.target.style.display = "none"; 
@@ -1493,19 +1499,19 @@ export default function StoreInfoPage() {
                 ) : null}
                 <div style={{ display: logoPreview && !logoError ? "none" : "flex", flexDirection: "column", alignItems: "center", gap: "4px", color: "var(--text-muted)" }}>
                   <Store size={32} />
-                  <span style={{ fontSize: "10px" }}>No Logo</span>
+                  <span style={{ fontSize: "10px" }}>{t("admin.storeInfo.page.noLogo")}</span>
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
                     style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-                    Store
+                    {t("admin.storeInfo.page.storeLabel")}
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
                     <span className="w-1.5 h-1.5 rounded-full"
                       style={{ backgroundColor: formData.store_status === "open" ? "var(--success-text)" : "var(--danger-text)" }} />
-                    {formData.store_status === "open" ? "Open" : "Closed"}
+                    {formData.store_status === "open" ? t("admin.storeInfo.page.open") : t("admin.storeInfo.page.closed")}
                   </span>
                 </div>
                 <h2 className="text-[22px] font-bold leading-tight tracking-tight" style={{ color: "var(--text-primary)" }}>
@@ -1518,11 +1524,11 @@ export default function StoreInfoPage() {
             </div>
             <div className="flex gap-3">
               <div className="rounded-lg px-4 py-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Currency</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.currency")}</p>
                 <p className="text-[14px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{getCurrencyName(formData.currency)}</p>
               </div>
               <div className="rounded-lg px-4 py-3" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Country</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.country")}</p>
                 <p className="text-[14px] font-bold mt-0.5" style={{ color: "var(--text-primary)" }}>{getCountryName(formData.country)}</p>
               </div>
             </div>
@@ -1537,8 +1543,8 @@ export default function StoreInfoPage() {
                 <Mail size={16} style={{ color: "var(--purple-text)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Contact Information</h3>
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store contact details</p>
+                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.contactInfo")}</h3>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.storeContactDetails")}</p>
               </div>
             </div>
             <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1555,8 +1561,8 @@ export default function StoreInfoPage() {
                 <MapPin size={16} style={{ color: "var(--rose)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Location</h3>
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Store location information</p>
+                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.location")}</h3>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.storeLocationInformation")}</p>
               </div>
             </div>
             <div className="p-4 grid grid-cols-2 gap-4">
@@ -1579,8 +1585,8 @@ export default function StoreInfoPage() {
                 <Briefcase size={16} style={{ color: "var(--orange)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Business Details</h3>
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Business information</p>
+                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.businessDetails")}</h3>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.businessInformation")}</p>
               </div>
             </div>
             <div className="p-4 grid grid-cols-2 gap-4">
@@ -1599,8 +1605,8 @@ export default function StoreInfoPage() {
                 <Store size={16} style={{ color: "var(--success-text)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Store Settings</h3>
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Current configuration</p>
+                <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.storeSettings")}</h3>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.currentConfiguration")}</p>
               </div>
             </div>
             <div className="p-4">
@@ -1611,8 +1617,8 @@ export default function StoreInfoPage() {
                     <Check size={16} style={{ color: "var(--success-text)" }} />
                   </div>
                   <div>
-                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Store Status</p>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Current availability</p>
+                    <p className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.storeStatus")}</p>
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.currentAvailability")}</p>
                   </div>
                 </div>
                 <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
@@ -1625,7 +1631,7 @@ export default function StoreInfoPage() {
               {formData.maintenance_message && (
                 <div className="mt-4 rounded-lg px-4 py-3"
                   style={{ backgroundColor: "rgba(245,158,11,0.06)", border: "1px solid color-mix(in srgb, var(--warning) 28%, transparent)" }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--warning-text)" }}>Maintenance Message</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--warning-text)" }}>{t("admin.storeInfo.page.maintenanceMessage")}</p>
                   <p className="text-[12px] mt-1 leading-5" style={{ color: "var(--text-secondary)" }}>{formData.maintenance_message}</p>
                 </div>
               )}
@@ -1640,8 +1646,8 @@ export default function StoreInfoPage() {
               <Share2 size={16} style={{ color: "var(--indigo-text)" }} />
             </div>
             <div>
-              <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>Social Profiles</h3>
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Connected social platforms</p>
+              <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.socialProfiles")}</h3>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.connectedPlatforms")}</p>
             </div>
           </div>
           <div className="p-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
@@ -1677,8 +1683,8 @@ export default function StoreInfoPage() {
               <ShieldCheck size={16} style={{ color: "var(--teal)" }} />
             </div>
             <div>
-              <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>SEO & Store Policies</h3>
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Search engine & legal information</p>
+              <h3 className="text-[14px] font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>{t("admin.storeInfo.page.seoStorePolicies")}</h3>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.storeInfo.page.searchLegalInformation")}</p>
             </div>
           </div>
           <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">

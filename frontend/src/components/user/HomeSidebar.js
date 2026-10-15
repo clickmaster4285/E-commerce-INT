@@ -26,6 +26,7 @@ import {
   Wallet,
 } from "lucide-react";
 import CategoryIcon from "./CategoryIcon";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import {
   formatPrice,
   getDealBadgeText,
@@ -365,6 +366,7 @@ export default function HomeSidebar({
   showAllDealsView = false,
   onToggleAllDealsView,
 }) {
+  const { dir } = useTranslation();
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAllDeals, setShowAllDeals] = useState(false);
   const [brandQuery, setBrandQuery] = useState("");
@@ -544,7 +546,7 @@ export default function HomeSidebar({
   }
 
   return (
-    <aside
+    <aside dir={dir}
       className={`isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
     >
       <div

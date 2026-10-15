@@ -5,6 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { attributeApi } from "../../../../apis/admin/attributeApi";
 import { toNonNegative } from "./discountUtils";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -49,7 +50,11 @@ const getName = (item, type) => {
   return item?.name || "Unnamed";
 };
 
-const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+const formatCurrency = (amount) => {
+  const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
+};
 
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -100,7 +105,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => {
               const active = value === opt.value;
@@ -221,6 +226,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 );
 
 function Select({ value, onChange, options, inputStyle }) {
+  const { t } = useTranslation();
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" style={inputStyle}>
@@ -333,6 +339,7 @@ const TargetIconFor = (formType) => {
 };
 
 export function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+  const { t, locale, dir } = useTranslation();
   const [viewingProduct, setViewingProduct] = useState(null);
 
   const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
@@ -370,7 +377,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
@@ -411,14 +418,14 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* BASIC INFORMATION */}
             <section>
-              <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your discount a clear identity" />
+              <SectionHeader icon={InfoIcon} title={t("admin.discounts.form.basicInfo")} subtitle={t("admin.discounts.form.basicInfoSubtitle")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="space-y-4">
                   <FormField label="Discount Name" required fullWidth>
                     <TextInput
                       value={formData.name}
                       onChange={(v) => setFormData({ ...formData, name: v })}
-                      placeholder="e.g., Summer Sale 2026"
+                      placeholder={t("admin.discounts.form.namePlaceholder")}
                       style={inputStyle}
                     />
                   </FormField>
@@ -426,7 +433,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                     <TextInput
                       value={formData.code}
                       onChange={(v) => { setFormData({ ...formData, code: v }); setFormErrors(prev => ({ ...prev, code: undefined })); }}
-                      placeholder="e.g., SUMMER20"
+                      placeholder={t("admin.discounts.form.codePlaceholder")}
                       style={{ ...inputStyle, textTransform: "uppercase" }}
                       className={formErrors.code ? "ring-2 ring-red-500/50" : ""}
                     />
@@ -436,7 +443,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                     <TextArea
                       value={formData.description}
                       onChange={(v) => setFormData({ ...formData, description: v })}
-                      placeholder="Add optional details customers will see for this discount..."
+                      placeholder={t("admin.discounts.form.descriptionPlaceholder")}
                       rows={3}
                       style={inputStyle}
                     />
@@ -569,7 +576,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* DISCOUNT VALUE */}
             <section>
-              <SectionHeader icon={PercentIcon} title="Discount Value" subtitle="Configure how the discount is calculated" />
+              <SectionHeader icon={PercentIcon} title={t("admin.discounts.form.discountValueSection")} subtitle={t("admin.discounts.form.discountValueSubtitle")} />
               <div className="rounded-lg p-4 space-y-4" style={cardStyle}>
                 <FormField label="Discount Type" fullWidth>
                   <CustomModalSelect
@@ -595,7 +602,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                         description: "Example: Sell at a fixed price, e.g. Rs. 7,000",
                       },
                     ]}
-                    placeholder="Select discount type"
+                    placeholder={t("admin.discounts.form.selectDiscountType")}
                   />
                 </FormField>
 
@@ -625,8 +632,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             <section>
               <SectionHeader 
                 icon={LayersIcon} 
-                title="Conditions & Limits" 
-                subtitle="Control when and how often the discount can be used" 
+                title={t("admin.discounts.form.conditionsLimits")} 
+                subtitle={t("admin.discounts.form.conditionsLimitsSubtitle")} 
               />
               <div className="rounded-lg p-5 space-y-5" style={cardStyle}>
                 
@@ -646,7 +653,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                   {/* Min Quantity with Checkbox Logic */}
                   <div>
                     <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                      <span>Min Quantity</span>
+                      <span>{t("admin.discounts.form.minQuantity")}</span>
                       <span 
                         className="flex items-center gap-2 cursor-pointer select-none group" 
                         onClick={() => {
@@ -729,7 +736,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* SCHEDULE & STATUS */}
             <section>
-              <SectionHeader icon={CalendarIcon} title="Schedule & Status" subtitle="Control when the discount is live" />
+              <SectionHeader icon={CalendarIcon} title={t("admin.discounts.form.scheduleStatus")} subtitle={t("admin.discounts.form.scheduleStatusSubtitle")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField label="Start Date">
@@ -746,7 +753,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                         { value: "active", label: "Active" },
                         { value: "disabled", label: "Inactive" },
                       ]}
-                      placeholder="Select Status"
+                      placeholder={t("admin.discounts.form.selectStatus")}
                     />
                   </FormField>
                 </div>
@@ -777,7 +784,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
             {saveMutation.isPending ? (
-              <><Spinner className="w-4 h-4" /> Saving...</>
+              <><Spinner className="w-4 h-4" /> {t("admin.discounts.form.saving")}</>
             ) : (
               editingDiscount ? "Update Discount" : "Create Discount"
             )}
@@ -798,6 +805,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
 /* ==================== SELECTION MODAL ==================== */
 export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+  const { t, locale, dir } = useTranslation();
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 
@@ -825,7 +833,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
   }, [items, draftIds, type]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={cardStyle}
