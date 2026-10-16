@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Languages } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import LanguageTransition from "@/components/common/LanguageTransition";
 
 const LANGUAGE_KEYS = {
   en: "common.english",
@@ -13,6 +14,8 @@ const LANGUAGE_KEYS = {
 export default function AdminLanguageSwitcher() {
   const { locale, locales, changeLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Target locale while a switch is in flight — the curtain is mounted for it.
+  const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -66,8 +69,9 @@ export default function AdminLanguageSwitcher() {
                 role="option"
                 aria-selected={active}
                 onClick={() => {
-                  changeLocale(item.code);
                   setOpen(false);
+                  if (item.code === locale) return;
+                  setSwitchingTo(item.code);
                 }}
                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start text-[13px] transition-colors hover:bg-[var(--bg-secondary)]"
                 style={{ color: active ? "var(--accent)" : "var(--text-primary)" }}
@@ -78,6 +82,15 @@ export default function AdminLanguageSwitcher() {
             );
           })}
         </div>
+      )}
+
+      {switchingTo && (
+        <LanguageTransition
+          locale={switchingTo}
+          variant="admin"
+          onSwitch={() => changeLocale(switchingTo)}
+          onComplete={() => setSwitchingTo(null)}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import { categoryApi } from "../../../apis/admin/categoryApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useCategorySocketSync } from "../../../hooks/admin/useCategorySocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -77,6 +78,13 @@ const sanitizeOptionLabels = (raw) => {
 const getCategoryName = (categoryId, categories) => {
   const category = categories.find((item) => String(item._id) === String(categoryId));
   return category?.name || "None";
+};
+
+// Same lookup, but returns the parent CATEGORY OBJECT — `nameOf()` ko poora doc
+// chahiye (translations map `name` ke saath hi), plain name string nahi.
+const getCategoryDoc = (categoryId, categories) => {
+  if (!categoryId) return null;
+  return (categories || []).find((item) => String(item._id) === String(categoryId)) || null;
 };
 
 /* ================= Parent category restriction helpers =================
@@ -259,6 +267,9 @@ export default function CategoriesPage() {
   // Admin-panel i18n. English is the fallback for any missing key.
   const { t: __t } = useTranslation();
   const t = (k, p) => __t("admin.categories." + k, p);
+  // Database-sourced content (category / attribute names + descriptions) —
+  // active locale me render hota hai, English fallback helper ke andar hai.
+  const { nameOf, descriptionOf, attributeOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -1058,8 +1069,11 @@ const [viewMode, setViewMode] = useState(() => {
         t,
       }),
     }));
-    const selectedParentName = formData.parent_category_id
-      ? categoryOptions.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+    // Selected parent ka poora doc chahiye — `nameOf()` translations map ke
+    // saath kaam karta hai (plain `.name` sirf English deta hai).
+    const selectedParentCategoryDoc = getCategoryDoc(formData.parent_category_id, categoryOptions);
+    const selectedParentName = selectedParentCategoryDoc
+      ? nameOf(selectedParentCategoryDoc)
       : "None";
 
     // ✅ NEW: Category Name kisi existing (children wali) category se match karta
@@ -1290,7 +1304,7 @@ const [viewMode, setViewMode] = useState(() => {
                               ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]"
                               : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{cat.name}</span>
+                            <span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{nameOf(cat)}</span>
                             {state.badge && (
                               <span className={`text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] border shrink-0 whitespace-nowrap ${state.disabled
                                 ? "bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-[var(--border-color)]"
@@ -1365,9 +1379,10 @@ const [viewMode, setViewMode] = useState(() => {
                 {tempSelectedAttrIds.map((attrId) => {
                   const attr = allAttributes.find((a) => String(a._id) === String(attrId));
                   if (!attr) return null;
+                  const localizedAttr = attributeOf(attr);
                   return (
                     <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
-                      {attr.name}
+                      {localizedAttr.name}
                       <button type="button" onClick={() => toggleTempAttribute(attrId)}
                         className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                         <CloseIcon className="w-2.5 h-2.5" />
@@ -1397,6 +1412,7 @@ const [viewMode, setViewMode] = useState(() => {
                 {filteredAllAttributes.length > 0 ? (
                   filteredAllAttributes.map((attr) => {
                     const isChecked = tempSelectedAttrIds.includes(attr._id);
+                    const localizedAttr = attributeOf(attr);
                     return (
                       <button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)}
                         className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
@@ -1406,7 +1422,7 @@ const [viewMode, setViewMode] = useState(() => {
                         </div>
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attr.name}</p>
+                          <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
                           <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p>
                         </div>
                         {/* Values count */}
@@ -1565,6 +1581,7 @@ const [viewMode, setViewMode] = useState(() => {
                   {paginatedCategories.map((category, index) => {
                     const isSelected = selectedIds.includes(category._id);
                     const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+                    const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
                     const isActive = category.is_active !== false;
                     return (
                       <tr key={category._id} className="transition cursor-pointer" style={{ borderBottom: index < paginatedCategories.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
@@ -1576,11 +1593,11 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
-                            <span className="font-medium text-[13px] truncate max-w-[140px]">{category.name}</span>
+                            <span className="font-medium text-[13px] truncate max-w-[140px]">{nameOf(category)}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{category.description || "—"}</p></td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentName}</td>
+                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(category) || "—"}</p></td>
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentDoc ? nameOf(parentDoc) : "—"}</td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive
@@ -1603,6 +1620,7 @@ const [viewMode, setViewMode] = useState(() => {
             {paginatedCategories.map((category) => {
               const isMobileSelected = selectedIds.includes(category._id);
               const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+              const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
               const isMobileActive = category.is_active !== false;
               return (
                 <div key={category._id} onClick={() => handleViewDetail(category)} className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
@@ -1611,12 +1629,12 @@ const [viewMode, setViewMode] = useState(() => {
                     <input type="checkbox" checked={isMobileSelected} onChange={() => toggleSelect(category._id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded cursor-pointer shrink-0" style={{ accentColor: "var(--accent)" }} />
                     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate leading-tight">{category.name}</p>
+                      <p className="text-[13px] font-medium truncate leading-tight">{nameOf(category)}</p>
                       <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : parentName}</span>
+                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
                     <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{isMobileActive ? t("status.active") : t("status.inactive")}</span>
                   </div>
                   <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -1631,17 +1649,18 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedCategories.map((category) => {
               const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+              const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
               return (
                 <div key={category._id} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-5 h-5" /></div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{category.name}</p>
+                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(category)}</p>
                     <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                   </div>
                   <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : parentName}</span>
+                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
                     <ActionButtons category={category} />
                   </div>
                 </div>
@@ -1687,7 +1706,7 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="w-full max-w-sm rounded-lg p-6" style={cardStyle}>
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
-              <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? t("delete.titleOne", { name: deleteTarget.categories[0].name }) : t("delete.titleMany", { count: deleteTarget.categories.length })}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p></div>
+              <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? t("delete.titleOne", { name: nameOf(deleteTarget.categories[0]) }) : t("delete.titleMany", { count: deleteTarget.categories.length })}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p></div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
               <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("delete.cancel")}</button>

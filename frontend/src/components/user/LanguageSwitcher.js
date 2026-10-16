@@ -8,10 +8,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Languages, Check } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import LanguageTransition from "@/components/common/LanguageTransition";
 
 export default function LanguageSwitcher({ className = "" }) {
   const { locale, locales, changeLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Target locale while a switch is in flight — the curtain is mounted for it.
+  const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -78,8 +81,9 @@ export default function LanguageSwitcher({ className = "" }) {
                 role="option"
                 aria-selected={isActive}
                 onClick={() => {
-                  changeLocale(l.code);
                   setOpen(false);
+                  if (l.code === locale) return;
+                  setSwitchingTo(l.code);
                 }}
                 className="flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-[13px] transition-colors duration-150"
                 style={{
@@ -106,6 +110,15 @@ export default function LanguageSwitcher({ className = "" }) {
             );
           })}
         </div>
+      )}
+
+      {switchingTo && (
+        <LanguageTransition
+          locale={switchingTo}
+          variant="user"
+          onSwitch={() => changeLocale(switchingTo)}
+          onComplete={() => setSwitchingTo(null)}
+        />
       )}
     </div>
   );

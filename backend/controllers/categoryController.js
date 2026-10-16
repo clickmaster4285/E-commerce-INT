@@ -7,6 +7,13 @@ const Employee = require("../models/Employee");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { queueTranslationSync } = require("../utils/translationService");
+
+// Populated attribute ke saath `translations` zaroori — attribute ka `name`
+// translate hota hai aur options ke labels `values[].label_translations` me
+// hote hain. Inke bina frontend hamesha English fallback dikha raha hota.
+const ATTRIBUTE_POPULATE_SELECT =
+  "name code data_type values variant_allowed is_active translations translation_source translation_status";
 
 // createdby/updatedby creator User ya Employee dono ho sakta hai.
 // Model ref Employee hai, isliye populate fail hone par User se resolve karo.
@@ -394,6 +401,9 @@ const createCategory = async (req, res) => {
       updatedby: null,
     });
 
+    // 🌍 Urdu + Arabic translation background me generate (response block nahi hota)
+    queueTranslationSync(Category, category._id);
+
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -427,7 +437,7 @@ const getCategories = async (req, res) => {
     const categories = await Category.find({ is_deleted: false })
       .select("-__v")
       .populate("parent_category_id", "name category_code")
-      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+      .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .sort({ sort_order: 1, created_at: -1 })
@@ -448,7 +458,7 @@ const getCategoryById = async (req, res) => {
     })
       .select("-__v")
       .populate("parent_category_id", "name category_code")
-      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+      .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
@@ -602,6 +612,9 @@ const updateCategory = async (req, res) => {
     if (!updatedCategory) {
       return res.status(404).json({ success: false, message: "Category not found" });
     }
+
+    // 🌍 English change → hash badla → translation dobara generate hogi
+    queueTranslationSync(Category, updatedCategory._id);
 
     emitSocketEvent("categoryUpdated", updatedCategory.toObject());
 

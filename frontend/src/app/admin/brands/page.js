@@ -8,6 +8,7 @@ import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -229,6 +230,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 /* ================= Main Component ================= */
 export default function BrandsPage() {
   const { t, dir, locale } = useTranslation();
+  const { nameOf, descriptionOf } = useLocalized();
   useBrandSocketSync();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -834,10 +836,10 @@ export default function BrandsPage() {
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <div className="flex items-center gap-2 sm:gap-2.5">
                             <Avatar brand={brand} size="w-7 h-7 sm:w-8 sm:h-8" />
-                            <span className="font-medium text-[12px] sm:text-[13px] truncate max-w-[110px] sm:max-w-[140px]">{brand.name}</span>
+                            <span className="font-medium text-[12px] sm:text-[13px] truncate max-w-[110px] sm:max-w-[140px]">{nameOf(brand)}</span>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{brand.description || "—"}</p></td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(brand) || "—"}</p></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><StatusBadge active={brand.is_active} /></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-end"><ActionButtons brand={brand} /></td>
@@ -877,7 +879,7 @@ export default function BrandsPage() {
                     <Avatar brand={brand} />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium truncate leading-tight">
-                        {brand.name}
+                        {nameOf(brand)}
                       </p>
                       <p
                         className="text-[11px] font-mono truncate mt-0.5"
@@ -917,7 +919,7 @@ export default function BrandsPage() {
                   <StatusBadge active={brand.is_active} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[12px] sm:text-[13px] truncate">{brand.name}</p>
+                  <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(brand)}</p>
                   <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{brand.brand_code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -1101,14 +1103,14 @@ export default function BrandsPage() {
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: deleteTarget.brands[0].name }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
+                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: nameOf(deleteTarget.brands[0]) }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.deleteWarning")}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4 p-2.5 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <Avatar brand={deleteTarget.brands[0]} size="w-8 h-8" />
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{deleteTarget.brands[0].name}</p>
+                <p className="text-sm font-medium truncate">{nameOf(deleteTarget.brands[0])}</p>
                 <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.brands.length === 1 ? deleteTarget.brands[0].brand_code || "—" : t("admin.brands.ui.moreCount", { count: deleteTarget.brands.length - 1 })}</p>
               </div>
             </div>

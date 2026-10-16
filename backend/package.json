@@ -6,7 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "backfill:translations": "node scripts/backfillTranslations.js",
+    "translation:check": "node scripts/backfillTranslations.js --check",
+    "argos:serve": "py scripts/argosTranslateServer.py"
   },
   "keywords": [],
   "author": "",

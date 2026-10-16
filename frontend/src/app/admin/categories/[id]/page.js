@@ -8,6 +8,7 @@ import { categoryApi } from "@/apis/admin/categoryApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
 import { useAttributeSocketSync } from "../../../../hooks/admin/useAttributeSocketSync";
 import { toast } from "sonner";
+import { useLocalized } from "@/i18n/localize";
 
 /* =========================================================
    ICONS
@@ -789,6 +790,9 @@ export default function CategoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
+  // Database-sourced content (category / attribute names + descriptions) —
+  // active locale me render hota hai, English fallback helper ke andar hai.
+  const { nameOf, descriptionOf, attributeOf } = useLocalized();
 
   const categoryId = getId(params?.id);
   const backPath = "/admin/categories";
@@ -839,16 +843,23 @@ export default function CategoryDetailPage() {
     return categoryAttributes.filter((attr) => attr.category_config?.is_variant_option);
   }, [categoryAttributes]);
 
-  const parentCategoryName = useMemo(() => {
-    if (!category) return "None";
+  // Parent ka poora doc chahiye — `nameOf()` translations map ke saath kaam
+  // karta hai (plain `.name` sirf English deta hai). Populated parent ya
+  // `allCategories` list se resolve — jaise pehle, bas object return karta hai.
+  const parentCategoryDoc = useMemo(() => {
+    if (!category) return null;
     const parentId = getId(category.parent_category_id);
-    if (!parentId) return "None";
+    if (!parentId) return null;
     if (category.parent_category_id && typeof category.parent_category_id === "object") {
-      return category.parent_category_id.name || "None";
+      return category.parent_category_id;
     }
-    const found = allCategories.find((item) => String(item._id) === String(parentId));
-    return found?.name || "None";
+    return allCategories.find((item) => String(item._id) === String(parentId)) || null;
   }, [category, allCategories]);
+
+  const parentCategoryName = useMemo(() => {
+    if (!parentCategoryDoc) return "None";
+    return parentCategoryDoc.name || "None";
+  }, [parentCategoryDoc]);
 
   // Mutations
   const deleteMutation = useMutation({
@@ -957,12 +968,12 @@ export default function CategoryDetailPage() {
           <Ico d={D.chevron} className="w-3 h-3" />
           {parentCategoryName !== "None" && (
             <>
-              <span className="max-w-[180px] truncate">{parentCategoryName}</span>
+              <span className="max-w-[180px] truncate">{nameOf(parentCategoryDoc)}</span>
               <Ico d={D.chevron} className="w-3 h-3" />
             </>
           )}
           <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
-            {category.name}
+            {nameOf(category)}
           </span>
         </nav>
 
@@ -1004,7 +1015,7 @@ export default function CategoryDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
-                  {category.name}
+                  {nameOf(category)}
                 </h2>
                 <span
                   className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold"
@@ -1024,7 +1035,7 @@ export default function CategoryDetailPage() {
               )}
               {category.description && (
                 <p className="mt-2 max-w-md text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  {category.description}
+                  {descriptionOf(category)}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1088,7 +1099,7 @@ export default function CategoryDetailPage() {
                 Category Name
               </span>
               <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
-                {category.name}
+                {nameOf(category)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-8">
@@ -1107,7 +1118,7 @@ export default function CategoryDetailPage() {
                 Parent Category
               </span>
               <span className="max-w-[140px] truncate text-[12px] font-semibold text-[var(--accent)]">
-                {parentCategoryName}
+                {parentCategoryDoc ? nameOf(parentCategoryDoc) : parentCategoryName}
               </span>
             </div>
             <div className="flex items-center justify-between gap-8">
@@ -1170,7 +1181,7 @@ export default function CategoryDetailPage() {
                 {categoryAttributes.length} {categoryAttributes.length === 1 ? "Attribute" : "Attributes"}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Assigned to {category.name}
+                Assigned to {nameOf(category)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1212,7 +1223,14 @@ export default function CategoryDetailPage() {
                   </thead>
                   <tbody>
                     {categoryAttributes.map((attr, idx) => {
-                      const optionLabels = sanitizeOptionLabels(attr.values);
+                      // ✅ Attribute name + option labels database se aate hain —
+                      // `attributeOf()` inhe active locale me de deta hai (English
+                      // fallback built-in). `rawOptionLabels` sirf boolean Yes/No
+                      // detect karne ke liye chahiye — wo raw values par match karta
+                      // hai, is liye usse localized list se alag rakha hai.
+                      const localizedAttr = attributeOf(attr);
+                      const rawOptionLabels = sanitizeOptionLabels(attr.values);
+                      const optionLabels = sanitizeOptionLabels(localizedAttr.values);
                       const optionCount = optionLabels.length;
                       const isMultiSelect = attr.data_type === "multi_select" || attr.data_type === "select";
                       const isBoolean = attr.data_type === "boolean";
@@ -1226,8 +1244,8 @@ export default function CategoryDetailPage() {
                       const hiddenCount = optionCount - PREVIEW_LIMIT;
 
                       const boolValue = isBoolean ? (() => {
-                        const trueEntry = optionLabels.find((l) => l.toLowerCase() === "yes" || l.toLowerCase() === "true");
-                        const falseEntry = optionLabels.find((l) => l.toLowerCase() === "no" || l.toLowerCase() === "false");
+                        const trueEntry = rawOptionLabels.find((l) => l.toLowerCase() === "yes" || l.toLowerCase() === "true");
+                        const falseEntry = rawOptionLabels.find((l) => l.toLowerCase() === "no" || l.toLowerCase() === "false");
                         if (attr.value === true || attr.value === "true" || trueEntry) return "Yes";
                         if (attr.value === false || attr.value === "false" || falseEntry) return "No";
                         return null;
@@ -1248,7 +1266,7 @@ export default function CategoryDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{attr.name}</p>
+                                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       Variant
@@ -1535,7 +1553,7 @@ export default function CategoryDetailPage() {
               <div>
                 <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">Delete Category?</h3>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                  Are you sure you want to delete <span className="font-medium text-[var(--text-primary)]">{category.name}</span>? This action cannot be undone.
+                  Are you sure you want to delete <span className="font-medium text-[var(--text-primary)]">{nameOf(category)}</span>? This action cannot be undone.
                 </p>
               </div>
             </div>

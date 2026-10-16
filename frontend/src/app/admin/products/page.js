@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { productApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
@@ -227,6 +228,7 @@ MAIN COMPONENT
 export default function ProductsPage() {
   // Admin-panel i18n. English is the fallback for any missing key.
   const { t: __t } = useTranslation();
+  const { nameOf, descriptionOf } = useLocalized();
   const t = (k, p) => __t("admin.products." + k, p);
   const ts = (k, p) => __t("admin.shared." + k, p);
   const router = useRouter();
@@ -782,11 +784,11 @@ const [viewMode, setViewMode] = useState(() => {
 
   const getCategoryName = (p) => {
     const cid = normalizeId(p?.category_id);
-    return p?.category_id?.name || categories.find((c) => String(c._id) === cid)?.name || t("table.unknown");
+    return nameOf(p?.category_id) || nameOf(categories.find((c) => String(c._id) === cid)) || t("table.unknown");
   };
   const getBrandName = (p) => {
     const bid = normalizeId(p?.brand_id);
-    return p?.brand_id?.name || brands.find((b) => String(b._id) === bid)?.name || t("table.unknown");
+    return nameOf(p?.brand_id) || nameOf(brands.find((b) => String(b._id) === bid)) || t("table.unknown");
   };
 
   // ✅ SERVER-SIDE PAGINATION — search/filter DB par apply ho chuke hain (backend),
@@ -1005,7 +1007,7 @@ const [viewMode, setViewMode] = useState(() => {
                         <div className="flex items-center gap-2.5">
                           {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
                           <div className="min-w-0">
-                            <p className="max-w-[160px] truncate text-[13px] font-medium">{p.name}</p>
+                            <p className="max-w-[160px] truncate text-[13px] font-medium">{nameOf(p)}</p>
                             {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
                           </div>
                         </div>
@@ -1013,7 +1015,7 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <span className="inline-block max-w-[220px] truncate align-middle">{p.description ? p.description : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{descriptionOf(p) ? descriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]">
                         <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? t("table.variant") : t("table.variantsUnit")}</span>
@@ -1055,9 +1057,9 @@ const [viewMode, setViewMode] = useState(() => {
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold">{p.name}</p>
+                  <p className="truncate text-[13px] font-semibold">{nameOf(p)}</p>
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{p.description ? (p.description.length > 60 ? p.description.slice(0, 60) + "..." : p.description) : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(p) ? (descriptionOf(p).length > 60 ? descriptionOf(p).slice(0, 60) + "..." : descriptionOf(p)) : "—"}</p>
                   <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{t("card.variantsLabel")} {variantCount}</p>
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("card.taxLabel")} {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
@@ -1150,7 +1152,7 @@ const [viewMode, setViewMode] = useState(() => {
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "var(--danger-soft)" }}><AlertTriangle className="h-5 w-5 text-red-500" /></div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold">{t("delete.titleOne", { name: productToDelete.name })}</h3>
+                <h3 className="text-sm font-semibold">{t("delete.titleOne", { name: nameOf(productToDelete) })}</h3>
                 <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p>
               </div>
             </div>

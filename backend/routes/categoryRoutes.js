@@ -42,7 +42,7 @@ router.get("/public", publicCache(60 * 1000), async (req, res) => {
     // deactivate karne ke baad bhi category nahi hat rahi thi).
     // Convention: baaki public endpoints bhi `is_active: true` use karte hain.
     const categories = await Category.find({ is_deleted: false, is_active: true })
-      .select("name description parent_category_id category_type sort_order created_at")
+      .select("name description parent_category_id category_type sort_order created_at translations")
       .sort({ sort_order: 1, name: 1 })
       .lean();
 
@@ -77,8 +77,17 @@ const CATEGORY_SORT_FIELDS = {
 // ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// ⚠️ `translations` / `translation_source` / `translation_status` ZAROORI hain:
+// frontend `nameOf()` / `descriptionOf()` inhi se localized value padhte hain.
+// Inke bina projection ke category ka Urdu/Arabic text kabhi frontend tak
+// pohnchta hi nahi (silent fallback to English).
 const CATEGORY_LIST_SELECT =
-  "name category_code description parent_category_id category_type is_active attributes sort_order created_at";
+  "name category_code description parent_category_id category_type is_active attributes sort_order created_at translations translation_source translation_status";
+
+// Populated attribute ke liye bhi — attribute ka `name` translate hota hai,
+// aur options ke labels `values[].label_translations` me hote hain.
+const ATTRIBUTE_POPULATE_SELECT =
+  "name code data_type values variant_allowed is_active translations translation_source translation_status";
 
 router.get("/admin/all", authMiddleware, async (req, res) => {
   try {
@@ -89,7 +98,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
     if (!wantsPagination) {
       const categories = await Category.find({ is_deleted: false })
         .select(CATEGORY_LIST_SELECT)
-        .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+        .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
         .sort({ created_at: -1 })
         .lean();
 
@@ -135,7 +144,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
         Category.countDocuments(filter),
         Category.find(filter)
           .select(CATEGORY_LIST_SELECT)
-          .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+          .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
           .sort({ [sortField]: sortOrder, _id: 1 })
           .skip((page - 1) * limit)
           .limit(limit)
@@ -145,7 +154,7 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
         Category.countDocuments({ ...activeFilter, "attributes.0": { $exists: true } }),
         // ✅ Parent dropdown / parent name resolution ke liye lightweight full list
         Category.find(activeFilter)
-          .select("name category_code parent_category_id")
+          .select("name category_code parent_category_id translations")
           .sort({ sort_order: 1, name: 1 })
           .lean(),
       ]);

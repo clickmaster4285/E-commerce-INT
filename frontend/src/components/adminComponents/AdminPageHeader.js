@@ -37,13 +37,13 @@ export default function AdminPageHeader({
     <div className={`flex flex-col gap-4 md:flex-row md:items-center md:justify-between ${className}`.trim()}>
       <div className="min-w-0">
         <h1
-          className={`text-[24px] font-bold leading-7 tracking-tight ${titleClassName}`.trim()}
+          className={`admin-page-header__title text-[24px] font-bold leading-7 tracking-tight ${titleClassName}`.trim()}
           style={{ color: "var(--text-primary)" }}
         >
           {title}
         </h1>
         {subtitle ? (
-          <p className={`mt-1 text-[13px] ${subtitleClassName}`.trim()} style={{ color: "var(--text-muted)" }}>
+          <p className={`admin-page-header__subtitle mt-1 text-[13px] ${subtitleClassName}`.trim()} style={{ color: "var(--text-muted)" }}>
             {subtitle}
           </p>
         ) : null}

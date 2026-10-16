@@ -289,6 +289,147 @@ html[lang="ur"] body,
   font-family: "Noto Nastaliq Urdu", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
 }
 
+/* ==========================================
+   URDU (Noto Nastaliq) — TYPOGRAPHY REPAIR
+   ------------------------------------------
+   Nastaliq is a *descending* script: marks (nuqte, zair) hang far below the
+   baseline and harkat stack above the ascender. An Inter/Cairo box of 14px at
+   line-height 1.4 literally shaves them off, and the app-wide `tracking-*` /
+   `uppercase` utilities join the individual harf together — which is what
+   makes Urdu read as "chipke hue lafz". Both are repaired below.
+
+   WHY `html:has([lang="ur"])` AND NOT `html[lang="ur"]`:
+   the root layout hardcodes `<html lang="en">`; only the LanguageProvider
+   wrapper carries the real locale. So `html[lang="ur"]` never matches (the
+   rule right above is effectively dead) — but `html:has([lang="ur"])` is true
+   whenever Urdu is active AND, unlike a bare `[lang="ur"]` prefix, it also
+   reaches portals mounted outside that wrapper (Sonner toasts, which live in
+   <Providers> — a sibling of <LanguageProvider>).
+
+   English and Arabic are untouched: every rule below requires a `[lang="ur"]`
+   element to exist somewhere in the document.
+   ========================================== */
+
+/* ---- 1. BASE METRICS ------------------------------------------- */
+html:has([lang="ur"]) {
+  /* `!important` on an inherited property outranks the descendant
+     `tracking-*` / `uppercase` utilities — tracking joins harf in Nastaliq. */
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  /* Nastaliq words run long — break instead of overflowing their box. */
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ur"]) body,
+[lang="ur"] {
+  line-height: 2;
+  /* 14px -> 15px. Text that already carries an explicit Tailwind `text-*`
+     keeps its own size, so this only lifts size-less / inherited text. */
+  font-size: 15px;
+}
+
+/* ---- 2. HEADINGS -----------------------------------------------
+   Page titles use one-off sizes (text-[24px] leading-7, text-[20px]
+   leading-tight …) so they are normalised by tag rather than by class. */
+html:has([lang="ur"]) :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 2.2;
+  /* headroom so the marks stacked above the letter are never clipped */
+  padding-block: 2px;
+}
+
+/* ---- 3. NEUTRALISE THE TOO-TIGHT LEADING UTILITIES -------------
+   `leading-*` is inherited, so a bare `[lang="ur"]` line-height loses to a
+   `.leading-none` sitting on the element itself. Re-state them by class. */
+html:has([lang="ur"]) :is(
+  .leading-none,
+  .leading-tight,
+  .leading-snug,
+  .leading-4,
+  .leading-5,
+  .leading-6
+) {
+  line-height: 2;
+}
+
+/* ---- 4. LET TEXT WRAP INSTEAD OF TRUNCATING --------------------
+   `truncate` / `whitespace-nowrap` clip Nastaliq mid-glyph and are the single
+   biggest source of "text kata hua". Reset on text-bearing tags only. */
+html:has([lang="ur"])
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em)
+  :is(.truncate, .whitespace-nowrap) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* ---- 5. FIXED-HEIGHT TEXT BOXES MUST BE ABLE TO GROW -----------
+   Guards, so we never touch media, icon or decorative boxes:
+     :not(:empty)                     → empty bars/dividers (e.g. the sidebar's
+                                       `h-4 w-[3px]` active indicator) are empty,
+                                       so `height: auto` would collapse them to 0
+     :not(:has(img, video, canvas)) → avatars / thumbnails / media keep their
+                                     square size
+     :not(.w-5 … .w-11)             → square icon buttons (h-8 w-8) keep theirs
+   The `min-height` rules below then act as a floor, so pills, chips and
+   buttons keep the exact box they have in English and only grow when the
+   Nastaliq glyphs actually need more room. */
+html:has([lang="ur"])
+  :is(span, p, a, label, button, li, td, th, dd, dt)
+  :is(.h-4, .h-5, .h-6, .h-7, .h-8, .h-9, .h-10, .h-11)
+  :not(:empty)
+  :not(:has(img, video, canvas))
+  :not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) {
+  height: auto;
+  overflow: visible;
+}
+
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-4:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-5:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.25rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-6:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.5rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-7:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.75rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-8:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-9:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.25rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-10:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.5rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-11:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.75rem; }
+
+/* ---- 6. ADMIN PAGE HEADER (point 3) ----------------------------
+   The heading gets line-height 2.2 + padding above, so the subtitle needs a
+   real gap (6-8px) instead of the LTR `mt-1`, otherwise the two lines touch.
+   `padding-block` would make the Tailwind `mt-*` win, so margin it is. */
+html:has([lang="ur"]) .admin-page-header__title {
+  /* +1 step over the English text-[24px] */
+  font-size: 25px;
+}
+
+html:has([lang="ur"]) .admin-page-header__subtitle {
+  margin-top: 8px;
+  line-height: 1.9;
+}
+
+/* ---- 7. SONNER TOASTS -----------------------------------------
+   The toaster renders into its own portal at <body> level and ships its own
+   `font-family` + `line-height: 1.4/1.5`, so it needs an explicit override —
+   higher specificity than sonner's injected stylesheet. */
+html:has([lang="ur"]) [data-sonner-toaster] {
+  font-family: "Noto Nastaliq Urdu", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 2;
+}
+
+html:has([lang="ur"]) [data-sonner-toast][data-styled="true"] {
+  font-size: 15px;
+  line-height: 2;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ur"]) [data-sonner-toast] [data-title],
+html:has([lang="ur"]) [data-sonner-toast] [data-description] {
+  line-height: 1.9;
+  white-space: normal;
+}
+
 a {
   color: inherit;
   text-decoration: none;

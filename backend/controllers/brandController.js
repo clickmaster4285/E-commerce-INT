@@ -5,6 +5,7 @@ const fs = require("fs-extra");
 const { getIO } = require("../utils/socket");
 const log = require("../utils/logger");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { queueTranslationSync } = require("../utils/translationService");
 
 // ==========================================
 // SOCKET HELPER — same pattern as
@@ -113,6 +114,9 @@ const createBrand = async (req, res) => {
 
     const brand = await Brand.create(brandData);
 
+    // 🌍 Urdu + Arabic translation background me generate (response block nahi hota)
+    queueTranslationSync(Brand, brand._id);
+
     const updatedBrand = await Brand.findById(brand._id)
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
@@ -166,7 +170,7 @@ const getBrands = async (req, res) => {
     const brandsWithProducts = await Promise.all(
       brands.map(async (brand) => {
         const products = await Product.find({ brand_id: brand._id })
-          .populate("category_id", "name")
+          .populate("category_id", "name translations")
           .select("name brand_id category_id status created_at");
         return { ...brand.toObject(), products };
       })
@@ -192,7 +196,7 @@ const getBrandById = async (req, res) => {
     }
 
     const products = await Product.find({ brand_id: brand._id })
-      .populate("category_id", "name")
+      .populate("category_id", "name translations")
       .select("name brand_id category_id status created_at");
 
     res.status(200).json({
@@ -218,7 +222,7 @@ const getBrandWithProducts = async (req, res) => {
     }
 
     const products = await Product.find({ brand_id: brand._id })
-      .populate("category_id", "name")
+      .populate("category_id", "name translations")
       .select("name brand_id category_id status created_at");
 
     res.status(200).json({
@@ -283,8 +287,13 @@ const updateBrand = async (req, res) => {
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
+    // 🌍 English change → hash badla → translation dobara generate hogi.
+    // Translation wahi rakhi jayegi jo abhi tak valid thi, is liye user ko
+    // turant fallback dikhta hai aur koi data loss nahi hota.
+    queueTranslationSync(Brand, brand._id);
+
     const products = await Product.find({ brand_id: brand._id })
-      .populate("category_id", "name")
+      .populate("category_id", "name translations")
       .select("name brand_id category_id status created_at");
 
     // ✅ LOG ACTIVITY (fire-and-forget — response wait nahi karta)
@@ -416,7 +425,7 @@ const getBrandsAdmin = async (req, res) => {
       const brandsWithProducts = await Promise.all(
         brands.map(async (brand) => {
           const products = await Product.find({ brand_id: brand._id })
-            .populate("category_id", "name")
+            .populate("category_id", "name translations")
             .select("name brand_id category_id status created_at");
           return { ...brand.toObject(), products };
         })

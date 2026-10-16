@@ -619,8 +619,8 @@ const getActiveDealById = async (req, res) => {
     // ✅ Deterministic order (_id tie-break) taake pages overlap na hon
     const [productsToShow] = await Promise.all([
       Product.find(productsQuery)
-        .populate("category_id", "name")
-        .populate("brand_id", "name")
+        .populate("category_id", "name translations")
+        .populate("brand_id", "name translations")
         .sort({ created_at: -1, _id: -1 })
         .skip(skip)
         .limit(limit)

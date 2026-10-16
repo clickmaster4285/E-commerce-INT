@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useProductSocketSync } from "../../../../hooks/admin/useProductSocketSync";
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
+import { useLocalized } from "@/i18n/localize";
 import {
   Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
@@ -247,7 +248,7 @@ function AllAttributesModal({ attributes, onClose }) {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {filteredAttributes.map((attribute) => (
                     <div key={attribute.name} className="min-w-0 rounded-lg p-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                      <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                      <p className="break-words text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{attribute.label || attribute.name}</p>
                       <p className="mt-2 whitespace-pre-wrap break-words text-[13px] font-semibold leading-5" style={{ color: "var(--text-primary)" }}>{attribute.value || "—"}</p>
                     </div>
                   ))}
@@ -609,7 +610,7 @@ function DetailStat({ label, value, sub, subColor, dotColor, color }) {
   );
 }
 
-function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
+function VariantDetailsDrawer({ variant, productName, attributeLabelOf, onClose, onEdit, onDelete, onManageTags, onRemoveTag, tagUpdatePending }) {
   const [previewImage, setPreviewImage] = useState(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const panelRef = useRef(null);
@@ -658,8 +659,10 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
   const quantity = Number(variant.quantity || 0);
   const images = variant.images || [];
   const tagList = (variant.tags || []).map(tagNameOf).filter(Boolean);
+  // `name` raw key rehta hai (keys + color-detection ke liye), `label` localized
+  // display name hai — attribute VALUE kabhi translate nahi hota.
   const attributes = Object.entries(variant.attributes || {})
-    .map(([name, raw]) => ({ name, value: attrValueOf(raw) }))
+    .map(([name, raw]) => ({ name, label: attributeLabelOf?.(name) || name, value: attrValueOf(raw) }))
     .filter((attribute) => attribute.value);
   const createdBy = actorInfo(variant.createdby).known ? variant.createdby : null;
   const updatedBy = actorInfo(variant.updatedby).known ? variant.updatedby : null;
@@ -788,7 +791,7 @@ function VariantDetailsDrawer({ variant, productName, onClose, onEdit, onDelete,
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {attributes.map((attribute) => (
                   <div key={attribute.name} className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <p className="truncate text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>{attribute.name}</p>
+                    <p className="truncate text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>{attribute.label}</p>
                     <p className="mt-1 flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "var(--text-primary)" }}>
                       {isColorAttribute(attribute.name, attribute.value) && (
                         <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: attribute.value, border: "1px solid var(--border-color)" }} />
@@ -1018,6 +1021,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { nameOf, descriptionOf, attributeOf } = useLocalized();
 
   useProductSocketSync();
   const { socket, isConnected } = useAdminSocket();
@@ -1131,6 +1135,23 @@ export default function ProductDetailPage() {
           ? a.category_config.value : (a.values || []).map((v) => v.label || v.value),
       }));
   }, [rawAttributes, categoryAttributes]);
+
+  // ✅ Attribute names DB docs (Attribute collection) par hote hain — variant
+  // sirf raw name string key rakhta hai, us par koi translation map nahi hota.
+  // Is liye localized label yahan ek name → label map se resolve hota hai
+  // (attribute ka `name` translate hota hai, value kabhi nahi).
+  const attributeNameMap = useMemo(() => {
+    const map = new Map();
+    [...(rawAttributes || []), ...(categoryAttributes || [])].forEach((a) => {
+      const key = String(a?.name || "").trim().toLowerCase();
+      if (key && !map.has(key)) map.set(key, attributeOf(a).name);
+    });
+    return map;
+  }, [rawAttributes, categoryAttributes, attributeOf]);
+  const attributeLabelOf = (name) => {
+    const key = String(name || "").trim().toLowerCase();
+    return attributeNameMap.get(key) || name;
+  };
 
   const { data: globalTags = [], refetch: refetchTags } = useQuery({ queryKey: ["globalTags"], queryFn: tagApi.getAll });
 
@@ -1710,7 +1731,7 @@ export default function ProductDetailPage() {
         if (val) map[n].add(val);
       });
     });
-    return Object.entries(map).map(([name, vals]) => ({ name, display: vals.size > 1 ? "Multiple" : [...vals][0] || "—" }));
+    return Object.entries(map).map(([name, vals]) => ({ name, label: attributeLabelOf(name), display: vals.size > 1 ? "Multiple" : [...vals][0] || "—" }));
   })();
   const allAttributeDetails = (() => {
     const valuesByName = new Map();
@@ -1723,7 +1744,7 @@ export default function ProductDetailPage() {
         valuesByName.get(cleanName).add(cleanValue);
       });
     });
-    return [...valuesByName.entries()].map(([name, values]) => ({ name, value: [...values].join(", ") }));
+    return [...valuesByName.entries()].map(([name, values]) => ({ name, label: attributeLabelOf(name), value: [...values].join(", ") }));
   })();
   const attributeCount = attributeSummary.length;
   const tagCount = allAssignedTags.length;
@@ -2064,6 +2085,7 @@ export default function ProductDetailPage() {
         <VariantDetailsDrawer
           variant={drawerVariant}
           productName={product?.name}
+          attributeLabelOf={attributeLabelOf}
           onClose={() => { if (showVariantTagsModal) return; setVariantDetailsTarget(null); }}
           onEdit={() => {
             const variantId = drawerVariant._id;
@@ -2103,19 +2125,19 @@ export default function ProductDetailPage() {
             <ChevronRight className="w-3 h-3 shrink-0" />
             {product.category_id?.name && (
               <>
-                <span className="max-w-[160px] truncate">{product.category_id.name}</span>
+                <span className="max-w-[160px] truncate">{nameOf(product.category_id)}</span>
                 <ChevronRight className="w-3 h-3 shrink-0" />
               </>
             )}
             {product.brand_id?.name && (
               <>
-                <span className="max-w-[160px] truncate">{product.brand_id.name}</span>
+                <span className="max-w-[160px] truncate">{nameOf(product.brand_id)}</span>
                 <ChevronRight className="w-3 h-3 shrink-0" />
               </>
             )}
-            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{product.name}</span>
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</span>
           </nav>
-          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h1>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</h1>
           <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>View product information, variants, status and related details.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2190,10 +2212,10 @@ export default function ProductDetailPage() {
 
           {/* Info Area */}
           <div className="p-4 md:p-5 flex flex-col justify-center gap-4">
-            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
+            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</h2>
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {product.description ? product.description.slice(0, 160) + (product.description.length > 160 ? "..." : "") : "No description provided."}
+              {descriptionOf(product) ? descriptionOf(product).slice(0, 160) + (descriptionOf(product).length > 160 ? "..." : "") : "No description provided."}
             </p>
             <div className="flex items-baseline gap-3">
               {/* ✅ Product price — sirf variant price data se:
@@ -2260,7 +2282,7 @@ export default function ProductDetailPage() {
                     {product.brand_id?.name ? ini(product.brand_id.name) : <Store className="w-4 h-4" />}
                   </div>
                   <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {product.brand_id?.name || "—"}
+                    {nameOf(product.brand_id) || "—"}
                   </span>
                 </div>
                 {product.brand_id?._id && (
@@ -2280,7 +2302,7 @@ export default function ProductDetailPage() {
                     <Box className="w-4 h-4" />
                   </div>
                   <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {product.category_id?.name || "—"}
+                    {nameOf(product.category_id) || "—"}
                   </span>
                 </div>
                 {product.category_id?._id && (
@@ -2299,7 +2321,7 @@ export default function ProductDetailPage() {
                   <div className="grid grid-cols-2 gap-2">
                     {attributeSummary.slice(0, 4).map((attr) => (
                       <div key={attr.name} className="rounded-lg p-2" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                        <p className="truncate text-[10px] font-semibold" style={{ color: "var(--text-primary)" }}>{attr.name}</p>
+                        <p className="truncate text-[10px] font-semibold" style={{ color: "var(--text-primary)" }}>{attr.label}</p>
                         <p className="truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{attr.display}</p>
                       </div>
                     ))}
@@ -2373,15 +2395,15 @@ export default function ProductDetailPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.name}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product)}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Brand</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.brand_id?.name || "—"}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product.brand_id) || "—"}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.category_id?.name || "—"}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product.category_id) || "—"}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">Tax Rate</p>
@@ -2417,7 +2439,7 @@ export default function ProductDetailPage() {
                       </div>
                       <div className="p-4 space-y-4">
                         <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
-                          {product.description || "No description provided for this product."}
+                          {descriptionOf(product) || "No description provided for this product."}
                         </p>
                         <div>
                           <div className="flex items-center justify-between mb-2">
@@ -2711,15 +2733,15 @@ export default function ProductDetailPage() {
                   <>
                     <InfoCard icon={FolderOpen} title="Category Details">
                       <div className="space-y-1">
-                        <DataRow icon={Hash} label="Name" value={product.category_id.name} />
+                        <DataRow icon={Hash} label="Name" value={nameOf(product.category_id)} />
                         <DataRow icon={Hash} label="Code" value={product.category_id.category_code || "—"} mono />
                         <DataRow icon={Activity} label="Status" value="Active" highlight />
-                        <DataRow icon={Package} label="Assigned Product" value={product.name} />
+                        <DataRow icon={Package} label="Assigned Product" value={nameOf(product)} />
                       </div>
                     </InfoCard>
                     <InfoCard icon={FileText} title="Description">
                       <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                        {product.category_id.description || "No description available for this category."}
+                        {descriptionOf(product.category_id) || "No description available for this category."}
                       </p>
                     </InfoCard>
                   </>
@@ -2738,7 +2760,7 @@ export default function ProductDetailPage() {
                   <>
                     <InfoCard icon={Store} title="Brand Details">
                       <div className="space-y-1">
-                        <DataRow icon={Hash} label="Name" value={product.brand_id.name} />
+                        <DataRow icon={Hash} label="Name" value={nameOf(product.brand_id)} />
                         <DataRow icon={Hash} label="Code" value={product.brand_id.brand_code || "—"} mono />
                         <DataRow icon={FolderOpen} label="Country" value={product.brand_id.country || "—"} />
                         <DataRow icon={Activity} label="Status" value={product.brand_id.is_active ? "Active" : "Inactive"} highlight={product.brand_id.is_active} />
@@ -2746,7 +2768,7 @@ export default function ProductDetailPage() {
                     </InfoCard>
                     <InfoCard icon={FileText} title="Description">
                       <p className="text-[13px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
-                        {product.brand_id.description || "No description available for this brand."}
+                        {descriptionOf(product.brand_id) || "No description available for this brand."}
                       </p>
                     </InfoCard>
                   </>
@@ -3455,7 +3477,7 @@ export default function ProductDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{product.name}&quot;?</h3>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{nameOf(product)}&quot;?</h3>
                 <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The product and all its variants will be permanently removed.</p>
               </div>
             </div>

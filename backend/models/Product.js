@@ -38,6 +38,38 @@ const productSchema = new mongoose.Schema(
       default: "",
     },
 
+    // ==========================================
+    // 🌍 AUTOMATIC TRANSLATIONS (LibreTranslate)
+    // ------------------------------------------
+    // English `name`/`description` upar hi source of truth hain — inme kabhi
+    // koi write nahi hota, translation alag `translations` map me jaata hai.
+    // `translation_source` me us English text ka hash rehta hai jisse stale
+    // translation detect hoti hai (English edit → hash badla → regenerate).
+    //
+    // `name` yahan `skipped` rehta hai — product ka naam model number hai
+    // ("iPhone 15 Pro Max", "SM-S918B") jise translate karna galat hoga;
+    // sirf `description` translate hoti hai.
+    translations: {
+      name: { type: Map, of: String, default: () => ({}) },
+      description: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      name: { type: String, default: "" },
+      description: { type: String, default: "" },
+    },
+    translation_status: {
+      name: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "skipped",
+      },
+      description: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "pending",
+      },
+    },
+
     tax: {
       type: Number,
       default: 0,

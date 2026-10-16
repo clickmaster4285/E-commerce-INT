@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
+import { useLocalized } from "@/i18n/localize";
 import { Country } from "country-state-city";
 import { toast } from "sonner";
 
@@ -318,6 +319,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 ========================================================= */
 export default function BrandDetailPage() {
   useBrandSocketSync();
+  const { nameOf, descriptionOf } = useLocalized();
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -563,13 +565,13 @@ export default function BrandDetailPage() {
             )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-[17px] leading-tight font-bold">{brand.name}</h2>
+                <h2 className="text-[17px] leading-tight font-bold">{nameOf(brand)}</h2>
                 <StatusPill active={brand.is_active} />
               </div>
               <span className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>
                 {brand.brand_code || "—"}
               </span>
-              {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{brand.description}</p>}
+              {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{descriptionOf(brand)}</p>}
               <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                 <span><span className="mr-1">Country</span><strong style={{ color: "var(--text-primary)" }}>{brand.country || "—"}</strong></span>
                 <span><span className="mr-1">Created At</span><strong style={{ color: "var(--text-primary)" }}>{formatDateTime(brand.created_at)}</strong></span>
@@ -672,7 +674,7 @@ export default function BrandDetailPage() {
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                   <InfoRow label="Brand Code" value={brand.brand_code} mono />
-                  <InfoRow label="Brand Name" value={brand.name} />
+                  <InfoRow label="Brand Name" value={nameOf(brand)} />
                   <InfoRow label="Country" value={brand.country || "—"} />
                   <InfoRow
                     label="Status"
@@ -699,7 +701,7 @@ export default function BrandDetailPage() {
                       className="whitespace-pre-wrap break-words text-[12px] leading-5"
                       style={{ color: "var(--text-secondary)" }}
                     >
-                      {brand.description}
+                      {descriptionOf(brand)}
                     </p>
                   ) : (
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
@@ -1150,7 +1152,7 @@ export default function BrandDetailPage() {
                       >
                         <td className="align-top py-3 pl-4 pr-2">
                           <p className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                            {product.name || "—"}
+                            {nameOf(product) || "—"}
                           </p>
                           <p
                             className="mt-1 font-mono text-[10px]"
@@ -1164,11 +1166,11 @@ export default function BrandDetailPage() {
                             className="line-clamp-2 text-[11px] leading-5"
                             style={{ color: "var(--text-secondary)" }}
                           >
-                            {product.description || "No description provided."}
+                            {descriptionOf(product) || "No description provided."}
                           </p>
                         </td>
                         <td className="px-2 py-3" style={{ color: "var(--text-secondary)" }}>
-                          {product.category_id?.name || "—"}
+                          {nameOf(product.category_id) || "—"}
                         </td>
                         <td className="py-3 pr-4 text-center">
                           <span
@@ -1517,7 +1519,7 @@ export default function BrandDetailPage() {
                 <h3 className="text-[14px] font-semibold">Delete Brand?</h3>
                 <p className="mt-1 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
                   Are you sure you want to delete{" "}
-                  <span style={{ color: "var(--text-primary)" }}>{brand.name}</span>? This
+                  <span style={{ color: "var(--text-primary)" }}>{nameOf(brand)}</span>? This
                   action cannot be undone.
                 </p>
               </div>
