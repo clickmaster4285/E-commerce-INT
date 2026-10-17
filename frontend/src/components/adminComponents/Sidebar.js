@@ -823,7 +823,7 @@ export default function Sidebar({ onNavigate, userData }) {
             </p>
           ) : (
             <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
-              Powered by{" "}
+              {t("admin.sidebar.poweredBy")}{" "}
               <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> {t("admin.sidebar.version")}
             </p>
           )}

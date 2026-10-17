@@ -46,7 +46,8 @@ const getImageUrl = (path) => {
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-const localeTag = (locale) => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US";
+const localeTag = (locale) =>
+  locale === "ur" ? "ur-PK" : locale === "en" ? "en-US" : locale;
 const fmt = (n, locale = "en") => new Intl.NumberFormat(localeTag(locale)).format(Number(n || 0));
 const fmtCurrency = (n, locale = "en") => new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "PKR" }).format(Number(n || 0));
 

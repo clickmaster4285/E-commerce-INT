@@ -12,6 +12,7 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 // ==========================================
 // API SETUP
@@ -141,8 +142,9 @@ const ChevronDownIcon = ({ className = "w-4 h-4" }) => (<svg className={classNam
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function BannerRowsSkeleton({ rows = 10 }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading banners">
+    <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.14451ce42db3")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`banner-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* checkbox */}
@@ -170,8 +172,9 @@ function BannerRowsSkeleton({ rows = 10 }) {
 }
 
 function BannerCardsSkeleton({ cards = 8, cardStyle }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading banners">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.14451ce42db3")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`banner-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
           <span className="skeleton block h-32 w-full rounded-md" />
@@ -209,7 +212,7 @@ const PowerIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fil
 // ==========================================
 // HELPERS
 // ==========================================
-const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const formatDate = (d, locale = "en") => d ? new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -406,9 +409,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
           className="inline-flex items-center gap-1.5 text-[11px] font-medium whitespace-nowrap"
           style={{ color: "var(--text-muted)" }}
         >
-          <PhotoIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
-          Max {MAX_IMAGE_MB} MB · JPG, PNG or WEBP
-        </p>
+          <PhotoIcon className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />{t("admin.promotions.ui.generated.0706025b2bbc")}{" "}{MAX_IMAGE_MB}{" "}{t("admin.promotions.ui.generated.b6f07cc2b713")}</p>
       </div>
 
       {/* Drop Zone / Preview Container */}
@@ -436,7 +437,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
               type="button"
               onClick={handleRemove}
               className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-md border-2 border-[var(--bg-card)]"
-              title="Remove image"
+              title={t("admin.shared.media.remove")}
             >
               <CloseIcon className="w-3 h-3" />
             </button>
@@ -450,18 +451,13 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
             </div>
 
             {isDragging ? (
-              <p className="text-sm font-bold" style={{ color: "var(--accent)" }}>Drop image here</p>
+              <p className="text-sm font-bold" style={{ color: "var(--accent)" }}>{t("admin.promotions.ui.generated.1afa92fb9bde")}</p>
             ) : (
               <>
-                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-                  Click to upload or drag and drop
-                </p>
-                <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-                  JPG, PNG or WEBP
-                </p>
+                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.ad7e385dcc48")}</p>
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.imageFormats")}</p>
                 {dimensions && (
-                  <p className="text-[10px] mt-0.5 font-mono opacity-70" style={{ color: "var(--text-secondary)" }}>
-                    Recommended: {dimensions}
+                  <p className="text-[10px] mt-0.5 font-mono opacity-70" style={{ color: "var(--text-secondary)" }}>{t("admin.promotions.ui.generated.913ef290eadb")}{" "}{dimensions}
                   </p>
                 )}
               </>
@@ -514,6 +510,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 // ==========================================
 export default function BannersPage() {
   const { t, locale, dir } = useTranslation();
+  const { contentOf, nameOf, productNameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -763,7 +760,7 @@ export default function BannersPage() {
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["banner-deal-options"] });
-      toast.success("Deal created successfully");
+      toast.success(t("admin.deals.toast.created"));
       const newDealId = result?._id || result?.id || result?.data?._id || result?.data?.id;
       if (newDealId && !variables.id) {
         setForm(prev => ({ ...prev, linkedDealId: newDealId }));
@@ -778,31 +775,31 @@ export default function BannersPage() {
 
   const handleDealSubmit = (e) => {
     e.preventDefault();
-    if (!String(dealFormData.name || "").trim()) return toast.error("Deal name is required");
+    if (!String(dealFormData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
 
     const dealValue = dealFormData.value === "" ? NaN : Number(dealFormData.value);
     if (["percentage", "fixed_amount"].includes(dealFormData.value_type)) {
-      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
-      if (dealFormData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
+      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error(t("admin.deals.validation.value"));
+      if (dealFormData.value_type === "percentage" && dealValue > 100) return toast.error(t("admin.deals.validation.percentage"));
     }
 
     if (dealFormData.value_type === "buy_x_get_y") {
-      if (!dealFormData.buy_quantity || Number(dealFormData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
-      if (!dealFormData.get_quantity || Number(dealFormData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+      if (!dealFormData.buy_quantity || Number(dealFormData.buy_quantity) <= 0) return toast.error(t("admin.deals.validation.buyQty"));
+      if (!dealFormData.get_quantity || Number(dealFormData.get_quantity) <= 0) return toast.error(t("admin.deals.validation.getQty"));
     }
 
     // ✅ Bundle deal ke liye bundle price zaroori hai
     if (dealFormData.value_type === "bundle" && (!dealFormData.bundle_price || Number(dealFormData.bundle_price) <= 0)) {
-      return toast.error("Please enter a valid Bundle Price");
+      return toast.error(t("admin.promotions.ui.generated.183c6ea27eca"));
     }
 
-    if (dealFormData.target_type === "product" && dealFormData.selected_product_ids.length === 0) return toast.error("Select at least one product");
-    if (dealFormData.target_type === "category" && dealFormData.selected_category_ids.length === 0) return toast.error("Select at least one category");
-    if (dealFormData.target_type === "brand" && dealFormData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
+    if (dealFormData.target_type === "product" && dealFormData.selected_product_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
+    if (dealFormData.target_type === "category" && dealFormData.selected_category_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
+    if (dealFormData.target_type === "brand" && dealFormData.selected_brand_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
 
     const startDate = dealFormData.start_at ? dateToISO(dealFormData.start_at) : new Date().toISOString();
     const endDate = dealFormData.end_at ? dateToISO(dealFormData.end_at) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const cleanProductIds = dealFormData.selected_product_ids.map(id => String(id?._id || id));
     const cleanCategoryIds = dealFormData.selected_category_ids.map(id => String(id?._id || id));
@@ -1103,7 +1100,7 @@ export default function BannersPage() {
           aria-expanded={open}
           className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.featuredProducts.ui.actions")}
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -1124,17 +1121,17 @@ export default function BannersPage() {
             >
               <MenuItem
                 icon={<EyeIcon className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.promotions.ui.generated.e45a7490664f")}
                 onClick={() => { setActionMenu(null); router.push(`${pathname}/${id}`); }}
               />
               <MenuItem
                 icon={<EditIcon className="w-4 h-4" />}
-                label="Edit Banner"
+                label={t("admin.promotions.ui.generated.4c1ac215acc0")}
                 onClick={() => { setActionMenu(null); handleEdit(banner); }}
               />
               <MenuItem
                 icon={<CopyIcon className="w-4 h-4" />}
-                label="Duplicate"
+                label={t("admin.promotions.ui.generated.5e4cd5ffe4f2")}
                 onClick={() => { 
                   setActionMenu(null); 
                   adminBannerApi.duplicate(id).then(() => { 
@@ -1153,7 +1150,7 @@ export default function BannersPage() {
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<TrashIcon className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.promotions.ui.generated.9485989ff514")}
                 danger
                 onClick={() => { setActionMenu(null); handleDelete(banner); }}
               />
@@ -1182,12 +1179,12 @@ export default function BannersPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.banners.page.heading")}</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage homepage, promotional, and category banners</p>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.51b820dfa0f7")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.brands.ui.listView")}><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.featuredProducts.ui.gridView")}><GridIcon /></button>
             </div>
             <button onClick={handleOpenAdd} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
               <PlusIcon /> {t("admin.banners.page.addBanner")}
@@ -1198,11 +1195,11 @@ export default function BannersPage() {
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
-            { label: "Total Banners", value: stats.total, color: "var(--text-primary)" },
-            { label: "Active", value: stats.active, color: "var(--success-text)" },
-            { label: "Scheduled", value: stats.scheduled, color: "var(--info-text)" },
-            { label: "Expired", value: stats.expired, color: "var(--text-muted)" },
-            { label: "Draft", value: stats.draft, color: "var(--warning-text)" },
+            { label: t("admin.promotions.ui.generated.299c3da20015"), value: stats.total, color: "var(--text-primary)" },
+            { label: t("admin.banners.page.active"), value: stats.active, color: "var(--success-text)" },
+            { label: t("admin.promotions.ui.generated.e891e3709fb4"), value: stats.scheduled, color: "var(--info-text)" },
+            { label: t("admin.shared.status.expired"), value: stats.expired, color: "var(--text-muted)" },
+            { label: t("admin.shared.status.draft"), value: stats.draft, color: "var(--warning-text)" },
           ].map((stat, i) => (
             <div key={i} className="rounded-lg p-4" style={cardStyle}>
               <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{stat.label}</p>
@@ -1232,17 +1229,17 @@ export default function BannersPage() {
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
             <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="expired">Expired</option>
+              <option value="all">{t("admin.attributes.filter.allStatus")}</option>
+              <option value="active">{t("admin.banners.page.active")}</option>
+              <option value="inactive">{t("common.inactive")}</option>
+              <option value="expired">{t("admin.shared.status.expired")}</option>
             </SelectFilter>
             <SelectFilter value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">All Types</option>
-              <option value="homepage_hero">Homepage Hero</option>
-              <option value="promotional">Promotional</option>
-              <option value="product">Product</option>
-              <option value="collection">Collection</option>
+              <option value="all">{t("admin.promotions.ui.generated.5afd80c9916f")}</option>
+              <option value="homepage_hero">{t("admin.promotions.ui.generated.59b57435cfd9")}</option>
+              <option value="promotional">{t("admin.promotions.ui.generated.6cde26a45732")}</option>
+              <option value="product">{t("common.product")}</option>
+              <option value="collection">{t("admin.promotions.ui.generated.2037de437c80")}</option>
             </SelectFilter>
           </div>
         </div>
@@ -1250,9 +1247,9 @@ export default function BannersPage() {
         {/* ===== Bulk Selection Bar ===== */}
         {selectedIds.length > 0 && (
           <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length}{" "}{t("admin.promotions.ui.generated.835f3b50e337")}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
+              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.featuredProducts.modal.clear")}</button>
               <button onClick={handleBulkDelete} disabled={deleteMutation.isPending} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger, var(--danger))" }}>
                 <TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}
               </button>
@@ -1272,9 +1269,9 @@ export default function BannersPage() {
                     <tr>
                       <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.preview")}</th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Title</th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Type</th>
-                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.detail.title")}</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.d0a3e7f81a98")}</th>
+                      <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.productTableStatus")}</th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.schedule")}</th>
                       <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.positionShort")}</th>
                       <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.banners.page.actions")}</th>
@@ -1304,11 +1301,11 @@ export default function BannersPage() {
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                     </th>
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.preview")}</th>
-                    <SortHeader label="Title" sortKey="title" />
-                    <SortHeader label="Type" sortKey="bannerType" />
-                    <SortHeader label="Status" sortKey="status" />
+                    <SortHeader label={t("admin.banners.detail.title")} sortKey="title" />
+                    <SortHeader label={t("admin.promotions.ui.generated.d0a3e7f81a98")} sortKey="bannerType" />
+                    <SortHeader label={t("admin.brands.detail.productTableStatus")} sortKey="status" />
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.schedule")}</th>
-                    <SortHeader label="Pos" sortKey="position" />
+                    <SortHeader label={t("admin.promotions.ui.generated.1478c028a167")} sortKey="position" />
                     <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.banners.page.actions")}</th>
                   </tr>
                 </thead>
@@ -1326,11 +1323,11 @@ export default function BannersPage() {
                         <td className="px-4 py-2.5">
                           <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-[13px]">{banner.title}</td>
+                        <td className="px-4 py-2.5 font-medium text-[13px]">{contentOf(banner.title, banner.translations?.title)}</td>
                         <td className="px-4 py-2.5 capitalize text-[13px]" style={{ color: "var(--text-secondary)" }}>{banner.bannerType.replace("_", " ")}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={banner.status} /></td>
                         <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>
-                          {banner.startDate ? formatDate(banner.startDate) : "—"} to {banner.endDate ? formatDate(banner.endDate) : "—"}
+                          {banner.startDate ? formatDate(banner.startDate, locale) : "—"}{" "}{t("admin.promotions.ui.generated.4374aaee247f")}{" "}{banner.endDate ? formatDate(banner.endDate, locale) : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-[13px]">{banner.position}</td>
                         <td className="px-4 py-2.5 whitespace-nowrap w-1">
@@ -1350,13 +1347,13 @@ export default function BannersPage() {
                 <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[13px] truncate">{banner.title}</p>
+                    <p className="font-semibold text-[13px] truncate">{contentOf(banner.title, banner.translations?.title)}</p>
                     <p className="text-[11px] capitalize mt-0.5" style={{ color: "var(--text-muted)" }}>{banner.bannerType.replace("_", " ")}</p>
                   </div>
                   <StatusBadge status={banner.status} />
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>Pos: {banner.position}</span>
+                  <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.e9b0086c168c")}{" "}{banner.position}</span>
                   <ActionButtons banner={banner} />
                 </div>
               </div>
@@ -1367,7 +1364,7 @@ export default function BannersPage() {
         {/* ===== Pagination ===== */}
         {totalBanners > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalBanners)} of {totalBanners} banners</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalBanners)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalBanners}{" "}{t("admin.nav.item.banners")}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4" /></button>
               <div className="flex items-center gap-1">
@@ -1391,8 +1388,8 @@ export default function BannersPage() {
               {/* Modal Header */}
               <div className="px-6 py-4 flex items-center justify-between border-b" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                 <div>
-                  <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{editingBanner ? "Edit Banner" : "Create New Banner"}</h3>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Fill in the details below to {editingBanner ? "update" : "create"} your banner</p>
+                  <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>{editingBanner ? t("admin.banners.page.editBanner") : t("admin.banners.page.addBanner")}</h3>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.f85396668ef1")}{" "}{editingBanner ? t("admin.banners.page.editBanner").toLowerCase() : t("admin.banners.page.addBanner").toLowerCase()}{" "}{t("admin.promotions.ui.generated.193cff426bba")}</p>
                 </div>
                 <button onClick={() => { setShowModal(false); resetForm(); }} disabled={bannerMutation.isPending} className="p-2 rounded-lg transition disabled:opacity-50 hover:bg-gray-500/10">
                   <CloseIcon className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
@@ -1402,23 +1399,23 @@ export default function BannersPage() {
               <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
                 
                 {/* 1. Basic Information */}
-                <FormSection number="1" title="Basic Information" description="Define your banner's identity and type">
+                <FormSection number="1" title={t("admin.categories.form.basicInfo")} description={t("admin.promotions.ui.generated.fc15c43868d9")}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Banner Title" required helpText="Internal name for admin reference">
-                      <Input type="text" value={form.title} onChange={(e) => updateForm("title", e.target.value)} required placeholder="e.g., Summer Sale 2024" />
+                    <FormField label={t("admin.promotions.ui.generated.fb4e62a66212")} required helpText={t("admin.promotions.ui.generated.7276662c1b5b")}>
+                      <Input type="text" value={form.title} onChange={(e) => updateForm("title", e.target.value)} required placeholder={t("admin.promotions.ui.generated.a589c4e03cdf")} />
                     </FormField>
-                    <FormField label="Banner Type" helpText="Determines where this banner appears">
+                    <FormField label={t("admin.promotions.ui.generated.b28b426cddce")} helpText={t("admin.promotions.ui.generated.016a111cc7b8")}>
                       <Select value={form.bannerType} onChange={(e) => updateForm("bannerType", e.target.value)}>
-                        <option value="homepage_hero">Homepage Hero</option>
-                        <option value="promotional">Promotional</option>
-                        <option value="product">Product</option>
-                        <option value="collection">Collection</option>
-                        <option value="popup">Popup</option>
+                        <option value="homepage_hero">{t("admin.promotions.ui.generated.59b57435cfd9")}</option>
+                        <option value="promotional">{t("admin.promotions.ui.generated.6cde26a45732")}</option>
+                        <option value="product">{t("common.product")}</option>
+                        <option value="collection">{t("admin.promotions.ui.generated.2037de437c80")}</option>
+                        <option value="popup">{t("admin.promotions.ui.generated.3b6fb9033a83")}</option>
                       </Select>
                     </FormField>
                   </div>
                   <div className="mt-4">
-                    <FormField label="Position" required helpText="Display order (lowest first). Auto-suggested to next available.">
+                    <FormField label={t("admin.promotions.ui.generated.90be16585da2")} required helpText={t("admin.promotions.ui.generated.9b4539d532ea")}>
                       <div className="relative">
                         <Input
                           type="number"
@@ -1447,10 +1444,10 @@ export default function BannersPage() {
                 </FormSection>
 
                 {/* 2. Responsive Images */}
-                <FormSection number="2" title="Banner Image" description="Upload the banner image">
+                <FormSection number="2" title={t("admin.promotions.ui.generated.21ab35490f09")} description={t("admin.promotions.ui.generated.1e3643257aa2")}>
                   <div className="grid grid-cols-1 gap-4">
                     <ImageUploadBox
-                      label="Desktop Image"
+                      label={t("admin.promotions.ui.generated.74e894d2ba1b")}
                       required
                       dimensions="1920x600px recommended"
                       file={form.desktopImage}
@@ -1462,100 +1459,100 @@ export default function BannersPage() {
                 </FormSection>
 
                 {/* 3. Banner Content */}
-                <FormSection number="3" title="Banner Content" description="Text content displayed on the banner">
+                <FormSection number="3" title={t("admin.promotions.ui.generated.f243628d5358")} description={t("admin.promotions.ui.generated.b0c97aeaa329")}>
                   <div className="space-y-4">
-                    <FormField label="Eyebrow / Small Heading" helpText="Small text above main heading">
-                      <Input type="text" value={form.eyebrow} onChange={(e) => updateForm("eyebrow", e.target.value)} placeholder="e.g., SUMMER COLLECTION" />
+                    <FormField label={t("admin.promotions.ui.generated.2a8669ea5f98")} helpText={t("admin.promotions.ui.generated.e6ff69230b64")}>
+                      <Input type="text" value={form.eyebrow} onChange={(e) => updateForm("eyebrow", e.target.value)} placeholder={t("admin.promotions.ui.generated.8b9078dcbffb")} />
                     </FormField>
-                    <FormField label="Main Heading" required helpText="Primary bold text on banner">
-                      <Input type="text" value={form.heading} onChange={(e) => updateForm("heading", e.target.value)} placeholder="e.g., UP TO 50% OFF" />
+                    <FormField label={t("admin.banners.detail.heading")} required helpText={t("admin.promotions.ui.generated.281b01376894")}>
+                      <Input type="text" value={form.heading} onChange={(e) => updateForm("heading", e.target.value)} placeholder={t("admin.promotions.ui.generated.7567f0cc3da4")} />
                     </FormField>
-                    <FormField label="Description" helpText="Brief description below heading">
-                      <Textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} rows="3" placeholder="Shop our latest collection..." />
+                    <FormField label={t("common.description")} helpText={t("admin.promotions.ui.generated.318959db31c9")}>
+                      <Textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} rows="3" placeholder={t("admin.promotions.ui.generated.b187c59b57e4")} />
                     </FormField>
                   </div>
                 </FormSection>
 
                 {/* 4. Call to Action */}
-                <FormSection number="4" title="Call to Action" description="Button, link & deal configuration">
+                <FormSection number="4" title={t("admin.promotions.ui.generated.c8db8ba44a0c")} description="Button, link & deal configuration">
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <FormField label="Button Text" helpText="Text displayed on button">
-                        <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder="e.g., Shop Now" />
+                      <FormField label={t("admin.promotions.ui.generated.9905b0ab47e6")} helpText={t("admin.promotions.ui.generated.f1365e5fb311")}>
+                        <Input type="text" value={form.primaryButton.text} onChange={(e) => updateNested("primaryButton", "text", e.target.value)} placeholder={t("admin.promotions.ui.generated.cc3936825cbc")} />
                       </FormField>
-                      <FormField label="Link Type" helpText="Where button click leads">
+                      <FormField label={t("admin.promotions.ui.generated.a1b4254f5c21")} helpText={t("admin.promotions.ui.generated.36aae8e46c09")}>
                         <Select value={form.primaryButton.linkType} onChange={(e) => updateNested("primaryButton", "linkType", e.target.value)}>
-                          <option value="custom_url">Custom URL</option>
-                          <option value="product">Product Page</option>
-                          <option value="category">Category Page</option>
-                          <option value="brand">Brand Page</option>
-                          <option value="deal">Deal Page</option>
-                          <option value="none">No Link</option>
+                          <option value="custom_url">{t("admin.promotions.ui.generated.c234572ce0d7")}</option>
+                          <option value="product">{t("admin.promotions.ui.generated.9ae00634a948")}</option>
+                          <option value="category">{t("admin.promotions.ui.generated.813068322e61")}</option>
+                          <option value="brand">{t("admin.promotions.ui.generated.80a72e79f7e9")}</option>
+                          <option value="deal">{t("admin.promotions.ui.generated.3c3aa4dcbf06")}</option>
+                          <option value="none">{t("admin.promotions.ui.generated.65194c1f81b3")}</option>
                         </Select>
                       </FormField>
                       {form.primaryButton.linkType === "product" && (
-                        <FormField label="Select Product" required helpText="Banner button opens this product on the storefront">
+                        <FormField label={t("admin.promotions.ui.generated.171e528920c0")} required helpText={t("admin.promotions.ui.generated.74e8464d31d8")}>
                           <Select
                             value={form.primaryButton.productId || ""}
                             onChange={(e) => updateNested("primaryButton", "productId", e.target.value)}
                           >
-                            <option value="">— Choose a product —</option>
+                            <option value="">{t("admin.promotions.ui.generated.741c59e5d0f9")}</option>
                             {products.map((p) => (
                               <option key={p._id || p.id} value={p._id || p.id}>
-                                {p.name || p.title}
+                                {productNameOf(p) || p.title}
                               </option>
                             ))}
                           </Select>
                         </FormField>
                       )}
                       {form.primaryButton.linkType === "category" && (
-                        <FormField label="Select Category" required helpText="Banner button opens this category on the storefront">
+                        <FormField label={t("admin.productDetail.page.selectCategory")} required helpText={t("admin.promotions.ui.generated.5607aae0a2fd")}>
                           <Select
                             value={form.primaryButton.categoryId || ""}
                             onChange={(e) => updateNested("primaryButton", "categoryId", e.target.value)}
                           >
-                            <option value="">— Choose a category —</option>
+                            <option value="">{t("admin.promotions.ui.generated.ea15f779a748")}</option>
                             {categories.map((c) => (
                               <option key={c._id || c.id} value={c._id || c.id}>
-                                {c.name}
+                                {nameOf(c)}
                               </option>
                             ))}
                           </Select>
                         </FormField>
                       )}
                       {form.primaryButton.linkType === "brand" && (
-                        <FormField label="Select Brand" required helpText="Banner button opens this brand on the storefront">
+                        <FormField label={t("admin.productDetail.page.selectBrand")} required helpText={t("admin.promotions.ui.generated.698dfd15b57e")}>
                           <Select
                             value={form.primaryButton.brandId || ""}
                             onChange={(e) => updateNested("primaryButton", "brandId", e.target.value)}
                           >
-                            <option value="">— Choose a brand —</option>
+                            <option value="">{t("admin.promotions.ui.generated.63b100e956ff")}</option>
                             {brands.map((b) => (
                               <option key={b._id || b.id} value={b._id || b.id}>
-                                {b.name}
+                                {nameOf(b)}
                               </option>
                             ))}
                           </Select>
                         </FormField>
                       )}
                       {form.primaryButton.linkType === "deal" && (
-                        <FormField label="Select Deal" required helpText="Banner button opens this deal on the storefront">
+                        <FormField label={t("admin.promotions.ui.generated.a66063367127")} required helpText={t("admin.promotions.ui.generated.9ee5b6313eef")}>
                           <Select
                             value={form.primaryButton.dealId || ""}
                             onChange={(e) => updateNested("primaryButton", "dealId", e.target.value)}
                           >
-                            <option value="">— Choose a deal —</option>
+                            <option value="">{t("admin.promotions.ui.generated.05c0d0455546")}</option>
                             {deals.map((d) => (
                               <option key={d._id || d.id} value={d._id || d.id}>
-                                {d.name}{d.isActive ? "" : " (disabled)"}
+                                {contentOf(d.name, d.translations?.name)}{d.isActive ? "" : ` (${t("admin.banners.page.disabled")})`}
                               </option>
                             ))}
                           </Select>
                         </FormField>
                       )}
                       {form.primaryButton.linkType === "custom_url" && (
-                        <FormField label="Target URL" required helpText="Full URL destination">
-                          <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder="https://..." />
+                        <FormField label={t("admin.promotions.ui.generated.e79411425b71")} required helpText={t("admin.promotions.ui.generated.3cec9bd6d577")}>
+                          <Input type="text" value={form.primaryButton.link} onChange={(e) => updateNested("primaryButton", "link", e.target.value)} placeholder={t("admin.promotions.ui.generated.98204c44686b")} />
                         </FormField>
                       )}
                     </div>
@@ -1563,12 +1560,12 @@ export default function BannersPage() {
                 </FormSection>
 
                 {/* 5. Schedule */}
-                <FormSection number="5" title="Schedule" description="Set when banner should be active">
+                <FormSection number="5" title={t("admin.banners.page.schedule")} description={t("admin.promotions.ui.generated.bad8452adcc7")}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Start Date" helpText="When banner becomes active">
+                    <FormField label={t("admin.discounts.form.startDate")} helpText={t("admin.promotions.ui.generated.66da02d35798")}>
                       <Input type="date" value={form.startDate} onChange={(e) => updateForm("startDate", e.target.value)} />
                     </FormField>
-                    <FormField label="End Date" helpText="When banner expires">
+                    <FormField label={t("admin.promotions.ui.generated.269c8b374312")} helpText={t("admin.promotions.ui.generated.ce497a6f87ec")}>
                       <Input type="date" value={form.endDate} onChange={(e) => updateForm("endDate", e.target.value)} />
                     </FormField>
                   </div>
@@ -1582,9 +1579,7 @@ export default function BannersPage() {
                     disabled={bannerMutation.isPending}
                     className="flex-1 h-11 rounded-lg text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border"
                     style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}
-                  >
-                    Cancel
-                  </button>
+                  >{t("admin.discounts.delete.cancel")}</button>
                   <button
                     type="submit"
                     disabled={bannerMutation.isPending || !!positionDuplicate}
@@ -1592,10 +1587,8 @@ export default function BannersPage() {
                   >
                     {bannerMutation.isPending ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Spinner className="w-4 h-4" />
-                        Saving...
-                      </span>
-                    ) : editingBanner ? "Update Banner" : "Create Banner"}
+                        <Spinner className="w-4 h-4" />{t("common.saving")}</span>
+                    ) : editingBanner ? t("admin.banners.toast.updated") : t("admin.banners.toast.added")}
                   </button>
                 </div>
               </form>
@@ -1614,13 +1607,13 @@ export default function BannersPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{deleteTarget.banners.length === 1 ? `Delete "${deleteTarget.banners[0].title}"?` : `Delete ${deleteTarget.banners.length} banners?`}</h3>
-                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.products.delete.body")}</p>
                 </div>
               </div>
               <div className="flex gap-2 mt-5">
-                <button onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
+                <button onClick={() => setDeleteTarget(null)} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>{t("admin.discounts.delete.cancel")}</button>
                 <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                  {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                  {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
                 </button>
               </div>
             </div>
@@ -1668,3 +1661,4 @@ export default function BannersPage() {
     </div>
   );
 }
+

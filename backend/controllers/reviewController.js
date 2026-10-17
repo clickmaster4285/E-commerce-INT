@@ -6,6 +6,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const { queueTranslationSync } = require("../utils/translationService");
 
 // ==========================================
 // 🔌 SOCKET HELPER (baqi controllers ki tarah)
@@ -248,6 +249,7 @@ const createReview = async (req, res) => {
       videos: media.videos || [],
       verifiedPurchase: true,
     });
+    queueTranslationSync(Review, review._id);
 
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -328,6 +330,7 @@ const updateReview = async (req, res) => {
     }
 
     await review.save();
+    queueTranslationSync(Review, review._id);
     await deleteReviewMediaFiles({ images: removedImages, videos: removedVideos });
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -446,6 +449,7 @@ const setReviewResponse = async (req, res) => {
       responded_by_name: String(req.user?.name || "Store Support").trim().slice(0, 100),
     };
     await review.save();
+    queueTranslationSync(Review, review._id);
     emitSocketEvent("reviewUpdated", {
       _id: review._id,
       product_id: review.product_id,
@@ -582,7 +586,7 @@ const getAdminReviewById = async (req, res) => {
           _id: { $ne: review._id },
           is_deleted: { $ne: true },
         })
-          .select("product_id rating title comment status created_at")
+          .select("product_id rating title comment status created_at translations")
           .populate("product_id", "name translations")
           .sort({ created_at: -1 })
           .limit(3)

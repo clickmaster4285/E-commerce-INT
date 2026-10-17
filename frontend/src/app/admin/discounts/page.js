@@ -11,6 +11,7 @@ import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 
@@ -113,9 +114,10 @@ const dateToISO = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
+  const { t } = useTranslation();
   const config = {
-    active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const item = config[status] || config.inactive;
   return (
@@ -128,6 +130,7 @@ const StatusBadge = ({ status }) => {
 
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
@@ -176,7 +179,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => {
               const active = value === opt.value;
@@ -308,8 +311,9 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function DiscountRowsSkeleton({ rows = 10 }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading discounts">
+    <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* checkbox */}
@@ -338,8 +342,9 @@ function DiscountRowsSkeleton({ rows = 10 }) {
 }
 
 function DiscountCardsSkeleton({ cards = 8, cardStyle }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading discounts">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`discount-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
           <div className="flex items-start justify-between">
@@ -478,6 +483,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
   const { t } = useTranslation();
+  const { nameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -787,10 +793,10 @@ export default function DiscountsPage() {
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const discountTypes = [
-    { key: "all", title: "All Products Discount", desc: "Apply discount on all products", icon: GlobeIcon },
-    { key: "product", title: "Product Discount", desc: "Apply discount on specific products", icon: BoxIcon },
-    { key: "category", title: "Category Discount", desc: "Apply discount on entire categories", icon: FolderIcon },
-    { key: "brand", title: "Brand Discount", desc: "Apply discount on specific brands", icon: AwardIcon },
+    { key: "all", title: t("admin.discounts.page.allProductsDiscount"), desc: "Apply discount on all products", icon: GlobeIcon },
+    { key: "product", title: t("admin.discounts.page.productDiscount"), desc: "Apply discount on specific products", icon: BoxIcon },
+    { key: "category", title: t("admin.discounts.page.categoryDiscount"), desc: "Apply discount on entire categories", icon: FolderIcon },
+    { key: "brand", title: t("admin.discounts.page.brandDiscount"), desc: "Apply discount on specific brands", icon: AwardIcon },
   ];
 
   const openDiscountForm = (type) => {
@@ -837,7 +843,7 @@ export default function DiscountsPage() {
           aria-expanded={open}
           className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.featuredProducts.ui.actions")}
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -858,12 +864,12 @@ export default function DiscountsPage() {
             >
               <MenuItem
                 icon={<EyeIcon className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.promotions.ui.generated.e45a7490664f")}
                 onClick={() => { setActionMenu(null); handleView(id); }}
               />
               <MenuItem
                 icon={<EditIcon className="w-4 h-4" />}
-                label="Edit Discount"
+                label={t("admin.promotions.ui.generated.5beba536c8fd")}
                 onClick={() => { setActionMenu(null); openEdit(discount); }}
               />
               <MenuItem
@@ -876,7 +882,7 @@ export default function DiscountsPage() {
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<TrashIcon className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.promotions.ui.generated.9485989ff514")}
                 danger
                 onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
               />
@@ -984,7 +990,7 @@ export default function DiscountsPage() {
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
           <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length}{" "}{t("admin.promotions.ui.generated.835f3b50e337")}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.page.clear")}</button>
               <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}</button>
@@ -1048,7 +1054,7 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || "Untitled Discount"}</p>
                             </div>
                           </div>
                         </td>
@@ -1072,7 +1078,7 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || "Untitled Discount"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                   <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount)}</span>
@@ -1086,7 +1092,7 @@ export default function DiscountsPage() {
         {/* PAGINATION */}
         {totalDiscounts > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)} of {totalDiscounts} discounts</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalDiscounts}{" "}{t("admin.nav.item.discounts")}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
@@ -1141,14 +1147,13 @@ export default function DiscountsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={cardStyle}>
-            <h3 className="text-base font-semibold">Delete Discount?</h3>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Are you sure you want to delete {deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
+            <h3 className="text-base font-semibold">{t("admin.discounts.page.deleteQuestion")}</h3>
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.b3ea6f7db57f")}{" "}{deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
             </p>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
               </button>
             </div>
           </div>
@@ -1157,4 +1162,3 @@ export default function DiscountsPage() {
     </div>
   );
 }
-

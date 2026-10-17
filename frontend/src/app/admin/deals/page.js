@@ -13,6 +13,7 @@ import { toNonNegative, validateNonNegative } from "../discounts/_components/dis
 import useDealSocketSync from "../../../hooks/admin/useDealSocketSync"; 
 import { DealFormModal, SelectionModal } from "./_components/dealModals";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 /* ==================== CONSTANTS ==================== */
 // ✅ Server-side pagination — ek request par yehi deals aati hain
@@ -141,14 +142,15 @@ const dateToISO = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
+  const { t } = useTranslation();
   // ✅ Sirf Active/Inactive — purani values (scheduled/expired/disabled) bhi inactive
   const config = {
-    active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    scheduled: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    expired: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    disabled: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-    draft: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    scheduled: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    expired: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    disabled: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    draft: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const item = config[status] || config.inactive;
   return (
@@ -161,6 +163,7 @@ const StatusBadge = ({ status }) => {
 
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
@@ -201,7 +204,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-48 animate-in fade-in zoom-in-95 duration-100 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => (
               <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -233,6 +236,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const { t, locale, dir } = useTranslation();
+  const { nameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -645,10 +649,10 @@ export default function DealsPage() {
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const dealTypes = [
-    { key: "all", title: "All Products Deal", desc: "Apply deal on all products", icon: GlobeIcon },
-    { key: "product", title: "Product Deal", desc: "Apply deal on specific products", icon: BoxIcon },
-    { key: "category", title: "Category Deal", desc: "Apply deal on entire categories", icon: FolderIcon },
-    { key: "brand", title: "Brand Deal", desc: "Apply deal on specific brands", icon: AwardIcon },
+    { key: "all", title: t("admin.promotions.ui.generated.07a8194001b2"), desc: "Apply deal on all products", icon: GlobeIcon },
+    { key: "product", title: t("admin.promotions.ui.generated.7941c68fd73d"), desc: "Apply deal on specific products", icon: BoxIcon },
+    { key: "category", title: t("admin.deals.page.categoryDeal"), desc: "Apply deal on entire categories", icon: FolderIcon },
+    { key: "brand", title: t("admin.promotions.ui.generated.241496435cbb"), desc: "Apply deal on specific brands", icon: AwardIcon },
   ];
 
   const openDealForm = (type) => {
@@ -685,7 +689,7 @@ export default function DealsPage() {
           aria-expanded={open}
           className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.featuredProducts.ui.actions")}
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -706,12 +710,12 @@ export default function DealsPage() {
             >
               <MenuItem
                 icon={<EyeIcon className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.promotions.ui.generated.e45a7490664f")}
                 onClick={() => { setActionMenu(null); handleViewDeal(id); }}
               />
               <MenuItem
                 icon={<EditIcon className="w-4 h-4" />}
-                label="Edit Deal"
+                label={t("admin.promotions.ui.generated.935cd25b12ae")}
                 onClick={() => { setActionMenu(null); openEdit(deal); }}
               />
               <MenuItem
@@ -724,7 +728,7 @@ export default function DealsPage() {
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<TrashIcon className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.promotions.ui.generated.9485989ff514")}
                 danger
                 onClick={() => { setActionMenu(null); setDeleteTarget([deal]); }}
               />
@@ -854,7 +858,7 @@ export default function DealsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{deal?.name || "Untitled Deal"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || "Untitled Deal"}</p>
                               <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
                           </div>
@@ -879,7 +883,7 @@ export default function DealsPage() {
                   <StatusBadge status={getDealStatus(deal)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{deal?.name || "Untitled Deal"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(deal) || "Untitled Deal"}</p>
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -894,12 +898,10 @@ export default function DealsPage() {
         {/* ✅ PAGINATION (server-side) */}
         {totalPages > 1 && (
           <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              Showing {pagination.total === 0 ? 0 : (currentPage - 1) * DEALS_PER_PAGE + 1}-{Math.min(currentPage * DEALS_PER_PAGE, pagination.total)} of {pagination.total} deals
-              {isFetching && !isLoading && <span className="ml-2 opacity-70">• loading...</span>}
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{pagination.total === 0 ? 0 : (currentPage - 1) * DEALS_PER_PAGE + 1}-{Math.min(currentPage * DEALS_PER_PAGE, pagination.total)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{pagination.total}{" "}{t("admin.nav.item.deals")}{isFetching && !isLoading && <span className="ml-2 opacity-70">{t("admin.promotions.ui.generated.6542a6f2bacd")}</span>}
             </p>
             <div className="flex items-center gap-2">
-              <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label="Previous page"><ChevronLeftIcon className="h-4 w-4" /></button>
+              <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label={t("admin.reviews.ui.previousPage")}><ChevronLeftIcon className="h-4 w-4" /></button>
               {renderPageNumbers().map((pg, i) =>
                 pg === "..." ? (
                   <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
@@ -907,7 +909,7 @@ export default function DealsPage() {
                   <button key={pg} type="button" disabled={isFetching} onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
                 )
               )}
-              <button type="button" disabled={currentPage >= totalPages || isFetching} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label="Next page"><ChevronRightIcon className="h-4 w-4" /></button>
+              <button type="button" disabled={currentPage >= totalPages || isFetching} onClick={() => setCurrentPage((pg) => Math.min(totalPages, pg + 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label={t("admin.brands.ui.nextPage")}><ChevronRightIcon className="h-4 w-4" /></button>
             </div>
           </div>
         )}
@@ -928,12 +930,12 @@ export default function DealsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={cardStyle}>
-            <h3 className="text-base font-semibold">Delete Deal?</h3>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>Are you sure you want to delete <span className="font-semibold">{deleteTarget[0]?.name}</span>?</p>
+            <h3 className="text-base font-semibold">{t("admin.promotions.ui.generated.ae09b0d69538")}</h3>
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deleteOne", { name: nameOf(deleteTarget[0]) })}</p>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
               </button>
             </div>
           </div>
@@ -955,8 +957,9 @@ export default function DealsPage() {
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading deals">
+    <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1b44fba50568")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`deal-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* deal — icon + name + code */}
@@ -986,8 +989,9 @@ function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
 }
 
 function DealCardsSkeleton({ cards = 8, cardStyle }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading deals">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.1b44fba50568")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`deal-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
           <div className="flex items-start justify-between">
@@ -1143,8 +1147,7 @@ function BundleImageUploader({ value, onChange }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <label className="block text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-          Bundle Image <span className="text-red-500">*</span>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>{t("admin.promotions.ui.generated.e27fbc4f8b6c")}{" "}<span className="text-red-500">*</span>
         </label>
         {preview && (
           <button
@@ -1152,9 +1155,7 @@ function BundleImageUploader({ value, onChange }) {
             onClick={handleRemove}
             className="text-[11px] font-semibold transition hover:opacity-70"
             style={{ color: "var(--danger)" }}
-          >
-            Remove
-          </button>
+          >{t("admin.discounts.form.remove")}</button>
         )}
       </div>
 
@@ -1185,7 +1186,7 @@ function BundleImageUploader({ value, onChange }) {
         {preview ? (
           <img
             src={preview}
-            alt="Bundle"
+            alt={t("admin.promotions.ui.generated.d59795de8a4d")}
             className="w-full h-40 object-cover rounded-md"
             style={{ border: "1px solid var(--border-color)" }}
           />
@@ -1200,7 +1201,7 @@ function BundleImageUploader({ value, onChange }) {
             <p className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
               {uploading ? "Uploading image..." : isDragging ? "Drop image here" : "Click to upload or drag & drop"}
             </p>
-            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>PNG, JPG or WEBP — max 5MB</p>
+            <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.df9ec0d4a893")}</p>
           </div>
         )}
 
@@ -1216,9 +1217,7 @@ function BundleImageUploader({ value, onChange }) {
         />
       </div>
 
-      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-        Ye image bundle deal card aur storefront par dikhayi jayegi.
-      </p>
+      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.7e7cd16d12f1")}</p>
     </div>
   );
 }

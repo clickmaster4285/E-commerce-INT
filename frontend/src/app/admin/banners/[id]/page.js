@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import bannerAPI from "@/apis/admin/bannerApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -38,11 +39,11 @@ function formatType(value) {
   return String(value).replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatDate(value, withTime = false) {
+function formatDate(value, withTime = false, locale = "en") {
   if (!value) return "\u2014";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "\u2014";
-  return date.toLocaleString("en-US", withTime
+  return date.toLocaleString(locale, withTime
     ? { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
     : { day: "numeric", month: "short", year: "numeric" });
 }
@@ -200,8 +201,9 @@ function SkeletonInfoRows({ rows = 4 }) {
 }
 
 function BannerDetailSkeleton() {
+  const { t } = useTranslation();
   return (
-    <div className="w-full space-y-4 pb-10" aria-busy="true" aria-label="Loading banner details">
+    <div className="w-full space-y-4 pb-10" aria-busy="true" aria-label={t("admin.promotions.ui.generated.071331956711")}>
       {/* BREADCRUMB */}
       <div className="flex items-center gap-1.5">
         <span className="skeleton inline-block h-3 w-14 rounded align-middle" />
@@ -240,8 +242,8 @@ function BannerDetailSkeleton() {
       {/* MAIN GRID */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-4">
-          <SectionCard icon={Eye} title="Banner Preview"><span className="skeleton block h-56 w-full rounded-lg" /></SectionCard>
-          <SectionCard icon={Info} title="Basic Information"><SkeletonInfoRows rows={5} /></SectionCard>
+          <SectionCard icon={Eye} title={t("admin.promotions.ui.generated.facd9b26c9c7")}><span className="skeleton block h-56 w-full rounded-lg" /></SectionCard>
+          <SectionCard icon={Info} title={t("admin.categories.form.basicInfo")}><SkeletonInfoRows rows={5} /></SectionCard>
           {/* section tabs */}
           <div className="flex items-center gap-1 rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             {Array.from({ length: 3 }).map((_, i) => (
@@ -249,13 +251,13 @@ function BannerDetailSkeleton() {
             ))}
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <SectionCard icon={Type} title="Banner Content"><SkeletonInfoRows rows={4} /></SectionCard>
-            <SectionCard icon={Link2} title="Buttons"><SkeletonInfoRows rows={3} /></SectionCard>
+            <SectionCard icon={Type} title={t("admin.promotions.ui.generated.f243628d5358")}><SkeletonInfoRows rows={4} /></SectionCard>
+            <SectionCard icon={Link2} title={t("admin.promotions.ui.generated.23396acb661d")}><SkeletonInfoRows rows={3} /></SectionCard>
           </div>
         </div>
         <aside className="min-w-0 space-y-4">
-          <SectionCard icon={User} title="Banner Information"><SkeletonInfoRows rows={4} /></SectionCard>
-          <SectionCard icon={History} title="History"><SkeletonInfoRows rows={4} /></SectionCard>
+          <SectionCard icon={User} title={t("admin.promotions.ui.generated.5bdde5230801")}><SkeletonInfoRows rows={4} /></SectionCard>
+          <SectionCard icon={History} title={t("admin.brands.detail.history")}><SkeletonInfoRows rows={4} /></SectionCard>
         </aside>
       </div>
     </div>
@@ -284,6 +286,7 @@ function InfoTile({ icon: Icon, label, value }) {
 }
 
 function ButtonCard({ label, tone, button }) {
+  const { t } = useTranslation();
   const s = TOKEN_STYLES[tone];
   return (
     <div className="rounded-xl p-3.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card-alt)" }}>
@@ -294,9 +297,9 @@ function ButtonCard({ label, tone, button }) {
         </span>
         <Link2 className="h-3.5 w-3.5" style={{ color: "var(--text-muted)" }} />
       </div>
-      <InfoRow label="Text">{button?.text}</InfoRow>
-      <InfoRow label="Link Type">{formatType(button?.linkType)}</InfoRow>
-      <InfoRow label="Link">
+      <InfoRow label={t("admin.promotions.ui.generated.372ea08cab33")}>{button?.text}</InfoRow>
+      <InfoRow label={t("admin.promotions.ui.generated.a1b4254f5c21")}>{formatType(button?.linkType)}</InfoRow>
+      <InfoRow label={t("admin.promotions.ui.generated.4f0aa52d656a")}>
         <span className="font-mono text-[11.5px]">{button?.link}</span>
       </InfoRow>
     </div>
@@ -315,6 +318,7 @@ const TABS = [
 
 export default function BannerDetailPage() {
   const { t, locale, dir } = useTranslation();
+  const { contentOf } = useLocalized();
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -369,13 +373,12 @@ export default function BannerDetailPage() {
         <span className="empty-state-icon">
           <AlertTriangle className="h-6 w-6" style={{ color: "var(--danger)" }} />
         </span>
-        <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Banner Not Found</h2>
+        <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.096b194646de")}</h2>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           {error?.message || "This banner does not exist or has been deleted."}
         </p>
         <button onClick={() => router.push(backPath)} className="btn-primary mt-2">
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to Banners
-        </button>
+          <ArrowLeft className="h-3.5 w-3.5" />{" "}{t("admin.banners.detail.backToBanners")}</button>
       </div>
     );
   }
@@ -393,7 +396,7 @@ export default function BannerDetailPage() {
     <>
       <div dir={dir} lang={locale} className="w-full space-y-4 pb-10">
         {/* ============ BREADCRUMB ============ */}
-        <nav className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }} aria-label="Breadcrumb">
+        <nav className="flex items-center gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }} aria-label={t("admin.promotions.ui.generated.6e5ce570b4af")}>
           <button onClick={() => router.push(backPath)} className="font-medium transition-colors hover:opacity-80" style={{ color: "var(--text-muted)" }}>
             {t("admin.banners.page.title")}
           </button>
@@ -414,7 +417,7 @@ export default function BannerDetailPage() {
             </button>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="truncate text-[17px] font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>
-                {banner.title || t("admin.banners.detail.bannerDetails")}
+                {contentOf(banner.title, banner.translations?.title) || t("admin.banners.detail.bannerDetails")}
               </h1>
               <Chip tone="accent">{formatType(banner.bannerType)}</Chip>
             </div>
@@ -452,10 +455,10 @@ export default function BannerDetailPage() {
 
         {/* ============ QUICK FACTS ============ */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <InfoTile icon={Hash} label="Position" value={String(banner.position ?? 0)} />
-          <InfoTile icon={Type} label="Type" value={formatType(banner.bannerType)} />
-          <InfoTile icon={Calendar} label="Start Date" value={banner.startDate ? formatDate(banner.startDate, true) : null} />
-          <InfoTile icon={Calendar} label="End Date" value={banner.endDate ? formatDate(banner.endDate, true) : null} />
+          <InfoTile icon={Hash} label={t("admin.promotions.ui.generated.90be16585da2")} value={String(banner.position ?? 0)} />
+          <InfoTile icon={Type} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={formatType(banner.bannerType)} />
+          <InfoTile icon={Calendar} label={t("admin.discounts.form.startDate")} value={banner.startDate ? formatDate(banner.startDate, true, locale) : null} />
+          <InfoTile icon={Calendar} label={t("admin.discounts.form.endDate")} value={banner.endDate ? formatDate(banner.endDate, true, locale) : null} />
         </div>
 
         {/* ============ MAIN GRID ============ */}
@@ -482,7 +485,7 @@ export default function BannerDetailPage() {
                 >
                   <img
                     src={desktopImage}
-                    alt={banner.altText || banner.title || t("admin.banners.detail.banner")}
+                    alt={contentOf(banner.altText, banner.translations?.altText) || contentOf(banner.title, banner.translations?.title) || t("admin.banners.detail.banner")}
                     className="block h-auto max-h-[420px] w-full object-contain"
                   />
                 </div>
@@ -496,15 +499,15 @@ export default function BannerDetailPage() {
 
             {/* Basic Information */}
             <SectionCard icon={Info} title={t("admin.discounts.form.basicInfo")}>
-              <InfoRow label="Title">{banner.title}</InfoRow>
-              <InfoRow label="Internal Name">
+              <InfoRow label={t("admin.banners.detail.title")}>{contentOf(banner.title, banner.translations?.title)}</InfoRow>
+              <InfoRow label={t("admin.promotions.ui.generated.b1dc0e30ac89")}>
                 <span className="font-mono text-[12px]">{banner.internalName || banner.slug}</span>
               </InfoRow>
-              <InfoRow label="Banner Type">
+              <InfoRow label={t("admin.promotions.ui.generated.b28b426cddce")}>
                 <Chip tone="accent">{formatType(banner.bannerType)}</Chip>
               </InfoRow>
-              <InfoRow label="Status"><StatusPill status={banner.status} /></InfoRow>
-              <InfoRow label="Position">{String(banner.position ?? 0)}</InfoRow>
+              <InfoRow label={t("admin.brands.detail.productTableStatus")}><StatusPill status={banner.status} /></InfoRow>
+              <InfoRow label={t("admin.promotions.ui.generated.90be16585da2")}>{String(banner.position ?? 0)}</InfoRow>
             </SectionCard>
 
             {/* Section tabs */}
@@ -512,7 +515,7 @@ export default function BannerDetailPage() {
               className="flex items-center gap-1 overflow-x-auto rounded-xl p-1.5"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
               role="tablist"
-              aria-label="Banner sections"
+              aria-label={t("admin.promotions.ui.generated.96925ecd2cde")}
             >
               {TABS.map((tab) => {
                 const TabIcon = tab.icon;
@@ -537,21 +540,21 @@ export default function BannerDetailPage() {
 
             {/* Content + Buttons */}
             <div id="banner-content-section" className="grid scroll-mt-24 grid-cols-1 gap-4 lg:grid-cols-2">
-              <SectionCard icon={Type} title="Banner Content">
-                <InfoRow label="Eyebrow">{banner.eyebrow}</InfoRow>
-                <InfoRow label="Heading">{banner.heading}</InfoRow>
-                <InfoRow label="Description">
-                  <span className="line-clamp-3 whitespace-pre-wrap text-right" title={banner.description}>
-                    {banner.description}
+              <SectionCard icon={Type} title={t("admin.promotions.ui.generated.f243628d5358")}>
+                <InfoRow label={t("admin.banners.detail.eyebrow")}>{contentOf(banner.eyebrow, banner.translations?.eyebrow)}</InfoRow>
+                <InfoRow label={t("admin.banners.detail.heading")}>{contentOf(banner.heading, banner.translations?.heading)}</InfoRow>
+                <InfoRow label={t("admin.banners.detail.description")}>
+                  <span className="line-clamp-3 whitespace-pre-wrap text-right" title={contentOf(banner.description, banner.translations?.description)}>
+                    {contentOf(banner.description, banner.translations?.description)}
                   </span>
                 </InfoRow>
               </SectionCard>
 
-              <SectionCard id="banner-buttons-section" icon={Link2} title="Buttons">
+              <SectionCard id="banner-buttons-section" icon={Link2} title={t("admin.promotions.ui.generated.23396acb661d")}>
                 <div className="space-y-3">
-                  <ButtonCard label="Primary Button" tone="accent" button={banner.primaryButton} />
+                  <ButtonCard label={t("admin.banners.detail.primaryButton")} tone="accent" button={{ ...banner.primaryButton, text: contentOf(banner.primaryButton?.text, banner.translations?.primaryButton?.text) }} />
                   {banner.secondaryButton?.text && (
-                    <ButtonCard label="Secondary Button" tone="neutral" button={banner.secondaryButton} />
+                    <ButtonCard label={t("admin.banners.detail.secondaryButton")} tone="neutral" button={{ ...banner.secondaryButton, text: contentOf(banner.secondaryButton?.text, banner.translations?.secondaryButton?.text) }} />
                   )}
                 </div>
               </SectionCard>
@@ -561,18 +564,18 @@ export default function BannerDetailPage() {
 
           {/* ----- RIGHT RAIL ----- */}
           <aside className="min-w-0 space-y-4 xl:sticky xl:top-4">
-            <SectionCard icon={User} title="Banner Information">
-              <RailRow icon={User} label="Created By" value={resolveUser(createdBy)} />
-              <RailRow icon={Calendar} label="Created At" value={formatDate(banner.createdAt, true)} />
+            <SectionCard icon={User} title={t("admin.promotions.ui.generated.5bdde5230801")}>
+              <RailRow icon={User} label={t("admin.brands.detail.createdBy")} value={resolveUser(createdBy)} />
+              <RailRow icon={Calendar} label={t("admin.brands.detail.createdAt")} value={formatDate(banner.createdAt, true, locale)} />
               {wasUpdated && (
                 <>
-                  <RailRow icon={Pencil} label="Updated By" value={resolveUser(updatedBy)} />
-                  <RailRow icon={Clock} label="Updated At" value={formatDate(banner.updatedAt, true)} />
+                  <RailRow icon={Pencil} label={t("admin.brands.detail.updatedBy")} value={resolveUser(updatedBy)} />
+                  <RailRow icon={Clock} label={t("admin.brands.detail.updatedAt")} value={formatDate(banner.updatedAt, true, locale)} />
                 </>
               )}
             </SectionCard>
 
-            <SectionCard id="banner-history-section" icon={History} title="History">
+            <SectionCard id="banner-history-section" icon={History} title={t("admin.brands.detail.history")}>
               <div className="space-y-0">
                 {wasUpdated && (
                   <div className="flex gap-3 border-b pb-4" style={{ borderColor: "var(--border-color)" }}>
@@ -581,13 +584,12 @@ export default function BannerDetailPage() {
                       <span className="mt-1 w-px flex-1" style={{ backgroundColor: "var(--border-color)" }} />
                     </span>
                     <div className="min-w-0 pb-1">
-                      <p className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>Banner Updated</p>
-                      <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--text-muted)" }}>Banner details were updated</p>
-                      <p className="mt-1 text-[10.5px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        By {resolveUser(updatedBy)} · {relativeDate(banner.updatedAt)}
+                      <p className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.1cf3c5927dab")}</p>
+                      <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.b77e9c4a8d4a")}</p>
+                      <p className="mt-1 text-[10.5px] font-semibold" style={{ color: "var(--text-secondary)" }}>{t("common.by")}{" "}{resolveUser(updatedBy)} · {relativeDate(banner.updatedAt)}
                       </p>
                       <p className="mt-0.5 text-[10.5px]" style={{ color: "var(--text-muted)" }}>
-                        {formatDate(banner.updatedAt, true)}
+                        {formatDate(banner.updatedAt, true, locale)}
                       </p>
                     </div>
                   </div>
@@ -595,13 +597,12 @@ export default function BannerDetailPage() {
                 <div className={`flex gap-3 ${wasUpdated ? "pt-3.5" : ""}`}>
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--purple)" }} />
                   <div className="min-w-0">
-                    <p className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>Banner Created</p>
-                    <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--text-muted)" }}>Banner was created</p>
-                    <p className="mt-1 text-[10.5px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                      By {resolveUser(createdBy)} · {relativeDate(banner.createdAt)}
+                    <p className="text-[12.5px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.484bb8a3e27f")}</p>
+                    <p className="mt-0.5 text-[11.5px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.b866f21e210a")}</p>
+                    <p className="mt-1 text-[10.5px] font-semibold" style={{ color: "var(--text-secondary)" }}>{t("common.by")}{" "}{resolveUser(createdBy)} · {relativeDate(banner.createdAt)}
                     </p>
                     <p className="mt-0.5 text-[10.5px]" style={{ color: "var(--text-muted)" }}>
-                      {formatDate(banner.createdAt, true)}
+                      {formatDate(banner.createdAt, true, locale)}
                     </p>
                   </div>
                 </div>
@@ -627,18 +628,14 @@ export default function BannerDetailPage() {
                 </span>
                 <div>
                   <h3 className="text-[14px] font-bold" style={{ color: "var(--text-primary)" }}>
-                    Delete &quot;{banner.title}&quot;?
+                    {t("admin.banners.page.deleteOne", { title: contentOf(banner.title, banner.translations?.title) })}
                   </h3>
-                  <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                    This action cannot be undone. The banner will be permanently removed.
-                  </p>
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.26619d21c346")}</p>
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button onClick={() => setShowDelete(false)} className="btn-secondary">
-                Cancel
-              </button>
+              <button onClick={() => setShowDelete(false)} className="btn-secondary">{t("admin.discounts.delete.cancel")}</button>
               <button
                 onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
@@ -654,5 +651,4 @@ export default function BannerDetailPage() {
     </>
   );
 }
-
 

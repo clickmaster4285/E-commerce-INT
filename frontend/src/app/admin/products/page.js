@@ -234,7 +234,7 @@ MAIN COMPONENT
 export default function ProductsPage() {
   // Admin-panel i18n. English is the fallback for any missing key.
   const { t: __t, locale } = useTranslation();
-  const { nameOf, descriptionOf } = useLocalized();
+  const { nameOf, productNameOf, productDescriptionOf } = useLocalized();
   const t = (k, p) => __t("admin.products." + k, p);
   const ts = (k, p) => __t("admin.shared." + k, p);
   const router = useRouter();
@@ -1011,9 +1011,9 @@ const [viewMode, setViewMode] = useState(() => {
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                          {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
                           <div className="min-w-0">
-                            <p className="max-w-[160px] truncate text-[13px] font-medium">{nameOf(p)}</p>
+                            <p className="max-w-[160px] truncate text-[13px] font-medium">{productNameOf(p)}</p>
                             {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
                           </div>
                         </div>
@@ -1021,7 +1021,7 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <span className="inline-block max-w-[220px] truncate align-middle">{descriptionOf(p) ? descriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]">
                         <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? t("table.variant") : t("table.variantsUnit")}</span>
@@ -1059,13 +1059,13 @@ const [viewMode, setViewMode] = useState(() => {
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  {img ? <img src={getImageUrl(img)} alt={p.name} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                  {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold">{nameOf(p)}</p>
+                  <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(p) ? (descriptionOf(p).length > 60 ? descriptionOf(p).slice(0, 60) + "..." : descriptionOf(p)) : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—"}</p>
                   <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{t("card.variantsLabel")} {variantCount}</p>
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("card.taxLabel")} {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>

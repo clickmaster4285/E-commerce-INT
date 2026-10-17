@@ -1047,7 +1047,7 @@ export default function ProductDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { t, dir, locale } = useTranslation();
-  const { nameOf, descriptionOf, attributeOf } = useLocalized();
+  const { nameOf, productNameOf, productDescriptionOf, descriptionOf, attributeOf } = useLocalized();
   const errorToastMessage = (error, fallback) => (
     locale === "en"
       ? error?.response?.data?.message || error?.message || fallback
@@ -2190,9 +2190,9 @@ export default function ProductDetailPage() {
                 <ChevronRight className="w-3 h-3 shrink-0" />
               </>
             )}
-            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</span>
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</span>
           </nav>
-          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</h1>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h1>
           <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2221,7 +2221,7 @@ export default function ProductDetailPage() {
                 >
                   <img
                     src={getImageUrl(firstVariant.images[0].img_url)}
-                    alt={product.name}
+                    alt={productNameOf(product)}
                     className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
                     style={{ maxHeight: 300 }}
                   />
@@ -2267,10 +2267,10 @@ export default function ProductDetailPage() {
 
           {/* Info Area */}
           <div className="p-4 md:p-5 flex flex-col justify-center gap-4">
-            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{nameOf(product)}</h2>
+            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h2>
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {descriptionOf(product) ? descriptionOf(product).slice(0, 160) + (descriptionOf(product).length > 160 ? "..." : "") : t("admin.productDetail.page.noDescription")}
+              {productDescriptionOf(product) ? productDescriptionOf(product).slice(0, 160) + (productDescriptionOf(product).length > 160 ? "..." : "") : t("admin.productDetail.page.noDescription")}
             </p>
             <div className="flex items-baseline gap-3">
               {/* ✅ Product price — sirf variant price data se:
@@ -2450,7 +2450,7 @@ export default function ProductDetailPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.productName")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product)}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{productNameOf(product)}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.brand")}</p>
@@ -2494,7 +2494,7 @@ export default function ProductDetailPage() {
                       </div>
                       <div className="p-4 space-y-4">
                         <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
-                          {descriptionOf(product) || t("admin.productDetail.page.noDescriptionFull")}
+                          {productDescriptionOf(product) || t("admin.productDetail.page.noDescriptionFull")}
                         </p>
                         <div>
                           <div className="flex items-center justify-between mb-2">
@@ -2795,7 +2795,7 @@ export default function ProductDetailPage() {
                         <DataRow icon={Hash} label={t("common.name")} value={nameOf(product.category_id)} />
                         <DataRow icon={Hash} label={t("admin.productDetail.page.code")} value={product.category_id.category_code || "—"} mono />
                         <DataRow icon={Activity} label={t("admin.productDetail.page.status")} value={t("common.active")} highlight />
-                        <DataRow icon={Package} label={t("admin.productDetail.page.assignedProduct")} value={nameOf(product)} />
+                        <DataRow icon={Package} label={t("admin.productDetail.page.assignedProduct")} value={productNameOf(product)} />
                       </div>
                     </InfoCard>
                     <InfoCard icon={FileText} title={t("admin.productDetail.page.description")}>
@@ -3215,7 +3215,7 @@ export default function ProductDetailPage() {
                                 <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.identification")}</p>
                                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                   <div>
-                                    <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>SKU *</label>
+                                    <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.sku")} *</label>
                                     <input required type="text" placeholder={t("admin.productDetail.page.skuExample")} value={variant.sku}
                                       readOnly={!!editingProduct && !!variant._id}
                                       onChange={(e) => updateVariant(index, "sku", e.target.value)}
@@ -3539,7 +3539,7 @@ export default function ProductDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.deleteProductTitle", { name: nameOf(product) })}</h3>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.deleteProductTitle", { name: productNameOf(product) })}</h3>
                 <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.deleteProductBody")}</p>
               </div>
             </div>

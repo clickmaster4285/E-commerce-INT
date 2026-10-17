@@ -45,6 +45,10 @@ const TRANSLATABLE_FIELDS = {
   Category: ["name", "description"],
   Product: ["name", "description"],
   Attribute: ["name", "description"], // + values[].label (values[].value raw rehta hai)
+  Review: ["title", "comment", "storeResponse.message"],
+  Discount: ["name", "description"],
+  Deal: ["name", "description"],
+  Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
 };
 
 // Ye sab translatable *content* fields hain. Jo is list me hain par
@@ -56,6 +60,10 @@ const CONTENT_FIELDS = {
   Category: ["name", "description"],
   Product: ["name", "description"],
   Attribute: ["name", "description"],
+  Review: ["title", "comment", "storeResponse.message"],
+  Discount: ["name", "description"],
+  Deal: ["name", "description"],
+  Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
 };
 
 /** Chhota, stable hash — staleness detect karne ke liye. */
@@ -84,20 +92,15 @@ function isProductNameIdentifier(value) {
   );
 }
 
-function containsUntranslatedProductWords(source, translation) {
+function containsUntranslatedLatinWords(source, translation, { preserveFirstWord = false } = {}) {
   const sourceWords = String(source ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const translatedWords = String(translation ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const firstSourceWord = sourceWords[0]?.toLocaleLowerCase();
 
   return translatedWords.some((word, index) => {
-    if (/[\d]/.test(word)) return false;
-    if (sourceWords.some((sourceWord) => sourceWord === word && /^[A-Z]{1,6}$/.test(sourceWord))) {
-      return false;
-    }
-    if (index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
-    return sourceWords.some(
-      (sourceWord) => sourceWord.toLocaleLowerCase() === word.toLocaleLowerCase()
-    );
+    if (/\d/.test(word) || /^[A-Z]{2,6}$/.test(word) || /[a-z][A-Z]/.test(word)) return false;
+    if (preserveFirstWord && index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
+    return true;
   });
 }
 
@@ -124,7 +127,13 @@ function isUsableTranslation(source, translation, locale, options = {}) {
     return false;
   }
 
-  if (options.productName && containsUntranslatedProductWords(original, translated)) {
+  if (
+    targetScript &&
+    (options.rejectSourceWords || options.productName) &&
+    containsUntranslatedLatinWords(original, translated, {
+      preserveFirstWord: options.productName,
+    })
+  ) {
     return false;
   }
 
@@ -135,8 +144,32 @@ function isUsableTranslation(source, translation, locale, options = {}) {
 /** Mongoose Map bhi object ho sakta hai — dono ko plain object bana do. */
 function toPlain(mapOrObject) {
   if (!mapOrObject) return {};
-  if (typeof mapOrObject.toObject === "function") return mapOrObject.toObject();
-  return { ...mapOrObject };
+  const plain = typeof mapOrObject.toObject === "function" ? mapOrObject.toObject() : mapOrObject;
+  if (Array.isArray(plain)) return plain.map(toPlain);
+  if (typeof plain !== "object") return plain;
+  if (plain instanceof Date || plain?._bsontype || Buffer.isBuffer(plain)) return plain;
+  return Object.fromEntries(Object.entries(plain).map(([key, value]) => [key, toPlain(value)]));
+}
+
+function getPathValue(value, path) {
+  return path.split(".").reduce((current, part) => current?.[part], value);
+}
+
+function setPathValue(target, path, value) {
+  const parts = path.split(".");
+  const leaf = parts.pop();
+  const parent = parts.reduce((current, part) => {
+    if (!current[part] || typeof current[part] !== "object") current[part] = {};
+    return current[part];
+  }, target);
+  parent[leaf] = value;
+}
+
+function deletePathValue(target, path) {
+  const parts = path.split(".");
+  const leaf = parts.pop();
+  const parent = parts.reduce((current, part) => current?.[part], target);
+  if (parent) delete parent[leaf];
 }
 
 /** Attribute ke option labels (index + value + label). */
@@ -193,38 +226,62 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
       continue;
     }
 
-    const text = String(doc[field] ?? "").trim();
+    const text = String(getPathValue(doc, field) ?? "").trim();
     if (modelName === "Product" && field === "name" && isProductNameIdentifier(text)) {
-      nextStatus[field] = "skipped";
-      delete nextTranslations[field];
-      delete nextSource[field];
+      setPathValue(nextStatus, field, "skipped");
+      deletePathValue(nextTranslations, field);
+      deletePathValue(nextSource, field);
+      continue;
+    }
+
+    if (
+      modelName === "Review" &&
+      /[\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Han}]/u.test(text)
+    ) {
+      setPathValue(nextStatus, field, "skipped");
+      deletePathValue(nextTranslations, field);
+      deletePathValue(nextSource, field);
       continue;
     }
 
     if (!isTranslatableText(text)) {
       // Khaali ya 1-2 char → translate karne ka koi matlab nahi.
-      nextStatus[field] = "skipped";
+      setPathValue(nextStatus, field, "skipped");
       continue;
     }
 
     const currentHash = hashText(text);
-    const storedHash = nextSource[field] || "";
+    const storedHash = getPathValue(nextSource, field) || "";
+    const validationOptions = {
+      productName: modelName === "Product" && field === "name",
+      rejectSourceWords:
+        (modelName === "Product" && field === "description") ||
+        ["Review", "Discount", "Deal", "Banner"].includes(modelName),
+    };
     const haveTranslation = TARGET_LOCALES.every(
       (locale) =>
-        isUsableTranslation(text, nextTranslations[field]?.[locale], locale, {
-          productName: modelName === "Product" && field === "name",
-        })
+        isUsableTranslation(
+          text,
+          getPathValue(nextTranslations, field)?.[locale],
+          locale,
+          validationOptions
+        )
     );
 
     // Hash same + translation maujood → fresh, kuch nahi karna.
     if (!force && storedHash === currentHash && haveTranslation) {
-      nextStatus[field] = "done";
+      setPathValue(nextStatus, field, "done");
       continue;
     }
 
-    nextSource[field] = currentHash;
-    nextStatus[field] = "pending";
-    stale.push({ field, text, preserveValidTranslations: !force && storedHash === currentHash });
+    setPathValue(nextSource, field, currentHash);
+    setPathValue(nextStatus, field, "pending");
+    stale.push({
+      field,
+      text,
+      validationOptions,
+      preserveValidTranslations: !force && storedHash === currentHash,
+    });
   }
 
   // ---- TRANSLATE ------------------------------------------------
@@ -235,24 +292,23 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
   let failed = false;
   let invalidTranslation = false;
 
-  for (const locale of TARGET_LOCALES) {
-    const translated = await translateBatch(uniqueTexts, locale);
-    if (translated === null) {
-      failed = true;
-      break;
+  if (uniqueTexts.length) {
+    for (const locale of TARGET_LOCALES) {
+      const translated = await translateBatch(uniqueTexts, locale);
+      if (translated === null) {
+        failed = true;
+        break;
+      }
+      const bySource = new Map();
+      uniqueTexts.forEach((text, i) => bySource.set(text, String(translated[i] ?? "").trim()));
+      results.set(locale, bySource);
     }
-    const bySource = new Map();
-    uniqueTexts.forEach((text, i) => bySource.set(text, String(translated[i] ?? "").trim()));
-    results.set(locale, bySource);
   }
 
   if (!failed) {
-    for (const { field, text, preserveValidTranslations } of stale) {
-      const perLocale = toPlain(nextTranslations[field]);
+    for (const { field, text, validationOptions, preserveValidTranslations } of stale) {
+      const perLocale = toPlain(getPathValue(nextTranslations, field));
       for (const locale of TARGET_LOCALES) {
-        const validationOptions = {
-          productName: modelName === "Product" && field === "name",
-        };
         if (
           preserveValidTranslations &&
           isUsableTranslation(text, perLocale[locale], locale, validationOptions)
@@ -271,13 +327,15 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
         }
       }
 
-      nextTranslations[field] = perLocale;
-      nextStatus[field] = TARGET_LOCALES.every((locale) => Boolean(perLocale[locale]))
-        ? "done"
-        : "pending";
+      setPathValue(nextTranslations, field, perLocale);
+      setPathValue(
+        nextStatus,
+        field,
+        TARGET_LOCALES.every((locale) => Boolean(perLocale[locale])) ? "done" : "pending"
+      );
     }
   } else {
-    for (const { field } of stale) nextStatus[field] = "pending";
+    for (const { field } of stale) setPathValue(nextStatus, field, "pending");
   }
 
   // ---- BUILD THE `$set` -----------------------------------------
@@ -414,7 +472,7 @@ async function backfillTranslations(models, opts = {}) {
     // Cursor → poori dataset ek saath memory me nahi aati.
     const cursor = Model.find({ is_deleted: { $ne: true } })
       .select(
-        "_id name description values translations translation_source translation_status is_deleted"
+        "_id name description title comment storeResponse.message values translations translation_source translation_status is_deleted"
       )
       .lean()
       .cursor();

@@ -27,38 +27,46 @@ export function localizedField(source, translations, locale) {
   return (typeof translated === "string" && translated.trim()) || source;
 }
 
-function hasUntranslatedProductWords(source, translation) {
+function hasUntranslatedLatinWords(source, translation, preserveFirstWord = false) {
   const sourceWords = String(source ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const translatedWords = String(translation ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const firstSourceWord = sourceWords[0]?.toLocaleLowerCase();
 
   return translatedWords.some((word, index) => {
-    if (/\d/.test(word)) return false;
-    if (sourceWords.some((sourceWord) => sourceWord === word && /^[A-Z]{1,6}$/.test(sourceWord))) {
-      return false;
-    }
-    if (index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
-    return sourceWords.some(
-      (sourceWord) => sourceWord.toLocaleLowerCase() === word.toLocaleLowerCase()
-    );
+    if (/\d/.test(word) || /^[A-Z]{2,6}$/.test(word) || /[a-z][A-Z]/.test(word)) return false;
+    if (preserveFirstWord && index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
+    return true;
   });
 }
 
-/** Product names can retain a brand/code, but not untranslated source words. */
-export function localizedProductNameOf(product, locale) {
-  const translated = localizedField(
-    product?.name,
-    product?.translations?.name,
-    locale
-  );
+const TARGET_SCRIPTS = {
+  ar: /\p{Script=Arabic}/u,
+  ur: /\p{Script=Arabic}/u,
+  hi: /\p{Script=Devanagari}/u,
+  zh: /\p{Script=Han}/u,
+};
+
+function localizedContentField(source, translations, locale, { preserveFirstWord = false } = {}) {
+  const translated = localizedField(source, translations, locale);
+  const targetScript = TARGET_SCRIPTS[locale];
   if (
-    locale !== "en" &&
-    translated !== product?.name &&
-    hasUntranslatedProductWords(product?.name, translated)
+    translated !== source &&
+    targetScript?.test(translated) &&
+    hasUntranslatedLatinWords(source, translated, preserveFirstWord)
   ) {
-    return product?.name;
+    return source;
   }
   return translated;
+}
+
+/** Product names may retain the first brand token and technical identifiers. */
+export function localizedProductNameOf(product, locale) {
+  return localizedContentField(
+    product?.name,
+    product?.translations?.name,
+    locale,
+    { preserveFirstWord: true }
+  );
 }
 
 /**
@@ -75,14 +83,34 @@ export function useLocalized() {
 
   return useMemo(() => {
     /** Brand / Category / Product doc se localized name. */
-    const nameOf = (doc) => localizedField(doc?.name, doc?.translations?.name, locale);
+    const nameOf = (doc) =>
+      localizedContentField(doc?.name, doc?.translations?.name, locale);
 
     /** Product name with stale mixed-language translations rejected. */
     const productNameOf = (product) => localizedProductNameOf(product, locale);
 
-    /** Brand / Category / Product doc se localized description. */
+    /** Product descriptions with mixed target-script translations rejected. */
+    const productDescriptionOf = (product) =>
+      localizedContentField(
+        product?.description,
+        product?.translations?.description,
+        locale
+      );
+
+    /** Brand / Category / other descriptions. */
     const descriptionOf = (doc) =>
-      localizedField(doc?.description, doc?.translations?.description, locale);
+      localizedContentField(doc?.description, doc?.translations?.description, locale);
+
+    /** Cached review translations; originals remain the editable source text. */
+    const reviewTextOf = (review, field) => {
+      const parts = field.split(".");
+      const source = parts.reduce((value, part) => value?.[part], review);
+      const translations = parts.reduce(
+        (value, part) => value?.[part],
+        review?.translations
+      );
+      return localizedContentField(source, translations, locale);
+    };
 
     /**
      * Attribute se localized name + uske option labels.
@@ -110,9 +138,21 @@ export function useLocalized() {
       localizedField(value?.label, value?.label_translations, locale);
 
     /** Generic raw text helper (already-extracted strings ke liye). */
-    const text = (source, translations) => localizedField(source, translations, locale);
+    const text = (source, translations) =>
+      localizedContentField(source, translations, locale);
 
-    return { locale, text, nameOf, productNameOf, descriptionOf, attributeOf, optionLabelOf };
+    return {
+      locale,
+      text,
+      nameOf,
+      productNameOf,
+      productDescriptionOf,
+      descriptionOf,
+      contentOf: text,
+      reviewTextOf,
+      attributeOf,
+      optionLabelOf,
+    };
   }, [locale]);
 }
 

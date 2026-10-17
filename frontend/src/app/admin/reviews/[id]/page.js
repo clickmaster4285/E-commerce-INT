@@ -130,7 +130,7 @@ function buildSuggestedReply(review, customerName) {
 export default function AdminReviewDetailPage() {
   const { id } = useParams();
   const { t, dir, locale } = useTranslation();
-  const { productNameOf } = useLocalized();
+  const { productNameOf, reviewTextOf } = useLocalized();
   const queryClient = useQueryClient();
   const [responseDraft, setResponseDraft] = useState("");
   const [isEditingResponse, setIsEditingResponse] = useState(false);
@@ -156,7 +156,7 @@ export default function AdminReviewDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || t("admin.reviews.detail.statusFailed")),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || t("admin.reviews.detail.statusFailed") : t("admin.reviews.detail.statusFailed")),
   });
 
   const responseMutation = useMutation({
@@ -176,7 +176,7 @@ export default function AdminReviewDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.reviews.detail.publishFailed")),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || error?.message || t("admin.reviews.detail.publishFailed") : t("admin.reviews.detail.publishFailed")),
   });
 
   const deleteResponseMutation = useMutation({
@@ -190,7 +190,7 @@ export default function AdminReviewDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || t("admin.reviews.detail.deleteFailed")),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || t("admin.reviews.detail.deleteFailed") : t("admin.reviews.detail.deleteFailed")),
   });
 
   if (isLoading || !id) {
@@ -235,6 +235,9 @@ export default function AdminReviewDetailPage() {
 
   const user = review.user_id && typeof review.user_id === "object" ? review.user_id : {};
   const product = review.product_id && typeof review.product_id === "object" ? review.product_id : {};
+  const reviewTitle = reviewTextOf(review, "title");
+  const reviewComment = reviewTextOf(review, "comment");
+  const localizedStoreResponse = reviewTextOf(review, "storeResponse.message");
   const hidden = review.status === "hidden";
   const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
   const productId = product._id || (typeof review.product_id === "string" ? review.product_id : null);
@@ -345,16 +348,16 @@ export default function AdminReviewDetailPage() {
               </div>
             </div>
 
-            {review.title && (
+            {reviewTitle && (
               <div className="mt-3.5 rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)]/60 px-3 py-2">
-                <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{review.title}</h3>
+                <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{reviewTitle}</h3>
               </div>
             )}
 
-            {review.comment && (
+            {reviewComment && (
               <div className="mt-3">
                 <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-secondary)]">
-                  {review.comment}
+                  {reviewComment}
                 </p>
               </div>
             )}
@@ -468,7 +471,7 @@ export default function AdminReviewDetailPage() {
               {review.storeResponse?.message && !isEditingResponse ? (
                 <div className="rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)] p-3">
                   <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-primary)]">
-                    {review.storeResponse.message}
+                    {localizedStoreResponse}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
                     <span className="inline-flex items-center gap-1">
@@ -567,7 +570,7 @@ export default function AdminReviewDetailPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(relatedProduct) || t("admin.reviews.detail.productUnavailable")}</p>
                         <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">
-                          {customerReview.title || customerReview.comment || t("admin.reviews.ui.ratingOnly")}
+                          {reviewTextOf(customerReview, "title") || reviewTextOf(customerReview, "comment") || t("admin.reviews.ui.ratingOnly")}
                         </p>
                         <div className="mt-1 flex items-center gap-1">
                           <StarRating rating={relatedRating} size={10} showValue={false} />
@@ -777,7 +780,7 @@ export default function AdminReviewDetailPage() {
             type="button"
             onClick={() => setLightboxMedia(null)}
             className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            aria-label="Close lightbox"
+            aria-label={t("common.close")}
           >
             <X size={18} />
           </button>

@@ -52,7 +52,7 @@ const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--
 
 const Stars = ({ value = 0, size = 13 }) => {
   const { t, locale } = useTranslation();
-  const formattedValue = new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(value);
+  const formattedValue = new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale).format(value);
   return (
   <span className="inline-flex items-center gap-0.5" aria-label={t("admin.reviews.ui.starsCount", { value: formattedValue })}>
     {[1, 2, 3, 4, 5].map((i) => (
@@ -165,7 +165,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
 
 export default function AdminReviewsPage() {
   const { t, locale } = useTranslation();
-  const { productNameOf } = useLocalized();
+  const { productNameOf, reviewTextOf } = useLocalized();
   const router = useRouter();
   const queryClient = useQueryClient();
   // ✅ Baqi pages ki tarah live socket sync —
@@ -363,7 +363,8 @@ export default function AdminReviewsPage() {
                     const product = r.product_id && typeof r.product_id === "object" ? r.product_id : {};
                     const productName = productNameOf(product);
                     const hidden = r.status === "hidden";
-                    const comment = String(r.comment || "").trim();
+                    const reviewTitle = String(reviewTextOf(r, "title") || "").trim();
+                    const comment = String(reviewTextOf(r, "comment") || "").trim();
                     const commentWords = comment.split(/\s+/).filter(Boolean);
                     const canExpandComment = commentWords.length > 5;
                     const isCommentExpanded = expandedReviews.has(r._id);
@@ -421,8 +422,8 @@ export default function AdminReviewsPage() {
                         <td className="px-4 py-3">
                           <div className="max-w-[300px]">
                             <Link href={`/admin/reviews/${r._id}`} className="block text-start">
-                            {r.title ? (
-                              <span className="block truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{r.title}</span>
+                            {reviewTitle ? (
+                              <span className="block truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{reviewTitle}</span>
                             ) : null}
                             </Link>
                             <span className="mt-0.5 block text-[12.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
@@ -456,7 +457,7 @@ export default function AdminReviewsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
-                          {r.created_at ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <RowActions
@@ -526,6 +527,4 @@ export default function AdminReviewsPage() {
     </div>
   );
 }
-
-
 
